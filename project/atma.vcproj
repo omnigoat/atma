@@ -154,10 +154,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\include\atma\pipe.hpp"
-				>
-			</File>
-			<File
 				RelativePath="..\include\atma\ref.hpp"
 				>
 			</File>
