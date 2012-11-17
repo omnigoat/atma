@@ -1,5 +1,6 @@
 
 ; visual studio 2012 files
+project/*.ncb
 project/*.sdf
 project/*.opensdf
 project/*.suo
