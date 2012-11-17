@@ -1,0 +1,113 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="include">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="include\unittest">
+      <UniqueIdentifier>{212efac9-27ce-4def-b673-450125bac75a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\config">
+      <UniqueIdentifier>{15eba01f-1b79-41ab-beac-416450e8cd49}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\time">
+      <UniqueIdentifier>{573ac28e-4378-44f1-969c-1d251e00057a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\time\detail">
+      <UniqueIdentifier>{a0ce67f2-e78b-4431-b05b-c7727cece3ab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\time\detail\win32">
+      <UniqueIdentifier>{cb639116-091f-4c80-bcb1-bddcb0f40c2d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\events">
+      <UniqueIdentifier>{cf581ce7-941f-4662-a728-5076c5ce9bef}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\ui">
+      <UniqueIdentifier>{59148f82-557f-4ecc-b397-4ab49a39f1a3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\ui\win32">
+      <UniqueIdentifier>{51e9d6e8-90c1-4e1f-bd87-6de10e0acc1e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\lockfree">
+      <UniqueIdentifier>{bd6e461d-e4e4-4151-820a-ba75b405d987}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\include\atma\assert.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\dense_balanced_binary_tree.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\ref.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\string_builder.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\time.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\unittest\compile.hpp">
+      <Filter>include\unittest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\unittest\emission.hpp">
+      <Filter>include\unittest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\unittest\ennumerate.hpp">
+      <Filter>include\unittest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\unittest\run.hpp">
+      <Filter>include\unittest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\unittest\unittest.hpp">
+      <Filter>include\unittest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\config\platform.hpp">
+      <Filter>include\config</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\time\detail\win32\time_impl.hpp">
+      <Filter>include\time\detail\win32</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\signals\connection.hpp">
+      <Filter>include\events</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\signals\connection_header.hpp">
+      <Filter>include\events</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\signals\forward_declarations.hpp">
+      <Filter>include\events</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\signals\multi_signal.hpp">
+      <Filter>include\events</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\signals\signal.hpp">
+      <Filter>include\events</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\signals\signal_base.hpp">
+      <Filter>include\events</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\signals\signal_header.hpp">
+      <Filter>include\events</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\signals\signal_traits.hpp">
+      <Filter>include\events</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\signals\slot.hpp">
+      <Filter>include\events</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\signals\slot_base.hpp">
+      <Filter>include\events</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\signals\slot_header.hpp">
+      <Filter>include\events</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\ui\win32\window_manager.hpp">
+      <Filter>include\ui\win32</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\lockfree\queue.hpp">
+      <Filter>include\lockfree</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
