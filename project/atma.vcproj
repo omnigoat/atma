@@ -154,6 +154,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\include\atma\dense_balanced_binary_tree.hpp"
+				>
+			</File>
+			<File
 				RelativePath="..\include\atma\ref.hpp"
 				>
 			</File>
@@ -211,6 +215,66 @@
 							>
 						</File>
 					</Filter>
+				</Filter>
+			</Filter>
+			<Filter
+				Name="events"
+				>
+				<File
+					RelativePath="..\include\atma\signals\connection.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\include\atma\signals\connection_header.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\include\atma\signals\forward_declarations.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\include\atma\signals\multi_signal.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\include\atma\signals\signal.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\include\atma\signals\signal_base.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\include\atma\signals\signal_header.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\include\atma\signals\signal_traits.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\include\atma\signals\slot.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\include\atma\signals\slot_base.hpp"
+					>
+				</File>
+				<File
+					RelativePath="..\include\atma\signals\slot_header.hpp"
+					>
+				</File>
+			</Filter>
+			<Filter
+				Name="ui"
+				>
+				<Filter
+					Name="win32"
+					>
+					<File
+						RelativePath="..\include\atma\ui\win32\window_manager.hpp"
+						>
+					</File>
 				</Filter>
 			</Filter>
 		</Filter>
