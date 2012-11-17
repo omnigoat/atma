@@ -1,7 +1,9 @@
-# ignore MSVC config files
-project/*.ncb
-project/*.user
 
-# ignore generated build folders
-project/Debug/
-project/Release/
+; visual studio 2012 files
+project/*.sdf
+project/*.opensdf
+project/*.suo
+project/*.user
+project/Debug
+project/Release
+
