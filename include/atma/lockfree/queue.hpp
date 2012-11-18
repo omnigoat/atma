@@ -47,7 +47,7 @@ namespace lockfree {
 			node_t* tmp = new node_t(t);
 			while (producer_lock_.exchange(true))
 				;
-			std::cout << "added " << t << std::endl;
+			
 			tail_->next = tmp;
 			tail_ = tmp;
 			producer_lock_ = false;
@@ -55,13 +55,12 @@ namespace lockfree {
 
 		bool pop(T& result)
 		{
-			// aquire exclusivity
 			while (consumer_lock_.exchange(true))
 				;
 
 			node_t* head = head_;
 			node_t* head_next = head_->next;
-			if (head_next != nullptr)
+			if (head_next)
 			{
 				T* value = head_next->value;
 				head_next->value = nullptr;
@@ -69,7 +68,6 @@ namespace lockfree {
 				consumer_lock_ = false;
 
 				result = *value;
-				delete value;
 				delete head;
 				return true;
 			}
