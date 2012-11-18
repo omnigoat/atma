@@ -2,65 +2,76 @@
 #define ATMA_LOCKFREE_QUEUE_HPP
 //=====================================================================
 #include <atomic>
+#include <iostream>
 //=====================================================================
 namespace atma {
 namespace lockfree {
 //=====================================================================
 	
+	// cache padding defined as 4kb
+	const unsigned int cache_line_size = 4 * 1024;
+
 	namespace detail {
 		template <typename T>
 		struct queue_node_t
 		{
 			queue_node_t() : value(nullptr), next(nullptr) {}
-			queue_node_t(T* value) : value(value), next(nullptr) {}
+			queue_node_t(const T& value) : value(new T(value)), next(nullptr) {}
+			~queue_node_t() { delete value; }
 
 			T* value;
 			std::atomic<queue_node_t*> next;
+			char pad[ cache_line_size - sizeof(T*) - sizeof(std::atomic<queue_node_t*>) ];
 		};
 	}
 
 	template <typename T>
 	struct queue_t
 	{
-		typedef detail::queue_node_t node_t;
+		typedef detail::queue_node_t<T> node_t;
 
 		queue_t() {
-			head_ = tail_ = new detail::queue_node_t
+			head_ = tail_ = new node_t;
 			producer_lock_ = consumer_lock_ = false;
 		};
 
 		~queue_t() {
 			while (head_ != nullptr) {
-				detail::queue_node_t* tmp = head_;
+				node_t* tmp = head_;
 				head_ = tmp->next;
 				delete tmp;
 			}
 		}
 
 		void push_back(const T& t) {
-			detail::queue_node_t* tmp = new detail::queue_node_t{new T{t}};
+			node_t* tmp = new node_t(t);
 			while (producer_lock_.exchange(true))
 				;
+			std::cout << "added " << t << std::endl;
 			tail_->next = tmp;
 			tail_ = tmp;
 			producer_lock_ = false;
 		}
 
-		bool pop(T& result) {
+		bool pop(T& result)
+		{
+			// aquire exclusivity
 			while (consumer_lock_.exchange(true))
 				;
 
-			if (head_->next != nullptr) {
-				node_t* old_head = head_;
-				head_ = head_->next;
-				T* value = head_->value;
-				head_->value = nullptr;
-				consumer_lock_.exchange = false;
+			node_t* head = head_;
+			node_t* head_next = head_->next;
+			if (head_next != nullptr)
+			{
+				T* value = head_next->value;
+				head_next->value = nullptr;
+				head_ = head_next;
+				consumer_lock_ = false;
 
-				result = std::move(*value);
+				result = *value;
 				delete value;
-				delete old_head;
-				retuern true;
+				delete head;
+				return true;
 			}
 
 			consumer_lock_ = false;
@@ -68,10 +79,19 @@ namespace lockfree {
 		}
 
 	private:
-		detail::queue_node_t* head_;
-		std::atomic<bool> consumer_lock_;
-		detail::queue_node_t* tail_;
-		std::atomic<bool> producer_lock_;
+		char pad0[cache_line_size];
+
+		node_t* head_;
+		char pad1[cache_line_size - sizeof(node_t*)];
+
+		std::atomic_bool consumer_lock_;
+		char pad2[cache_line_size - sizeof(std::atomic_bool)];
+
+		node_t* tail_;
+		char pad3[cache_line_size - sizeof(node_t*)];
+
+		std::atomic_bool producer_lock_;
+		char pad4[cache_line_size - sizeof(std::atomic_bool)];
 	};
 	
 //=====================================================================
