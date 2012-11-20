@@ -21,7 +21,7 @@ namespace lockfree {
 		queue_t();
 		~queue_t();
 
-		void push_back(const T& t);
+		void push(const T& t);
 		bool pop(T& result);
 		
 	private:
@@ -40,7 +40,7 @@ namespace lockfree {
 
 		std::atomic_bool consumer_lock_;
 		char pad2[cache_line_size - sizeof(std::atomic_bool)];
-
+		
 		node_t* tail_;
 		char pad3[cache_line_size - sizeof(node_t*)];
 
@@ -88,11 +88,10 @@ namespace lockfree {
 	}
 
 	template <typename T>
-	void queue_t<T>::push_back(const T& t) {
+	void queue_t<T>::push(const T& t) {
 		node_t* tmp = new node_t(t);
 		while (producer_lock_.exchange(true))
 			;
-			
 		tail_->next = tmp;
 		tail_ = tmp;
 		producer_lock_ = false;
