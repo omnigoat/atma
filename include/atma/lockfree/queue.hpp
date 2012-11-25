@@ -8,8 +8,8 @@ namespace atma {
 namespace lockfree {
 //=====================================================================
 	
-	// cache padding defined as 4kb
-	const unsigned int cache_line_size = 4 * 1024;
+	// cache padding defined as 32 bytes
+	const unsigned int cache_line_size = 32;
 
 
 	//=====================================================================
@@ -36,16 +36,16 @@ namespace lockfree {
 		char pad0[cache_line_size];
 
 		node_t* head_;
-		char pad1[cache_line_size - sizeof(node_t*)];
+		char pad1[sizeof(node_t*) % cache_line_size];
 
 		std::atomic_bool consumer_lock_;
-		char pad2[cache_line_size - sizeof(std::atomic_bool)];
+		char pad2[sizeof(std::atomic_bool) % cache_line_size];
 		
 		node_t* tail_;
-		char pad3[cache_line_size - sizeof(node_t*)];
+		char pad3[sizeof(node_t*) % cache_line_size];
 
 		std::atomic_bool producer_lock_;
-		char pad4[cache_line_size - sizeof(std::atomic_bool)];
+		char pad4[sizeof(std::atomic_bool) % cache_line_size];
 	};
 	
 
@@ -61,7 +61,7 @@ namespace lockfree {
 
 		T* value;
 		std::atomic<node_t*> next;
-		char pad[ cache_line_size - sizeof(T*) - sizeof(std::atomic<node_t*>) ];
+		char pad[ (sizeof(T*) + sizeof(std::atomic<node_t*>)) % cache_line_size ];
 	};
 
 
