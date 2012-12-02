@@ -79,6 +79,7 @@
     <ClInclude Include="..\include\atma\dense_balanced_binary_tree.hpp" />
     <ClInclude Include="..\include\atma\lockfree\queue.hpp" />
     <ClInclude Include="..\include\atma\ref.hpp" />
+    <ClInclude Include="..\include\atma\string.hpp" />
     <ClInclude Include="..\include\atma\string_builder.hpp" />
     <ClInclude Include="..\include\atma\time.hpp" />
     <ClInclude Include="..\include\atma\unittest\compile.hpp" />
