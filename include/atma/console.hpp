@@ -3,19 +3,12 @@
 //
 //
 //=====================================================================
-#ifndef ATMA_CONFIG_PLATFORM_HPP
-#define ATMA_CONFIG_PLATFORM_HPP
+#ifndef ATMA_CONSOLE_HPP
+#define ATMA_CONSOLE_HPP
 //=====================================================================
 namespace atma {
 //=====================================================================
 	
-	// at the moment, we only support win32 :P
-	#if defined(_WIN32) || defined(WIN32)
-	#	define ATMA_PLATFORM_WIN32
-	#	include "windows.h"
-	#	undef min
-	#	undef max
-	#endif
 	
 //=====================================================================
 } // namespace atma
