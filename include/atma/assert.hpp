@@ -17,6 +17,10 @@
 #	define ATMA_ENABLE_ASSERTS
 #endif
 
+#ifdef ATMA_NO_ASSERT
+#	undef ATMA_ENABLE_ASSERTS
+#endif
+
 
 //=====================================================================
 namespace atma {
@@ -71,24 +75,19 @@ namespace assert {
 } // namespace atma
 //=====================================================================
 #if defined(ATMA_ENABLE_ASSERTS)
-	#define ATMA_ASSERT(x) \
-		do \
-		{ \
-			if ( !(x) && ::atma::assert::atma_assert(#x, __FILE__, __LINE__) ) \
+	#define ATMA_ASSERT_MSG(x, msg) \
+		([](int line){ \
+			if ( !(x) && ::atma::assert::atma_assert(msg, __FILE__, line) ) \
 				{ __asm int 3 }\
-		} while(0)
+		})(__LINE__)
+
+
+	#define ATMA_ASSERT(x) ATMA_ASSERT_MSG(x, #x)
 		
-	#define ATMA_HALT(msg) \
-		do { __asm int 3 } while(0)
-		
-#elif defined(ATMA_ENABLE_ASSERT_WARNING_SUPRESSANT)
-	#define ATMA_ASSERT(x) \
-		do { (void)sizeof(x); } while(0)
-	#define ATMA_HALT(msg) \
-		do { (void)(sizeof(msg); } while(0)
 #else
-	#define ATMA_ASSERT(x) do {} while(0)
-	#define ATMA_HALT(msg) do {} while(0)
+	#define ATMA_ASSERT(x) ([]{})()
+	#define ATMA_ASSERT_MSG(x,m) ([]{})()
+
 #endif
 
 //=====================================================================
