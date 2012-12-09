@@ -32,6 +32,9 @@
     <Filter Include="include\lockfree">
       <UniqueIdentifier>{bd6e461d-e4e4-4151-820a-ba75b405d987}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\math">
+      <UniqueIdentifier>{135ab3bf-6445-42c2-8365-c3cfe90e1e09}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\atma\assert.hpp">
@@ -108,6 +111,9 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\lockfree\queue.hpp">
       <Filter>include\lockfree</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\math\vector.hpp">
+      <Filter>include\math</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
