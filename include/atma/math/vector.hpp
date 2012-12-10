@@ -12,8 +12,7 @@ namespace atma {
 //=====================================================================
 template <unsigned int E, typename T> struct vector;
 //=====================================================================
-	template <class OP, class EXPR>
-	struct expr;
+	
 
 	template <typename T>
 	struct vector<3, T>
@@ -36,8 +35,8 @@ template <unsigned int E, typename T> struct vector;
 		vector& operator *= (const T& rhs);
 		vector& operator /= (const T& rhs);
 
-		template <class OP, class EXPR>
-		vector& operator = (const expr<OP, EXPR>& e) {
+		template <class OP>
+		vector& operator = (const expr_tmpl::expr<vector<3, T>, OP>& e) {
 			x_ = e[0];
 			y_ = e[1];
 			z_ = e[2];
@@ -150,60 +149,54 @@ template <unsigned int E, typename T> struct vector;
 		return *this;
 	}
 
-	#define ATMA_MATH_OPERATOR_T_T(fn, name, rt, lhst, rhst) \
+	#define ATMA_MATH_OPERATOR_T_T(fn, name, lhst, rhst, rt) \
 	expr_tmpl::expr<rt, expr_tmpl::##name##<lhst, rhst>>##fn##(const lhst##& lhs, const rhst##& rhs) { \
 		return expr_tmpl::expr<rt, expr_tmpl::##name##<lhst, rhst>>(expr_tmpl::##name##<lhst, rhst>(lhs, rhs)); \
 	}
 	
-	#define ATMA_MATH_OPERATOR_T_X(fn, name, rt, lhst, rhst) \
+	#define ATMA_MATH_OPERATOR_T_X(fn, name, lhst, rhst, rt) \
 	template <typename RHS_OPER> \
-	expr_tmpl::expr<rt, expr_tmpl::##name##<lhst, expr<rhst, RHS_OPER>>>##fn##(const lhst##& lhs, const expr<rhst, RHS_OPER>& rhs) { \
-		return expr_tmpl::expr<rt, expr_tmpl::##name##<lhst, expr<rhst, RHS_OPER>>>(expr_tmpl::##name##<lhst, expr<rhst, RHS_OPER>>(lhs, rhs)); \
+	expr_tmpl::expr<rt, expr_tmpl::##name##<lhst, expr_tmpl::expr<rhst, RHS_OPER>>>##fn##(const lhst##& lhs, const expr_tmpl::expr<rhst, RHS_OPER>& rhs) { \
+		return expr_tmpl::expr<rt, expr_tmpl::##name##<lhst, expr_tmpl::expr<rhst, RHS_OPER>>>(expr_tmpl::##name##<lhst, expr_tmpl::expr<rhst, RHS_OPER>>(lhs, rhs)); \
 	}
 
-	#define ATMA_MATH_OPERATOR_X_T(fn, name, rt, lhst, rhst) \
+	#define ATMA_MATH_OPERATOR_X_T(fn, name, lhst, rhst, rt) \
 	template <typename LHS_OPER> \
-	expr_tmpl::expr<rt, expr_tmpl::##name##<expr<lhst, LHS_OPER>, rhst>>##fn##(const expr<lhst, LHS_OPER>& lhs, const rhst##& rhs) { \
-		return expr_tmpl::expr<rt, expr_tmpl::##name##<expr<lhst, LHS_OPER>, rhst>>(expr_tmpl::##name##<expr<lhst, LHS_OPER>, rhst>(lhs, rhs)); \
+	expr_tmpl::expr<rt, expr_tmpl::##name##<expr_tmpl::expr<lhst, LHS_OPER>, rhst>>##fn##(const expr_tmpl::expr<lhst, LHS_OPER>& lhs, const rhst##& rhs) { \
+		return expr_tmpl::expr<rt, expr_tmpl::##name##<expr_tmpl::expr<lhst, LHS_OPER>, rhst>> \
+		 (expr_tmpl::##name##<expr_tmpl::expr<lhst, LHS_OPER>, rhst>(lhs, rhs)); \
 	}
 	
-	#define ATMA_MATH_OPERATOR_X_X(fn, name, rt, lhst, rhst) \
+	#define ATMA_MATH_OPERATOR_X_X(fn, name, lhst, rhst, rt) \
 	template <typename LHS_OPER, typename RHS_OPER> \
-	expr_tmpl::expr<rt, expr_tmpl::##name##<expr<lhst, LHS_OPER>, expr<rhst, RHS_OPER>>> \
-	fn##(const expr<lhst, LHS_OPER>& lhs, const expr<rhst, RHS_OPER>##& rhs) { \
-		return expr_tmpl::expr<rt, expr_tmpl::##name##<expr<lhst, LHS_OPER>, expr<rhst, RHS_OPER>>> \
-		(expr_tmpl::##name##<expr<lhst, LHS_OPER>, expr<rhst, RHS_OPER>>(lhs, rhs)); \
+	expr_tmpl::expr<rt, expr_tmpl::##name##<expr_tmpl::expr<lhst, LHS_OPER>, expr_tmpl::expr<rhst, RHS_OPER>>> \
+	fn##(const expr_tmpl::expr<lhst, LHS_OPER>& lhs, const expr_tmpl::expr<rhst, RHS_OPER>##& rhs) { \
+		return expr_tmpl::expr<rt, expr_tmpl::##name##<expr_tmpl::expr<lhst, LHS_OPER>, expr_tmpl::expr<rhst, RHS_OPER>>> \
+		(expr_tmpl::##name##<expr_tmpl::expr<lhst, LHS_OPER>, expr_tmpl::expr<rhst, RHS_OPER>>(lhs, rhs)); \
 	}
 
-	#define ATMA_MATH_OPERATOR_T_TX(fn, name, rt, lhst, rhst) \
-		ATMA_MATH_OPERATOR_T_T(fn, name, rt, lhst, rhst) \
-		ATMA_MATH_OPERATOR_T_X(fn, name, rt, lhst, rhst)
+	#define ATMA_MATH_OPERATOR_T_TX(fn, name, lhst, rhst, rt) \
+		ATMA_MATH_OPERATOR_T_T(fn, name, lhst, rhst, rt) \
+		ATMA_MATH_OPERATOR_T_X(fn, name, lhst, rhst, rt)
 
-	#define ATMA_MATH_OPERATOR_TX_T(fn, name, rt, lhst, rhst) \
-		ATMA_MATH_OPERATOR_T_T(fn, name, rt, lhst, rhst) \
-		ATMA_MATH_OPERATOR_X_T(fn, name, rt, lhst, rhst)
+	#define ATMA_MATH_OPERATOR_TX_T(fn, name, lhst, rhst, rt) \
+		ATMA_MATH_OPERATOR_T_T(fn, name, lhst, rhst, rt) \
+		ATMA_MATH_OPERATOR_X_T(fn, name, lhst, rhst, rt)
 
-	#define ATMA_MATH_OPERATOR_TX_TX(fn, name, rt, lhst, rhst) \
-		ATMA_MATH_OPERATOR_T_T(fn, name, rt, lhst, rhst) \
-		ATMA_MATH_OPERATOR_T_X(fn, name, rt, lhst, rhst) \
-		ATMA_MATH_OPERATOR_X_T(fn, name, rt, lhst, rhst) \
-		ATMA_MATH_OPERATOR_X_X(fn, name, rt, lhst, rhst)
-
-
-	//ATMA_MATH_OPERATOR(elementwise_sub_oper, vector3f, vector3f)
-	//ATMA_MATH_OPERATOR_XT_T(elementwise_mul_oper, vector3f, float)
-	//ATMA_MATH_OPERATOR_T_XT(elementwise_mul_oper, float, vector3f)
-
-	//#include <atma/math/expr_tmpl/make_operators
+	#define ATMA_MATH_OPERATOR_TX_TX(fn, name, lhst, rhst, rt) \
+		ATMA_MATH_OPERATOR_T_T(fn, name, lhst, rhst, rt) \
+		ATMA_MATH_OPERATOR_T_X(fn, name, lhst, rhst, rt) \
+		ATMA_MATH_OPERATOR_X_T(fn, name, lhst, rhst, rt) \
+		ATMA_MATH_OPERATOR_X_X(fn, name, lhst, rhst, rt)
 
 	typedef vector<3, float> vector3f;
 
-	/*expr<vector3f, elementwise_add_oper<vector3f, vector3f>> operator + (const vector3f& lhs, const vector3f& rhs) {
-		return expr<vector3f, elementwise_add_oper<vector3f, vector3f>>(elementwise_add_oper<vector3f, vector3f>(lhs, rhs));
-	}*/
-	ATMA_MATH_OPERATOR_TX_TX((operator +), elementwise_add_oper, vector3f, vector3f, vector3f)
-
-
+	ATMA_MATH_OPERATOR_TX_TX(operator +, elementwise_add_oper, vector3f, vector3f, vector3f)
+	ATMA_MATH_OPERATOR_TX_TX(operator -, elementwise_sub_oper, vector3f, vector3f, vector3f)
+	ATMA_MATH_OPERATOR_T_TX(operator *, elementwise_mul_oper, float, vector3f, vector3f)
+	ATMA_MATH_OPERATOR_TX_T(operator *, elementwise_mul_oper, vector3f, float, vector3f)
+	ATMA_MATH_OPERATOR_TX_T(operator /, elementwise_div_oper, vector3f, float, vector3f)
+	
 
 	//ATMA_MATH_OPERATOR_T_X((operator +), elementwise_add_oper, vector3f, vector3f, vector3f)
 	//ATMA_MATH_OPERATOR_X_T((operator +), elementwise_add_oper, vector3f, vector3f, vector3f)
