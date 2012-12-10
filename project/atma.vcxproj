@@ -43,6 +43,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
     <IntDir>$(Configuration)\</IntDir>
+    <IncludePath>$(ProjectDir)..\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
@@ -78,6 +79,9 @@
     <ClInclude Include="..\include\atma\assert.hpp" />
     <ClInclude Include="..\include\atma\dense_balanced_binary_tree.hpp" />
     <ClInclude Include="..\include\atma\lockfree\queue.hpp" />
+    <ClInclude Include="..\include\atma\math\expr_tmpl\elementwise_opers.hpp" />
+    <ClInclude Include="..\include\atma\math\expr_tmpl\expression.hpp" />
+    <ClInclude Include="..\include\atma\math\expr_tmpl\utility.hpp" />
     <ClInclude Include="..\include\atma\math\vector.hpp" />
     <ClInclude Include="..\include\atma\ref.hpp" />
     <ClInclude Include="..\include\atma\string_builder.hpp" />
