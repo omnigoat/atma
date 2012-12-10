@@ -5,6 +5,8 @@
 #define ATMA_MATH_VECTOR_HPP
 //=====================================================================
 #include <type_traits>
+#include <atma/math/expr_tmpl/elementwise_opers.hpp>
+#include <atma/math/expr_tmpl/expression.hpp>
 //=====================================================================
 namespace atma {
 //=====================================================================
@@ -148,143 +150,66 @@ template <unsigned int E, typename T> struct vector;
 		return *this;
 	}
 
-
-
-
-
+	#define ATMA_MATH_OPERATOR_T_T(fn, name, rt, lhst, rhst) \
+	expr_tmpl::expr<rt, expr_tmpl::##name##<lhst, rhst>>##fn##(const lhst##& lhs, const rhst##& rhs) { \
+		return expr_tmpl::expr<rt, expr_tmpl::##name##<lhst, rhst>>(expr_tmpl::##name##<lhst, rhst>(lhs, rhs)); \
+	}
 	
-	// this little structure determines, given a value of T, the
-	// return-type of its index operator (operator [])
-	template <typename T, bool II = std::is_arithmetic<T>::value>
-	struct element_type_of
-	 { typedef T type; };
+	#define ATMA_MATH_OPERATOR_T_X(fn, name, rt, lhst, rhst) \
+	template <typename RHS_OPER> \
+	expr_tmpl::expr<rt, expr_tmpl::##name##<lhst, expr<rhst, RHS_OPER>>>##fn##(const lhst##& lhs, const expr<rhst, RHS_OPER>& rhs) { \
+		return expr_tmpl::expr<rt, expr_tmpl::##name##<lhst, expr<rhst, RHS_OPER>>>(expr_tmpl::##name##<lhst, expr<rhst, RHS_OPER>>(lhs, rhs)); \
+	}
 
-	template <typename T>
-	struct element_type_of<T, false>
-	 : element_type_of<decltype(&T::operator[]), false>
-	  {};
+	#define ATMA_MATH_OPERATOR_X_T(fn, name, rt, lhst, rhst) \
+	template <typename LHS_OPER> \
+	expr_tmpl::expr<rt, expr_tmpl::##name##<expr<lhst, LHS_OPER>, rhst>>##fn##(const expr<lhst, LHS_OPER>& lhs, const rhst##& rhs) { \
+		return expr_tmpl::expr<rt, expr_tmpl::##name##<expr<lhst, LHS_OPER>, rhst>>(expr_tmpl::##name##<expr<lhst, LHS_OPER>, rhst>(lhs, rhs)); \
+	}
 	
-	template <typename R, typename C, typename... Args>
-	struct element_type_of<R(C::*)(Args...) const, false>
-	 { typedef typename std::remove_reference<R>::type type; };
+	#define ATMA_MATH_OPERATOR_X_X(fn, name, rt, lhst, rhst) \
+	template <typename LHS_OPER, typename RHS_OPER> \
+	expr_tmpl::expr<rt, expr_tmpl::##name##<expr<lhst, LHS_OPER>, expr<rhst, RHS_OPER>>> \
+	fn##(const expr<lhst, LHS_OPER>& lhs, const expr<rhst, RHS_OPER>##& rhs) { \
+		return expr_tmpl::expr<rt, expr_tmpl::##name##<expr<lhst, LHS_OPER>, expr<rhst, RHS_OPER>>> \
+		(expr_tmpl::##name##<expr<lhst, LHS_OPER>, expr<rhst, RHS_OPER>>(lhs, rhs)); \
+	}
+
+	#define ATMA_MATH_OPERATOR_T_TX(fn, name, rt, lhst, rhst) \
+		ATMA_MATH_OPERATOR_T_T(fn, name, rt, lhst, rhst) \
+		ATMA_MATH_OPERATOR_T_X(fn, name, rt, lhst, rhst)
+
+	#define ATMA_MATH_OPERATOR_TX_T(fn, name, rt, lhst, rhst) \
+		ATMA_MATH_OPERATOR_T_T(fn, name, rt, lhst, rhst) \
+		ATMA_MATH_OPERATOR_X_T(fn, name, rt, lhst, rhst)
+
+	#define ATMA_MATH_OPERATOR_TX_TX(fn, name, rt, lhst, rhst) \
+		ATMA_MATH_OPERATOR_T_T(fn, name, rt, lhst, rhst) \
+		ATMA_MATH_OPERATOR_T_X(fn, name, rt, lhst, rhst) \
+		ATMA_MATH_OPERATOR_X_T(fn, name, rt, lhst, rhst) \
+		ATMA_MATH_OPERATOR_X_X(fn, name, rt, lhst, rhst)
 
 
+	//ATMA_MATH_OPERATOR(elementwise_sub_oper, vector3f, vector3f)
+	//ATMA_MATH_OPERATOR_XT_T(elementwise_mul_oper, vector3f, float)
+	//ATMA_MATH_OPERATOR_T_XT(elementwise_mul_oper, float, vector3f)
 
-	template <typename T, bool IA = std::is_arithmetic<T>::value>
-	struct value {
-		static typename element_type_of<T>::type
-		 get(const T& in, unsigned int i)
-		  { return in[i]; }
-	};
-
-	template <typename T>
-	struct value<T, true> {
-		static T get(const T& in, unsigned int)
-		 { return in; }
-	};
-
-
-	template <typename T>
-	struct member_type {
-		typedef const T& type;
-	};
-
-	template <typename R, typename O>
-	struct member_type<expr<R, O>> {
-		typedef const expr<R, O> type;
-	};
-
-	
-
-
-	
-	template <typename LHS, typename RHS>
-	struct elementwise_add_oper
-	{
-		elementwise_add_oper(const LHS& lhs, const RHS& rhs)
-		 : lhs(lhs), rhs(rhs)
-		  {}
-
-		typename element_type_of<LHS>::type
-		 operator [](int i) const
-		  { return lhs[i] + rhs[i]; }
-
-	private:
-		typename member_type<LHS>::type lhs;
-		typename member_type<RHS>::type rhs;
-	};
-
-	template <typename LHS, typename RHS>
-	struct elementwise_sub_oper
-	{
-		elementwise_sub_oper(const LHS& lhs, const RHS& rhs)
-		 : lhs(lhs), rhs(rhs)
-		  {}
-
-		typename element_type_of<LHS>::type
-		 operator [](int i) const
-		  { return lhs[i] - rhs[i]; }
-
-	private:
-		typename member_type<LHS>::type lhs;
-		typename member_type<RHS>::type rhs;
-	};
-
-	template <typename LHS, typename RHS>
-	struct elementwise_mul_oper
-	{
-		elementwise_mul_oper(const LHS& lhs, const RHS& rhs)
-		 : lhs(lhs), rhs(rhs)
-		  {}
-
-		typename element_type_of<LHS>::type
-		 operator [](int i) const
-		  { return value<LHS>::get(lhs, i) * value<RHS>::get(rhs, i); }
-
-	private:
-		typename member_type<LHS>::type lhs;
-		typename member_type<RHS>::type rhs;
-	};
-
-
-
-
-	template <typename T>
-	struct expression_template_traits;
-
-	// expr
-	template <class R, class EXPR>
-	struct expr;
-	
-	// binary_expr
-	template <typename LHS, typename RHS>
-	struct binary_expr;
-
-	// expr again
-	template <typename R, typename OPER>
-	struct expr
-	{
-		expr(const OPER& oper)
-		 : oper(oper)
-		 {
-		 }
-
-		typename element_type_of<OPER>::type
-		 operator [](int i) const
-		  { return oper[i]; }
-
-	private:
-		OPER oper;
-	};
-
-
+	//#include <atma/math/expr_tmpl/make_operators
 
 	typedef vector<3, float> vector3f;
 
-	expr<vector3f, elementwise_add_oper<vector3f, vector3f>> operator + (const vector3f& lhs, const vector3f& rhs) {
+	/*expr<vector3f, elementwise_add_oper<vector3f, vector3f>> operator + (const vector3f& lhs, const vector3f& rhs) {
 		return expr<vector3f, elementwise_add_oper<vector3f, vector3f>>(elementwise_add_oper<vector3f, vector3f>(lhs, rhs));
-	}
+	}*/
+	ATMA_MATH_OPERATOR_TX_TX((operator +), elementwise_add_oper, vector3f, vector3f, vector3f)
 
+
+
+	//ATMA_MATH_OPERATOR_T_X((operator +), elementwise_add_oper, vector3f, vector3f, vector3f)
+	//ATMA_MATH_OPERATOR_X_T((operator +), elementwise_add_oper, vector3f, vector3f, vector3f)
+	//ATMA_MATH_OPERATOR_X_X((operator +), elementwise_add_oper, vector3f, vector3f, vector3f)
+
+/*
 	template <typename RHS_OPER>
 	expr<vector3f, elementwise_add_oper<vector3f, expr<vector3f, RHS_OPER>>> operator + (const vector3f& lhs, const expr<vector3f, RHS_OPER>& rhs) {
 		return expr<vector3f, elementwise_add_oper<vector3f, expr<vector3f, RHS_OPER>>>(lhs, rhs);
@@ -302,7 +227,7 @@ template <unsigned int E, typename T> struct vector;
 	expr<vector3f, elementwise_mul_oper<float, expr<vector3f, RHS_OPER>>> operator * (const float& lhs, const expr<vector3f, RHS_OPER>& rhs) {
 		return expr<vector3f, elementwise_mul_oper<float, expr<vector3f, RHS_OPER>>>
 			(elementwise_mul_oper<float, expr<vector3f, RHS_OPER>>(lhs, rhs));
-	}
+	}*/
 
 	/*
 	template <typename T, template <typename, typename> class OP, class EXPR>
