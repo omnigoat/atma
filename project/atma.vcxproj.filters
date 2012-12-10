@@ -109,5 +109,8 @@
     <ClInclude Include="..\include\atma\lockfree\queue.hpp">
       <Filter>include\lockfree</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\console.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
