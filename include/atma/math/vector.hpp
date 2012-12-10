@@ -4,6 +4,8 @@
 #ifndef ATMA_MATH_VECTOR_HPP
 #define ATMA_MATH_VECTOR_HPP
 //=====================================================================
+#include <type_traits>
+//=====================================================================
 namespace atma {
 //=====================================================================
 template <unsigned int E, typename T> struct vector;
@@ -14,6 +16,8 @@ template <unsigned int E, typename T> struct vector;
 	template <typename T>
 	struct vector<3, T>
 	{
+		typedef T element_type;
+
 		// constructors
 		vector();
 		vector(const T& x, const T& y, const T& z);
@@ -148,39 +152,108 @@ template <unsigned int E, typename T> struct vector;
 
 
 
+	
+	// this little structure determines, given a value of T, the
+	// return-type of its index operator (operator [])
+	template <typename T, bool II = std::is_arithmetic<T>::value>
+	struct element_type_of
+	 { typedef T type; };
+
+	template <typename T>
+	struct element_type_of<T, false>
+	 : element_type_of<decltype(&T::operator[]), false>
+	  {};
+	
+	template <typename R, typename C, typename... Args>
+	struct element_type_of<R(C::*)(Args...) const, false>
+	 { typedef typename std::remove_reference<R>::type type; };
 
 
 
-	template <typename T, typename R = T, bool is_integral = std::is_integral<T>::value>
+	template <typename T, bool IA = std::is_arithmetic<T>::value>
 	struct value {
-		static R get(const T& in, unsigned int i) {
-			return in[i];
-		}
+		static typename element_type_of<T>::type
+		 get(const T& in, unsigned int i)
+		  { return in[i]; }
 	};
 
-	template <typename T, typename R>
-	struct value<T, R, true> {
-		static R get(const T& in, unsigned int) {
-			return in;
-		}
+	template <typename T>
+	struct value<T, true> {
+		static T get(const T& in, unsigned int)
+		 { return in; }
 	};
 
-	#define ATMA_MATH_BINARY_OPER(NAME, OP) \
-	template <typename R> \
-	struct NAME { \
-		typedef R result_type; \
-		static R result(const R& lhs, const R& rhs) { \
-			return lhs OP rhs; \
-		} \
+
+	template <typename T>
+	struct member_type {
+		typedef const T& type;
 	};
 
-	ATMA_MATH_BINARY_OPER(add_oper, +)
-	ATMA_MATH_BINARY_OPER(sub_oper, -)
-	ATMA_MATH_BINARY_OPER(mul_oper, *)
-	ATMA_MATH_BINARY_OPER(div_oper, /)
+	template <typename R, typename O>
+	struct member_type<expr<R, O>> {
+		typedef const expr<R, O> type;
+	};
+
+	
+
+
+	
+	template <typename LHS, typename RHS>
+	struct elementwise_add_oper
+	{
+		elementwise_add_oper(const LHS& lhs, const RHS& rhs)
+		 : lhs(lhs), rhs(rhs)
+		  {}
+
+		typename element_type_of<LHS>::type
+		 operator [](int i) const
+		  { return lhs[i] + rhs[i]; }
+
+	private:
+		typename member_type<LHS>::type lhs;
+		typename member_type<RHS>::type rhs;
+	};
+
+	template <typename LHS, typename RHS>
+	struct elementwise_sub_oper
+	{
+		elementwise_sub_oper(const LHS& lhs, const RHS& rhs)
+		 : lhs(lhs), rhs(rhs)
+		  {}
+
+		typename element_type_of<LHS>::type
+		 operator [](int i) const
+		  { return lhs[i] - rhs[i]; }
+
+	private:
+		typename member_type<LHS>::type lhs;
+		typename member_type<RHS>::type rhs;
+	};
+
+	template <typename LHS, typename RHS>
+	struct elementwise_mul_oper
+	{
+		elementwise_mul_oper(const LHS& lhs, const RHS& rhs)
+		 : lhs(lhs), rhs(rhs)
+		  {}
+
+		typename element_type_of<LHS>::type
+		 operator [](int i) const
+		  { return value<LHS>::get(lhs, i) * value<RHS>::get(rhs, i); }
+
+	private:
+		typename member_type<LHS>::type lhs;
+		typename member_type<RHS>::type rhs;
+	};
+
+
+
+
+	template <typename T>
+	struct expression_template_traits;
 
 	// expr
-	template <class OP, class EXPR>
+	template <class R, class EXPR>
 	struct expr;
 	
 	// binary_expr
@@ -188,55 +261,75 @@ template <unsigned int E, typename T> struct vector;
 	struct binary_expr;
 
 	// expr again
-	template <class OP, typename LHS, typename RHS>
-	struct expr<OP, binary_expr<LHS, RHS>>
+	template <typename R, typename OPER>
+	struct expr
 	{
-		expr(const LHS& lhs, const RHS& rhs)
-		 : lhs(lhs), rhs(rhs)
-		  {}
+		expr(const OPER& oper)
+		 : oper(oper)
+		 {
+		 }
 
-		typename OP::result_type operator [](int i) const {
-			return OP::result(
-				value<LHS, typename OP::result_type>::get(lhs, i),
-				value<RHS, typename OP::result_type>::get(rhs, i)
-			);
-		}
+		typename element_type_of<OPER>::type
+		 operator [](int i) const
+		  { return oper[i]; }
+
 	private:
-		const LHS& lhs;
-		const RHS& rhs;
+		OPER oper;
 	};
-
-	
 
 
 
 	typedef vector<3, float> vector3f;
 
-	expr<add_oper<float>, binary_expr<vector3f, vector3f>> operator + (const vector3f& lhs, const vector3f& rhs) {
-		return expr<add_oper<float>, binary_expr<vector3f, vector3f>>(lhs, rhs);
+	expr<vector3f, elementwise_add_oper<vector3f, vector3f>> operator + (const vector3f& lhs, const vector3f& rhs) {
+		return expr<vector3f, elementwise_add_oper<vector3f, vector3f>>(elementwise_add_oper<vector3f, vector3f>(lhs, rhs));
+	}
+
+	template <typename RHS_OPER>
+	expr<vector3f, elementwise_add_oper<vector3f, expr<vector3f, RHS_OPER>>> operator + (const vector3f& lhs, const expr<vector3f, RHS_OPER>& rhs) {
+		return expr<vector3f, elementwise_add_oper<vector3f, expr<vector3f, RHS_OPER>>>(lhs, rhs);
+	}
+
+	expr<vector3f, elementwise_mul_oper<vector3f, float>> operator * (const vector3f& lhs, const float& rhs) {
+		return expr<vector3f, elementwise_mul_oper<vector3f, float>>(elementwise_mul_oper<vector3f, float>(lhs, rhs));
+	}
+
+	expr<vector3f, elementwise_mul_oper<float, vector3f>> operator * (const float& lhs, const vector3f& rhs) {
+		return expr<vector3f, elementwise_mul_oper<float, vector3f>>(elementwise_mul_oper<float, vector3f>(lhs, rhs));
+	}
+
+	template <typename RHS_OPER>
+	expr<vector3f, elementwise_mul_oper<float, expr<vector3f, RHS_OPER>>> operator * (const float& lhs, const expr<vector3f, RHS_OPER>& rhs) {
+		return expr<vector3f, elementwise_mul_oper<float, expr<vector3f, RHS_OPER>>>
+			(elementwise_mul_oper<float, expr<vector3f, RHS_OPER>>(lhs, rhs));
+	}
+
+	/*
+	template <typename T, template <typename, typename> class OP, class EXPR>
+	expr<add_oper<vector<3, T>>, binary_expr<vector<3, T>, expr<OP<vector<3, T>>, EXPR>>>
+	operator + (const vector<3, T>& lhs, const expr<OP<vector<3, T>>, EXPR>& rhs) {
+		return expr<add_oper<vector<3, T>>, binary_expr<vector<3, T>, expr<OP<T>, EXPR>>>(lhs, rhs);
+	}
+
+	template <typename T, template <typename> class OP, class EXPR>
+	expr<add_oper<T>, binary_expr<vector<3, T>, expr<OP<T>, EXPR>>>
+	operator + (const expr<OP<T>, EXPR>& lhs, const vector3f& rhs) {
+		return expr<add_oper<vector<3, T>>, binary_expr<vector<3, T>, expr<OP<T>, EXPR>>>(lhs, rhs);
 	}
 
 	expr<sub_oper<float>, binary_expr<vector3f, vector3f>> operator - (const vector3f& lhs, const vector3f& rhs) {
 		return expr<sub_oper<float>, binary_expr<vector3f, vector3f>>(lhs, rhs);
 	}
+	expr<vector3f, binary_expr<OP, LHS, RHS>>
 
 	template <typename T, template <typename> class OP, class EXPR>
-	auto operator - (const vector<3, T>& lhs, const expr<OP<T>, EXPR>& rhs)
-	-> expr<sub_oper<T>, binary_expr<vector<3, T>, expr<OP<T>, EXPR>>> {
+	expr<sub_oper<T>, binary_expr<vector<3, T>, expr<OP<T>, EXPR>>>
+	operator - (const vector<3, T>& lhs, const expr<OP<T>, EXPR>& rhs) {
 		return expr<sub_oper<T>, binary_expr<vector<3, T>, expr<OP<T>, EXPR>>>(lhs, rhs);
 	}
 
-	/*
-	binary_expr<sub_oper<float>, vector3f, vector3f> operator - (const vector3f& lhs, const vector3f& rhs) {
-		return binary_expr<sub_oper<float>, vector3f, vector3f>(lhs, rhs);
-	}
-
-	template <template <typename> class OP, typename R_LHS, typename R_RHS>
-	binary_expr<sub_oper<float>, vector3f, binary_expr<OP<float>, R_LHS, R_RHS>>
-	operator - (const vector3f& lhs, const binary_expr<OP<float>, R_LHS, R_RHS>& rhs) {
-		return binary_expr<sub_oper<float>, vector3f, binary_expr<OP<float>, R_LHS, R_RHS>>(lhs, rhs);
-	}
 	
+
 	// subtraction between two binary expressions
 	template <
 	 template <typename> class L_OP, typename L_LHS, typename L_RHS,
