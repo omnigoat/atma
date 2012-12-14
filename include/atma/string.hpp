@@ -1,6 +1,9 @@
 #ifndef ATMA_STRING
 #define ATMA_STRING
 //=====================================================================
+#include <vector>
+#include <iterator>
+//=====================================================================
 namespace atma {
 //=====================================================================
 	
@@ -48,13 +51,14 @@ namespace atma {
 			// *must* be char
 			char const& x = *i;
 
+			
 			// top 4 bits set, 21 bits (surrogates!)
-			if ((x & 0xf0) == 0xf0)
+			if ((x & 0xf8) == 0xf0)
 			{
 				char32_t surrogate =
 				  static_cast<char32_t>((x & 0x7) << 18) |
 				  static_cast<char32_t>((*++i & 0x3f) << 12) |
-				  static_cast<char32_t>((*++i & 0x3f) << 6 |
+				  static_cast<char32_t>((*++i & 0x3f) << 6) |
 				  static_cast<char32_t>(*++i & 0x3f)
 				  ;
 
@@ -62,14 +66,30 @@ namespace atma {
 				*dest++ = static_cast<char16_t>(surrogate >> 10) + 0xd800;
 				*dest++ = static_cast<char16_t>(surrogate & 0xffa00) + 0xdc00;
 			}
-			else if ((x & 0xb0) == 0xb0) {
+			// top 3 bits set, 16 bits
+			else if ((x & 0xf0) == 0xe0) {
+				*dest++ =
+				  (static_cast<char16_t>(x & 0x0f) << 12) |
+				  (static_cast<char16_t>(*++i & 0x3f) << 6) |
+				  static_cast<char16_t>(*++i & 0x3f)
+				  ;
 			}
+			// top 2 bits set, 12 bits
+			else if ((x & 0xe0) == 0xc0) {
+				*dest++ =
+				  (static_cast<char16_t>(x & 0x3f)  << 6) |
+				  static_cast<char16_t>(*++i & 0x3f)
+				  ;
+			}
+			// one byte! 7 bytes
 			else {
 				*dest++ = static_cast<char16_t>(x);
 			}
 		}
 	}
 
+	class utf8_string_t;
+	class utf16_string_t;
 
 	class utf8_string_t
 	{
@@ -77,22 +97,47 @@ namespace atma {
 		typedef char value_t;
 
 		utf8_string_t();
+		utf8_string_t(const utf16_string_t&);
 		utf8_string_t(const utf8_string_t&);
 		utf8_string_t(utf8_string_t&&);
-
-		//explicit utf8_string_t(value_t const* begin, value_t const* end);
-		//explicit utf8_string_t(
-
-		
 
 	private:
 		typedef std::vector<value_t> chars_t;
 		chars_t chars_;
 	};
 
+	class utf16_string_t
+	{
+	public:
+		typedef char16_t value_t;
+
+		utf16_string_t();
+		utf16_string_t(const utf16_string_t&);
+		utf16_string_t(const utf8_string_t&);
+		utf16_string_t(utf8_string_t&&);
+
+	private:
+		typedef std::vector<value_t> chars_t;
+		chars_t chars_;
+
+		friend class utf8_string_t;
+	};
+
+
+
+
 
 	utf8_string_t::utf8_string_t()
 	{
+	}
+
+	utf8_string_t::utf8_string_t(const utf16_string_t& rhs)
+	{
+		// optimistically reserve one char per char16_t. this will work
+		// optimally for english text, and will be fine for anything else.
+		chars_.reserve( rhs.chars_.size() );
+
+		utf8_from_utf16(std::back_inserter(chars_), rhs.chars_.begin(), rhs.chars_.end());
 	}
 
 	utf8_string_t::utf8_string_t(const utf8_string_t& rhs)
@@ -105,6 +150,12 @@ namespace atma {
 	{
 	}
 
+
+
+	utf16_string_t::utf16_string_t(const utf8_string_t&)
+	{
+		
+	}
 
 //=====================================================================
 } // namespace atma
