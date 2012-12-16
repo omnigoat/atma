@@ -81,6 +81,7 @@
     <ClInclude Include="..\include\atma\lockfree\queue.hpp" />
     <ClInclude Include="..\include\atma\math\expr_tmpl\elementwise_opers.hpp" />
     <ClInclude Include="..\include\atma\math\expr_tmpl\expression.hpp" />
+    <ClInclude Include="..\include\atma\math\expr_tmpl\operators.hpp" />
     <ClInclude Include="..\include\atma\math\expr_tmpl\utility.hpp" />
     <ClInclude Include="..\include\atma\math\vector.hpp" />
     <ClInclude Include="..\include\atma\ref.hpp" />
