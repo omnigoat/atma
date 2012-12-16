@@ -127,5 +127,8 @@
     <ClInclude Include="..\include\atma\math\expr_tmpl\utility.hpp">
       <Filter>include\math\expr_tmpl</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\math\expr_tmpl\operators.hpp">
+      <Filter>include\math\expr_tmpl</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
