@@ -159,7 +159,7 @@ template <unsigned int E, typename T> struct vector;
 	ATMA_MATH_OPERATOR_TX_T(operator *, elementwise_mul_oper, vector3f, float, vector3f)
 	ATMA_MATH_OPERATOR_TX_T(operator /, elementwise_div_oper, vector3f, float, vector3f)
 	
-	ATMA_MATH_OPERATOR_TX_TX(dot_product, vector_dotproduct_oper, vector3f, vector3f, vector3f)
+//	ATMA_MATH_OPERATOR_TX_TX(dot_product, vector_dotproduct_oper, vector3f, vector3f, vector3f)
 
 //=====================================================================
 } // namespace atma
