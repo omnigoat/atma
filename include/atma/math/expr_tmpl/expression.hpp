@@ -13,18 +13,18 @@ namespace expr_tmpl {
 	template <typename R, typename OPER>
 	struct expr
 	{
-		expr(const OPER& oper)
-		 : oper(oper)
+		template <typename... Args>
+		expr(const Args&... args)
+		 : oper(args...)
 		  {}
  
-		typename element_type_of<OPER>::type
-		 operator [](int i) const
+		auto operator [](int i) const
+		 -> decltype(std::declval<OPER>()[i])
 		  { return oper[i]; }
 
 	private:
 		OPER oper;
 	};
-
 
 //=====================================================================
 } // namespace expr_tmpl
