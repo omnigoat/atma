@@ -10,31 +10,31 @@ namespace atma {
 namespace expr_tmpl {
 //=====================================================================
 
-	template <template <typename, typename> class TAG, typename LHS, typename RHS>
+	template <template <typename, typename> class FN, typename LHS, typename RHS>
 	struct binary_oper
 	{
+		typedef FN<value_t<LHS>, value_t<RHS>> fn_t;
+		typedef value_t<LHS> lhs_t;
+		typedef value_t<RHS> rhs_t;
+
 		binary_oper(const LHS& lhs, const RHS& rhs)
 		 : lhs_(lhs), rhs_(rhs)
 		  {}
 		
-		typename element_type_of<TAG<LHS, RHS>>::type
-		 operator [](int i) const
-		  { return tag_(lhs_, rhs_, i); }
+		auto operator [](int i) const
+		 -> decltype(fn_t()(std::declval<lhs_t>(), std::declval<rhs_t>(), i))
+		  { return fn_(lhs_, rhs_, i); }
 
 	private:
-		TAG<LHS, RHS> tag_;
-		const LHS& lhs_;
-		const RHS& rhs_;
+		fn_t fn_;
+		lhs_t lhs_;
+		rhs_t rhs_;
 	};
 
 
-	template <typename LHS, typename RHS>
-	struct add_oper {
-		typedef decltype(std::declval<LHS>()[0] + std::declval<RHS>()[0]) result_type;
 
-		result_type operator ()(const LHS& lhs, const RHS& rhs, int i) const
-		 { return lhs[i] + rhs[i]; }
-	};
+
+
 
 //=====================================================================
 } // namespace expr_tmpl

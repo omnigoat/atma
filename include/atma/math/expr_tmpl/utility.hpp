@@ -10,59 +10,81 @@ namespace atma {
 namespace expr_tmpl {
 //=====================================================================
 	
-	
-	//=====================================================================
-	// type deduction of, given a value of T, the
-	// return-type of its index operator (operator [])
-	//=====================================================================
-	template <typename T, bool II = std::is_arithmetic<T>::value>
-	struct element_type_of
-	 { typedef T type; };
-
-	template <typename T>
-	struct element_type_of<T, false>
-	 : element_type_of<decltype(&T::operator[]), false>
-	  {};
-	
-	template <typename R, typename C, typename... Args>
-	struct element_type_of<R(C::*)(Args...) const, false>
-	 { typedef typename std::remove_reference<R>::type type; };
-
-
-	//=====================================================================
-	// correctly retrieve value from either scalar or vector objects
-	//=====================================================================
-	template <typename T, bool IA = std::is_arithmetic<T>::value>
-	struct value {
-		static typename element_type_of<T>::type
-		 get(const T& in, unsigned int i)
-		  { return in[i]; }
-	};
-
-	template <typename T>
-	struct value<T, true> {
-		static T get(const T& in, unsigned int)
-		 { return in; }
-	};
-
-	
-
-	//=====================================================================
-	// member-type for operators, because we must store @expr by value
-	//=====================================================================
 	template <typename, typename> struct expr;
 
+
+	//=====================================================================
+	// storage_policy
+	// ----------------
+	//   stores @expr<> by value, and all other things by reference. "all
+	//   other things" will in general be const references to actual things
+	//   we wish to compute (vectors, matrices, numbers, etc). these are
+	//   stored by reference as they do not fall off the stack until
+	//   computations involving them have finished.
+	//=====================================================================
 	template <typename T>
-	struct member_type {
+	struct storage_policy {
 		typedef const T& type;
 	};
 
 	template <typename R, typename O>
-	struct member_type<expr<R, O>> {
+	struct storage_policy<expr<R, O>> {
 		typedef const expr<R, O> type;
 	};
-
 	
+
+	//=====================================================================
+	// has_index_operator
+	// --------------------
+	//=====================================================================
+	template <typename T, bool P = std::is_arithmetic<T>::value>
+	struct has_index_operator {
+		static const bool value = true;
+	};
+
+	template <typename T>
+	struct has_index_operator<T, true> {
+		static const bool value = false;
+	};
+
+
+
+
+	//=====================================================================
+	// value_t
+	// ---------
+	//   provides the correct storage and index operator for any type.
+	//=====================================================================
+	template <typename T, bool F = has_index_operator<T>::value>
+	struct value_t
+	{
+		value_t(const T& t)
+		 : value_(t)
+		  {}
+
+		auto operator [](int i) const
+		 -> const decltype(std::declval<T>()[i])&
+		  { return value_[i]; }
+
+	private:
+		typename storage_policy<T>::type value_;
+	};
+
+	template <typename T>
+	struct value_t<T, false>
+	{
+		value_t(const T& t)
+		 : value_(t)
+		  {}
+
+		auto operator [](int i) const
+		 -> T
+		  { return value_; }
+
+	private:
+		typename storage_policy<T>::type value_;
+	};
+
 
 //=====================================================================
 } // namespace expr_tmpl

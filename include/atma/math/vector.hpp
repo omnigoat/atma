@@ -8,6 +8,7 @@
 #include <atma/math/expr_tmpl/expression.hpp>
 #include <atma/math/expr_tmpl/elementwise_opers.hpp>
 #include <atma/math/expr_tmpl/operators.hpp>
+#include <atma/math/expr_tmpl/binary_operator.hpp>
 //=====================================================================
 namespace atma {
 //=====================================================================
@@ -153,11 +154,17 @@ template <unsigned int E, typename T> struct vector;
 
 	typedef vector<3, float> vector3f;
 
-	ATMA_MATH_OPERATOR_TX_TX(operator +, elementwise_add_oper, vector3f, vector3f, vector3f)
-	ATMA_MATH_OPERATOR_TX_TX(operator -, elementwise_sub_oper, vector3f, vector3f, vector3f)
-	ATMA_MATH_OPERATOR_T_TX(operator *, elementwise_mul_oper, float, vector3f, vector3f)
-	ATMA_MATH_OPERATOR_TX_T(operator *, elementwise_mul_oper, vector3f, float, vector3f)
-	ATMA_MATH_OPERATOR_TX_T(operator /, elementwise_div_oper, vector3f, float, vector3f)
+	auto operator + (const vector3f& lhs, const vector3f& rhs)
+	 -> expr_tmpl::expr<vector3f, expr_tmpl::binary_oper<expr_tmpl::elementwise_add, vector3f, vector3f>>
+	  { return expr_tmpl::expr<vector3f, expr_tmpl::binary_oper<expr_tmpl::elementwise_add, vector3f, vector3f>>(lhs, rhs); }
+
+
+
+//	ATMA_MATH_OPERATOR_TX_TX(operator +, elementwise_add_oper, vector3f, vector3f, vector3f)
+//	ATMA_MATH_OPERATOR_TX_TX(operator -, elementwise_sub_oper, vector3f, vector3f, vector3f)
+	//ATMA_MATH_OPERATOR_T_TX(operator *, elementwise_mul_oper, float, vector3f, vector3f)
+	//ATMA_MATH_OPERATOR_TX_T(operator *, elementwise_mul_oper, vector3f, float, vector3f)
+	//ATMA_MATH_OPERATOR_TX_T(operator /, elementwise_div_oper, vector3f, float, vector3f)
 	
 //	ATMA_MATH_OPERATOR_TX_TX(dot_product, vector_dotproduct_oper, vector3f, vector3f, vector3f)
 
