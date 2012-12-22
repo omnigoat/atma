@@ -10,85 +10,15 @@ namespace atma {
 namespace expr_tmpl {
 //=====================================================================
 
-	//=====================================================================
-	// addition
-	//=====================================================================
 	template <typename LHS, typename RHS>
-	struct elementwise_add_oper
+	struct elementwise_add
 	{
-		elementwise_add_oper(const LHS& lhs, const RHS& rhs)
-		 : lhs(lhs), rhs(rhs)
-		  {}
+		typedef decltype(std::declval<LHS>()[0] + std::declval<RHS>()[0]) result_type;
 
-		typename element_type_of<LHS>::type
-		 operator [](int i) const
-		  { return value<LHS>::get(lhs, i) + value<RHS>::get(rhs, i); }
-
-	private:
-		typename member_type<LHS>::type lhs;
-		typename member_type<RHS>::type rhs;
+		result_type
+		 operator ()(const LHS& lhs, const RHS& rhs, int i) const
+		  { return lhs[i] + rhs[i]; }
 	};
-
-
-	//=====================================================================
-	// subtraction
-	//=====================================================================
-	template <typename LHS, typename RHS>
-	struct elementwise_sub_oper
-	{
-		elementwise_sub_oper(const LHS& lhs, const RHS& rhs)
-		 : lhs(lhs), rhs(rhs)
-		  {}
-
-		typename element_type_of<LHS>::type
-		 operator [](int i) const
-		  { return value<LHS>::get(lhs, i) - value<RHS>::get(rhs, i); }
-
-	private:
-		typename member_type<LHS>::type lhs;
-		typename member_type<RHS>::type rhs;
-	};
-
-
-	//=====================================================================
-	// multiplication
-	//=====================================================================
-	template <typename LHS, typename RHS>
-	struct elementwise_mul_oper
-	{
-		elementwise_mul_oper(const LHS& lhs, const RHS& rhs)
-		 : lhs(lhs), rhs(rhs)
-		  {}
-
-		typename element_type_of<LHS>::type
-		 operator [](int i) const
-		  { return value<LHS>::get(lhs, i) * value<RHS>::get(rhs, i); }
-
-	private:
-		typename member_type<LHS>::type lhs;
-		typename member_type<RHS>::type rhs;
-	};
-
-
-	//=====================================================================
-	// division
-	//=====================================================================
-	template <typename LHS, typename RHS>
-	struct elementwise_div_oper
-	{
-		elementwise_div_oper(const LHS& lhs, const RHS& rhs)
-		 : lhs(lhs), rhs(rhs)
-		  {}
-
-		typename element_type_of<LHS>::type
-		 operator [](int i) const
-		  { return value<LHS>::get(lhs, i) / value<RHS>::get(rhs, i); }
-
-	private:
-		typename member_type<LHS>::type lhs;
-		typename member_type<RHS>::type rhs;
-	};
-
 
 
 //=====================================================================
