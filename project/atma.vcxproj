@@ -77,6 +77,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\include\atma\assert.hpp" />
+    <ClInclude Include="..\include\atma\console.hpp" />
     <ClInclude Include="..\include\atma\dense_balanced_binary_tree.hpp" />
     <ClInclude Include="..\include\atma\lockfree\queue.hpp" />
     <ClInclude Include="..\include\atma\math\expr_tmpl\binary_operator.hpp" />
