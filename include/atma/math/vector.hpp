@@ -9,12 +9,13 @@
 #include <type_traits>
 #include <initializer_list>
 #include <atma/assert.hpp>
-#include <atma/math/expr_tmpl/expression.hpp>
-#include <atma/math/expr_tmpl/elementwise_fns.hpp>
-#include <atma/math/expr_tmpl/operators.hpp>
-#include <atma/math/expr_tmpl/binary_operator.hpp>
+#include <atma/math/impl/expression.hpp>
+#include <atma/math/impl/elementwise_fns.hpp>
+#include <atma/math/impl/operators.hpp>
+#include <atma/math/impl/binary_operator.hpp>
 //=====================================================================
 namespace atma {
+namespace math {
 //=====================================================================
 	
 	template <unsigned int E, typename T>
@@ -268,6 +269,7 @@ namespace atma {
 
 
 //=====================================================================
+} // namespace math
 } // namespace atma
 //=====================================================================
 #endif
