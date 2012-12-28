@@ -155,7 +155,7 @@ namespace atma {
 	typedef vector<3, float> vector3f;
 
 	template <unsigned int E, typename T>
-	auto dot_product(const vector<E,T>& lhs, const vector<E,T>& rhs) -> T
+	inline auto dot_product(const vector<E,T>& lhs, const vector<E,T>& rhs) -> T
 	{
 		T result{};
 		for (auto i = 0u; i != E; ++i)
@@ -164,30 +164,92 @@ namespace atma {
 	}
 
 
+
+	//=====================================================================
+	// addition
+	//=====================================================================
+	// T + T
 	template <unsigned int E, typename T>
-	auto operator + (const vector<E,T>& lhs, const vector<E,T>& rhs)
+	inline auto operator + (const vector<E,T>& lhs, const vector<E,T>& rhs)
 	 -> expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_add, vector<E,T>, vector<E,T>>>
 	  { return expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_add, vector<E,T>, vector<E,T>>>(lhs, rhs); }
 
+	// T + X
 	template <unsigned int E, typename T, typename OPER>
-	auto operator + (const vector<E,T>& lhs, const expr_tmpl::expr<vector<E,T>, OPER>& rhs)
-	 -> expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_add, vector<E,T>, decltype(rhs)>>
-	  { return expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_add, vector<E,T>, decltype(rhs)>>(lhs, rhs); }
+	inline auto operator + (const vector<E,T>& lhs, const expr_tmpl::expr<vector<E,T>, OPER>& rhs)
+	 -> expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_add, vector<E,T>, expr_tmpl::expr<vector<E,T>, OPER>>>
+	  { return expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_add, vector<E,T>, expr_tmpl::expr<vector<E,T>, OPER>>>(lhs, rhs); }
 	
-
+	// X + T
 	template <unsigned int E, typename T, typename OPER>
-	auto operator * (const vector<E,T>& lhs, const expr_tmpl::expr<T,OPER>& rhs) ->
-	expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<vector_mul_post<E,T>, vector<E,T>, decltype(rhs)>>
-	{
-		return expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<vector_mul_post<E,T>, vector<E,T>, decltype(rhs)>>(lhs, rhs);
+	inline auto operator + (const expr_tmpl::expr<vector<E,T>, OPER>& lhs, const vector<E,T>& rhs) ->
+	expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_add, expr_tmpl::expr<vector<E,T>, OPER>, vector<E,T>>> {
+		return expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_add, expr_tmpl::expr<vector<E,T>, OPER>, vector<E,T>>>(lhs, rhs);
 	}
 
+	// X + X
+	template <unsigned int E, typename T, typename LHS_OPER, typename RHS_OPER>
+	inline auto operator + (const expr_tmpl::expr<vector<E,T>, LHS_OPER>& lhs, const expr_tmpl::expr<vector<E,T>, RHS_OPER>& rhs) ->
+	expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_add, expr_tmpl::expr<vector<E,T>, LHS_OPER>, expr_tmpl::expr<vector<E,T>, RHS_OPER>>> {
+		return expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_add, expr_tmpl::expr<vector<E,T>, LHS_OPER>, expr_tmpl::expr<vector<E,T>, RHS_OPER>>>(lhs, rhs);
+	}
+
+
+
+	//=====================================================================
+	// subtraction
+	//=====================================================================
+	// T - T
 	template <unsigned int E, typename T>
-	auto operator * (const vector<E,T>& lhs, const T& rhs) ->
-	expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<vector_mul_post<E,T>, vector<E,T>, T>>
-	{
+	inline auto operator - (const vector<E,T>& lhs, const vector<E,T>& rhs)
+	 -> expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_sub, vector<E,T>, vector<E,T>>>
+	  { return expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_sub, vector<E,T>, vector<E,T>>>(lhs, rhs); }
+
+	// T - X
+	template <unsigned int E, typename T, typename OPER>
+	inline auto operator - (const vector<E,T>& lhs, const expr_tmpl::expr<vector<E,T>, OPER>& rhs)
+	 -> expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_sub, vector<E,T>, expr_tmpl::expr<vector<E,T>, OPER>>>
+	  { return expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_sub, vector<E,T>, expr_tmpl::expr<vector<E,T>, OPER>>>(lhs, rhs); }
+	
+	// X - T
+	template <unsigned int E, typename T, typename OPER>
+	inline auto operator - (const expr_tmpl::expr<vector<E,T>, OPER>& lhs, const vector<E,T>& rhs) ->
+	expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_sub, expr_tmpl::expr<vector<E,T>, OPER>, vector<E,T>>> {
+		return expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_sub, expr_tmpl::expr<vector<E,T>, OPER>, vector<E,T>>>(lhs, rhs);
+	}
+
+	// X - X
+	template <unsigned int E, typename T, typename LHS_OPER, typename RHS_OPER>
+	inline auto operator - (const expr_tmpl::expr<vector<E,T>, LHS_OPER>& lhs, const expr_tmpl::expr<vector<E,T>, RHS_OPER>& rhs) ->
+	expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_sub, expr_tmpl::expr<vector<E,T>, LHS_OPER>, expr_tmpl::expr<vector<E,T>, RHS_OPER>>> {
+		return expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<expr_tmpl::elementwise_sub, expr_tmpl::expr<vector<E,T>, LHS_OPER>, expr_tmpl::expr<vector<E,T>, RHS_OPER>>>(lhs, rhs);
+	}
+
+
+
+	//=====================================================================
+	// post multiplication
+	//    note: we don't have an expr for the scalar, because any expression
+	//          that results in a single element almost definitely has high
+	//          computational costs (like dot-products)
+	//=====================================================================
+	// T * T
+	template <unsigned int E, typename T>
+	inline auto operator * (const vector<E,T>& lhs, const T& rhs) ->
+	expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<vector_mul_post<E,T>, vector<E,T>, T>> {
 		return expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<vector_mul_post<E,T>, vector<E,T>, T>>(lhs, rhs);
 	}
+
+	// X * T
+	template <unsigned int E, typename T, typename OPER>
+	inline auto operator * (const expr_tmpl::expr<vector<E,T>, OPER>& lhs, const T& rhs) ->
+	expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<vector_mul_post<E,T>, expr_tmpl::expr<vector<E,T>, OPER>, T>> {
+		expr_tmpl::expr<vector<E,T>, expr_tmpl::binary_oper<vector_mul_post<E,T>, expr_tmpl::expr<vector<E,T>, OPER>, T>>(lhs, rhs);
+	}
+
+	//=====================================================================
+	// pre multiplication
+	//=====================================================================
 
 
 //=====================================================================
