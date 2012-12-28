@@ -180,10 +180,24 @@ impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_post<E,T>, vector<E,T
 template <unsigned int E, typename T, typename OPER>
 inline auto operator * (const impl::expr<vector<E,T>, OPER>& lhs, const T& rhs) ->
 impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_post<E,T>, impl::expr<vector<E,T>, OPER>, T>> {
-	impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_post<E,T>, impl::expr<vector<E,T>, OPER>, T>>(lhs, rhs);
+	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_post<E,T>, impl::expr<vector<E,T>, OPER>, T>>(lhs, rhs);
 }
 
 //=====================================================================
 // pre multiplication
 //=====================================================================
+// T * T
+template <unsigned int E, typename T>
+inline auto operator * (const T& lhs, const vector<E,T>& rhs) ->
+impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_pre<E,T>, T, vector<E,T>>> {
+	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_pre<E,T>, T, vector<E,T>>>(lhs, rhs);
+}
+
+// T * X
+template <unsigned int E, typename T, typename OPER>
+inline auto operator * (const T& lhs, const impl::expr<vector<E,T>, OPER>& rhs) ->
+impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_pre<E,T>, T, impl::expr<vector<E,T>, OPER>>> {
+	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_pre<E,T>, T, impl::expr<vector<E,T>, OPER>>>(lhs, rhs);
+}
+
 
