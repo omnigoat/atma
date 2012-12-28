@@ -84,6 +84,8 @@
     <ClInclude Include="..\include\atma\math\impl\expression.hpp" />
     <ClInclude Include="..\include\atma\math\impl\operators.hpp" />
     <ClInclude Include="..\include\atma\math\impl\utility.hpp" />
+    <ClInclude Include="..\include\atma\math\impl\vector_impl.hpp" />
+    <ClInclude Include="..\include\atma\math\impl\vector_opers.hpp" />
     <ClInclude Include="..\include\atma\math\vector.hpp" />
     <ClInclude Include="..\include\atma\ref.hpp" />
     <ClInclude Include="..\include\atma\string_builder.hpp" />
