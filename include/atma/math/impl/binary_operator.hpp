@@ -1,14 +1,14 @@
 //=====================================================================
 //
 //=====================================================================
-#ifndef ATMA_MATH_EXPR_TMPL_BINARY_OPERATOR_HPP
-#define ATMA_MATH_EXPR_TMPL_BINARY_OPERATOR_HPP
+#ifndef ATMA_MATH_impl_BINARY_OPERATOR_HPP
+#define ATMA_MATH_impl_BINARY_OPERATOR_HPP
 //=====================================================================
 #include <atma/math/impl/utility.hpp>
 //=====================================================================
 namespace atma {
 namespace math {
-namespace expr_tmpl {
+namespace impl {
 //=====================================================================
 
 	template <typename FN, typename LHS, typename RHS>
@@ -30,7 +30,7 @@ namespace expr_tmpl {
 	};
 		
 //=====================================================================
-} // namespace expr_tmpl
+} // namespace impl
 } // namespace math
 } // namespace atma
 //=====================================================================

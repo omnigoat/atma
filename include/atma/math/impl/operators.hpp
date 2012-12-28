@@ -1,20 +1,20 @@
 //=====================================================================
 //
 //=====================================================================
-#ifndef ATMA_MATH_EXPR_TMPL_OPERATORS_HPP
-#define ATMA_MATH_EXPR_TMPL_OPERATORS_HPP
+#ifndef ATMA_MATH_impl_OPERATORS_HPP
+#define ATMA_MATH_impl_OPERATORS_HPP
 //=====================================================================
 namespace atma {
 namespace math {
-namespace expr_tmpl {
+namespace impl {
 //=====================================================================
 	
 	//=====================================================================
 	// operator type-to-type
 	//=====================================================================
 	#define ATMA_MATH_OPERATOR_T_T(fn, name, lhst, rhst, rt) \
-	expr_tmpl::expr<rt, expr_tmpl::##name##<lhst, rhst>>##fn##(const lhst##& lhs, const rhst##& rhs) { \
-		return expr_tmpl::expr<rt, expr_tmpl::##name##<lhst, rhst>>(expr_tmpl::##name##<lhst, rhst>(lhs, rhs)); \
+	impl::expr<rt, impl::##name##<lhst, rhst>>##fn##(const lhst##& lhs, const rhst##& rhs) { \
+		return impl::expr<rt, impl::##name##<lhst, rhst>>(impl::##name##<lhst, rhst>(lhs, rhs)); \
 	}
 	
 	//=====================================================================
@@ -22,8 +22,8 @@ namespace expr_tmpl {
 	//=====================================================================
 	#define ATMA_MATH_OPERATOR_T_X(fn, name, lhst, rhst, rt) \
 	template <typename RHS_OPER> \
-	expr_tmpl::expr<rt, expr_tmpl::##name##<lhst, expr_tmpl::expr<rhst, RHS_OPER>>>##fn##(const lhst##& lhs, const expr_tmpl::expr<rhst, RHS_OPER>& rhs) { \
-		return expr_tmpl::expr<rt, expr_tmpl::##name##<lhst, expr_tmpl::expr<rhst, RHS_OPER>>>(expr_tmpl::##name##<lhst, expr_tmpl::expr<rhst, RHS_OPER>>(lhs, rhs)); \
+	impl::expr<rt, impl::##name##<lhst, impl::expr<rhst, RHS_OPER>>>##fn##(const lhst##& lhs, const impl::expr<rhst, RHS_OPER>& rhs) { \
+		return impl::expr<rt, impl::##name##<lhst, impl::expr<rhst, RHS_OPER>>>(impl::##name##<lhst, impl::expr<rhst, RHS_OPER>>(lhs, rhs)); \
 	}
 
 	//=====================================================================
@@ -31,9 +31,9 @@ namespace expr_tmpl {
 	//=====================================================================
 	#define ATMA_MATH_OPERATOR_X_T(fn, name, lhst, rhst, rt) \
 	template <typename LHS_OPER> \
-	expr_tmpl::expr<rt, expr_tmpl::##name##<expr_tmpl::expr<lhst, LHS_OPER>, rhst>>##fn##(const expr_tmpl::expr<lhst, LHS_OPER>& lhs, const rhst##& rhs) { \
-		return expr_tmpl::expr<rt, expr_tmpl::##name##<expr_tmpl::expr<lhst, LHS_OPER>, rhst>> \
-		 (expr_tmpl::##name##<expr_tmpl::expr<lhst, LHS_OPER>, rhst>(lhs, rhs)); \
+	impl::expr<rt, impl::##name##<impl::expr<lhst, LHS_OPER>, rhst>>##fn##(const impl::expr<lhst, LHS_OPER>& lhs, const rhst##& rhs) { \
+		return impl::expr<rt, impl::##name##<impl::expr<lhst, LHS_OPER>, rhst>> \
+		 (impl::##name##<impl::expr<lhst, LHS_OPER>, rhst>(lhs, rhs)); \
 	}
 	
 	//=====================================================================
@@ -41,10 +41,10 @@ namespace expr_tmpl {
 	//=====================================================================
 	#define ATMA_MATH_OPERATOR_X_X(fn, name, lhst, rhst, rt) \
 	template <typename LHS_OPER, typename RHS_OPER> \
-	expr_tmpl::expr<rt, expr_tmpl::##name##<expr_tmpl::expr<lhst, LHS_OPER>, expr_tmpl::expr<rhst, RHS_OPER>>> \
-	fn##(const expr_tmpl::expr<lhst, LHS_OPER>& lhs, const expr_tmpl::expr<rhst, RHS_OPER>##& rhs) { \
-		return expr_tmpl::expr<rt, expr_tmpl::##name##<expr_tmpl::expr<lhst, LHS_OPER>, expr_tmpl::expr<rhst, RHS_OPER>>> \
-		(expr_tmpl::##name##<expr_tmpl::expr<lhst, LHS_OPER>, expr_tmpl::expr<rhst, RHS_OPER>>(lhs, rhs)); \
+	impl::expr<rt, impl::##name##<impl::expr<lhst, LHS_OPER>, impl::expr<rhst, RHS_OPER>>> \
+	fn##(const impl::expr<lhst, LHS_OPER>& lhs, const impl::expr<rhst, RHS_OPER>##& rhs) { \
+		return impl::expr<rt, impl::##name##<impl::expr<lhst, LHS_OPER>, impl::expr<rhst, RHS_OPER>>> \
+		(impl::##name##<impl::expr<lhst, LHS_OPER>, impl::expr<rhst, RHS_OPER>>(lhs, rhs)); \
 	}
 
 
@@ -67,7 +67,7 @@ namespace expr_tmpl {
 	
 
 //=====================================================================
-} // namespace expr_tmpl
+} // namespace impl
 } // namespace math
 } // namespace atma
 //=====================================================================
