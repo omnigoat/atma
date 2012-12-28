@@ -4,9 +4,10 @@
 #ifndef ATMA_MATH_EXPR_TMPL_ELEMENTWISE_FNS_HPP
 #define ATMA_MATH_EXPR_TMPL_ELEMENTWISE_FNS_HPP
 //=====================================================================
-#include <atma/math/expr_tmpl/utility.hpp>
+#include <atma/math/impl/utility.hpp>
 //=====================================================================
 namespace atma {
+namespace math {
 namespace expr_tmpl {
 //=====================================================================
 
@@ -28,6 +29,7 @@ namespace expr_tmpl {
 
 //=====================================================================
 } // namespace expr_tmpl
+} // namespace math
 } // namespace atma
 //=====================================================================
 #endif
