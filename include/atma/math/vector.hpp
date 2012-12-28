@@ -22,37 +22,32 @@ namespace atma {
 	{
 		typedef T element_type;
 
-		// constructors
+		// construction
 		vector();
 		vector(std::initializer_list<T>);
-
 		vector(const vector& rhs);
 		
+		// assignment
 		vector& operator = (const vector& rhs);
+		template <class OP>
+		vector& operator = (const expr_tmpl::expr<vector<E, T>, OP>& e);
 
-		const T& operator [] (int i) const;
-
+		// access
+		const T& operator [] (unsigned int i) const;
 		const T* begin() const { return &*elements_.begin(); }
 		const T* end() const { return &*elements_.end(); }
 
+		// mutation
 		vector& operator += (const vector& rhs);
 		vector& operator -= (const vector& rhs);
 		vector& operator *= (const T& rhs);
 		vector& operator /= (const T& rhs);
-
-		template <class OP>
-		vector& operator = (const expr_tmpl::expr<vector<E, T>, OP>& e) {
-			for (auto i = 0u; i != E; ++i) {
-				elements_[i] = e[i];
-			}
-			return *this;
-		}
-
 		vector& set(unsigned int i, const T& n);
 
 	private:
 		std::array<T, E> elements_;
 	};
+
 
 
 	//=====================================================================
@@ -83,7 +78,17 @@ namespace atma {
 	}
 
 	template <unsigned int E, typename T>
-	const T& vector<E, T>::operator [](int i) const {
+	template <typename OP>
+	vector<E, T>& vector<E, T>::operator = (const expr_tmpl::expr<vector<E, T>, OP>& e) {
+		for (auto i = 0u; i != E; ++i) {
+			elements_[i] = e[i];
+		}
+		return *this;
+	}
+
+	template <unsigned int E, typename T>
+	const T& vector<E, T>::operator [](unsigned int i) const {
+		ATMA_ASSERT(i < E);
 		return elements_[i];
 	}
 
@@ -123,7 +128,25 @@ namespace atma {
 	}
 
 
-	namespace expr_tmpl {
+	//=====================================================================
+	// non-member functions
+	//=====================================================================
+	template <unsigned int E, typename T>
+	inline auto dot_product(const vector<E,T>& lhs, const vector<E,T>& rhs) -> T
+	{
+		T result{};
+		for (auto i = 0u; i != E; ++i)
+			result += lhs[i] * rhs[i];
+		return result;
+	}
+
+
+
+	//=====================================================================
+	// expression templates
+	//=====================================================================
+	namespace expr_tmpl
+	{
 		template <unsigned int E, typename T>
 		struct cast<vector<E,T>> {
 			template <typename OPER>
@@ -152,16 +175,8 @@ namespace atma {
 		  { return lhs * rhs[i]; }
 	};
 
-	typedef vector<3, float> vector3f;
-
-	template <unsigned int E, typename T>
-	inline auto dot_product(const vector<E,T>& lhs, const vector<E,T>& rhs) -> T
-	{
-		T result{};
-		for (auto i = 0u; i != E; ++i)
-			result += lhs[i] * rhs[i];
-		return result;
-	}
+	
+	
 
 
 
