@@ -1,34 +1,20 @@
 //=====================================================================
 //
 //=====================================================================
-#ifndef ATMA_MATH_EXPR_TMPL_ELEMENTWISE_FNS_HPP
-#define ATMA_MATH_EXPR_TMPL_ELEMENTWISE_FNS_HPP
+#ifndef ATMA_MATH_impl_vector_FNS_HPP
+#define ATMA_MATH_impl_vector_FNS_HPP
 //=====================================================================
-#include <atma/math/impl/utility.hpp>
+#include <atma/math/impl/binary_operator.hpp>
 //=====================================================================
 namespace atma {
 namespace math {
-namespace expr_tmpl {
+namespace impl {
 //=====================================================================
 
-	struct elementwise_add
-	{
-		template <typename LHS, typename RHS>
-		auto operator ()(const LHS& lhs, const RHS& rhs, int i) const
-		 -> decltype(lhs[i]+rhs[i])
-		  { return lhs[i] + rhs[i]; }
-	};
 	
-	struct elementwise_sub
-	{
-		template <typename LHS, typename RHS>
-		auto operator ()(const LHS& lhs, const RHS& rhs, int i) const
-		 -> decltype(lhs[i]-rhs[i])
-		  { return lhs[i] - rhs[i]; }
-	};
 
 //=====================================================================
-} // namespace expr_tmpl
+} // namespace impl
 } // namespace math
 } // namespace atma
 //=====================================================================

@@ -1,14 +1,14 @@
 //=====================================================================
 //
 //=====================================================================
-#ifndef ATMA_MATH_EXPR_TMPL_UTILITY_HPP
-#define ATMA_MATH_EXPR_TMPL_UTILITY_HPP
+#ifndef ATMA_MATH_impl_UTILITY_HPP
+#define ATMA_MATH_impl_UTILITY_HPP
 //=====================================================================
 #include <type_traits>
 //=====================================================================
 namespace atma {
 namespace math {
-namespace expr_tmpl {
+namespace impl {
 //=====================================================================
 	
 	template <typename, typename> struct expr;
@@ -93,7 +93,7 @@ namespace expr_tmpl {
 
 
 //=====================================================================
-} // namespace expr_tmpl
+} // namespace impl
 } // namespace math
 } // namespace atma
 //=====================================================================
