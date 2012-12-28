@@ -1,10 +1,8 @@
 //=====================================================================
 //
 //=====================================================================
-#ifndef ATMA_MATH_EXPR_TMPL_EXPRESSION_HPP
-#define ATMA_MATH_EXPR_TMPL_EXPRESSION_HPP
-//=====================================================================
-#include <atma/math/expr_tmpl/utility.hpp>
+#ifndef ATMA_MATH_EXPR_TMPL_EXPR_HPP
+#define ATMA_MATH_EXPR_TMPL_EXPR_HPP
 //=====================================================================
 namespace atma {
 namespace expr_tmpl {
@@ -22,8 +20,19 @@ namespace expr_tmpl {
 		 -> decltype(std::declval<OPER>()[i])
 		  { return oper[i]; }
 
+		operator R() const
+		 { return cast<R>()(*this); }
+
 	private:
 		OPER oper;
+	};
+
+	template <typename T>
+	struct cast {
+		template <typename OPER>
+		T operator ()(const expr<T, OPER>& o) const {
+			return o[0];
+		}
 	};
 
 //=====================================================================

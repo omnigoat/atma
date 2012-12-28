@@ -80,7 +80,7 @@
     <ClInclude Include="..\include\atma\dense_balanced_binary_tree.hpp" />
     <ClInclude Include="..\include\atma\lockfree\queue.hpp" />
     <ClInclude Include="..\include\atma\math\expr_tmpl\binary_operator.hpp" />
-    <ClInclude Include="..\include\atma\math\expr_tmpl\elementwise_opers.hpp" />
+    <ClInclude Include="..\include\atma\math\expr_tmpl\elementwise_fns.hpp" />
     <ClInclude Include="..\include\atma\math\expr_tmpl\expression.hpp" />
     <ClInclude Include="..\include\atma\math\expr_tmpl\operators.hpp" />
     <ClInclude Include="..\include\atma\math\expr_tmpl\utility.hpp" />
