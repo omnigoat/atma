@@ -24,6 +24,11 @@ namespace expr_tmpl {
 	//=====================================================================
 	template <typename T>
 	struct storage_policy {
+		typedef const T type;
+	};
+
+	template <typename T>
+	struct storage_policy<const T&> {
 		typedef const T& type;
 	};
 
@@ -63,7 +68,7 @@ namespace expr_tmpl {
 		  {}
 
 		auto operator [](int i) const
-		 -> const decltype(std::declval<T>()[i])&
+		 -> decltype(std::declval<T>()[i])
 		  { return value_[i]; }
 
 	private:
