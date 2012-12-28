@@ -17,7 +17,7 @@ namespace impl {
 		 : oper(args...)
 		  {}
  
-		auto operator [](int i) const
+		auto operator [](unsigned int i) const
 		 -> decltype(std::declval<OPER>()[i])
 		  { return oper[i]; }
 
