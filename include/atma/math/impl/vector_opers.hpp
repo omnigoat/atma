@@ -18,7 +18,8 @@ namespace impl
 		 : lhs(lhs), rhs(rhs)
 		  {}
 		
-		auto operator [](int i) const -> T {
+		auto operator [](unsigned int i) const -> T {
+			ATMA_ASSERT(i < E);
 			return lhs[i] + rhs[i];
 		}
 	
@@ -33,7 +34,8 @@ namespace impl
 		 : lhs(lhs), rhs(rhs)
 		  {}
 		
-		auto operator [](int i) const -> T {
+		auto operator [](unsigned int i) const -> T {
+			ATMA_ASSERT(i < E);
 			return lhs[i] - rhs[i];
 		}
 	
@@ -49,7 +51,8 @@ namespace impl
 		 : lhs(lhs), rhs(rhs)
 		  {}
 		
-		auto operator [](int i) const -> T {
+		auto operator [](unsigned int i) const -> T {
+			ATMA_ASSERT(i < E);
 			return lhs[i] * rhs;
 		}
 	
@@ -64,7 +67,8 @@ namespace impl
 		 : lhs(lhs), rhs(rhs)
 		  {}
 		
-		auto operator [](int i) const -> T {
+		auto operator [](unsigned int i) const -> T {
+			ATMA_ASSERT(i < E);
 			return lhs * rhs[i];
 		}
 	
@@ -79,7 +83,8 @@ namespace impl
 		 : lhs(lhs), rhs(rhs)
 		  {}
 		
-		auto operator [](int i) const -> T {
+		auto operator [](unsigned int i) const -> T {
+			ATMA_ASSERT(i < E);
 			return lhs[i] / rhs;
 		}
 	
