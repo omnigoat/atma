@@ -75,6 +75,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\include\atma\algorithm.hpp" />
     <ClInclude Include="..\include\atma\assert.hpp" />
     <ClInclude Include="..\include\atma\console.hpp" />
     <ClInclude Include="..\include\atma\dense_balanced_binary_tree.hpp" />
