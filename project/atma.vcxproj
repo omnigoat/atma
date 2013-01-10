@@ -102,6 +102,9 @@
     <ClInclude Include="..\include\atma\signals\slot_base.hpp" />
     <ClInclude Include="..\include\atma\signals\slot_header.hpp" />
     <ClInclude Include="..\include\atma\ui\win32\window_manager.hpp" />
+    <ClInclude Include="..\include\atma\utf\algorithm.hpp" />
+    <ClInclude Include="..\include\atma\utf\utf8_istream.hpp" />
+    <ClInclude Include="..\include\atma\utf\utf8_string.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
