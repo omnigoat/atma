@@ -80,12 +80,11 @@
     <ClInclude Include="..\include\atma\console.hpp" />
     <ClInclude Include="..\include\atma\lockfree\queue.hpp" />
     <ClInclude Include="..\include\atma\math\impl\binary_operator.hpp" />
-    <ClInclude Include="..\include\atma\math\impl\elementwise_fns.hpp" />
     <ClInclude Include="..\include\atma\math\impl\expression.hpp" />
-    <ClInclude Include="..\include\atma\math\impl\operators.hpp" />
-    <ClInclude Include="..\include\atma\math\impl\utility.hpp" />
+    <ClInclude Include="..\include\atma\math\impl\storage_policy.hpp" />
     <ClInclude Include="..\include\atma\math\impl\vector_impl.hpp" />
     <ClInclude Include="..\include\atma\math\impl\vector_opers.hpp" />
+    <ClInclude Include="..\include\atma\math\matrix.hpp" />
     <ClInclude Include="..\include\atma\math\vector.hpp" />
     <ClInclude Include="..\include\atma\ref.hpp" />
     <ClInclude Include="..\include\atma\string_builder.hpp" />

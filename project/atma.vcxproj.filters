@@ -112,16 +112,7 @@
     <ClInclude Include="..\include\atma\math\impl\binary_operator.hpp">
       <Filter>include\math\impl</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\atma\math\impl\elementwise_fns.hpp">
-      <Filter>include\math\impl</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\atma\math\impl\expression.hpp">
-      <Filter>include\math\impl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\math\impl\operators.hpp">
-      <Filter>include\math\impl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\math\impl\utility.hpp">
       <Filter>include\math\impl</Filter>
     </ClInclude>
     <ClInclude Include="..\include\atma\math\impl\vector_impl.hpp">
@@ -129,6 +120,12 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\math\impl\vector_opers.hpp">
       <Filter>include\math\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\math\impl\storage_policy.hpp">
+      <Filter>include\math\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\math\matrix.hpp">
+      <Filter>include\math</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
