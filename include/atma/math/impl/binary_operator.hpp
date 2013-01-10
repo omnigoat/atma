@@ -4,7 +4,7 @@
 #ifndef ATMA_MATH_impl_BINARY_OPERATOR_HPP
 #define ATMA_MATH_impl_BINARY_OPERATOR_HPP
 //=====================================================================
-#include <atma/math/impl/utility.hpp>
+#include <atma/math/impl/storage_policy.hpp>
 //=====================================================================
 namespace atma {
 namespace math {
