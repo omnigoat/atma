@@ -6,6 +6,8 @@
 #include <algorithm>
 //=====================================================================
 #include <atma/assert.hpp>
+#include <atma/utf/algorithm.hpp>
+#include <atma/utf/utf8_istream.hpp>
 //=====================================================================
 namespace atma {
 //=====================================================================
@@ -146,36 +148,6 @@ namespace atma {
 		friend class utf8_string_t;
 	};
 
-	class utf8_stream_iterator
-	{
-	public:
-		utf8_stream_iterator();
-		utf8_stream_iterator(char const* stream);
-		
-		utf8_stream_iterator& operator ++();
-		
-		char const* begin() const;
-		char const* end() const;
-		unsigned int byte_count() const;
-
-	private:
-		void update_character_end();
-
-		char const* stream_;
-		char const* character_end_;
-	};
-
-	inline bool operator == (const utf8_stream_iterator& lhs, const utf8_stream_iterator& rhs) {
-		return lhs.byte_count() == rhs.byte_count() && std::equal(lhs.begin(), lhs.end(), rhs.begin());
-	}
-
-	inline bool operator != (const utf8_stream_iterator& lhs, const utf8_stream_iterator& rhs) {
-		return lhs.byte_count() != rhs.byte_count() || !std::equal(lhs.begin(), lhs.end(), rhs.end());
-	}
-
-
-	typedef utf8_string_t string;
-
 
 	utf8_string_t::utf8_string_t()
 	 : char_count_()
@@ -183,10 +155,17 @@ namespace atma {
 	}
 
 	utf8_string_t::utf8_string_t(char const* str_begin, char const* str_end)
-	 : char_count_( std::distance(str_begin, str_end) )
+	 : char_count_()
 	{
-		//chars_.resize(char_count_);
-		//std::copy(str_begin, str_end, chars.begin());
+		ATMA_ASSERT(str_begin != nullptr);
+		ATMA_ASSERT(str_end != nullptr);
+
+		utf8_istream_t stream{str_begin, str_end};
+
+		for (utf8_stream_iterator i(stream), ie; i != ie; ++i) {
+			chars_.insert(chars_.end(), i.begin(), i.end());
+			++char_count_;
+		}
 	}
 
 	utf8_string_t::utf8_string_t(char const* str)
@@ -194,7 +173,9 @@ namespace atma {
 	{
 		ATMA_ASSERT(str != nullptr);
 
-		for (utf8_stream_iterator i{str}; i != utf8_stream_iterator(); ++i) {
+		utf8_istream_t stream{str};
+
+		for (utf8_stream_iterator i(stream); i != utf8_stream_iterator(); ++i) {
 			chars_.insert(chars_.end(), i.begin(), i.end());
 			++char_count_;
 		}
@@ -219,65 +200,12 @@ namespace atma {
 	 : chars_(std::move(rhs.chars_)), char_count_(rhs.char_count_)
 	{
 	}
-
 	
 
 
-	utf8_stream_iterator::utf8_stream_iterator()
-	 : utf8_stream_iterator("\0")
-	{
-	}
 
-	utf8_stream_iterator::utf8_stream_iterator(char const* stream)
-	 : stream_(stream), character_end_()
-	{
-		// if we've been placed in the middle of a sequence, then
-		// find the beginning of the next character
-		while (stream_ && (*stream_ & 0xc0) == 0x80) {
-			++stream_;
-		}
 
-		update_character_end();
-	}
 
-	char const* utf8_stream_iterator::begin() const {
-		return stream_;
-	}
-
-	char const* utf8_stream_iterator::end() const {
-		return character_end_;
-	}
-
-	unsigned int utf8_stream_iterator::byte_count() const {
-		return std::distance(stream_, character_end_);
-	}
-
-	utf8_stream_iterator& utf8_stream_iterator::operator ++ ()
-	{
-		ATMA_ASSERT(*stream_ != '\0');
-
-		stream_ = character_end_;
-		update_character_end();
-
-		return *this;
-	}
-
-	void utf8_stream_iterator::update_character_end()
-	{
-		// continuation bytes are not allowed!
-		ATMA_ASSERT((*stream_ & 0xa0) != 0x80);
-
-		character_end_ = stream_;
-		if (!(*stream_ & 0x80)) {
-			++character_end_;
-		}
-		else {
-			char marker = *stream_;
-			while (marker & 0x80) {
-				marker <<= 1; ++character_end_;
-			}
-		}
-	}
 
 
 	//=====================================================================
