@@ -44,11 +44,45 @@ namespace atma {
 		return out;
 	}
 
+	// default predicate
 	template <typename LIT, typename RIT, typename OT, typename MERGER, typename LFN, typename RFN>
-	OT merge(LIT xs_begin, LIT xs_end, RIT ys_begin, RIT ys_end, OT out, MERGER merger, LFN lfn, RFN rfn) {
+	OT merge(LIT xs_begin, LIT xs_end, RIT ys_begin, RIT ys_end, OT out, MERGER merger, LFN lfn, RFN rfn)
+	{
 		return merge(xs_begin, xs_end, ys_begin, ys_end, out, merger, lfn, rfn, std::less<typename LIT::value_type>());
 	}
 
+	// do-nothing failure-function
+	template <typename LIT, typename RIT, typename OT, typename MERGER, typename PR>
+	OT merge(LIT xs_begin, LIT xs_end, RIT ys_begin, RIT ys_end, OT out, MERGER merger, PR pred)
+	{
+		auto do_nothing = [](typename LIT::value_type const&){};
+		return merge(xs_begin, xs_end, ys_begin, ys_end, out, merger, do_nothing, do_nothing, pred);
+	}
+
+	// do-nothing failure-function, default-predicate
+	template <typename LIT, typename RIT, typename OT, typename MERGER>
+	OT merge(LIT xs_begin, LIT xs_end, RIT ys_begin, RIT ys_end, OT out, MERGER merger)
+	{
+		auto do_nothing = [](typename LIT::value_type const&){};
+		return merge(xs_begin, xs_end, ys_begin, ys_end, out, merger, do_nothing, do_nothing, std::less<typename LIT::value_type>());
+	}
+
+
+
+	//=====================================================================
+	//=====================================================================
+	template <typename IT, typename OTS, typename OTF, typename PR>
+	void seperate(IT begin, IT end, OTS out_succeed, OTF out_failure, PR pred) {
+		while (begin != end) {
+			if (pred(*begin)) {
+				*out_succeed++ = *begin;
+			}
+			else {
+				*out_failure++ = *begin;
+			}
+			++begin;
+		}
+	}
 
 //=====================================================================
 } // namespace atma
