@@ -32,6 +32,7 @@ namespace atma {
 			}
 			else {
 				*out++ = merger(*x, *y);
+				++x; ++y;
 			}
 		}
 
