@@ -97,6 +97,9 @@
     <ClInclude Include="..\include\atma\signals\slot_base.hpp" />
     <ClInclude Include="..\include\atma\signals\slot_header.hpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\include\atma\intrusive_ptr.hpp" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
