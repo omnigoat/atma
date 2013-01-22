@@ -83,4 +83,9 @@
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\include\atma\intrusive_ptr.hpp">
+      <Filter>include</Filter>
+    </None>
+  </ItemGroup>
 </Project>
