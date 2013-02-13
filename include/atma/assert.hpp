@@ -76,10 +76,10 @@ namespace assert {
 //=====================================================================
 #if defined(ATMA_ENABLE_ASSERTS)
 	#define ATMA_ASSERT_MSG(x, msg) \
-		([&](int line){ \
-			if ( !(x) && ::atma::assert::atma_assert(msg, __FILE__, line) ) \
-				{ __asm int 3 }\
-		})(__LINE__)
+		do { \
+			if ( !(x) && ::atma::assert::atma_assert(msg, __FILE__, __LINE__) ) \
+				{ __asm int 3 } \
+		} while (false)
 
 
 	#define ATMA_ASSERT(x) ATMA_ASSERT_MSG(x, #x)
