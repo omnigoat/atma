@@ -135,6 +135,7 @@ namespace console {
 		foreground_color_t fg_blue(0x09);
 		foreground_color_t fg_yellow(0x0e);
 		foreground_color_t fg_brightwhite(0xf);
+		foreground_color_t fg_dark_green(0x2);
 
 		background_color_t bg_red(0xc0);
 		background_color_t bg_green(0xa0);
