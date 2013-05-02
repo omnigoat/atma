@@ -40,9 +40,6 @@
     <ClInclude Include="..\include\atma\assert.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\atma\dense_balanced_binary_tree.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\atma\ref.hpp">
       <Filter>include</Filter>
     </ClInclude>
