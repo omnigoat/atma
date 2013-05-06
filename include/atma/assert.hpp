@@ -85,10 +85,16 @@ namespace assert {
 	#define ATMA_ASSERT(x) ATMA_ASSERT_MSG(x, #x)
 		
 #else
-	#define ATMA_ASSERT(x) ([]{})()
-	#define ATMA_ASSERT_MSG(x,m) ([]{})()
+	#define ATMA_ASSERT(x)
+	#define ATMA_ASSERT_MSG(x,m)
 
 #endif
+
+#define ATMA_ENSURE(x) \
+	do { \
+		if ( !(x) ) \
+			{ __asm int 3 } \
+	} while (false)
 
 //=====================================================================
 #endif // inclusion guard
