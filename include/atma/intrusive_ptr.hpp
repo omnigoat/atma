@@ -43,11 +43,17 @@ namespace atma {
 	template <typename T>
 	struct intrusive_ptr
 	{
-		explicit intrusive_ptr(T* t, bool add_ref = true) 
+		explicit intrusive_ptr(T* t) 
 		: px(t)
 		{
-			if (px && add_ref)
+			if (px)
 				add_ref_count(t);
+		}
+
+		template <typename Y>
+		explicit intrusive_ptr(Y* y)
+		: px(y)
+		{
 		}
 
 		intrusive_ptr(intrusive_ptr const& rhs)
@@ -57,7 +63,22 @@ namespace atma {
 				add_ref_count(px);
 		}
 
+		template <typename Y>
+		intrusive_ptr(intrusive_ptr<Y> const& rhs)
+		: px(rhs.px)
+		{
+			if (px)
+				add_ref_count(px);
+		}
+
 		intrusive_ptr(intrusive_ptr&& rhs)
+		: px()
+		{
+			std::swap(px, rhs.px);
+		}
+
+		template <typename Y>
+		intrusive_ptr(intrusive_ptr<Y>&& rhs)
 		: px()
 		{
 			std::swap(px, rhs.px);
@@ -76,11 +97,21 @@ namespace atma {
 			return *this;
 		}
 
+		template <typename Y>
+		auto operator = (intrusive_ptr<Y> const& rhs) -> intrusive_ptr& {
+			return this->operator = <T>(rhs);
+		}
+
 		auto operator = (intrusive_ptr<T>&& rhs) -> intrusive_ptr& {
 			if (px)
 				rm_ref_count(px);
 			px = rhs.px;
 			rhs.px = nullptr;
+		}
+
+		template <typename Y>
+		auto operator = (intrusive_ptr<Y>&& rhs) -> intrusive_ptr& {
+			return this->operator = <T>(rhs);
 		}
 
 		auto operator * () const -> T* {
