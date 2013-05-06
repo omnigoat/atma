@@ -43,6 +43,11 @@ namespace atma {
 	template <typename T>
 	struct intrusive_ptr
 	{
+		intrusive_ptr()
+		: px()
+		{
+		}
+
 		explicit intrusive_ptr(T* t) 
 		: px(t)
 		{
@@ -52,7 +57,7 @@ namespace atma {
 
 		template <typename Y>
 		explicit intrusive_ptr(Y* y)
-		: px(y)
+		: intrusive_ptr<T>(y) //px(y)
 		{
 		}
 
