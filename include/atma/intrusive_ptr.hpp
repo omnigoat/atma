@@ -128,7 +128,7 @@ namespace atma {
 		}
 
 		template <typename Y>
-		intrusive_ptr<Y> as() const {
+		auto as() const -> intrusive_ptr<Y> {
 			return intrusive_ptr<Y>(static_cast<Y*>(px));
 		}
 
