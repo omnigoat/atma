@@ -11,112 +11,107 @@
 namespace atma {
 //=====================================================================
 	
+
+	//=====================================================================
+	// ref_counted
+	// -------------
+	//   this is a *non-virtual* base class.
+	//=====================================================================
 	struct ref_counted
 	{
 	protected:
 		ref_counted() : ref_count_() {}
+
 	private:
 		unsigned int ref_count_;
 
-		template <typename T> friend auto add_ref_count(T*) -> void;
-		template <typename T> friend auto rm_ref_count(T*) -> void;
+		friend auto add_ref_count(ref_counted*) -> void;
+		friend auto rm_ref_count(ref_counted*) -> void;
 	};
 
 
 
-	template <typename T>
-	auto add_ref_count(T* t) -> void {
-		ATMA_ASSERT(t);
-		++static_cast<ref_counted*>(t)->ref_count_;
+	//=====================================================================
+	// add/rm_ref_count
+	// ------------------
+	//   called by intrusive_ptr
+	//=====================================================================
+	inline auto add_ref_count(ref_counted* t) -> void {
+		t && ++t->ref_count_;
 	}
 
-	template <typename T>
-	auto rm_ref_count(T* t) -> void {
-		ATMA_ASSERT(t);
-		if (--static_cast<ref_counted*>(t)->ref_count_ == 0) {
+	inline auto rm_ref_count(ref_counted* t) -> void {
+		ATMA_ASSERT(!t || t->ref_count_ >= 0);
+
+		if (t && --t->ref_count_ == 0) {
 			delete t;
 		}
 	}
 
 
 
+	//=====================================================================
+	// intrusive_ptr
+	// ---------------
+	//   atma's intrusive pointer implementation
+	//=====================================================================
 	template <typename T>
 	struct intrusive_ptr
 	{
+		// constructors/destrectuor
 		intrusive_ptr()
 		: px()
 		{
 		}
 
-		explicit intrusive_ptr(T* t) 
-		: px(t)
-		{
-			if (px)
-				add_ref_count(t);
-		}
-
 		template <typename Y>
-		explicit intrusive_ptr(Y* y)
-		: intrusive_ptr<T>(y) //px(y)
+		explicit intrusive_ptr(Y* t) 
+		: px(static_cast<T*>(t))
 		{
+			add_ref_count(t);
 		}
-
-		intrusive_ptr(intrusive_ptr const& rhs)
-		: px(rhs.px)
-		{
-			if (px)
-				add_ref_count(px);
-		}
-
+		
 		template <typename Y>
 		intrusive_ptr(intrusive_ptr<Y> const& rhs)
-		: px(rhs.px)
+		: px(static_cast<T*>(rhs.px))
 		{
-			if (px)
-				add_ref_count(px);
-		}
-
-		intrusive_ptr(intrusive_ptr&& rhs)
-		: px()
-		{
-			std::swap(px, rhs.px);
+			add_ref_count(px);
 		}
 
 		template <typename Y>
 		intrusive_ptr(intrusive_ptr<Y>&& rhs)
-		: px()
+		: px(static_cast<T*>(rhs.px))
 		{
-			std::swap(px, rhs.px);
+			rhs.px = nullptr;
 		}
 
 		~intrusive_ptr() {
-			if (px) rm_ref_count(px);
+			rm_ref_count(px);
 		}
 
-		auto operator = (intrusive_ptr<T> const& rhs) -> intrusive_ptr& {
-			if (px)
-				rm_ref_count(px);
-			px = rhs.px;
-			if (px)
-				add_ref_count(px);
+		// operators
+		template <typename Y>
+		auto operator = (intrusive_ptr<Y> const& rhs) -> intrusive_ptr& {
+			rm_ref_count(px);
+			px = static_cast<T*>(rhs.px);
+			add_ref_count(px);
 			return *this;
 		}
 
 		template <typename Y>
-		auto operator = (intrusive_ptr<Y> const& rhs) -> intrusive_ptr& {
-			return this->operator = <T>(rhs);
-		}
-
-		auto operator = (intrusive_ptr<T>&& rhs) -> intrusive_ptr& {
-			if (px)
-				rm_ref_count(px);
-			px = rhs.px;
+		auto operator = (intrusive_ptr<Y>&& rhs) -> intrusive_ptr& {
+			rm_ref_count(px);
+			px = static_cast<T*>(rhs.px);
 			rhs.px = nullptr;
+			return *this;
 		}
 
 		template <typename Y>
-		auto operator = (intrusive_ptr<Y>&& rhs) -> intrusive_ptr& {
-			return this->operator = <T>(rhs);
+		auto operator = (Y* y) -> intrusive_ptr& {
+			rm_ref_count(px);
+			px = static_cast<T*>(y);
+			add_ref_count(px);
+			return *this;
 		}
 
 		auto operator * () const -> T* {
@@ -127,12 +122,21 @@ namespace atma {
 			return px;
 		}
 
+		// accessors
 		auto get() const -> T* {
 			return px;
 		}
 
+		template <typename Y>
+		intrusive_ptr<Y> as() const {
+			return intrusive_ptr<Y>(static_cast<Y*>(px));
+		}
+
 	private:
 		T* px;
+
+		template <typename Y>
+		friend struct intrusive_ptr;
 	};
 
 	template <typename T>
