@@ -94,7 +94,13 @@ namespace assert {
 	do { \
 		if ( !(x) ) \
 			{ __asm int 3 } \
-	} while (false)
+	} while (0)
+
+#define ATMA_ENSURE_IS(r, x) \
+	do { \
+		if ((r) != (x)) \
+			{ __asm int 3 } \
+	} while (0)
 
 //=====================================================================
 #endif // inclusion guard
