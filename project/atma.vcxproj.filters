@@ -17,6 +17,9 @@
     <Filter Include="include\lockfree">
       <UniqueIdentifier>{bd6e461d-e4e4-4151-820a-ba75b405d987}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\assert">
+      <UniqueIdentifier>{968ad29c-4c40-4d67-be31-61ef65f7d577}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\atma\assert.hpp">
@@ -81,6 +84,12 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\algorithm.hpp">
       <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\assert\switch.hpp">
+      <Filter>include\assert</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\assert\config.hpp">
+      <Filter>include\assert</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
