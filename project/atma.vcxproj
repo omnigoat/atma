@@ -78,6 +78,8 @@
   <ItemGroup>
     <ClInclude Include="..\include\atma\algorithm.hpp" />
     <ClInclude Include="..\include\atma\assert.hpp" />
+    <ClInclude Include="..\include\atma\assert\config.hpp" />
+    <ClInclude Include="..\include\atma\assert\switch.hpp" />
     <ClInclude Include="..\include\atma\console.hpp" />
     <ClInclude Include="..\include\atma\lockfree\queue.hpp" />
     <ClInclude Include="..\include\atma\unittest\compile.hpp" />
