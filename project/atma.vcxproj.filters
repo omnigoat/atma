@@ -85,9 +85,6 @@
     <ClInclude Include="..\include\atma\algorithm.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\atma\assert\switch.hpp">
-      <Filter>include\assert</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\atma\assert\config.hpp">
       <Filter>include\assert</Filter>
     </ClInclude>
@@ -95,6 +92,9 @@
       <Filter>include\assert</Filter>
     </ClInclude>
     <ClInclude Include="..\include\atma\assert\handling.hpp">
+      <Filter>include\assert</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\assert\basic.hpp">
       <Filter>include\assert</Filter>
     </ClInclude>
   </ItemGroup>

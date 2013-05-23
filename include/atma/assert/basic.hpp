@@ -3,8 +3,8 @@
 //
 //
 //=====================================================================
-#ifndef ATMA_ASSERT_SWITCH_HPP
-#define ATMA_ASSERT_SWITCH_HPP
+#ifndef ATMA_ASSERT_BASIC_HPP
+#define ATMA_ASSERT_BASIC_HPP
 //=====================================================================
 #include <atma/assert/config.hpp>
 #include <atma/assert/handling.hpp>
@@ -13,7 +13,8 @@
 #include <boost/preprocessor/tuple/to_seq.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
 //=====================================================================
-#if defined(ATMA_ENABLE_ASSERTS)
+#ifdef ATMA_ENABLE_ASSERTS
+//=====================================================================
 
 	//=====================================================================
 	// ATMA_ASSERT_MSG(x, msg)
@@ -118,14 +119,17 @@
 		BOOST_PP_CAT(ADD_PAREN_1 kindof_seq,_END)
 		
 
-#else
+//=====================================================================
+#else // ATMA_ENABLE_ASSERTS
+//=====================================================================
 	#define ATMA_ASSERT(...)
 	#define ATMA_ASSERT_MSG(...)
 	#define ATMA_ASSERT_ONE_OF(...)
 	#define ATMA_ASSERT_SWITCH(...)
-#endif
 
 
+//=====================================================================
+#endif // ATMA_ENABLE_ASSERTS
 //=====================================================================
 #endif // inclusion guard
 //=====================================================================
