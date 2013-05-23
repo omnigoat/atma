@@ -7,7 +7,7 @@
 #define ATMA_ASSERT_HPP
 //=====================================================================
 #include <atma/assert/config.hpp>
-#include <atma/assert/switch.hpp>
+#include <atma/assert/basic.hpp>
 #include <atma/assert/ensure.hpp>
 #include <atma/assert/handling.hpp>
 //=====================================================================
