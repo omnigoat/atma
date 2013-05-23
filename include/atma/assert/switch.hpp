@@ -8,14 +8,17 @@
 //=====================================================================
 #include <atma/assert/config.hpp>
 //=====================================================================
-#include <boost/preprocessor/seq.hpp>
-#include <boost/preprocessor/tuple.hpp>
-#include <boost/preprocessor/variadic.hpp>
+#include <boost/preprocessor/seq/for_each.hpp>
+#include <boost/preprocessor/tuple/to_seq.hpp>
+#include <boost/preprocessor/variadic/to_seq.hpp>
 //=====================================================================
 #if defined(ATMA_ENABLE_ASSERTS)
 
 	//=====================================================================
-	// ATMA_ASSERT_MSG
+	// ATMA_ASSERT_MSG(x, msg)
+	// -------------------------
+	//   standard assert macro that takes a boolean expression @x and a
+	//   string @msg and generates an assertion if !x, displaying the message.
 	//=====================================================================
 	#define ATMA_ASSERT_MSG(x, msg) \
 		do { \
@@ -25,14 +28,25 @@
 
 
 	//=====================================================================
-	// ATMA_ASSERT
+	// ATMA_ASSERT(x)
+	// ----------------
+	//   Passthrough to ATMA_ASSERT_MSG that stringifies @x
 	//=====================================================================
 	#define ATMA_ASSERT(x) \
 		ATMA_ASSERT_MSG(x, #x)
 
 
 	//=====================================================================
-	// ATMA_ASSERT_ONE_OF
+	// ATMA_ASSERT_ONE_OF(x, ...)
+	// ----------------------------
+	//   @x is compared against all subsequent arguments with the equality
+	//   operator, and that boolean expression is given to ATMA_ASSERT. the
+	//   expression generated (and given to ATMA_ASSERT) is as follows:
+	//
+	//   ATMA_ASSERT_ONE_OF(my_thing, option1, option2, option3)
+	//
+	//   my_thing == option1 || my_thing == option2 || my_thing == option3.
+	//
 	//=====================================================================
 	#define ATMA_ASSERT_ONE_OF(...) \
 		ATMA_ASSERT(( \
@@ -50,7 +64,27 @@
 
 	
 	//=====================================================================
-	// ATMA_ASSERT_SWITCH
+	// ATMA_ASSERT_SWITCH(x, seq)
+	// ----------------------------
+	//   takes a value @x and a sequence @seq. @seq is a sequence of
+	//   tuples, of minimum size 2, where the last tuple element is the
+	//   "action" to perform, and the first n-1 elements are values to
+	//   compare @x against. the first n-1 elements are case labels:
+	//
+	//   ATMA_ASSERT_SWITCH(my_thing, (2, thing2)(4, 5, thing45));
+	//
+	//   switch(my_thing) {
+	//     case 2: {
+	//       thing2;
+	//       break;
+	//     }
+	//     case 4:
+	//     case 5: {
+	//       thing45;
+	//       break;
+	//     }
+	//   }
+	//
 	//=====================================================================
 	#define ATMA_ASSERT_SWITCH(x, seq) \
 		do { \
@@ -86,6 +120,7 @@
 #else
 	#define ATMA_ASSERT(...)
 	#define ATMA_ASSERT_MSG(...)
+	#define ATMA_ASSERT_ONE_OF(...)
 	#define ATMA_ASSERT_SWITCH(...)
 #endif
 
