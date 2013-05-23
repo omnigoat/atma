@@ -7,8 +7,9 @@
 #define ATMA_ASSERT_SWITCH_HPP
 //=====================================================================
 #include <atma/assert/config.hpp>
+#include <atma/assert/handling.hpp>
 //=====================================================================
-#include <boost/preprocessor/seq/for_each.hpp>
+#include <boost/preprocessor/seq.hpp>
 #include <boost/preprocessor/tuple/to_seq.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
 //=====================================================================
@@ -22,7 +23,7 @@
 	//=====================================================================
 	#define ATMA_ASSERT_MSG(x, msg) \
 		do { \
-			if ( !(x) && ::atma::assert::atma_assert(msg, __FILE__, __LINE__) ) \
+			if ( !(x) && ::atma::assert::detail::handle(msg, __FILE__, __LINE__) ) \
 				{ __asm int 3 } \
 		} while (false)
 
