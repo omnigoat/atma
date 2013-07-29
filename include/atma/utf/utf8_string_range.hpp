@@ -18,6 +18,8 @@ namespace atma {
 		utf8_string_range_t(char const* begin, char const* end);
 		utf8_string_range_t(utf8_string_range_t const&);
 
+		auto bytes() const -> uint32_t;
+
 		auto begin() const -> iterator;
 		auto end() const -> iterator;
 
@@ -36,27 +38,32 @@ namespace atma {
 	//=====================================================================
 	// utf8_string_range_t implementation
 	//=====================================================================
-	utf8_string_range_t::utf8_string_range_t()
+	inline utf8_string_range_t::utf8_string_range_t()
 		: begin_(), end_()
 	{
 	}
 
-	utf8_string_range_t::utf8_string_range_t(char const* begin, char const* end)
+	inline utf8_string_range_t::utf8_string_range_t(char const* begin, char const* end)
 		: begin_(begin), end_(end)
 	{
 	}
 
-	utf8_string_range_t::utf8_string_range_t(utf8_string_range_t const& rhs)
+	inline utf8_string_range_t::utf8_string_range_t(utf8_string_range_t const& rhs)
 		: begin_(rhs.begin_), end_(rhs.end_)
 	{
 	}
 
-	auto utf8_string_range_t::begin() const -> iterator
+	inline auto utf8_string_range_t::bytes() const -> uint32_t
+	{
+		return end_ - begin_;
+	}
+
+	inline auto utf8_string_range_t::begin() const -> iterator
 	{
 		return begin_;
 	}
 
-	auto utf8_string_range_t::end() const -> iterator
+	inline auto utf8_string_range_t::end() const -> iterator
 	{
 		return end_;
 	}
