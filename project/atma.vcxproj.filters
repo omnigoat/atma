@@ -124,5 +124,8 @@
     <ClInclude Include="..\include\atma\utf\utf8_string.hpp">
       <Filter>include\utf</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\utf\utf8_string_range.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

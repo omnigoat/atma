@@ -29,8 +29,6 @@ namespace atma {
 		friend class utf16_string_t;
 	};
 
-
-
 	//=====================================================================
 	// implementation
 	//=====================================================================
@@ -42,7 +40,7 @@ namespace atma {
 	utf8_string_t::utf8_string_t(char const* begin, char const* end)
 	: chars_(begin, end), char_count_()
 	{
-		for (char const& x : chars_) {
+		for (char x : chars_) {
 			if (is_utf8_leading_byte(x))
 				++char_count_;
 		}

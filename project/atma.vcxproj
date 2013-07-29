@@ -104,6 +104,7 @@
     <ClInclude Include="..\include\atma\utf\algorithm.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_istream.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string.hpp" />
+    <ClInclude Include="..\include\atma\utf\utf8_string_range.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
