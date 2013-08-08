@@ -37,9 +37,10 @@ namespace lockfree {
 		template <typename T>
 		struct node_t<T, true>
 		{
-			node_t() : next(nullptr) {}
+			node_t() : next(nullptr) { memset(value_buffer, 0, sizeof(T)); }
 			node_t(T const& value) : next(nullptr) { new (value_buffer) T(value); }
-			~node_t() { value_ptr()->~T(); }
+			~node_t() { if (value_ptr()) value_ptr()->~T(); }
+
 			auto value_ptr() const -> T const* { return reinterpret_cast<T const*>(&value_buffer[0]); }
 
 			char value_buffer[sizeof(T)];
@@ -151,6 +152,7 @@ namespace lockfree {
 
 		// clear batch
 		b.tail_ = b.head_;
+		b.head_->next = nullptr;
 	}
 
 	template <typename T>
