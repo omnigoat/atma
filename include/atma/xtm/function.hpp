@@ -26,6 +26,20 @@ namespace xtm {
 		};
 	};
 
+	template <typename C, typename R, typename... Args>
+	struct function_traits<R(C::*)(Args...)>
+	{
+		typedef R result_type;
+
+		enum { arity = sizeof...(Args) };
+
+		template <size_t i>
+		struct arg
+		{
+			typedef typename std::tuple_element<i, std::tuple<Args...>>::type type;
+		};
+	};
+
 	template <typename R, typename... Args>
 	struct function_traits<R(*)(Args...)>
 	{
