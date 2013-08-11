@@ -23,6 +23,9 @@
     <Filter Include="include\utf">
       <UniqueIdentifier>{c571d2bb-bc4c-4294-a285-1c5b931d165e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\xtm">
+      <UniqueIdentifier>{519b14cc-6d79-43a3-aa0f-7274dcf5dd10}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\atma\assert.hpp">
@@ -114,6 +117,12 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\string.hpp">
       <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\xtm\tuple.hpp">
+      <Filter>include\xtm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\xtm\function.hpp">
+      <Filter>include\xtm</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

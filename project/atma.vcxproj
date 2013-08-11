@@ -106,6 +106,8 @@
     <ClInclude Include="..\include\atma\utf\utf8_istream.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string_range.hpp" />
+    <ClInclude Include="..\include\atma\xtm\function.hpp" />
+    <ClInclude Include="..\include\atma\xtm\tuple.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\include\atma\intrusive_ptr.hpp" />

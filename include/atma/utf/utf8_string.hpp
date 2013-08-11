@@ -24,7 +24,7 @@ namespace atma {
 	private:
 		typedef std::vector<value_t> chars_t;
 		chars_t chars_;
-		unsigned int char_count_;
+		uint32_t char_count_;
 
 		friend class utf16_string_t;
 	};
