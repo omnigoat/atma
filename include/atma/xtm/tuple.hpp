@@ -47,10 +47,10 @@ namespace xtm {
 			}
 
 			template <typename R, typename C, typename... Params, typename T, typename... A>
-			static inline auto apply(R(C::*f)(Params...), T&&, C&& c, A&&... a)
+			static inline auto apply(R(C::*f)(Params...), T&&, C* c, A&&... a)
 			-> R
 			{
-				return (c.*f)(std::forward<A>(a)...);
+				return (c->*f)(std::forward<A>(a)...);
 			}
 		};
 	}
@@ -64,7 +64,7 @@ namespace xtm {
 	}
 
 	template <typename R, typename C, typename... Params>
-	inline auto apply_tuple(R(C::*f)(Params...), std::tuple<C, Params...>&& t)
+	inline auto apply_tuple(R(C::*f)(Params...), std::tuple<C*, Params...>&& t)
 	-> R
 	{
 		return detail::tuple_applier_t<std::tuple_size<typename std::decay<decltype(t)>::type>::value>
