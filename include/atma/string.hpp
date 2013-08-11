@@ -14,9 +14,9 @@ namespace atma {
 //=====================================================================
 	
 	template <typename OT, typename IT>
-	unsigned int utf8_from_utf16(OT dest, IT begin, IT end)
+	uint32_t utf8_from_utf16(OT dest, IT begin, IT end)
 	{
-		unsigned int characters = 0;
+		uint32_t characters = 0;
 
 		for (auto i = begin; i != end; ++i)
 		{
@@ -56,9 +56,9 @@ namespace atma {
 	}
 
 	template <typename OT, typename IT>
-	unsigned int utf16_from_utf8(OT dest, IT begin, IT end)
+	uint32_t utf16_from_utf8(OT dest, IT begin, IT end)
 	{
-		unsigned int characters = 0;
+		uint32_t characters = 0;
 
 		for (auto i = begin; i != end; ++i)
 		{
@@ -126,7 +126,7 @@ namespace atma {
 	private:
 		typedef std::vector<value_t> chars_t;
 		chars_t chars_;
-		unsigned int char_count_;
+		uint32_t char_count_;
 
 		friend class utf16_string_t;
 	};
@@ -144,7 +144,7 @@ namespace atma {
 	private:
 		typedef std::vector<value_t> chars_t;
 		chars_t chars_;
-		unsigned int char_count_;
+		uint32_t char_count_;
 
 		friend class utf8_string_t;
 	};

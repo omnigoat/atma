@@ -7,6 +7,7 @@
 #define ATMA_INTRUSIVE_PTR_HPP
 //=====================================================================
 #include <atma/assert.hpp>
+#include <atomic>
 //=====================================================================
 namespace atma {
 //=====================================================================
@@ -19,11 +20,13 @@ namespace atma {
 	//=====================================================================
 	struct ref_counted
 	{
+		virtual ~ref_counted() {}
+
 	protected:
 		ref_counted() : ref_count_() {}
 
 	private:
-		unsigned int ref_count_;
+		std::atomic_uint32_t ref_count_;
 
 		friend auto add_ref_count(ref_counted*) -> void;
 		friend auto rm_ref_count(ref_counted*) -> void;
@@ -64,58 +67,88 @@ namespace atma {
 		{
 		}
 
-		template <typename Y>
-		explicit intrusive_ptr(Y* t) 
-		: px(static_cast<T*>(t))
+		explicit intrusive_ptr(T* t)
+		: px(t)
 		{
 			add_ref_count(t);
 		}
-		
-		template <typename Y>
-		intrusive_ptr(intrusive_ptr<Y> const& rhs)
-		: px(static_cast<T*>(rhs.px))
+
+		//template <typename Y>
+		//explicit intrusive_ptr(Y* t) 
+		//: px(static_cast<T*>(t))
+		//{
+		//	add_ref_count(t);
+		//}
+
+		intrusive_ptr(intrusive_ptr<T> const& rhs)
+		: px(rhs.px)
 		{
 			add_ref_count(px);
 		}
 
-		template <typename Y>
-		intrusive_ptr(intrusive_ptr<Y>&& rhs)
-		: px(static_cast<T*>(rhs.px))
-		{
-			rhs.px = nullptr;
-		}
+		//template <typename Y>
+		//intrusive_ptr(intrusive_ptr<Y> const& rhs)
+		//: px(static_cast<T*>(rhs.px))
+		//{
+		//	add_ref_count(px);
+		//}
+
+		//intrusive_ptr(intrusive_ptr<T>&& rhs)
+		//: px(rhs.px)
+		//{
+		//	rhs.px = nullptr;
+		//}
+
+		//template <typename Y>
+		//intrusive_ptr(intrusive_ptr<Y>&& rhs)
+		//: px(static_cast<T*>(rhs.px))
+		//{
+		//	rhs.px = nullptr;
+		//}
 
 		~intrusive_ptr() {
 			rm_ref_count(px);
 		}
 
 		// operators
-		template <typename Y>
-		auto operator = (intrusive_ptr<Y> const& rhs) -> intrusive_ptr& {
+		auto operator = (intrusive_ptr const& rhs) -> intrusive_ptr&
+		{
+			ATMA_ASSERT(this != &rhs);
+			//if (this == &rhs)
+				//return *this;
+			add_ref_count(rhs.px);
 			rm_ref_count(px);
-			px = static_cast<T*>(rhs.px);
-			add_ref_count(px);
+			px = rhs.px;
+			
 			return *this;
 		}
 
-		template <typename Y>
-		auto operator = (intrusive_ptr<Y>&& rhs) -> intrusive_ptr& {
-			rm_ref_count(px);
-			px = static_cast<T*>(rhs.px);
-			rhs.px = nullptr;
-			return *this;
-		}
+		//template <typename Y>
+		//auto operator = (intrusive_ptr<Y> const& rhs) -> intrusive_ptr& {
+		//	rm_ref_count(px);
+		//	px = static_cast<T*>(rhs.px);
+		//	add_ref_count(px);
+		//	return *this;
+		//}
 
-		template <typename Y>
-		auto operator = (Y* y) -> intrusive_ptr& {
-			rm_ref_count(px);
-			px = static_cast<T*>(y);
-			add_ref_count(px);
-			return *this;
-		}
+		//template <typename Y>
+		//auto operator = (intrusive_ptr<Y>&& rhs) -> intrusive_ptr& {
+		//	rm_ref_count(px);
+		//	px = static_cast<T*>(rhs.px);
+		//	rhs.px = nullptr;
+		//	return *this;
+		//}
 
-		auto operator * () const -> T* {
-			return px;
+		//template <typename Y>
+		//auto operator = (Y* y) -> intrusive_ptr& {
+		//	rm_ref_count(px);
+		//	px = static_cast<T*>(y);
+		//	add_ref_count(px);
+		//	return *this;
+		//}
+
+		auto operator * () const -> T& {
+			return *px;
 		}
 		
 		auto operator -> () const -> T* {

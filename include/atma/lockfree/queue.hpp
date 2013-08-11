@@ -26,8 +26,9 @@ namespace lockfree {
 		{
 			node_t() : value(nullptr), next(nullptr) {}
 			node_t(const T& value) : value(new T(value)), next(nullptr) {}
-			~node_t() { delete value; }
+			~node_t() { }
 			auto value_ptr() const -> T const* { return value; }
+			auto clear_value_ptr() -> void { value = nullptr; }
 
 			T* value;
 			std::atomic<node_t*> next;
@@ -38,10 +39,16 @@ namespace lockfree {
 		struct node_t<T, true>
 		{
 			node_t() : next(nullptr) { memset(value_buffer, 0, sizeof(T)); }
-			node_t(T const& value) : next(nullptr) { new (value_buffer) T(value); }
-			~node_t() { if (value_ptr()) value_ptr()->~T(); }
+			node_t(T const& value) : next(nullptr) {
+				new (value_buffer) T(value);
+			}
+			~node_t() {}
 
 			auto value_ptr() const -> T const* { return reinterpret_cast<T const*>(&value_buffer[0]); }
+			auto clear_value_ptr() -> void { 
+				if (value_ptr()) value_ptr()->~T();
+				memset(value_buffer, 0, sizeof(T));
+			}
 
 			char value_buffer[sizeof(T)];
 			std::atomic<node_t*> next;
@@ -170,6 +177,8 @@ namespace lockfree {
 			consumer_lock_ = false;
 
 			result = *value;
+			head_next->clear_value_ptr();
+
 			delete head;
 			return true;
 		}
