@@ -107,7 +107,8 @@ namespace lockfree {
 		~batch_t();
 
 		auto push(T const&) -> batch_t&;
-
+		auto begin() const -> node_t const*;
+		auto end() const -> node_t const*;
 
 	public:
 		typedef detail::node_t<T> node_t;
@@ -216,7 +217,18 @@ namespace lockfree {
 		return *this;
 	}
 
+	template <typename T>
+	auto queue_t<T>::batch_t::begin() const -> node_t const*
+	{
+		return head_->next;
+	}
 
+
+	template <typename T>
+	auto queue_t<T>::batch_t::end() const -> node_t const*
+	{
+		return nullptr;
+	}
 
 
 //=====================================================================
