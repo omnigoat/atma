@@ -7,7 +7,6 @@
 namespace atma {
 //=====================================================================
 
-	
 	//=====================================================================
 	// utf8_string_range_t
 	// ---------------------
@@ -15,8 +14,7 @@ namespace atma {
 	//   to external, contiguous memory that is expected to be valid for the
 	//   lifetime of the string-range.
 	//
-	//   This range is immutable, in that whilst we can change where we point
-	//   to, we can not change the contents of what we point to.
+	//   This range is immutable.
 	//
 	//=====================================================================
 	class utf8_string_range_t
@@ -39,6 +37,12 @@ namespace atma {
 		char const* end_;
 	};
 
+
+
+
+	//=====================================================================
+	// operators
+	//=====================================================================
 	inline auto operator == (utf8_string_range_t const& lhs, utf8_string_range_t const& rhs) -> bool
 	{
 		return lhs.bytes() == rhs.bytes() && memcmp(lhs.begin(), rhs.begin(), lhs.bytes()) == 0;
