@@ -43,7 +43,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
     <IntDir>$(Configuration)\</IntDir>
-    <IncludePath>$(ProjectDir)../vendor/;$(IncludePath)</IncludePath>
+    <IncludePath>../include;$(ProjectDir)../vendor/;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
@@ -83,6 +83,8 @@
     <ClInclude Include="..\include\atma\assert\handling.hpp" />
     <ClInclude Include="..\include\atma\assert\basic.hpp" />
     <ClInclude Include="..\include\atma\console.hpp" />
+    <ClInclude Include="..\include\atma\evented\delegate.hpp" />
+    <ClInclude Include="..\include\atma\evented\event.hpp" />
     <ClInclude Include="..\include\atma\lockfree\queue.hpp" />
     <ClInclude Include="..\include\atma\string.hpp" />
     <ClInclude Include="..\include\atma\unittest\compile.hpp" />
