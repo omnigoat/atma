@@ -26,6 +26,9 @@
     <Filter Include="include\xtm">
       <UniqueIdentifier>{519b14cc-6d79-43a3-aa0f-7274dcf5dd10}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\evented">
+      <UniqueIdentifier>{6ac3561b-d933-4be5-88cd-b3b8bdf83a57}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\atma\assert.hpp">
@@ -123,6 +126,12 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\xtm\function.hpp">
       <Filter>include\xtm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\evented\event.hpp">
+      <Filter>include\evented</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\evented\delegate.hpp">
+      <Filter>include\evented</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
