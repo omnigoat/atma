@@ -43,7 +43,11 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
     <IntDir>$(Configuration)\</IntDir>
+<<<<<<< HEAD
     <IncludePath>../include;$(ProjectDir)../vendor/;$(IncludePath)</IncludePath>
+=======
+    <IncludePath>$(ProjectDir)..\vendor;$(IncludePath)</IncludePath>
+>>>>>>> 4da48574eff1fc446927fe533cb9741b7e3218d6
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)$(Configuration)\</OutDir>
