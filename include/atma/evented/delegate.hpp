@@ -22,7 +22,7 @@ namespace evented {
 	struct delegate_t : atma::ref_counted
 	{
 		virtual ~delegate_t() {}
-		virtual auto operator ()(Params&&...)->R = 0;
+		virtual auto operator ()(Params&&...) -> R = 0;
 	};
 
 
