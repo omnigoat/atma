@@ -93,17 +93,6 @@
     <ClInclude Include="..\include\atma\unittest\run.hpp" />
     <ClInclude Include="..\include\atma\unittest\unittest.hpp" />
     <ClInclude Include="..\include\atma\config\platform.hpp" />
-    <ClInclude Include="..\include\atma\signals\connection.hpp" />
-    <ClInclude Include="..\include\atma\signals\connection_header.hpp" />
-    <ClInclude Include="..\include\atma\signals\forward_declarations.hpp" />
-    <ClInclude Include="..\include\atma\signals\multi_signal.hpp" />
-    <ClInclude Include="..\include\atma\signals\signal.hpp" />
-    <ClInclude Include="..\include\atma\signals\signal_base.hpp" />
-    <ClInclude Include="..\include\atma\signals\signal_header.hpp" />
-    <ClInclude Include="..\include\atma\signals\signal_traits.hpp" />
-    <ClInclude Include="..\include\atma\signals\slot.hpp" />
-    <ClInclude Include="..\include\atma\signals\slot_base.hpp" />
-    <ClInclude Include="..\include\atma\signals\slot_header.hpp" />
     <ClInclude Include="..\include\atma\utf\algorithm.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_istream.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string.hpp" />

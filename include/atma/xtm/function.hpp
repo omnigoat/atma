@@ -13,44 +13,44 @@ namespace xtm {
 	{
 	};
 	
-	template <typename C, typename R, typename... Args>
-	struct function_traits<R(C::*)(Args...) const>
+	template <typename C, typename R, typename... Params>
+	struct function_traits<R(C::*)(Params...) const>
 	{
 		typedef R result_type;
 		
-		enum { arity = sizeof...(Args) };
+		enum { arity = sizeof...(Params) };
 		
 		template <size_t i>
 		struct arg {
-			typedef typename std::tuple_element<i, std::tuple<Args...>>::type type;
+			typedef typename std::tuple_element<i, std::tuple<Params...>>::type type;
 		};
 	};
 
-	template <typename C, typename R, typename... Args>
-	struct function_traits<R(C::*)(Args...)>
+	template <typename C, typename R, typename... Params>
+	struct function_traits<R(C::*)(Params...)>
 	{
 		typedef R result_type;
 
-		enum { arity = sizeof...(Args) };
+		enum { arity = sizeof...(Params) };
 
 		template <size_t i>
 		struct arg
 		{
-			typedef typename std::tuple_element<i, std::tuple<Args...>>::type type;
+			typedef typename std::tuple_element<i, std::tuple<Params...>>::type type;
 		};
 	};
 
-	template <typename R, typename... Args>
-	struct function_traits<R(*)(Args...)>
+	template <typename R, typename... Params>
+	struct function_traits<R(*)(Params...)>
 	{
 		typedef R result_type;
 		
-		enum { arity = sizeof...(Args) };
+		enum { arity = sizeof...(Params) };
 		
 		template <size_t i>
 		struct arg
 		{
-			typedef typename std::tuple_element<i, std::tuple<Args...>>::type type;
+			typedef typename std::tuple_element<i, std::tuple<Params...>>::type type;
 		};
 	};
 
