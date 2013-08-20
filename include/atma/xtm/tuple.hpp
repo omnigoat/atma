@@ -8,16 +8,50 @@ namespace atma {
 namespace xtm {
 //=====================================================================
 	
+	namespace detail {
+		template <uint32_t N> struct tuple_applier_t;
+	}
 
 	//=====================================================================
 	// apply_tuple
 	// -------------
-	//   takes a function and a tuple, and calls the function with the
-	//   tuple's elements as arguments.
+	//   Takes a callable object and a tuple of arguments, and calls the
+	//   object with those arguments. @callable may be a function-pointer,
+	//   a member-function-pointer (with the first tuple element being a
+	//   pointer to an instantiation of the class), or a generic callable
+	//   object, like a std::function<>, or even a lambda.
+	//
+	//   A helper function is provided for member-function-pointers where
+	//   the pointer to the instantiation isn't in the tuple to begin with.
+	//   For speeeed.
 	//=====================================================================
-	namespace detail
+	template <typename F, typename... Args>
+	inline auto apply_tuple(F&& f, std::tuple<Args...>&& t)
+	-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
 	{
-		template <size_t N>
+		typedef typename std::decay<decltype(t)>::type DT;
+		typedef typename std::remove_reference<decltype(t)>::type RRT;
+
+		return detail::tuple_applier_t<std::tuple_size<DT>::value>::apply(std::forward<F>(f), std::forward<RRT>(t));
+	}
+
+
+	template <typename R, typename C, typename... Params, typename... Args>
+	inline auto apply_tuple(R(C::*f)(Params...), C* c, std::tuple<Args...>&& t)
+	-> R
+	{
+		typedef typename std::decay<decltype(t)>::type DT;
+		typedef typename std::remove_reference<decltype(t)>::type RRT;
+
+		return detail::tuple_applier_t<std::tuple_size<DT>::value>::apply(f, std::forward<RRT>(t), c);
+	}
+
+
+
+
+
+	namespace detail {
+		template <uint32_t N>
 		struct tuple_applier_t
 		{
 			template <typename F, typename T, typename... Args>
@@ -25,6 +59,14 @@ namespace xtm {
 			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
 			{
 				return tuple_applier_t<N - 1>::apply(std::forward<F>(f), std::forward<T>(t),
+					std::forward<typename std::tuple_element<N - 1, T>::type>(std::get<N - 1>(std::forward<T>(t))), std::forward<Args>(args)...);
+			}
+
+			template <typename R, typename C, typename... Params, typename T, typename... Args>
+			static inline auto apply(R(C::*f)(Params...), T&& t, C* c, Args&&... args)
+			-> R
+			{
+				return tuple_applier_t<N - 1>::apply(f, std::forward<T>(t), c,
 					std::forward<typename std::tuple_element<N - 1, T>::type>(std::get<N - 1>(std::forward<T>(t))), std::forward<Args>(args)...);
 			}
 		};
@@ -58,25 +100,6 @@ namespace xtm {
 		};
 	}
 
-	template <typename R, typename... Params, typename Tuple>
-	inline auto apply_tuple(R(*f)(Params...), Tuple&& t)
-	-> R
-	{
-		typedef typename std::decay<Tuple>::type DT;
-		typedef typename std::remove_reference<Tuple>::type RRT;
-
-		return detail::tuple_applier_t<std::tuple_size<DT>::value>::apply(f, std::forward<RRT>(t));
-	}
-
-	template <typename R, typename C, typename... Params, typename Tuple>
-	inline auto apply_tuple(R(C::*f)(Params...), Tuple&& t)
-	-> R
-	{
-		typedef typename std::decay<Tuple>::type DT;
-		typedef typename std::remove_reference<Tuple>::type RRT;
-
-		return detail::tuple_applier_t<std::tuple_size<DT>::value>::apply(f, std::forward<RRT>(t));
-	}
 
 //=====================================================================
 } // namespace xtm
