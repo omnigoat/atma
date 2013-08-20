@@ -2,6 +2,7 @@
 #define ATMA_XTM_TUPLE_HPP
 //=====================================================================
 #include <tuple>
+#include <cstdint>
 #include <atma/xtm/function.hpp>
 //=====================================================================
 namespace atma {
