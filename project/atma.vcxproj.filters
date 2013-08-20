@@ -11,9 +11,6 @@
     <Filter Include="include\config">
       <UniqueIdentifier>{15eba01f-1b79-41ab-beac-416450e8cd49}</UniqueIdentifier>
     </Filter>
-    <Filter Include="include\events">
-      <UniqueIdentifier>{cf581ce7-941f-4662-a728-5076c5ce9bef}</UniqueIdentifier>
-    </Filter>
     <Filter Include="include\lockfree">
       <UniqueIdentifier>{bd6e461d-e4e4-4151-820a-ba75b405d987}</UniqueIdentifier>
     </Filter>
@@ -51,39 +48,6 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\config\platform.hpp">
       <Filter>include\config</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\signals\connection.hpp">
-      <Filter>include\events</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\signals\connection_header.hpp">
-      <Filter>include\events</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\signals\forward_declarations.hpp">
-      <Filter>include\events</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\signals\multi_signal.hpp">
-      <Filter>include\events</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\signals\signal.hpp">
-      <Filter>include\events</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\signals\signal_base.hpp">
-      <Filter>include\events</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\signals\signal_header.hpp">
-      <Filter>include\events</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\signals\signal_traits.hpp">
-      <Filter>include\events</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\signals\slot.hpp">
-      <Filter>include\events</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\signals\slot_base.hpp">
-      <Filter>include\events</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\signals\slot_header.hpp">
-      <Filter>include\events</Filter>
     </ClInclude>
     <ClInclude Include="..\include\atma\lockfree\queue.hpp">
       <Filter>include\lockfree</Filter>
