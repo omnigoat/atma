@@ -42,10 +42,27 @@ namespace evented {
 
 			auto operator ()(Params&&... params) -> R override
 			{
-				return (*fn_)(std::move<Params>(params)...);
+				return (*fn_)(std::forward<Params>(params)...);
 			}
 
 			R(*fn_)(Params...);
+		};
+
+		// fnptr
+		template <typename R, typename T, typename... Params>
+		struct bound_fnptr_delegate_t : delegate_t<R, Params...>
+		{
+			bound_fnptr_delegate_t(R(*fn)(Params...), T&& bindings)
+			 : fn_(fn), bindings_(bindings)
+			{
+			}
+
+			auto operator ()(Params&&... params) -> R override {
+				return atma::xtm::apply_tuple_ex(fn_, bindings_, std::make_tuple(params));
+			}
+
+			R(*fn_)(Params...);
+			T bindings_;
 		};
 
 		// memfnptr
@@ -59,7 +76,7 @@ namespace evented {
 
 			auto operator ()(Params&&... params) -> R override
 			{
-				return (c_->*fn_)(std::move<Params>(params)...);
+				return (c_->*fn_)(std::forward<Params>(params)...);
 			}
 
 			R(C::*fn_)(Params...);
