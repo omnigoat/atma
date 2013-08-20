@@ -10,6 +10,7 @@ namespace xtm {
 	
 	namespace detail {
 		template <uint32_t N> struct tuple_applier_t;
+		template <uint32_t M> struct bound_tuple_applier_t;
 	}
 
 	//=====================================================================
@@ -46,11 +47,107 @@ namespace xtm {
 		return detail::tuple_applier_t<std::tuple_size<DT>::value>::apply(f, std::forward<RRT>(t), c);
 	}
 
+	template <typename F, typename... Bindings, typename... Args>
+	inline auto apply_tuple_ex(F&& f, std::tuple<Bindings...>&& b, std::tuple<Args...>&& t)
+	-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
+	{
+		typedef typename std::decay<decltype(t)>::type DT;
+		typedef typename std::decay<decltype(b)>::type DB;
+		
+		return detail::bound_tuple_applier_t<sizeof...(Bindings)>::apply(
+			std::forward<F>(f),
+			std::forward<std::remove_reference<decltype(b)>::type>(b),
+			std::forward<std::remove_reference<decltype(t)>::type>(t));
+	}
 
 
 
+	namespace detail
+	{
+		template <uint32_t I> struct xtm_ph {};
 
-	namespace detail {
+
+		//=====================================================================
+		// select_element_t
+		//=====================================================================
+		// generic types, pass the binding value through
+		template <typename A, typename T>
+		struct select_element_t {
+			static inline auto apply(A&& a, T&& b) -> A&& {
+				return std::forward<A>(a);
+			}
+		};
+
+		// when a placeholder is passed in, pick the argument in that slot
+		template <uint32_t I, typename T>
+		struct select_element_t<xtm_ph<I>, T> {
+			static inline auto apply(xtm_ph<I>&&, T&& t) -> typename std::tuple_element<I, T>::type&& {
+				return std::forward<typename std::tuple_element<I, T>::type>
+					(std::get<I>(std::forward<T>(t)));
+			}
+		};
+
+		
+		//=====================================================================
+		// bound_tuple_applier_t
+		//=====================================================================
+		// bindings and values still present
+		template <uint32_t M>
+		struct bound_tuple_applier_t
+		{
+			template <typename F, typename B, typename T, typename... Args>
+			static inline auto apply(F&& f, B&& b, T&& t, Args&&... args)
+			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
+			{
+				// binding element type
+				//typedef typename  B_T;
+				auto&& element = 
+					select_element_t<typename std::tuple_element<M - 1, B>::type, T>
+						::apply(std::forward<typename std::tuple_element<M - 1, B>::type>
+						(std::get<M - 1>(std::forward<B>(b))), std::forward<T>(t));
+
+				return bound_tuple_applier_t<M - 1>::apply(
+					std::forward<F>(f),
+					std::forward<B>(b),
+					std::forward<T>(t),
+					element,
+					std::forward<Args>(args)...);
+			}
+		};
+
+		// only bindings present
+		#if 0
+		template <uint32_t M>
+		struct bound_tuple_applier_t<M, 0>
+		{
+			template <typename F, typename B, typename T, typename... Args>
+			static inline auto apply(F&& f, B&& b, T&& t, Args&&... args)
+			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
+			{
+				// binding element type
+				typedef typename std::tuple_element<M - 1, T>::type B_T;
+				
+				return tuple_applier_t<M - 1>::apply(
+					std::forward<F>(f),
+					std::forward<T>(b),
+					std::forward<B_T>(std::get<M - 1>(std::forward<B>(b))),
+					std::forward<Args>(args)...);
+			}
+		};
+		#endif
+
+		// termination
+		template <>
+		struct bound_tuple_applier_t<0>
+		{
+			template <typename R, typename... Params, typename B, typename T, typename... Args>
+			static inline auto apply(R(*f)(Params...), B&&, T&&, Args&&... args)
+			-> R
+			{
+				return (*f)(std::forward<Args>(args)...);
+			}
+		};
+
 		template <uint32_t N>
 		struct tuple_applier_t
 		{
