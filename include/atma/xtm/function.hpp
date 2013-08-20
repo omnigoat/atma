@@ -20,6 +20,8 @@ namespace xtm {
 		
 		enum { arity = sizeof...(Params) };
 		
+		typedef std::tuple<Params...> tupled_params_type;
+
 		template <size_t i>
 		struct arg {
 			typedef typename std::tuple_element<i, std::tuple<Params...>>::type type;
@@ -32,6 +34,8 @@ namespace xtm {
 		typedef R result_type;
 
 		enum { arity = sizeof...(Params) };
+
+		typedef std::tuple<Params...> tupled_params_type;
 
 		template <size_t i>
 		struct arg
@@ -47,6 +51,8 @@ namespace xtm {
 		
 		enum { arity = sizeof...(Params) };
 		
+		typedef std::tuple<Params...> tupled_params_type;
+
 		template <size_t i>
 		struct arg
 		{
