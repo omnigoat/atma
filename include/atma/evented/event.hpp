@@ -9,40 +9,42 @@
 #include <atma/assert.hpp>
 #include <atma/evented/delegate.hpp>
 #include <atomic>
+#include <functional>
+#include <vector>
 //=====================================================================
 namespace atma {
 namespace evented {
 //=====================================================================
 	
-	
 	//=====================================================================
 	// event_t
 	//=====================================================================
-	template <typename R = void, typename... Params>
+	template <typename F = typename std::identity<void()>::type>
 	struct event_t
 	{
-		template <typename T>
-		auto operator += (T const& t) -> void {
+		typedef std::function<F> delegate_t;
+
+		auto operator += (delegate_t const& t) -> void {
 			connect(t);
 		}
 
 		// connect
-		template <typename T>
-		auto connect(T const& t) -> void {
-			delegates_.push_back(make_delegate(t));
+		auto connect(delegate_t const& t) -> void {
+			delegates_.push_back(t);
 		}
 
 		// fire
-		auto fire(Params&&... params) -> void
+		template <typename... Args>
+		auto fire(Args&&... args) -> void
 		{
 			for (auto const& x : delegates_) {
-				x->operator ()(std::move<Params>(params)...);
+				x(std::forward<Args>(args)...);
 			}
 		}
 
 
 	private:
-		typedef std::vector<intrusive_ptr<delegate_t<R, Params...>>> delegates_t;
+		typedef std::vector<delegate_t> delegates_t;
 		delegates_t delegates_;
 	};
 
