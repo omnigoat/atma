@@ -4,40 +4,44 @@
 //=====================================================================
 // construction
 //=====================================================================
-template <unsigned int E, typename T>
-vector<E, T>::vector()
+vector4f::vector4f()
 {
+	memset(fpd_, 0, 4 * 128);
 }
 
-template <unsigned int E, typename T>
-vector<E, T>::vector(std::initializer_list<T> elements)
+vector4f::vector4f(float x, float y, float z, float w)
 {
-	ATMA_ASSERT(elements.size() == E);
-	std::copy(elements.begin(), elements.end(), elements_.begin());
+	fpd_[0] = x;
+	fpd_[1] = y;
+	fpd_[2] = z;
+	fpd_[3] = w;
 }
 
-template <unsigned int E, typename T>
-vector<E, T>::vector(const vector<E, T>& rhs)
- : elements_(rhs.elements_)
+vector4f::vector4f(const vector4f& rhs)
 {
+	memcpy(fpd_, rhs.fpd_, 128);
 }
 
 
 //=====================================================================
 // assignment
 //=====================================================================
-template <unsigned int E, typename T>
-vector<E, T>& vector<E, T>::operator = (const vector<E, T>& rhs) {
-	elements_ = rhs.elements_;
+inline auto vector4f::operator = (const vector4f& rhs) -> vector4f&
+{
+	memcpy(fpd_, rhs.fpd_, 128);
 	return *this;
 }
 
-template <unsigned int E, typename T>
 template <typename OP>
-vector<E, T>& vector<E, T>::operator = (const impl::expr<vector<E, T>, OP>& e) {
+inline auto vector4f::operator = (const impl::expr<vector4f, OP>& e) -> vector4f&
+{
+#ifdef ATMA_MATH_USE_SSE
+	xmmd_ = e.xmmd();
+#else
 	for (auto i = 0u; i != E; ++i) {
-		elements_[i] = e[i];
+		fpd_[i] = e[i];
 	}
+#endif
 	return *this;
 }
 
@@ -45,18 +49,18 @@ vector<E, T>& vector<E, T>::operator = (const impl::expr<vector<E, T>, OP>& e) {
 //=====================================================================
 // access
 //=====================================================================
-template <unsigned int E, typename T>
-const T& vector<E, T>::operator [](unsigned int i) const {
+inline auto vector4f::operator [](uint32_t i) const -> T const&
+{
 	ATMA_ASSERT(i < E);
-	return elements_[i];
+	return fpd_[i];
 }
 
 
 //=====================================================================
 // computation
 //=====================================================================
-template <unsigned int E, typename T>
-inline auto vector<E, T>::magnitude_squared() const -> T
+
+inline auto vector4f::magnitude_squared() const -> T
 {
 	T result{};
 	for (auto& x : *this)
@@ -64,53 +68,46 @@ inline auto vector<E, T>::magnitude_squared() const -> T
 	return result;
 }
 
-template <unsigned int E, typename T>
-inline auto vector<E, T>::magnitude() const -> T
+inline auto vector4f::magnitude() const -> T
 {
 	return std::sqrt(magnitude_squared());
 }
 
-template <unsigned int E, typename T>
-inline auto vector<E, T>::normalized() const -> impl::expr<vector<E, T>, impl::binary_oper<impl::vector_div<E,T>, vector<E,T>, T>>
+inline auto vector4f::normalized() const -> impl::expr<vector4f, impl::binary_oper<impl::vector_div<E,T>, vector<E,T>, T>>
 {
-	return impl::expr<vector<E, T>, impl::binary_oper<impl::vector_div<E,T>, vector<E,T>, T>>(*this, magnitude());
+	return impl::expr<vector4f, impl::binary_oper<impl::vector_div<E,T>, vector<E,T>, T>>(*this, magnitude());
 }
 
 
 //=====================================================================
 // mutation
 //=====================================================================
-template <unsigned int E, typename T>
-vector<E, T>& vector<E, T>::operator += (const vector<E, T>& rhs) {
+vector4f& vector4f::operator += (const vector4f& rhs) {
 	for (auto i = 0u; i != E; ++i)
-		elements_[i] += rhs.elements_[i];
+		fpd_[i] += rhs.fpd_[i];
 	return *this;
 }
 
-template <unsigned int E, typename T>
-vector<E, T>& vector<E, T>::operator -= (const vector<E, T>& rhs) {
+vector4f& vector4f::operator -= (const vector4f& rhs) {
 	for (auto i = 0u; i != E; ++i)
-		elements_[i] -= rhs.elements_[i];
+		fpd_[i] -= rhs.fpd_[i];
 	return *this;
 }
 
-template <unsigned int E, typename T>
-vector<E, T>& vector<E, T>::operator *= (const T& rhs) {
+vector4f& vector4f::operator *= (const T& rhs) {
 	for (auto i = 0u; i != E; ++i)
-		elements_[i] *= rhs;
+		fpd_[i] *= rhs;
 	return *this;
 }
 
-template <unsigned int E, typename T>
-vector<E, T>& vector<E, T>::operator /= (const T& rhs) {
+vector4f& vector4f::operator /= (const T& rhs) {
 	for (auto i = 0u; i != E; ++i)
-		elements_[i] /= rhs;
+		fpd_[i] /= rhs;
 	return *this;
 }
 
-template <unsigned int E, typename T>
-auto vector<E, T>::set(unsigned int i, const T& n) -> vector<E, T>&
+vector4f& vector4f::set(uint32_t i, const T& n)
 {
-	elements_[i] = n;
+	fpd_[i] = n;
 	return *this;
 }

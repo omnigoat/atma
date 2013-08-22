@@ -1,73 +1,95 @@
 
-
 //=====================================================================
 // expression template functions
+//
+// this is where the operators actually do the work on per-element
 //=====================================================================
 namespace impl
 {
-	template <unsigned int E, typename T> struct vector_add {};
-	template <unsigned int E, typename T> struct vector_sub {};
-	template <unsigned int E, typename T> struct vector_mul_post {};
-	template <unsigned int E, typename T> struct vector_mul_pre {};
-	template <unsigned int E, typename T> struct vector_div {};
+	struct vector_add {};
+	struct vector_sub {};
+	struct vector_mul_post {};
+	struct vector_mul_pre {};
+	struct vector_div {};
 
-	template <unsigned int E, typename T, typename LHS, typename RHS>
-	struct expr<vector<E,T>, binary_oper<vector_add<E,T>, LHS, RHS>>
+
+	// vector_add
+	template <typename LHS, typename RHS>
+	struct expr<vector4f, vector_add, LHS, RHS> : base_expr<vector4f>
 	{
-		expr(const LHS& lhs, const RHS& rhs)
-		 : lhs(lhs), rhs(rhs)
-		  {}
+		expr(LHS const& lhs, RHS const& rhs)
+		: lhs(lhs), rhs(rhs)
+		{
+#ifdef ATMA_MATH_USE_SSE
+			xmmd_ = _mm_add_ps(lhs.xmmd_, rhs.xmmd_);
+#endif
+		}
 		
-		auto operator [](unsigned int i) const -> T {
+#ifndef ATMA_MATH_USE_SSE
+		auto operator [](uint32_t i) const -> T {
 			ATMA_ASSERT(i < E);
 			return lhs[i] + rhs[i];
 		}
-	
+#endif
 		typename storage_policy<LHS>::type lhs;
 		typename storage_policy<RHS>::type rhs;
 	};
 
-	template <unsigned int E, typename T, typename LHS, typename RHS>
-	struct expr<vector<E,T>, binary_oper<vector_sub<E,T>, LHS, RHS>>
+	// vector_sub
+	template <typename LHS, typename RHS>
+	struct expr<vector4f, vector_sub, LHS, RHS> : base_expr<vector4f>
 	{
-		expr(const LHS& lhs, const RHS& rhs)
-		 : lhs(lhs), rhs(rhs)
-		  {}
-		
-		auto operator [](unsigned int i) const -> T {
+		expr(LHS const& lhs, RHS const& rhs)
+		: lhs(lhs), rhs(rhs)
+		{
+#ifdef ATMA_MATH_USE_SSE
+			xmmd_ = _mm_sub_ps(lhs.xmmd_, rhs.xmmd_);
+#endif
+		}
+	
+#ifndef ATMA_MATH_USE_SSE
+		auto operator [](uint32_t i) const -> T {
 			ATMA_ASSERT(i < E);
 			return lhs[i] - rhs[i];
 		}
-	
+#endif
 		typename storage_policy<LHS>::type lhs;
 		typename storage_policy<RHS>::type rhs;
 	};
 
-
-	template <unsigned int E, typename T, typename LHS, typename RHS>
-	struct expr<vector<E,T>, binary_oper<vector_mul_post<E,T>, LHS, RHS>>
+	// vector_mul_post
+	template <typename LHS, typename RHS>
+	struct expr<vector4f, vector_mul_post, LHS, RHS> : base_expr<vector4f>
 	{
-		expr(const LHS& lhs, const RHS& rhs)
-		 : lhs(lhs), rhs(rhs)
-		  {}
-		
-		auto operator [](unsigned int i) const -> T {
-			ATMA_ASSERT(i < E);
-			return lhs[i] * rhs;
+		expr(LHS const& lhs, RHS const& rhs)
+		: lhs(lhs), rhs(rhs)
+		{
+#ifdef ATMA_MATH_USE_SSE
+			__m128 const scalar = _mm_set1_ps(rhs);
+			xmmd_ = _mm_mul_ps(lhs.xmmd_, scalar);
+#endif
 		}
-	
+
+#ifndef ATMA_MATH_USE_SSE
+		auto operator[](uint32_t i) const->T {
+			ATMA_ASSERT(i < E);
+			return lhs[i] * rhs[i];
+		}
+#endif
 		typename storage_policy<LHS>::type lhs;
 		typename storage_policy<RHS>::type rhs;
 	};
 
-	template <unsigned int E, typename T, typename LHS, typename RHS>
-	struct expr<vector<E,T>, binary_oper<vector_mul_pre<E,T>, LHS, RHS>>
+#if 0
+	// vector_mul_pre
+	template <typename LHS, typename RHS>
+	struct expr<vector4f, binary_oper<vector_mul_pre, LHS, RHS>
 	{
-		expr(const LHS& lhs, const RHS& rhs)
+		expr(LHS const& lhs, RHS const& rhs)
 		 : lhs(lhs), rhs(rhs)
 		  {}
 		
-		auto operator [](unsigned int i) const -> T {
+		auto operator [](uint32_t i) const -> T {
 			ATMA_ASSERT(i < E);
 			return lhs * rhs[i];
 		}
@@ -76,14 +98,15 @@ namespace impl
 		typename storage_policy<RHS>::type rhs;
 	};
 
-	template <unsigned int E, typename T, typename LHS, typename RHS>
-	struct expr<vector<E,T>, binary_oper<vector_div<E,T>, LHS, RHS>>
+	// vector_div
+	template <typename LHS, typename RHS>
+	struct expr<vector4f, binary_oper<vector_div, LHS, RHS>
 	{
-		expr(const LHS& lhs, const RHS& rhs)
+		expr(LHS const& lhs, RHS const& rhs)
 		 : lhs(lhs), rhs(rhs)
 		  {}
 		
-		auto operator [](unsigned int i) const -> T {
+		auto operator [](uint32_t i) const -> T {
 			ATMA_ASSERT(i < E);
 			return lhs[i] / rhs;
 		}
@@ -91,6 +114,7 @@ namespace impl
 		typename storage_policy<LHS>::type lhs;
 		typename storage_policy<RHS>::type rhs;
 	};
+#endif
 
 }
 	
@@ -101,31 +125,30 @@ namespace impl
 // addition
 //=====================================================================
 // T + T
-template <unsigned int E, typename T>
-inline auto operator + (const vector<E,T>& lhs, const vector<E,T>& rhs) ->
-impl::expr<vector<E,T>, impl::binary_oper<impl::vector_add<E,T>, vector<E,T>, vector<E,T>>> {
-	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_add<E,T>, vector<E,T>, vector<E,T>>>(lhs, rhs);
+inline auto operator + (vector4f const& lhs, vector4f const& rhs) ->
+impl::expr<vector4f, impl::vector_add, vector4f, vector4f> {
+	return impl::expr<vector4f, impl::vector_add, vector4f, vector4f>(lhs, rhs);
 }
 
 // T + X
-template <unsigned int E, typename T, typename OPER>
-inline auto operator + (const vector<E,T>& lhs, const impl::expr<vector<E,T>, OPER>& rhs) ->
-impl::expr<vector<E,T>, impl::binary_oper<impl::vector_add<E,T>, vector<E,T>, impl::expr<vector<E,T>, OPER>>> {
-	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_add<E,T>, vector<E,T>, impl::expr<vector<E,T>, OPER>>>(lhs, rhs);
+template <typename OPER>
+inline auto operator + (vector4f const& lhs, impl::expr<vector4f, OPER> const& rhs) ->
+impl::expr<vector4f, impl::vector_add, vector4f, impl::expr<vector4f, OPER>> {
+	return impl::expr<vector4f, impl::vector_add, vector4f, impl::expr<vector4f, OPER>>(lhs, rhs);
 }
-	
+
 // X + T
-template <unsigned int E, typename T, typename OPER>
-inline auto operator + (const impl::expr<vector<E,T>, OPER>& lhs, const vector<E,T>& rhs) ->
-impl::expr<vector<E,T>, impl::binary_oper<impl::vector_add<E,T>, impl::expr<vector<E,T>, OPER>, vector<E,T>>> {
-	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_add<E,T>, impl::expr<vector<E,T>, OPER>, vector<E,T>>>(lhs, rhs);
+template <typename OPER>
+inline auto operator + (impl::expr<vector4f, OPER> const& lhs, vector4f const& rhs) ->
+impl::expr<vector4f, impl::vector_add, impl::expr<vector4f, OPER>, vector4f> {
+	return impl::expr<vector4f, impl::vector_add, impl::expr<vector4f, OPER>, vector4f>(lhs, rhs);
 }
 
 // X + X
-template <unsigned int E, typename T, typename LHS_OPER, typename RHS_OPER>
-inline auto operator + (const impl::expr<vector<E,T>, LHS_OPER>& lhs, const impl::expr<vector<E,T>, RHS_OPER>& rhs) ->
-impl::expr<vector<E,T>, impl::binary_oper<impl::vector_add<E,T>, impl::expr<vector<E,T>, LHS_OPER>, impl::expr<vector<E,T>, RHS_OPER>>> {
-	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_add<E,T>, impl::expr<vector<E,T>, LHS_OPER>, impl::expr<vector<E,T>, RHS_OPER>>>(lhs, rhs);
+template <typename LHS_OPER, typename RHS_OPER>
+inline auto operator + (impl::expr<vector4f, LHS_OPER>& lhs, impl::expr<vector4f, RHS_OPER>& rhs) ->
+impl::expr<vector4f, impl::vector_add, impl::expr<vector4f, LHS_OPER>, impl::expr<vector4f, RHS_OPER>> {
+	return impl::expr<vector4f, impl::vector_add, impl::expr<vector4f, LHS_OPER>, impl::expr<vector4f, RHS_OPER>>(lhs, rhs);
 }
 
 
@@ -134,31 +157,30 @@ impl::expr<vector<E,T>, impl::binary_oper<impl::vector_add<E,T>, impl::expr<vect
 // subtraction
 //=====================================================================
 // T - T
-template <unsigned int E, typename T>
-inline auto operator - (const vector<E,T>& lhs, const vector<E,T>& rhs) ->
-impl::expr<vector<E,T>, impl::binary_oper<impl::vector_sub<E,T>, vector<E,T>, vector<E,T>>> {
-	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_sub<E,T>, vector<E,T>, vector<E,T>>>(lhs, rhs);
+inline auto operator - (vector4f const& lhs, vector4f const& rhs) ->
+impl::expr<vector4f, impl::vector_sub, vector4f, vector4f> {
+	return impl::expr<vector4f, impl::vector_sub, vector4f, vector4f>(lhs, rhs);
 }
 
 // T - X
-template <unsigned int E, typename T, typename OPER>
-inline auto operator - (const vector<E,T>& lhs, const impl::expr<vector<E,T>, OPER>& rhs) ->
-impl::expr<vector<E,T>, impl::binary_oper<impl::vector_sub<E,T>, vector<E,T>, impl::expr<vector<E,T>, OPER>>> {
-	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_sub<E,T>, vector<E,T>, impl::expr<vector<E,T>, OPER>>>(lhs, rhs);
+template <typename OPER>
+inline auto operator - (vector4f const& lhs, impl::expr<vector4f, OPER> const& rhs) ->
+impl::expr<vector4f, impl::vector_sub, vector4f, impl::expr<vector4f, OPER>> {
+	return impl::expr<vector4f, impl::vector_sub, vector4f, impl::expr<vector4f, OPER>>(lhs, rhs);
 }
 	
 // X - T
-template <unsigned int E, typename T, typename OPER>
-inline auto operator - (const impl::expr<vector<E,T>, OPER>& lhs, const vector<E,T>& rhs) ->
-impl::expr<vector<E,T>, impl::binary_oper<impl::vector_sub<E,T>, impl::expr<vector<E,T>, OPER>, vector<E,T>>> {
-	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_sub<E,T>, impl::expr<vector<E,T>, OPER>, vector<E,T>>>(lhs, rhs);
+template <typename OPER>
+inline auto operator - (impl::expr<vector4f, OPER> const& lhs, vector4f const& rhs) ->
+impl::expr<vector4f, impl::vector_sub, impl::expr<vector4f, OPER>, vector4f> {
+	return impl::expr<vector4f, impl::vector_sub, impl::expr<vector4f, OPER>, vector4f>(lhs, rhs);
 }
 
 // X - X
-template <unsigned int E, typename T, typename LHS_OPER, typename RHS_OPER>
-inline auto operator - (const impl::expr<vector<E,T>, LHS_OPER>& lhs, const impl::expr<vector<E,T>, RHS_OPER>& rhs) ->
-impl::expr<vector<E,T>, impl::binary_oper<impl::vector_sub<E,T>, impl::expr<vector<E,T>, LHS_OPER>, impl::expr<vector<E,T>, RHS_OPER>>> {
-	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_sub<E,T>, impl::expr<vector<E,T>, LHS_OPER>, impl::expr<vector<E,T>, RHS_OPER>>>(lhs, rhs);
+template <typename LHS_OPER, typename RHS_OPER>
+inline auto operator - (impl::expr<vector4f, LHS_OPER>& lhs, impl::expr<vector4f, RHS_OPER>& rhs) ->
+impl::expr<vector4f, impl::vector_sub, impl::expr<vector4f, LHS_OPER>, impl::expr<vector4f, RHS_OPER>> {
+	return impl::expr<vector4f, impl::vector_sub, impl::expr<vector4f, LHS_OPER>, impl::expr<vector4f, RHS_OPER>>(lhs, rhs);
 }
 
 
@@ -170,34 +192,33 @@ impl::expr<vector<E,T>, impl::binary_oper<impl::vector_sub<E,T>, impl::expr<vect
 //          computational costs (like dot-products)
 //=====================================================================
 // T * T
-template <unsigned int E, typename T>
-inline auto operator * (const vector<E,T>& lhs, const T& rhs) ->
-impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_post<E,T>, vector<E,T>, T>> {
-	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_post<E,T>, vector<E,T>, T>>(lhs, rhs);
+inline auto operator * (vector4f const& lhs, const T& rhs) ->
+impl::expr<vector4f, impl::vector_mul_post, vector4f, T> {
+	return impl::expr<vector4f, impl::vector_mul_post, vector4f, T>(lhs, rhs);
 }
 
 // X * T
-template <unsigned int E, typename T, typename OPER>
-inline auto operator * (const impl::expr<vector<E,T>, OPER>& lhs, const T& rhs) ->
-impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_post<E,T>, impl::expr<vector<E,T>, OPER>, T>> {
-	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_post<E,T>, impl::expr<vector<E,T>, OPER>, T>>(lhs, rhs);
+template <typename OPER>
+inline auto operator * (impl::expr<vector4f, OPER> const& lhs, const T& rhs) ->
+impl::expr<vector4f, impl::vector_mul_post, impl::expr<vector4f, OPER>, T> {
+	return impl::expr<vector4f, impl::vector_mul_post, impl::expr<vector4f, OPER>, T>(lhs, rhs);
 }
 
 //=====================================================================
 // pre multiplication
 //=====================================================================
+#if 0
 // T * T
-template <unsigned int E, typename T>
-inline auto operator * (const T& lhs, const vector<E,T>& rhs) ->
-impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_pre<E,T>, T, vector<E,T>>> {
-	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_pre<E,T>, T, vector<E,T>>>(lhs, rhs);
+inline auto operator * (const T& lhs, vector4f const& rhs) ->
+impl::expr<vector4f, impl::vector_mul_pre, T, vector4f> {
+	return impl::expr<vector4f, impl::vector_mul_pre, T, vector4f>(lhs, rhs);
 }
 
 // T * X
-template <unsigned int E, typename T, typename OPER>
-inline auto operator * (const T& lhs, const impl::expr<vector<E,T>, OPER>& rhs) ->
-impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_pre<E,T>, T, impl::expr<vector<E,T>, OPER>>> {
-	return impl::expr<vector<E,T>, impl::binary_oper<impl::vector_mul_pre<E,T>, T, impl::expr<vector<E,T>, OPER>>>(lhs, rhs);
+template <typename OPER>
+inline auto operator * (const T& lhs, impl::expr<vector4f, OPER> const& rhs) ->
+impl::expr<vector4f, impl::vector_mul_pre, T, impl::expr<vector4f, OPER>> {
+	return impl::expr<vector4f, impl::vector_mul_pre, T, impl::expr<vector4f, OPER>>(lhs, rhs);
 }
-
+#endif
 
