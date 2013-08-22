@@ -9,7 +9,7 @@
 #include <type_traits>
 #include <initializer_list>
 #include <atma/assert.hpp>
-#include <atma/math/impl/expression.hpp>
+#include <atma/math/impl/expr.hpp>
 #include <atma/math/impl/operators.hpp>
 #include <atma/math/impl/binary_operator.hpp>
 //=====================================================================
@@ -22,65 +22,73 @@ namespace math {
 	//=====================================================================
 	namespace impl
 	{
-		template <unsigned int E, typename T> struct vector_add;
-		template <unsigned int E, typename T> struct vector_sub;
-		template <unsigned int E, typename T> struct vector_mul_post;
-		template <unsigned int E, typename T> struct vector_mul_pre;
-		template <unsigned int E, typename T> struct vector_div;
+		struct vector4f_add;
+		struct vector4f_sub;
+		struct vector4f_mul_post;
+		struct vector4f_mul_pre;
+		struct vector4f_div;
 	}
 
 
 
 	//=====================================================================
-	// vector!
+	// vector4f
+	// ---------
 	//=====================================================================
-	template <unsigned int E, typename T>
-	struct vector
+	struct vector4f
 	{
-		typedef T element_type;
-
 		// construction
-		vector();
-		vector(std::initializer_list<T>);
-		vector(const vector& rhs);
+		vector4f();
+		vector4f(float x, float y, float z, float w);
+		vector4f(vector4f const& rhs);
 		
 		// assignment
-		vector& operator = (const vector& rhs);
+		auto operator = (vector4f const& rhs) -> vector4f&;
 		template <class OP>
-		vector& operator = (const impl::expr<vector<E, T>, OP>& e);
+		auto operator = (const impl::expr<vector4f, OP>& e) -> vector4f&;
 
 		// access
-		const T& operator [] (unsigned int i) const;
-		const T* begin() const { return &elements_[0]; }
-		const T* end() const { return &elements_[0] + E; }
-
+		auto operator[] (uint32_t i) const -> float;
+		
 		// computation
-		auto magnitude_squared() const -> T;
-		auto magnitude() const -> T;
-		auto normalized() const -> impl::expr<vector<E, T>, impl::binary_oper<impl::vector_div<E,T>, vector<E,T>, T>>;
+		auto magnitude_squared() const -> float;
+		auto magnitude() const -> float;
+		//auto normalized() const -> impl::expr<vector4f, impl::binary_oper<impl::vector_div<E,float>, vector4f, float>>;
 
 
 		// mutation
-		vector& operator += (const vector& rhs);
-		vector& operator -= (const vector& rhs);
-		vector& operator *= (const T& rhs);
-		vector& operator /= (const T& rhs);
-		vector& set(unsigned int i, const T& n);
-		vector& normalize();
+		vector4f& operator += (vector4f const& rhs);
+		vector4f& operator -= (vector4f const& rhs);
+		vector4f& operator *= (float rhs);
+		vector4f& operator /= (float rhs);
+		vector4f& set(uint32_t i, float n);
+		vector4f& normalize();
 
 	private:
-		std::array<T, E> elements_;
+#ifdef ATMA_MATH_USE_SSE
+		union
+		{
+			// floating-point-register data
+			struct { float fpd_[4]; };
+			// xmm-register data
+			__m128 xmmd_;
+		};
+#else
+		float fpd_[4];
+#endif
+
+		template <typename R, typename OPER>
+		friend struct impl::expr;
 	};
 	
 
 	//=====================================================================
 	// dot-product
 	//=====================================================================
-	template <unsigned int E, typename T>
-	inline auto dot_product(const vector<E,T>& lhs, const vector<E,T>& rhs) -> T
+	inline auto dot_product(vector4f const& lhs, vector4f const& rhs) -> float
 	{
-		T result{};
-		for (auto i = 0u; i != E; ++i)
+		float result{};
+		for (auto i = 0u; i != 4; ++i)
 			result += lhs[i] * rhs[i];
 		return result;
 	}
@@ -88,16 +96,16 @@ namespace math {
 	//=====================================================================
 	// cross-product (3-dimensional only)
 	//=====================================================================
-	template <typename T>
-	inline auto cross_product(const vector<3,T>& lhs, const vector<3,T>& rhs) -> vector<3,T>
+	#if 0
+	inline auto cross_product(vector4f const& lhs, vector4f const& rhs) -> vector4f
 	{
-		return vector<3,T>{
+		return vector4f<3,float>{
 			lhs[1]*rhs[2] - lhs[2]*rhs[1],
 			lhs[2]*rhs[0] - lhs[0]*rhs[2],
 			lhs[0]*rhs[1] - lhs[1]*rhs[0]
 		};
 	}
-
+	#endif
 	
 
 	// implementation
