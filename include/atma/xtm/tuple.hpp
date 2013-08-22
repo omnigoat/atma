@@ -17,8 +17,8 @@ namespace xtm {
 	template <typename F, typename... Bindings>
 	struct bind_t
 	{
-		bind_t(F&& fn, Bindings&&... bindings)
-			: fn_(fn), bindings_(std::forward<Bindings>(bindings)...)
+		bind_t(F&& fn, Bindings... bindings)
+			: fn_(fn), bindings_(bindings...)
 		{
 		}
 
@@ -32,7 +32,7 @@ namespace xtm {
 
 	private:
 		F fn_;
-		std::tuple<Bindings...> bindings_;
+		std::tuple<typename std::remove_reference<Bindings>::type...> bindings_;
 	};
 
 	template <typename F, typename... Bindings>
