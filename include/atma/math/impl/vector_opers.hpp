@@ -6,38 +6,35 @@
 //=====================================================================
 namespace impl
 {
-	struct vector_add {};
-	struct vector_sub {};
-	struct vector_mul_post {};
-	struct vector_mul_pre {};
-	struct vector_div {};
-
-
 	// vector_add
 	template <typename LHS, typename RHS>
-	struct expr<vector4f, vector_add, LHS, RHS> : base_expr<vector4f>
+	struct vector_add : expr<vector4f, vector_add<LHS, RHS>>
 	{
-		expr(LHS const& lhs, RHS const& rhs)
+		vector_add(LHS const& lhs, RHS const& rhs)
 		: lhs(lhs), rhs(rhs)
-		{
-#ifdef ATMA_MATH_USE_SSE
-			xmmd_ = _mm_add_ps(lhs.xmmd_, rhs.xmmd_);
-#endif
-		}
+		{}
 		
-#ifndef ATMA_MATH_USE_SSE
-		auto operator [](uint32_t i) const -> T {
+#ifdef ATMA_MATH_USE_SSE
+		auto xmmd() const -> __m128 {
+			return _mm_add_ps(lhs.xmmd(), rhs.xmmd());
+		}
+#else
+		auto operator [](uint32_t i) const -> float {
 			ATMA_ASSERT(i < E);
 			return lhs[i] + rhs[i];
 		}
 #endif
+
 		typename storage_policy<LHS>::type lhs;
 		typename storage_policy<RHS>::type rhs;
 	};
 
+
+
+#if 0
 	// vector_sub
 	template <typename LHS, typename RHS>
-	struct expr<vector4f, vector_sub, LHS, RHS> : base_expr<vector4f>
+	struct expr<vector4f, vector_sub<LHS, RHS>> : base_expr<vector4f>
 	{
 		expr(LHS const& lhs, RHS const& rhs)
 		: lhs(lhs), rhs(rhs)
@@ -48,7 +45,7 @@ namespace impl
 		}
 	
 #ifndef ATMA_MATH_USE_SSE
-		auto operator [](uint32_t i) const -> T {
+		auto operator [](uint32_t i) const -> float {
 			ATMA_ASSERT(i < E);
 			return lhs[i] - rhs[i];
 		}
@@ -59,7 +56,7 @@ namespace impl
 
 	// vector_mul_post
 	template <typename LHS, typename RHS>
-	struct expr<vector4f, vector_mul_post, LHS, RHS> : base_expr<vector4f>
+	struct expr<vector4f, vector_mul_post<LHS, RHS>> : base_expr<vector4f>
 	{
 		expr(LHS const& lhs, RHS const& rhs)
 		: lhs(lhs), rhs(rhs)
@@ -71,7 +68,7 @@ namespace impl
 		}
 
 #ifndef ATMA_MATH_USE_SSE
-		auto operator[](uint32_t i) const->T {
+		auto operator[](uint32_t i) const->float {
 			ATMA_ASSERT(i < E);
 			return lhs[i] * rhs[i];
 		}
@@ -89,7 +86,7 @@ namespace impl
 		 : lhs(lhs), rhs(rhs)
 		  {}
 		
-		auto operator [](uint32_t i) const -> T {
+		auto operator [](uint32_t i) const -> float {
 			ATMA_ASSERT(i < E);
 			return lhs * rhs[i];
 		}
@@ -106,7 +103,7 @@ namespace impl
 		 : lhs(lhs), rhs(rhs)
 		  {}
 		
-		auto operator [](uint32_t i) const -> T {
+		auto operator [](uint32_t i) const -> float {
 			ATMA_ASSERT(i < E);
 			return lhs[i] / rhs;
 		}
@@ -115,72 +112,73 @@ namespace impl
 		typename storage_policy<RHS>::type rhs;
 	};
 #endif
-
+#endif
 }
-	
+
 
 
 
 //=====================================================================
 // addition
 //=====================================================================
-// T + T
-inline auto operator + (vector4f const& lhs, vector4f const& rhs) ->
-impl::expr<vector4f, impl::vector_add, vector4f, vector4f> {
-	return impl::expr<vector4f, impl::vector_add, vector4f, vector4f>(lhs, rhs);
+// float + float
+inline auto operator + (vector4f const& lhs, vector4f const& rhs) -> impl::vector_add<vector4f, vector4f> {
+	return {lhs, rhs};
 }
 
-// T + X
+#if 0
+// float + X
 template <typename OPER>
 inline auto operator + (vector4f const& lhs, impl::expr<vector4f, OPER> const& rhs) ->
-impl::expr<vector4f, impl::vector_add, vector4f, impl::expr<vector4f, OPER>> {
-	return impl::expr<vector4f, impl::vector_add, vector4f, impl::expr<vector4f, OPER>>(lhs, rhs);
+impl::expr<vector4f, impl::vector_add<vector4f, impl::expr<vector4f, OPER>>> {
+	return {lhs, rhs};
 }
 
-// X + T
+// X + float
 template <typename OPER>
 inline auto operator + (impl::expr<vector4f, OPER> const& lhs, vector4f const& rhs) ->
-impl::expr<vector4f, impl::vector_add, impl::expr<vector4f, OPER>, vector4f> {
-	return impl::expr<vector4f, impl::vector_add, impl::expr<vector4f, OPER>, vector4f>(lhs, rhs);
+impl::expr<vector4f, impl::vector_add<impl::expr<vector4f, OPER>, vector4f>> {
+	return {lhs, rhs};
 }
 
 // X + X
 template <typename LHS_OPER, typename RHS_OPER>
 inline auto operator + (impl::expr<vector4f, LHS_OPER>& lhs, impl::expr<vector4f, RHS_OPER>& rhs) ->
-impl::expr<vector4f, impl::vector_add, impl::expr<vector4f, LHS_OPER>, impl::expr<vector4f, RHS_OPER>> {
-	return impl::expr<vector4f, impl::vector_add, impl::expr<vector4f, LHS_OPER>, impl::expr<vector4f, RHS_OPER>>(lhs, rhs);
+impl::expr<vector4f, impl::vector_add<impl::expr<vector4f, LHS_OPER>, impl::expr<vector4f, RHS_OPER>>> {
+	return {lhs, rhs};
 }
+#endif
 
 
-
+#if 0
 //=====================================================================
 // subtraction
 //=====================================================================
-// T - T
+// float - float
 inline auto operator - (vector4f const& lhs, vector4f const& rhs) ->
-impl::expr<vector4f, impl::vector_sub, vector4f, vector4f> {
-	return impl::expr<vector4f, impl::vector_sub, vector4f, vector4f>(lhs, rhs);
+impl::expr<vector4f, impl::vector_sub<vector4f, vector4f>> {
+	return {lhs, rhs};
 }
 
-// T - X
+// float - X
 template <typename OPER>
 inline auto operator - (vector4f const& lhs, impl::expr<vector4f, OPER> const& rhs) ->
-impl::expr<vector4f, impl::vector_sub, vector4f, impl::expr<vector4f, OPER>> {
-	return impl::expr<vector4f, impl::vector_sub, vector4f, impl::expr<vector4f, OPER>>(lhs, rhs);
+impl::expr<vector4f, impl::vector_sub<vector4f, impl::expr<vector4f, OPER>>> {
+	return {lhs, rhs};
 }
 	
-// X - T
+// X - float
 template <typename OPER>
 inline auto operator - (impl::expr<vector4f, OPER> const& lhs, vector4f const& rhs) ->
-impl::expr<vector4f, impl::vector_sub, impl::expr<vector4f, OPER>, vector4f> {
-	return impl::expr<vector4f, impl::vector_sub, impl::expr<vector4f, OPER>, vector4f>(lhs, rhs);
+impl::expr<vector4f, impl::vector_sub<impl::expr<vector4f, OPER>, vector4f>> {
+	return {lhs, rhs};
 }
 
 // X - X
 template <typename LHS_OPER, typename RHS_OPER>
 inline auto operator - (impl::expr<vector4f, LHS_OPER>& lhs, impl::expr<vector4f, RHS_OPER>& rhs) ->
-impl::expr<vector4f, impl::vector_sub, impl::expr<vector4f, LHS_OPER>, impl::expr<vector4f, RHS_OPER>> {
-	return impl::expr<vector4f, impl::vector_sub, impl::expr<vector4f, LHS_OPER>, impl::expr<vector4f, RHS_OPER>>(lhs, rhs);
+impl::expr<vector4f, impl::vector_sub<impl::expr<vector4f, LHS_OPER>, impl::expr<vector4f, RHS_OPER>>> {
+	return {lhs, rhs};
 }
 
 
@@ -191,34 +189,35 @@ impl::expr<vector4f, impl::vector_sub, impl::expr<vector4f, LHS_OPER>, impl::exp
 //          that results in a single element almost definitely has high
 //          computational costs (like dot-products)
 //=====================================================================
-// T * T
-inline auto operator * (vector4f const& lhs, const T& rhs) ->
-impl::expr<vector4f, impl::vector_mul_post, vector4f, T> {
-	return impl::expr<vector4f, impl::vector_mul_post, vector4f, T>(lhs, rhs);
+// float * float
+inline auto operator * (vector4f const& lhs, const float& rhs) ->
+impl::expr<vector4f, impl::vector_mul_post<vector4f, float>> {
+	return {lhs, rhs};
 }
 
-// X * T
+// X * float
 template <typename OPER>
-inline auto operator * (impl::expr<vector4f, OPER> const& lhs, const T& rhs) ->
-impl::expr<vector4f, impl::vector_mul_post, impl::expr<vector4f, OPER>, T> {
-	return impl::expr<vector4f, impl::vector_mul_post, impl::expr<vector4f, OPER>, T>(lhs, rhs);
+inline auto operator * (impl::expr<vector4f, OPER> const& lhs, const float& rhs) ->
+impl::expr<vector4f, impl::vector_mul_post<impl::expr<vector4f, OPER>, float>> {
+	return {lhs, rhs};
 }
+#endif
 
 //=====================================================================
 // pre multiplication
 //=====================================================================
 #if 0
-// T * T
-inline auto operator * (const T& lhs, vector4f const& rhs) ->
-impl::expr<vector4f, impl::vector_mul_pre, T, vector4f> {
-	return impl::expr<vector4f, impl::vector_mul_pre, T, vector4f>(lhs, rhs);
+// float * float
+inline auto operator * (const float& lhs, vector4f const& rhs) ->
+impl::expr<vector4f, impl::vector_mul_pre, float, vector4f> {
+	return impl::expr<vector4f, impl::vector_mul_pre, float, vector4f>(lhs, rhs);
 }
 
-// T * X
+// float * X
 template <typename OPER>
-inline auto operator * (const T& lhs, impl::expr<vector4f, OPER> const& rhs) ->
-impl::expr<vector4f, impl::vector_mul_pre, T, impl::expr<vector4f, OPER>> {
-	return impl::expr<vector4f, impl::vector_mul_pre, T, impl::expr<vector4f, OPER>>(lhs, rhs);
+inline auto operator * (const float& lhs, impl::expr<vector4f, OPER> const& rhs) ->
+impl::expr<vector4f, impl::vector_mul_pre, float, impl::expr<vector4f, OPER>> {
+	return impl::expr<vector4f, impl::vector_mul_pre, float, impl::expr<vector4f, OPER>>(lhs, rhs);
 }
 #endif
 
