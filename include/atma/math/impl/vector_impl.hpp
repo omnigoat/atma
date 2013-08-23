@@ -49,9 +49,9 @@ inline auto vector4f::operator = (const impl::expr<vector4f, OP>& e) -> vector4f
 //=====================================================================
 // access
 //=====================================================================
-inline auto vector4f::operator [](uint32_t i) const -> T const&
+inline auto vector4f::operator [](uint32_t i) const -> float
 {
-	ATMA_ASSERT(i < E);
+	ATMA_ASSERT(i < 4);
 	return fpd_[i];
 }
 
@@ -59,29 +59,33 @@ inline auto vector4f::operator [](uint32_t i) const -> T const&
 //=====================================================================
 // computation
 //=====================================================================
-
-inline auto vector4f::magnitude_squared() const -> T
+#if 0
+inline auto vector4f::magnitude_squared() const -> float
 {
-	T result{};
+	float result{};
 	for (auto& x : *this)
 		result += x*x;
 	return result;
 }
+#endif
 
-inline auto vector4f::magnitude() const -> T
+inline auto vector4f::magnitude() const -> float
 {
 	return std::sqrt(magnitude_squared());
 }
 
-inline auto vector4f::normalized() const -> impl::expr<vector4f, impl::binary_oper<impl::vector_div<E,T>, vector<E,T>, T>>
+#if 0
+inline auto vector4f::normalized() const -> impl::expr<vector4f, impl::binary_oper<impl::vector_div<E,float>, vector<E,float>, float>>
 {
-	return impl::expr<vector4f, impl::binary_oper<impl::vector_div<E,T>, vector<E,T>, T>>(*this, magnitude());
+	return impl::expr<vector4f, impl::binary_oper<impl::vector_div<E,float>, vector<E,float>, float>>(*this, magnitude());
 }
+#endif
 
 
 //=====================================================================
 // mutation
 //=====================================================================
+#if 0
 vector4f& vector4f::operator += (const vector4f& rhs) {
 	for (auto i = 0u; i != E; ++i)
 		fpd_[i] += rhs.fpd_[i];
@@ -94,20 +98,21 @@ vector4f& vector4f::operator -= (const vector4f& rhs) {
 	return *this;
 }
 
-vector4f& vector4f::operator *= (const T& rhs) {
+vector4f& vector4f::operator *= (float rhs) {
 	for (auto i = 0u; i != E; ++i)
 		fpd_[i] *= rhs;
 	return *this;
 }
 
-vector4f& vector4f::operator /= (const T& rhs) {
+vector4f& vector4f::operator /= (float rhs) {
 	for (auto i = 0u; i != E; ++i)
 		fpd_[i] /= rhs;
 	return *this;
 }
 
-vector4f& vector4f::set(uint32_t i, const T& n)
+vector4f& vector4f::set(uint32_t i, float n)
 {
 	fpd_[i] = n;
 	return *this;
 }
+#endif
