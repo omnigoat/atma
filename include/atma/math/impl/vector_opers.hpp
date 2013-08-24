@@ -111,29 +111,6 @@ namespace impl
 //=====================================================================
 // addition
 //=====================================================================
-// vector + vector
-inline auto operator + (vector4f const& lhs, vector4f const& rhs)
-	-> impl::vector4f_add<vector4f, vector4f>
-{
-	return { lhs, rhs };
-}
-
-// expr + vector
-template <typename OPER>
-inline auto operator + (impl::expr<vector4f, OPER> const& lhs, vector4f const& rhs)
-	-> impl::vector4f_add<decltype(lhs), vector4f>
-{
-	return { lhs, rhs };
-}
-
-// vector + expr
-template <typename OPER>
-inline auto operator + (vector4f const& lhs, impl::expr<vector4f, OPER> const& rhs)
-	-> impl::vector4f_add<decltype(lhs), decltype(rhs)>
-{
-	return { lhs, rhs };
-}
-
 // expr + expr
 template <typename LOP, typename ROP>
 inline auto operator + (impl::expr<vector4f, LOP> const& lhs, impl::expr<vector4f, ROP> const& rhs)
@@ -147,29 +124,6 @@ inline auto operator + (impl::expr<vector4f, LOP> const& lhs, impl::expr<vector4
 //=====================================================================
 // subtraction
 //=====================================================================
-// vector - vector
-inline auto operator - (vector4f const& lhs, vector4f const& rhs)
-	-> impl::vector4f_sub<vector4f, vector4f>
-{
-	return { lhs, rhs };
-}
-
-// expr - vector
-template <typename OPER>
-inline auto operator - (impl::expr<vector4f, OPER> const& lhs, vector4f const& rhs)
-	-> impl::vector4f_sub<decltype(lhs), vector4f>
-{
-	return { lhs, rhs };
-}
-
-// vector - expr
-template <typename OPER>
-inline auto operator - (vector4f const& lhs, impl::expr<vector4f, OPER> const& rhs)
-	-> impl::vector4f_sub<decltype(lhs), decltype(rhs)>
-{
-	return { lhs, rhs };
-}
-
 // expr - expr
 template <typename LOP, typename ROP>
 inline auto operator - (impl::expr<vector4f, LOP> const& lhs, impl::expr<vector4f, ROP> const& rhs)
@@ -180,29 +134,15 @@ inline auto operator - (impl::expr<vector4f, LOP> const& lhs, impl::expr<vector4
 
 
 //=====================================================================
-// post multiplication
+// multiplication
 //    note: we don't have an expr for the scalar, because any expression
 //          that results in a single element almost definitely has high
 //          computational costs (like dot-products)
 //=====================================================================
-// vector * float
-inline auto operator * (vector4f const& lhs, float rhs)
-	-> impl::vector4f_mul<vector4f, float>
-{
-	return {lhs, rhs};
-}
-
 // X * float
 template <typename OPER>
 inline auto operator * (impl::expr<vector4f, OPER> const& lhs, float rhs)
 	-> impl::vector4f_mul<impl::expr<vector4f, OPER>, float>
-{
-	return {lhs, rhs};
-}
-
-// float * vector
-inline auto operator * (float lhs, vector4f const& rhs)
-	-> impl::vector4f_mul<float, vector4f>
 {
 	return {lhs, rhs};
 }
@@ -218,13 +158,6 @@ inline auto operator * (float lhs, impl::expr<vector4f, OPER> const& rhs)
 //=====================================================================
 // division
 //=====================================================================
-// vector / float
-inline auto operator / (vector4f const& lhs, float rhs)
-	-> impl::vector4f_div<vector4f, float>
-{
-	return { lhs, rhs };
-}
-
 // X / float
 template <typename OPER>
 inline auto operator / (impl::expr<vector4f, OPER> const& lhs, float rhs)
