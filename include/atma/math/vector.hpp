@@ -31,12 +31,10 @@ namespace math {
 		// construction
 		vector4f();
 		vector4f(float x, float y, float z, float w);
-		vector4f(vector4f const& rhs);
 		template <typename OP>
 		vector4f(impl::expr<vector4f, OP> const&);
 
 		// assignment
-		auto operator = (vector4f const& rhs) -> vector4f&;
 		template <class OP>
 		auto operator = (const impl::expr<vector4f, OP>& e) -> vector4f&;
 
@@ -47,6 +45,7 @@ namespace math {
 		auto operator[] (uint32_t i) const -> float;
 		
 		// computation
+		auto is_zero() const -> bool;
 		auto magnitude_squared() const -> float;
 		auto magnitude() const -> float;
 		//auto normalized() const -> impl::expr<vector4f, impl::binary_oper<impl::vector_div<E,float>, vector4f, float>>;
@@ -62,19 +61,10 @@ namespace math {
 
 	private:
 #ifdef ATMA_MATH_USE_SSE
-		union
-		{
-			// xmm-register data
-			__m128 xmmd_;
-			// floating-point-register data
-			float fpd_[4];
-		};
+		__m128 xmmd_;
 #else
 		float fpd_[4];
 #endif
-
-		template <typename R, typename OPER>
-		friend struct impl::expr;
 	};
 	
 
@@ -83,10 +73,15 @@ namespace math {
 	//=====================================================================
 	inline auto dot_product(vector4f const& lhs, vector4f const& rhs) -> float
 	{
+#if ATMA_MATH_USE_SSE
+		auto x = _mm_dp_ps(lhs.xmmd(), rhs.xmmd(), 0x7f);
+		return x.m128_f32[0];
+#else
 		float result{};
 		for (auto i = 0u; i != 4; ++i)
 			result += lhs[i] * rhs[i];
 		return result;
+#endif
 	}
 
 	//=====================================================================
