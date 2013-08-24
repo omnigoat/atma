@@ -6,10 +6,14 @@
 //=====================================================================
 vector4f::vector4f()
 {
+#if ATMA_MATH_USE_SSE
+	xmmd_ = _mm_setzero_ps();
+#else
 	fpd_[0] = 0;
 	fpd_[1] = 0;
 	fpd_[2] = 0;
 	fpd_[3] = 0;
+#endif
 }
 
 vector4f::vector4f(float x, float y, float z, float w)
@@ -28,26 +32,10 @@ vector4f::vector4f(impl::expr<vector4f, OP> const& expr)
 #endif
 }
 
-vector4f::vector4f(const vector4f& rhs)
-{
-	memcpy(fpd_, rhs.fpd_, 128);
-}
-
 
 //=====================================================================
 // assignment
 //=====================================================================
-inline auto vector4f::operator = (const vector4f& rhs) -> vector4f&
-{
-#ifdef ATMA_MATH_USE_SSE
-	xmmd_ = rhs.xmmd_;
-#else
-	for (auto i = 0u; i != 4u; ++i)
-		fpd_[i] = rhs.element(i);
-#endif
-	return *this;
-}
-
 template <typename OP>
 inline auto vector4f::operator = (const impl::expr<vector4f, OP>& e) -> vector4f&
 {
@@ -68,7 +56,11 @@ inline auto vector4f::operator = (const impl::expr<vector4f, OP>& e) -> vector4f
 inline auto vector4f::operator [](uint32_t i) const -> float
 {
 	ATMA_ASSERT(i < 4);
+#ifdef ATMA_MATH_USE_SSE
+	return xmmd_.m128_f32[i];
+#else
 	return fpd_[i];
+#endif
 }
 
 
@@ -132,3 +124,9 @@ vector4f& vector4f::set(uint32_t i, float n)
 	return *this;
 }
 #endif
+
+vector4f& vector4f::normalize()
+{
+	xmmd_ = _mm_dp_ps(xmmd_, xmmd_, 0x7f);
+	return *this;
+}
