@@ -6,15 +6,26 @@
 //=====================================================================
 vector4f::vector4f()
 {
-	memset(fpd_, 0, 4 * 128);
+	fpd_[0] = 0;
+	fpd_[1] = 0;
+	fpd_[2] = 0;
+	fpd_[3] = 0;
 }
 
 vector4f::vector4f(float x, float y, float z, float w)
 {
-	fpd_[0] = x;
-	fpd_[1] = y;
-	fpd_[2] = z;
-	fpd_[3] = w;
+	xmmd_ = _mm_load_ps(&x);
+}
+
+template <typename OP>
+vector4f::vector4f(impl::expr<vector4f, OP> const& expr)
+{
+#ifdef ATMA_MATH_USE_SSE
+	xmmd_ = expr.xmmd();
+#else
+	for (
+	memcpy(fpd_, expr.fpd_, 128);
+#endif
 }
 
 vector4f::vector4f(const vector4f& rhs)
@@ -28,7 +39,12 @@ vector4f::vector4f(const vector4f& rhs)
 //=====================================================================
 inline auto vector4f::operator = (const vector4f& rhs) -> vector4f&
 {
-	memcpy(fpd_, rhs.fpd_, 128);
+#ifdef ATMA_MATH_USE_SSE
+	xmmd_ = rhs.xmmd_;
+#else
+	for (auto i = 0u; i != 4u; ++i)
+		fpd_[i] = rhs.element(i);
+#endif
 	return *this;
 }
 

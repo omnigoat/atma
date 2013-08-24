@@ -20,34 +20,30 @@ namespace math {
 	//=====================================================================
 	// forward-declare expression template functions
 	//=====================================================================
-	namespace impl
-	{
-		struct vector4f_add;
-		struct vector4f_sub;
-		struct vector4f_mul_post;
-		struct vector4f_mul_pre;
-		struct vector4f_div;
-	}
-
 
 
 	//=====================================================================
 	// vector4f
 	// ---------
 	//=====================================================================
-	struct vector4f
+	struct vector4f : impl::expr<vector4f, vector4f>
 	{
 		// construction
 		vector4f();
 		vector4f(float x, float y, float z, float w);
 		vector4f(vector4f const& rhs);
-		
+		template <typename OP>
+		vector4f(impl::expr<vector4f, OP> const&);
+
 		// assignment
 		auto operator = (vector4f const& rhs) -> vector4f&;
 		template <class OP>
 		auto operator = (const impl::expr<vector4f, OP>& e) -> vector4f&;
 
 		// access
+#ifdef ATMA_MATH_USE_SSE
+		auto xmmd() const -> __m128 { return xmmd_; }
+#endif
 		auto operator[] (uint32_t i) const -> float;
 		
 		// computation
@@ -55,7 +51,7 @@ namespace math {
 		auto magnitude() const -> float;
 		//auto normalized() const -> impl::expr<vector4f, impl::binary_oper<impl::vector_div<E,float>, vector4f, float>>;
 
-
+		
 		// mutation
 		vector4f& operator += (vector4f const& rhs);
 		vector4f& operator -= (vector4f const& rhs);
@@ -68,10 +64,10 @@ namespace math {
 #ifdef ATMA_MATH_USE_SSE
 		union
 		{
-			// floating-point-register data
-			struct { float fpd_[4]; };
 			// xmm-register data
 			__m128 xmmd_;
+			// floating-point-register data
+			float fpd_[4];
 		};
 #else
 		float fpd_[4];
