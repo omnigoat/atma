@@ -25,17 +25,17 @@ namespace impl {
 	//=====================================================================
 	template <typename T>
 	struct storage_policy {
-		typedef const T type;
+		typedef T const& type;
 	};
 
-	template <typename T>
-	struct storage_policy<const T&> {
-		typedef const T& type;
+	template <>
+	struct storage_policy<float> {
+		typedef float const type;
 	};
 
 	template <typename R, typename O>
 	struct storage_policy<expr<R, O>> {
-		typedef const expr<R, O> type;
+		typedef expr<R, O> const type;
 	};
 	
 //=====================================================================
