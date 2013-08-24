@@ -13,14 +13,14 @@ namespace impl {
 	struct expr
 	{
 #ifdef ATMA_MATH_USE_SSE
-		//auto xmmd() const -> decltype(std::declval<OPER>().xmmd()) {
-			//return static_cast<OPER const*>(this)->xmmd();
-		//}
+		auto xmmd() const -> __m128 {
+			return static_cast<OPER const*>(this)->xmmd();
+		}
 #else
-		auto operator [](unsigned int i) const
+		auto element(unsigned int i) const
 		-> decltype(std::declval<OPER>()[i])
 		{
-			return static_cast<OPER const*>(this)->operator[](i);
+			return static_cast<OPER const*>(this)->element(i);
 		}
 #endif
 	};
