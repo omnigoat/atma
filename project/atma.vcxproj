@@ -26,7 +26,7 @@
     <ClInclude Include="..\include\atma\math\impl\storage_policy.hpp" />
     <ClInclude Include="..\include\atma\math\impl\vector_impl.hpp" />
     <ClInclude Include="..\include\atma\math\impl\vector4f_exprs.hpp" />
-    <ClInclude Include="..\include\atma\math\matrix.hpp" />
+    <ClInclude Include="..\include\atma\math\matrix4f.hpp" />
     <ClInclude Include="..\include\atma\math\vector4f.hpp" />
     <ClInclude Include="..\include\atma\string.hpp" />
   </ItemGroup>

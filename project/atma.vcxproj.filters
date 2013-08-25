@@ -50,9 +50,6 @@
     <ClInclude Include="..\include\atma\assert\handling.hpp">
       <Filter>include\assert</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\atma\math\matrix.hpp">
-      <Filter>include\math</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\atma\math\impl\expr.hpp">
       <Filter>include\math\impl</Filter>
     </ClInclude>
@@ -76,6 +73,9 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\math\impl\element_type_of.hpp">
       <Filter>include\math\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\math\matrix4f.hpp">
+      <Filter>include\math</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
