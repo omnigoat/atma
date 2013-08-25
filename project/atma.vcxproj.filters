@@ -53,9 +53,6 @@
     <ClInclude Include="..\include\atma\math\matrix.hpp">
       <Filter>include\math</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\atma\math\vector.hpp">
-      <Filter>include\math</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\atma\math\impl\binary_operator.hpp">
       <Filter>include\math\impl</Filter>
     </ClInclude>
@@ -76,6 +73,9 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\math\impl\vector_opers.hpp">
       <Filter>include\math\impl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\math\vector4f.hpp">
+      <Filter>include\math</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
