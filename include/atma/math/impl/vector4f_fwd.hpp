@@ -1,17 +1,24 @@
 //=====================================================================
 //
 //=====================================================================
-#ifndef ATMA_MATH_impl_vector_FNS_HPP
-#define ATMA_MATH_impl_vector_FNS_HPP
+#ifndef ATMA_MATH_IMPL_VECTOR4F_FWD_HPP
+#define ATMA_MATH_IMPL_VECTOR4F_FWD_HPP
 //=====================================================================
-#include <atma/math/impl/binary_operator.hpp>
+#include <atma/math/impl/element_type_of.hpp>
 //=====================================================================
 namespace atma {
 namespace math {
+
+	struct vector4f;
+
 namespace impl {
 //=====================================================================
 
-	
+	template <>
+	struct element_type_of<vector4f>
+	{
+		typedef float type;
+	};
 
 //=====================================================================
 } // namespace impl
