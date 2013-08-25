@@ -1,32 +1,30 @@
 //=====================================================================
 //
 //=====================================================================
-#ifndef ATMA_MATH_IMPL_EXPR_HPP
-#define ATMA_MATH_IMPL_EXPR_HPP
+#ifndef ATMA_MATH_IMPL_BINARY_OPERATOR_HPP
+#define ATMA_MATH_IMPL_BINARY_OPERATOR_HPP
 //=====================================================================
-#include <atma/math/impl/element_type_of.hpp>
+#include <atma/math/impl/expr.hpp>
+#include <atma/math/impl/storage_policy.hpp>
 //=====================================================================
 namespace atma {
 namespace math {
 namespace impl {
 //=====================================================================
-	
-	template <typename R, typename OPER>
-	struct expr
-	{
-#ifdef ATMA_MATH_USE_SSE
-		auto xmmd() const -> __m128 {
-			return static_cast<OPER const*>(this)->xmmd();
-		}
-#else
-		auto element(uint32_t i) const
-		-> typename element_type_of<OPER>::type
-		{
-			return static_cast<OPER const*>(this)->element(i);
-		}
-#endif
-	};
 
+	// binary_expr
+	template <typename R, template <typename, typename> class OPER, typename LHS, typename RHS>
+	struct binary_expr : expr<R, OPER<LHS, RHS>>
+	{
+		binary_expr(LHS const& lhs, RHS const& rhs)
+			: lhs(lhs), rhs(rhs)
+		{
+		}
+
+		typename storage_policy<typename std::decay<LHS>::type>::type lhs;
+		typename storage_policy<typename std::decay<RHS>::type>::type rhs;
+	};
+		
 //=====================================================================
 } // namespace impl
 } // namespace math

@@ -7,32 +7,18 @@
 #include <array>
 #include <numeric>
 #include <type_traits>
-#include <initializer_list>
 #include <atma/assert.hpp>
-#include <atma/math/impl/expr.hpp>
-#include <atma/math/impl/operators.hpp>
-#include <atma/math/impl/binary_operator.hpp>
+#include <atma/math/impl/vector4f_fwd.hpp>
+#include <atma/math/impl/vector4f_exprs.hpp>
 //=====================================================================
 namespace atma {
 namespace math {
 //=====================================================================
 	
 	//=====================================================================
-	// forward-declare
-	//=====================================================================
-	struct vector4f;
-	namespace impl {
-		template <typename, typename> struct vector4f_add;
-		template <typename, typename> struct vector4f_sub;
-		template <typename, typename> struct vector4f_mul;
-		template <typename, typename> struct vector4f_div;
-	}
-
-
-
-	//=====================================================================
 	// vector4f
-	// ---------
+	// ----------
+	//   A four-component vector of floats.
 	//=====================================================================
 	struct vector4f : impl::expr<vector4f, vector4f>
 	{
@@ -57,8 +43,7 @@ namespace math {
 		auto is_zero() const -> bool;
 		auto magnitude_squared() const -> float;
 		auto magnitude() const -> float;
-
-		//auto normalized() const -> impl::vector4f_div<vector4f, float>;
+		auto normalized() const -> impl::vector4f_div<vector4f, float>;
 
 		
 		// mutation
@@ -87,7 +72,6 @@ namespace math {
 
 
 
-
 	//=====================================================================
 	//
 	//  IMPLEMENTATION
@@ -104,13 +88,19 @@ namespace math {
 
 	vector4f::vector4f(float x, float y, float z, float w)
 	{
+#ifdef ATMA_MATH_USE_SSE
 		xmmd_ = _mm_load_ps(&x);
+#else
+		memcpy(fpd_, &x, sizeof(float) * 4);
+#endif
 	}
 
+#ifdef ATMA_MATH_USE_SSE
 	vector4f::vector4f(__m128 xm)
 		: xmmd_(xm)
 	{
 	}
+#endif
 
 	template <typename OP>
 	vector4f::vector4f(impl::expr<vector4f, OP> const& expr)
@@ -163,10 +153,10 @@ namespace math {
 #endif
 	}
 
-	//inline auto vector4f::normalized() const -> impl::vector4f_div<vector4f, float>
-	//{
-	//	return { *this, magnitude_squared() };
-	//}
+	inline auto vector4f::normalized() const -> impl::vector4f_div<vector4f, float>
+	{
+		return { *this, magnitude_squared() };
+	}
 
 	template <typename OP>
 	vector4f& vector4f::operator += (impl::expr<vector4f, OP> const& rhs)
@@ -250,10 +240,14 @@ namespace math {
 	inline auto cross_product(impl::expr<vector4f, LOP> const& lhs, impl::expr<vector4f, ROP> const& rhs) -> vector4f
 	{
 #ifdef ATMA_MATH_USE_SSE
-		return vector4f(_mm_sub_ps(
-			_mm_mul_ps(_mm_shuffle_ps(lhs.xmmd(), lhs.xmmd(), _MM_SHUFFLE(3, 0, 2, 1)), _mm_shuffle_ps(rhs.xmmd(), rhs.xmmd(), _MM_SHUFFLE(3, 1, 0, 2))),
-			_mm_mul_ps(_mm_shuffle_ps(lhs.xmmd(), lhs.xmmd(), _MM_SHUFFLE(3, 1, 0, 2)), _mm_shuffle_ps(rhs.xmmd(), rhs.xmmd(), _MM_SHUFFLE(3, 0, 2, 1)))
-		));
+		return vector4f(
+			_mm_sub_ps(
+				_mm_mul_ps(
+					_mm_shuffle_ps(lhs.xmmd(), lhs.xmmd(), _MM_SHUFFLE(3, 0, 2, 1)),
+					_mm_shuffle_ps(rhs.xmmd(), rhs.xmmd(), _MM_SHUFFLE(3, 1, 0, 2))),
+				_mm_mul_ps(
+					_mm_shuffle_ps(lhs.xmmd(), lhs.xmmd(), _MM_SHUFFLE(3, 1, 0, 2)),
+					_mm_shuffle_ps(rhs.xmmd(), rhs.xmmd(), _MM_SHUFFLE(3, 0, 2, 1)))));
 #else
 		return vector4f<3, float>{
 			lhs[1]*rhs[2] - lhs[2]*rhs[1],
@@ -267,116 +261,14 @@ namespace math {
 
 
 
+
 	//=====================================================================
 	//
-	//  EXPRESSION TEMPLATES
+	//
+	//  OPERATORS
+	//
 	//
 	//=====================================================================
-	namespace impl
-	{
-#ifdef ATMA_MATH_USE_SSE
-		template <typename OP>
-		auto xmmd_of(expr<vector4f, OP> const& expr) -> __m128
-		{
-			return expr.xmmd();
-		}
-
-		auto xmmd_of(float x) -> __m128
-		{
-			return _mm_load_ps1(&x);
-		}
-
-#else
-		template <typename T>
-		auto element_of(T const& x, uint32_t i) -> float
-		{
-			return x[i];
-		}
-
-		auto element_of(float x, uint32_t) -> float
-		{
-			return x;
-		}
-#endif
-		
-		// binary_expr
-		template <typename R, template<typename,typename> class OPER, typename LHS, typename RHS>
-		struct binary_expr : expr<R, OPER<LHS, RHS>>
-		{
-			binary_expr(LHS const& lhs, RHS const& rhs)
-				: lhs(lhs), rhs(rhs)
-			{}
-
-			typename storage_policy<typename std::decay<LHS>::type>::type lhs;
-			typename storage_policy<typename std::decay<RHS>::type>::type rhs;
-		};
-
-
-		// vector4f_add
-		template <typename LHS, typename RHS>
-		struct vector4f_add : binary_expr<vector4f, vector4f_add, LHS, RHS>
-		{
-			vector4f_add(LHS const& lhs, RHS const& rhs)
-			: binary_expr(lhs, rhs)
-			{}
-
-#ifdef ATMA_MATH_USE_SSE
-			auto xmmd() const -> __m128 { return _mm_add_ps(xmmd_of(lhs), xmmd_of(rhs)); }
-#else
-			auto element(uint32_t i) const -> float { return element_of(lhs, i) + element_of(rhs, i); }
-#endif
-		};
-
-		// vector4f_sub
-		template <typename LHS, typename RHS>
-		struct vector4f_sub : binary_expr<vector4f, vector4f_sub, LHS, RHS>
-		{
-			vector4f_sub(LHS const& lhs, RHS const& rhs)
-			: binary_expr(lhs, rhs)
-			{
-			}
-
-#ifdef ATMA_MATH_USE_SSE
-			auto xmmd() const -> __m128 { return _mm_sub_ps(xmmd_of(lhs), xmmd_of(rhs)); }
-#else
-			auto element(uint32_t i) const -> float { return element_of(lhs, i) - element_of(rhs, i); }
-#endif
-		};
-
-		// vector4f_mul
-		template <typename LHS, typename RHS>
-		struct vector4f_mul : binary_expr<vector4f, vector4f_mul, LHS, RHS>
-		{
-			vector4f_mul(LHS const& lhs, RHS const& rhs)
-			: binary_expr(lhs, rhs)
-			{
-			}
-
-#ifdef ATMA_MATH_USE_SSE
-			auto xmmd() const -> __m128 { return _mm_mul_ps(xmmd_of(lhs), xmmd_of(rhs)); }
-#else
-			auto element(uint32_t i) const -> float { return element_of(lhs, i) * element_of(rhs, i); }
-#endif
-		};
-
-		// vector4f_div
-		template <typename LHS, typename RHS>
-		struct vector4f_div : binary_expr<vector4f, vector4f_div, LHS, RHS>
-		{
-			vector4f_div(LHS const& lhs, RHS const& rhs)
-			: binary_expr(lhs, rhs)
-			{
-			}
-
-#ifdef ATMA_MATH_USE_SSE
-			auto xmmd() const -> __m128 { return _mm_div_ps(xmmd_of(lhs), xmmd_of(rhs)); }
-#else
-			auto element(uint32_t i) const -> float { return element_of(lhs, i) / element_of(rhs, i); }
-#endif
-		};
-	}
-
-
 	//=====================================================================
 	// addition
 	//=====================================================================
@@ -410,7 +302,6 @@ namespace math {
 	{
 		return { lhs, rhs };
 	}
-
 
 
 	//=====================================================================
@@ -450,9 +341,6 @@ namespace math {
 
 	//=====================================================================
 	// multiplication
-	//    note: we don't have an expr for the scalar, because any expression
-	//          that results in a single element almost definitely has high
-	//          computational costs (like dot-products)
 	//=====================================================================
 	// vector * float
 	inline auto operator * (vector4f const& lhs, float rhs)
@@ -485,7 +373,6 @@ namespace math {
 	}
 
 	
-
 	//=====================================================================
 	// division
 	//=====================================================================
