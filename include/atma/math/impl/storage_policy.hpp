@@ -32,11 +32,6 @@ namespace impl {
 	struct storage_policy<float> {
 		typedef float const type;
 	};
-
-	template <typename R, typename O>
-	struct storage_policy<expr<R, O>> {
-		typedef expr<R, O> const type;
-	};
 	
 //=====================================================================
 } // namespace impl
