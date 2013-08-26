@@ -119,6 +119,44 @@ namespace math {
 		return vector4f(k);
 	}
 	
+	inline auto operator * (matrix4f const& lhs, float f) -> matrix4f
+	{
+		__m128 ss = _mm_set_ps(f, f, f, f);
+
+		__m128 r0 = _mm_mul_ps(lhs.xmmd(0), ss),
+			   r1 = _mm_mul_ps(lhs.xmmd(1), ss),
+			   r2 = _mm_mul_ps(lhs.xmmd(2), ss),
+			   r3 = _mm_mul_ps(lhs.xmmd(3), ss)
+			   ;
+		
+		return matrix4f(r0, r1, r2, r3);
+	}
+
+	inline auto operator + (matrix4f const& lhs, matrix4f const& rhs) -> matrix4f
+	{
+		return matrix4f(
+			_mm_add_ps(lhs.xmmd(0), rhs.xmmd(0)),
+			_mm_add_ps(lhs.xmmd(1), rhs.xmmd(1)),
+			_mm_add_ps(lhs.xmmd(2), rhs.xmmd(2)),
+			_mm_add_ps(lhs.xmmd(3), rhs.xmmd(3))
+		);
+	}
+
+	inline auto operator - (matrix4f const& lhs, matrix4f const& rhs) -> matrix4f
+	{
+		return matrix4f(
+			_mm_sub_ps(lhs.xmmd(0), rhs.xmmd(0)),
+			_mm_sub_ps(lhs.xmmd(1), rhs.xmmd(1)),
+			_mm_sub_ps(lhs.xmmd(2), rhs.xmmd(2)),
+			_mm_sub_ps(lhs.xmmd(3), rhs.xmmd(3))
+		);
+	}
+
+	inline auto inverse(matrix4f const& x) -> matrix4f
+	{
+		// put code here
+	}
+
 
 //=====================================================================
 } // namespace math
