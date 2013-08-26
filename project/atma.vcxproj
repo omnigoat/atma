@@ -36,7 +36,7 @@
     <ClCompile Include="..\source\math\vector.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{3301E1FA-9F23-43C6-A5E1-183204867D44}</ProjectGuid>
+    <ProjectGuid>{0581B1D8-88BC-4835-A665-EDCB87AAFC7C}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>atma</RootNamespace>
   </PropertyGroup>
