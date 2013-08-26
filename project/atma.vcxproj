@@ -22,10 +22,12 @@
     <ClInclude Include="..\include\atma\math\impl\binary_expr.hpp" />
     <ClInclude Include="..\include\atma\math\impl\element_type_of.hpp" />
     <ClInclude Include="..\include\atma\math\impl\expr.hpp" />
+    <ClInclude Include="..\include\atma\math\impl\vector4f_declaration.hpp" />
     <ClInclude Include="..\include\atma\math\impl\vector4f_fwd.hpp" />
     <ClInclude Include="..\include\atma\math\impl\storage_policy.hpp" />
-    <ClInclude Include="..\include\atma\math\impl\vector_impl.hpp" />
+    <ClInclude Include="..\include\atma\math\impl\vector4f_definition.hpp" />
     <ClInclude Include="..\include\atma\math\impl\vector4f_exprs.hpp" />
+    <ClInclude Include="..\include\atma\math\impl\vector4f_operators.hpp" />
     <ClInclude Include="..\include\atma\math\matrix4f.hpp" />
     <ClInclude Include="..\include\atma\math\vector4f.hpp" />
     <ClInclude Include="..\include\atma\string.hpp" />
@@ -34,7 +36,7 @@
     <ClCompile Include="..\source\math\vector.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{0581B1D8-88BC-4835-A665-EDCB87AAFC7C}</ProjectGuid>
+    <ProjectGuid>{3301E1FA-9F23-43C6-A5E1-183204867D44}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>atma</RootNamespace>
   </PropertyGroup>

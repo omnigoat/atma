@@ -4,8 +4,11 @@
 #ifndef ATMA_MATH_IMPL_VECTOR4F_EXPRS_HPP
 #define ATMA_MATH_IMPL_VECTOR4F_EXPRS_HPP
 //=====================================================================
+#ifndef ATMA_MATH_VECTOR4F_SCOPE
+#	error "this file needs to be included solely from vector4f.hpp"
+#endif
+//=====================================================================
 #include <atma/math/impl/binary_expr.hpp>
-
 //=====================================================================
 namespace atma {
 namespace math {
