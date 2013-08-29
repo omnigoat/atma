@@ -16,13 +16,35 @@ namespace atma {
 namespace evented {
 //=====================================================================
 	
+	struct flowcontrol_t
+	{
+		flowcontrol_t()
+			: break_(), prevent_default_()
+		{
+		}
+
+		auto stop_execution() -> void { break_ = true; }
+		auto prevent_default_behaviour() -> void { prevent_default_ = true; }
+
+		auto broke() const -> bool { return break_; }
+		auto prevent_default() const -> bool { return prevent_default_; }
+
+	private:
+		bool break_;
+		bool prevent_default_;
+	};
+
+
+
 	//=====================================================================
 	// event_t
 	//=====================================================================
-	template <typename F = typename std::identity<void()>::type>
+	template <typename... Args>
 	struct event_t
 	{
-		typedef std::function<F> delegate_t;
+		
+
+		typedef std::function<void(flowcontrol_t&, Args...)> delegate_t;
 
 		auto operator += (delegate_t const& t) -> void {
 			connect(t);
@@ -35,11 +57,16 @@ namespace evented {
 
 		// fire
 		template <typename... Args>
-		auto fire(Args&&... args) -> void
+		auto fire(Args&&... args) -> flowcontrol_t
 		{
+			flowcontrol_t fc;
 			for (auto const& x : delegates_) {
-				x(std::forward<Args>(args)...);
+				x(fc, std::forward<Args>(args)...);
+				if (fc.broke())
+					break;
 			}
+
+			return fc;
 		}
 
 
