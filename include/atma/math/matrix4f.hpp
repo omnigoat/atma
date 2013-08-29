@@ -14,8 +14,15 @@ namespace atma {
 namespace math {
 //=====================================================================
 	
-	__m128 const xmmd_one_f32x4 = _mm_set_ps(1.f, 1.f, 1.f, 1.f);
+	__m128 const xmmd_one_f32x4 = _mm_setr_ps(1.f, 1.f, 1.f, 1.f);
+	__m128 const xmmd_negone_f32x4 = _mm_setr_ps(-1.f, -1.f, -1.f, -1.f);
+	__m128 const xmmd_1110_i32x4 = _mm_cvtepi32_ps(_mm_setr_epi32(0xffff, 0xffff, 0xffff, 0));
+	__m128 const xmmd_identity_r3_f32x4 = _mm_setr_ps(0.f, 0.f, 0.f, 1.f);
 
+	inline auto _am_select_ps(__m128 const& a, __m128 const& b, __m128 const& mask) -> __m128
+	{
+		return _mm_or_ps(_mm_andnot_ps(mask, a), _mm_and_ps(b, mask));
+	}
 
 	struct matrix4f
 	{
@@ -279,6 +286,53 @@ namespace math {
 			_mm_mul_ps(c6, det)
 		);
 	}
+
+
+	// left-handed look-at view matrix
+	inline auto look_to(vector4f const& position, vector4f const& direction, vector4f const& up) -> matrix4f
+	{
+		vector4f r2 = direction.normalized();
+		vector4f r0 = cross_product(up, r2).normalized();
+		vector4f r1 = cross_product(r2, r0);
+		vector4f npos = vector4f(_mm_mul_ps(position.xmmd(), xmmd_negone_f32x4));
+
+#if 0
+		XMVECTOR R2 = XMVector3Normalize(EyeDirection);
+		XMVECTOR R0 = XMVector3Cross(UpDirection, R2);
+		R0 = XMVector3Normalize(R0);
+		XMVECTOR R1 = XMVector3Cross(R2, R0);
+		XMVECTOR NegEyePosition = XMVectorNegate(EyePosition);
+#endif
+		__m128 d0 = _mm_dp_ps(r0.xmmd(), npos.xmmd(), 0xef);
+		__m128 d1 = _mm_dp_ps(r1.xmmd(), npos.xmmd(), 0xef);
+		__m128 d2 = _mm_dp_ps(r2.xmmd(), npos.xmmd(), 0xef);
+
+#if 0
+		XMVECTOR D0 = XMVector3Dot(R0, NegEyePosition);
+		XMVECTOR D1 = XMVector3Dot(R1, NegEyePosition);
+		XMVECTOR D2 = XMVector3Dot(R2, NegEyePosition);
+#endif
+		auto result = matrix4f(
+			_am_select_ps(d0, r0.xmmd(), xmmd_1110_i32x4),
+			_am_select_ps(d1, r1.xmmd(), xmmd_1110_i32x4),
+			_am_select_ps(d2, r2.xmmd(), xmmd_1110_i32x4),
+			xmmd_identity_r3_f32x4
+		);
+
+		return transpose(result);
+
+#if 0
+		XMMATRIX M;
+		M.r[0] = XMVectorSelect(D0, R0, g_XMSelect1110.v);
+		M.r[1] = XMVectorSelect(D1, R1, g_XMSelect1110.v);
+		M.r[2] = XMVectorSelect(D2, R2, g_XMSelect1110.v);
+		M.r[3] = g_XMIdentityR3.v;
+
+		M = XMMatrixTranspose(M);
+#endif
+	}
+
+
 
 
 //=====================================================================
