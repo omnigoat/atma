@@ -191,7 +191,6 @@ namespace math {
 		__m128 d1 = _mm_mul_ps(v01, v11);
 		__m128 d2 = _mm_mul_ps(v02, v12);
 
-
 		v00 = _mm_shuffle_ps(t.xmmd(2), t.xmmd(2), _MM_SHUFFLE(3, 2, 3, 2));
 		v01 = _mm_shuffle_ps(t.xmmd(0), t.xmmd(0), _MM_SHUFFLE(3, 2, 3, 2));
 		v02 = _mm_shuffle_ps(t.xmmd(2), t.xmmd(0), _MM_SHUFFLE(3, 1, 3, 1));
@@ -288,30 +287,18 @@ namespace math {
 	}
 
 
-	// left-handed look-at view matrix
-	inline auto look_to(vector4f const& position, vector4f const& direction, vector4f const& up) -> matrix4f
+	// left-handed look-along view matrix
+	inline auto look_along(vector4f const& position, vector4f const& direction, vector4f const& up) -> matrix4f
 	{
 		vector4f r2 = direction.normalized();
 		vector4f r0 = cross_product(up, r2).normalized();
 		vector4f r1 = cross_product(r2, r0);
 		vector4f npos = vector4f(_mm_mul_ps(position.xmmd(), xmmd_negone_f32x4));
 
-#if 0
-		XMVECTOR R2 = XMVector3Normalize(EyeDirection);
-		XMVECTOR R0 = XMVector3Cross(UpDirection, R2);
-		R0 = XMVector3Normalize(R0);
-		XMVECTOR R1 = XMVector3Cross(R2, R0);
-		XMVECTOR NegEyePosition = XMVectorNegate(EyePosition);
-#endif
 		__m128 d0 = _mm_dp_ps(r0.xmmd(), npos.xmmd(), 0xef);
 		__m128 d1 = _mm_dp_ps(r1.xmmd(), npos.xmmd(), 0xef);
 		__m128 d2 = _mm_dp_ps(r2.xmmd(), npos.xmmd(), 0xef);
 
-#if 0
-		XMVECTOR D0 = XMVector3Dot(R0, NegEyePosition);
-		XMVECTOR D1 = XMVector3Dot(R1, NegEyePosition);
-		XMVECTOR D2 = XMVector3Dot(R2, NegEyePosition);
-#endif
 		auto result = matrix4f(
 			_am_select_ps(d0, r0.xmmd(), xmmd_1110_i32x4),
 			_am_select_ps(d1, r1.xmmd(), xmmd_1110_i32x4),
@@ -320,16 +307,11 @@ namespace math {
 		);
 
 		return transpose(result);
+	}
 
-#if 0
-		XMMATRIX M;
-		M.r[0] = XMVectorSelect(D0, R0, g_XMSelect1110.v);
-		M.r[1] = XMVectorSelect(D1, R1, g_XMSelect1110.v);
-		M.r[2] = XMVectorSelect(D2, R2, g_XMSelect1110.v);
-		M.r[3] = g_XMIdentityR3.v;
-
-		M = XMMatrixTranspose(M);
-#endif
+	inline auto look_to(vector4f const& position, vector4f const& target, vector4f const& up) -> matrix4f
+	{
+		return look_along(position, target - position, up);
 	}
 
 
