@@ -7,18 +7,19 @@
 #define ATMA_EVENTED_EVENT_HPP
 //=====================================================================
 #include <atma/assert.hpp>
-#include <atma/evented/delegate.hpp>
 #include <atomic>
 #include <functional>
 #include <vector>
 //=====================================================================
 namespace atma {
-namespace evented {
 //=====================================================================
 	
-	struct flowcontrol_t
+	//=====================================================================
+	// event_flow_t
+	//=====================================================================
+	struct event_flow_t
 	{
-		flowcontrol_t()
+		event_flow_t()
 			: break_(), prevent_default_()
 		{
 		}
@@ -27,7 +28,7 @@ namespace evented {
 		auto prevent_default_behaviour() -> void { prevent_default_ = true; }
 
 		auto broke() const -> bool { return break_; }
-		auto prevent_default() const -> bool { return prevent_default_; }
+		auto prevented() const -> bool { return prevent_default_; }
 
 	private:
 		bool break_;
@@ -42,24 +43,23 @@ namespace evented {
 	template <typename... Args>
 	struct event_t
 	{
-		
-
-		typedef std::function<void(flowcontrol_t&, Args...)> delegate_t;
-
-		auto operator += (delegate_t const& t) -> void {
-			connect(t);
-		}
+		typedef std::function<void(event_flow_t&, Args...)> delegate_t;
 
 		// connect
 		auto connect(delegate_t const& t) -> void {
 			delegates_.push_back(t);
 		}
 
+		auto operator += (delegate_t const& t) -> void
+		{
+			connect(t);
+		}
+
 		// fire
 		template <typename... Args>
-		auto fire(Args&&... args) -> flowcontrol_t
+		auto fire(Args&&... args) -> event_flow_t
 		{
-			flowcontrol_t fc;
+			event_flow_t fc;
 			for (auto const& x : delegates_) {
 				x(fc, std::forward<Args>(args)...);
 				if (fc.broke())
@@ -75,10 +75,7 @@ namespace evented {
 		delegates_t delegates_;
 	};
 
-
-
 //=====================================================================
-} // namespace evented
 } // namespace atma
 //=====================================================================
 #endif // inclusion guard

@@ -18,6 +18,7 @@
     <ClInclude Include="..\include\atma\assert\ensure.hpp" />
     <ClInclude Include="..\include\atma\assert\handling.hpp" />
     <ClInclude Include="..\include\atma\console.hpp" />
+    <ClInclude Include="..\include\atma\event.hpp" />
     <ClInclude Include="..\include\atma\intrusive_ptr.hpp" />
     <ClInclude Include="..\include\atma\math\impl\binary_expr.hpp" />
     <ClInclude Include="..\include\atma\math\impl\element_type_of.hpp" />
