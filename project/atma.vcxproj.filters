@@ -86,6 +86,9 @@
     <ClInclude Include="..\include\atma\math\impl\vector4f_declaration.hpp">
       <Filter>include\math\impl\vector4f</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\event.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\source\math\vector.cpp">
