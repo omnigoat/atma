@@ -18,6 +18,11 @@ namespace math {
 	__m128 const xmmd_negone_f32x4 = _mm_setr_ps(-1.f, -1.f, -1.f, -1.f);
 	__m128 const xmmd_1110_i32x4 = _mm_cvtepi32_ps(_mm_setr_epi32(0xffff, 0xffff, 0xffff, 0));
 	__m128 const xmmd_identity_r3_f32x4 = _mm_setr_ps(0.f, 0.f, 0.f, 1.f);
+	
+	__m128 const xmmd_mask_1000_f32x4 = _mm_cvtepi32_ps(_mm_setr_epi32(0xffff, 0, 0, 0));
+	__m128 const xmmd_mask_0100_f32x4 = _mm_cvtepi32_ps(_mm_setr_epi32(0, 0xffff, 0, 0));
+	__m128 const xmmd_mask_0010_f32x4 = _mm_cvtepi32_ps(_mm_setr_epi32(0, 0, 0xffff, 0));
+	__m128 const xmmd_mask_0001_f32x4 = _mm_cvtepi32_ps(_mm_setr_epi32(0, 0, 0, 0xffff));
 
 	inline auto _am_select_ps(__m128 const& a, __m128 const& b, __m128 const& mask) -> __m128
 	{
@@ -314,7 +319,55 @@ namespace math {
 		return look_along(position, target - position, up);
 	}
 
+#undef near
+#undef far
+	inline auto pespective(float width, float height, float near, float far) -> matrix4f
+	{
+		float nn = near + near;
+		float range = far / (far - near);
 
+		__m128 rmem = _mm_set_ps(nn / width, nn / height, range, -range * near);
+		__m128 t0 = _mm_setzero_ps();
+
+		__m128 r0 = _mm_move_ss(t0, rmem);
+		__m128 r1 = _mm_and_ps(_mm_shuffle_ps(_mm_shuffle_ps(rmem, t0, _MM_SHUFFLE(3,0,0,0)), t0, _MM_SHUFFLE(3,0,0,0)));
+
+		
+
+#if 0
+		XMMATRIX M;
+		float TwoNearZ = NearZ + NearZ;
+		float fRange = FarZ / (FarZ - NearZ);
+		// Note: This is recorded on the stack
+		XMVECTOR rMem = {
+			TwoNearZ / ViewWidth,
+			TwoNearZ / ViewHeight,
+			fRange,
+			-fRange * NearZ
+		};
+		// Copy from memory to SSE register
+		XMVECTOR vValues = rMem;
+		XMVECTOR vTemp = _mm_setzero_ps();
+		// Copy x only
+		vTemp = _mm_move_ss(vTemp, vValues);
+		// TwoNearZ / ViewWidth,0,0,0
+		M.r[0] = vTemp;
+		// 0,TwoNearZ / ViewHeight,0,0
+		vTemp = vValues;
+		vTemp = _mm_and_ps(vTemp, g_XMMaskY);
+		M.r[1] = vTemp;
+		// x=fRange,y=-fRange * NearZ,0,1.0f
+		vValues = _mm_shuffle_ps(vValues, g_XMIdentityR3, _MM_SHUFFLE(3, 2, 3, 2));
+		// 0,0,fRange,1.0f
+		vTemp = _mm_setzero_ps();
+		vTemp = _mm_shuffle_ps(vTemp, vValues, _MM_SHUFFLE(3, 0, 0, 0));
+		M.r[2] = vTemp;
+		// 0,0,-fRange * NearZ,0
+		vTemp = _mm_shuffle_ps(vTemp, vValues, _MM_SHUFFLE(2, 1, 0, 0));
+		M.r[3] = vTemp;
+#endif
+		return M;
+	}
 
 
 //=====================================================================
