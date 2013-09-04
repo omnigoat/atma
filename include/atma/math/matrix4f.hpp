@@ -14,32 +14,47 @@ namespace atma {
 namespace math {
 //=====================================================================
 	
-	__m128 const xmmd_one_f32x4 = _mm_setr_ps(1.f, 1.f, 1.f, 1.f);
-	__m128 const xmmd_negone_f32x4 = _mm_setr_ps(-1.f, -1.f, -1.f, -1.f);
-	__m128 const xmmd_1110_i32x4 = _mm_cvtepi32_ps(_mm_setr_epi32(0xffff, 0xffff, 0xffff, 0));
-	__m128 const xmmd_identity_r3_f32x4 = _mm_setr_ps(0.f, 0.f, 0.f, 1.f);
+	__m128 const xmmd_zero_ps = _mm_setzero_ps();
+	__m128 const xmmd_one_ps = _mm_setr_ps(1.f, 1.f, 1.f, 1.f);
+	__m128 const xmmd_negone_ps = _mm_setr_ps(-1.f, -1.f, -1.f, -1.f);
 	
-	__m128 const xmmd_mask_1000_f32x4 = _mm_cvtepi32_ps(_mm_setr_epi32(0xffff, 0, 0, 0));
-	__m128 const xmmd_mask_0100_f32x4 = _mm_cvtepi32_ps(_mm_setr_epi32(0, 0xffff, 0, 0));
-	__m128 const xmmd_mask_0010_f32x4 = _mm_cvtepi32_ps(_mm_setr_epi32(0, 0, 0xffff, 0));
-	__m128 const xmmd_mask_0001_f32x4 = _mm_cvtepi32_ps(_mm_setr_epi32(0, 0, 0, 0xffff));
+//	__m128 const xmmd_select_1110_ps = _mm_
+
+	__m128 const xmmd_mask_1000_ps = _mm_cmplt_ps(xmmd_zero_ps, {1, 0, 0, 0});
+	__m128 const xmmd_mask_0100_ps = _mm_cmplt_ps(xmmd_zero_ps, {0, 1, 0, 0});
+	__m128 const xmmd_mask_0010_ps = _mm_cmplt_ps(xmmd_zero_ps, {0, 0, 1, 0});
+	__m128 const xmmd_mask_0001_ps = _mm_cmplt_ps(xmmd_zero_ps, {0, 0, 0, 1});
+
+	__m128 const xmmd_mask_1110_ps = _mm_cmplt_ps(xmmd_zero_ps, {1, 1, 1, 0});
+
+	__m128 const xmmd_identity_r0_ps = _mm_setr_ps(1.f, 0.f, 0.f, 0.f);
+	__m128 const xmmd_identity_r1_ps = _mm_setr_ps(0.f, 1.f, 0.f, 0.f);
+	__m128 const xmmd_identity_r2_ps = _mm_setr_ps(0.f, 0.f, 1.f, 0.f);
+	__m128 const xmmd_identity_r3_ps = _mm_setr_ps(0.f, 0.f, 0.f, 1.f);
+
+	
 
 	inline auto _am_select_ps(__m128 const& a, __m128 const& b, __m128 const& mask) -> __m128
 	{
 		return _mm_or_ps(_mm_andnot_ps(mask, a), _mm_and_ps(b, mask));
 	}
 
+	inline auto _am_load_f32x4(float f0, float f1, float f2, float f3) -> __m128
+	{
+		__declspec(align(16)) float fs[] = {f3, f2, f1, f0};
+		return _mm_load_ps(fs);
+	}
+
 	struct matrix4f
 	{
 		static auto identity() -> matrix4f
 		{
-			static __m128 r0 = _mm_setr_ps(1.f, 0.f, 0.f, 0.f),
-						  r1 = _mm_setr_ps(0.f, 1.f, 0.f, 0.f),
-						  r2 = _mm_setr_ps(0.f, 0.f, 1.f, 0.f),
-						  r3 = _mm_setr_ps(0.f, 0.f, 0.f, 1.f)
-						  ;
-			
-			return matrix4f(r0, r1, r2, r3);
+			return matrix4f{
+				xmmd_identity_r0_ps,
+				xmmd_identity_r1_ps,
+				xmmd_identity_r2_ps,
+				xmmd_identity_r3_ps
+			};
 		}
 
 		matrix4f()
@@ -48,25 +63,25 @@ namespace math {
 
 		explicit matrix4f(__m128 const& r0, __m128 const& r1, __m128 const& r2, __m128 const& r3)
 		{
-			xmmd_[0] = r0;
-			xmmd_[1] = r1;
-			xmmd_[2] = r2;
-			xmmd_[3] = r3;
+			rmd_[0] = r0;
+			rmd_[1] = r1;
+			rmd_[2] = r2;
+			rmd_[3] = r3;
 		}
 
 		auto set(uint32_t r, uint32_t c, float v) -> void
 		{
-			xmmd_[r].m128_f32[c] = v;
+			rmd_[r].m128_f32[c] = v;
 		}
 
 		auto xmmd(uint32_t i) const -> __m128 const&
 		{
-			return xmmd_[i];
+			return rmd_[i];
 		}
 
 	private:
 #ifdef ATMA_MATH_USE_SSE
-		__m128 xmmd_[4];
+		__m128 rmd_[4];
 #else
 		float fpd_[4][4];
 #endif
@@ -281,7 +296,7 @@ namespace math {
 		// determinate
 		__m128 det = _mm_dp_ps(c0, t.xmmd(0), 0xff);
 
-		det = _mm_div_ps(xmmd_one_f32x4, det);
+		det = _mm_div_ps(xmmd_one_ps, det);
 
 		return matrix4f(
 			_mm_mul_ps(c0, det),
@@ -298,17 +313,17 @@ namespace math {
 		vector4f r2 = direction.normalized();
 		vector4f r0 = cross_product(up, r2).normalized();
 		vector4f r1 = cross_product(r2, r0);
-		vector4f npos = vector4f(_mm_mul_ps(position.xmmd(), xmmd_negone_f32x4));
+		vector4f npos = vector4f(_mm_mul_ps(position.xmmd(), xmmd_negone_ps));
 
 		__m128 d0 = _mm_dp_ps(r0.xmmd(), npos.xmmd(), 0xef);
 		__m128 d1 = _mm_dp_ps(r1.xmmd(), npos.xmmd(), 0xef);
 		__m128 d2 = _mm_dp_ps(r2.xmmd(), npos.xmmd(), 0xef);
 
 		auto result = matrix4f(
-			_am_select_ps(d0, r0.xmmd(), xmmd_1110_i32x4),
-			_am_select_ps(d1, r1.xmmd(), xmmd_1110_i32x4),
-			_am_select_ps(d2, r2.xmmd(), xmmd_1110_i32x4),
-			xmmd_identity_r3_f32x4
+			_am_select_ps(d0, r0.xmmd(), xmmd_mask_1110_ps),
+			_am_select_ps(d1, r1.xmmd(), xmmd_mask_1110_ps),
+			_am_select_ps(d2, r2.xmmd(), xmmd_mask_1110_ps),
+			xmmd_identity_r3_ps
 		);
 
 		return transpose(result);
@@ -321,17 +336,22 @@ namespace math {
 
 #undef near
 #undef far
+#if 1
 	inline auto pespective(float width, float height, float near, float far) -> matrix4f
 	{
 		float nn = near + near;
 		float range = far / (far - near);
 
-		__m128 rmem = _mm_set_ps(nn / width, nn / height, range, -range * near);
+		__m128 rmem = _am_load_f32x4(nn / width, nn / height, range, -range * near);
 		__m128 t0 = _mm_setzero_ps();
 
 		__m128 r0 = _mm_move_ss(t0, rmem);
-		__m128 r1 = _mm_and_ps(_mm_shuffle_ps(_mm_shuffle_ps(rmem, t0, _MM_SHUFFLE(3,0,0,0)), t0, _MM_SHUFFLE(3,0,0,0)));
+		__m128 r1 = _mm_and_ps(rmem, xmmd_mask_0100_ps);
+		rmem = _mm_shuffle_ps(rmem, xmmd_identity_r3_ps, _MM_SHUFFLE(3, 2, 3, 2));
+		__m128 r2 = _mm_shuffle_ps(t0, rmem, _MM_SHUFFLE(3, 0, 0, 0));
+		__m128 r3 = _mm_shuffle_ps(t0, rmem, _MM_SHUFFLE(2, 1, 0, 0));
 
+		return matrix4f{r0, r1, r2, r3};
 		
 
 #if 0
@@ -365,10 +385,11 @@ namespace math {
 		// 0,0,-fRange * NearZ,0
 		vTemp = _mm_shuffle_ps(vTemp, vValues, _MM_SHUFFLE(2, 1, 0, 0));
 		M.r[3] = vTemp;
-#endif
-		return M;
-	}
 
+		return M;
+#endif
+	}
+#endif
 
 //=====================================================================
 } // namespace math

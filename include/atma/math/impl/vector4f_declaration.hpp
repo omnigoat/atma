@@ -15,8 +15,9 @@ namespace math {
 	//=====================================================================
 	// vector4f
 	// ----------
-	//   A four-component vector of floats.
+	//   A four-component vector of floats, 16-byte aligned
 	//=====================================================================
+	__declspec(align(16))
 	struct vector4f : impl::expr<vector4f, vector4f>
 	{
 		// construction
@@ -32,7 +33,7 @@ namespace math {
 
 		// access
 #ifdef ATMA_MATH_USE_SSE
-		auto xmmd() const -> __m128 { return xmmd_; }
+		auto xmmd() const -> __m128 { return rmd_; }
 #endif
 		auto operator[] (uint32_t i) const -> float;
 		
@@ -51,11 +52,38 @@ namespace math {
 		auto set(uint32_t i, float n) -> void;
 		auto normalize() -> void;
 
+		template <uint8_t i>
+		struct elem_ref_t
+		{
+			elem_ref_t(vector4f* owner) : owner_(owner) {}
+
+			operator float() {
+				return owner_->rmd_.m128_f32[i];
+			}
+
+			float operator = (float rhs) {
+				owner_->rmd_.m128_f32[i] = rhs;
+				return rhs;
+			}
+
+		private:
+			vector4f* owner_;
+		};
+		/*
+		elem_ref_t<0> x;
+		elem_ref_t<1> y;
+		elem_ref_t<2> z;
+		elem_ref_t<3> w;
+		*/
+
 	private:
 #ifdef ATMA_MATH_USE_SSE
-		__m128 xmmd_;
+		union {
+			__m128 rmd_;
+			struct { float x, y, z, w; };
+		};
 #else
-		float fpd_[4];
+		float x, y, z, w;
 #endif
 	};
 	
@@ -64,7 +92,9 @@ namespace math {
 	// functions
 	//=====================================================================
 	inline auto dot_product(vector4f const& lhs, vector4f const& rhs) -> float;
-	inline auto cross_product(vector4f const& lhs, vector4f const& rhs) -> vector4f;
+
+	template <typename LOP, typename ROP>
+	inline auto cross_product(impl::expr<vector4f, LOP> const&, impl::expr<vector4f, ROP> const&) -> vector4f;
 
 
 //=====================================================================

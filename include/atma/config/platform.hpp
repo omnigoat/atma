@@ -11,6 +11,7 @@
 	#if defined(_WIN32) || defined(WIN32)
 	#	define ATMA_PLATFORM_WIN32
 	#	include "windows.h"
+	#	include "xmmintrin.h"
 	#	undef min
 	#	undef max
 	#endif
