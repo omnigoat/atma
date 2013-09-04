@@ -21,8 +21,11 @@
     <ClInclude Include="..\include\atma\event.hpp" />
     <ClInclude Include="..\include\atma\intrusive_ptr.hpp" />
     <ClInclude Include="..\include\atma\math\impl\binary_expr.hpp" />
+    <ClInclude Include="..\include\atma\math\impl\constants.hpp" />
     <ClInclude Include="..\include\atma\math\impl\element_type_of.hpp" />
     <ClInclude Include="..\include\atma\math\impl\expr.hpp" />
+    <ClInclude Include="..\include\atma\math\impl\matrix4f_definition.hpp" />
+    <ClInclude Include="..\include\atma\math\impl\matrix4f_declaration.hpp" />
     <ClInclude Include="..\include\atma\math\impl\vector4f_declaration.hpp" />
     <ClInclude Include="..\include\atma\math\impl\vector4f_fwd.hpp" />
     <ClInclude Include="..\include\atma\math\impl\storage_policy.hpp" />
