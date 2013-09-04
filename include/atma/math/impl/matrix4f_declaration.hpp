@@ -30,7 +30,12 @@ namespace math {
 		auto operator = (matrix4f const&) -> matrix4f&;
 
 
+		// computation
+		auto transposed() const -> matrix4f;
+		auto inverted() const -> matrix4f;
+
 		auto set(uint32_t r, uint32_t c, float v) -> void;
+		
 
 #ifdef ATMA_MATH_USE_SSE
 		auto xmmd(uint32_t i) const -> __m128 const&;
