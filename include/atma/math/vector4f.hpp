@@ -6,6 +6,7 @@
 //=====================================================================
 #define ATMA_MATH_VECTOR4F_SCOPE
 //=====================================================================
+#include <cstdint>
 #include <atma/math/impl/vector4f_fwd.hpp>
 #include <atma/math/impl/expr.hpp>
 #include <atma/math/impl/vector4f_declaration.hpp>
