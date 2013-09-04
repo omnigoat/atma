@@ -17,10 +17,10 @@ namespace math {
 
 	matrix4f::matrix4f(matrix4f const& rhs)
 	{
-		rmd_[0] = rmd_[0];
-		rmd_[1] = rmd_[1];
-		rmd_[2] = rmd_[2];
-		rmd_[3] = rmd_[3];
+		rmd_[0] = rhs.rmd_[0];
+		rmd_[1] = rhs.rmd_[1];
+		rmd_[2] = rhs.rmd_[2];
+		rmd_[3] = rhs.rmd_[3];
 	}
 
 #ifdef ATMA_MATH_USE_SSE
