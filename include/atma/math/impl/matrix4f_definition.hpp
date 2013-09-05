@@ -11,30 +11,110 @@ namespace atma {
 namespace math {
 //=====================================================================
 	
+
+	//=====================================================================
+	// impl
+	//=====================================================================
+	namespace impl
+	{
+		// cell-element-ref
+		template <typename T>
+		cell_element_ref<T>::cell_element_ref(matrix4f* owner, uint32_t row, uint32_t col)
+		: owner_(owner), row_(row), col_(col)
+		{}
+
+		template <typename T>
+		auto cell_element_ref<T>::operator = (float rhs) -> float
+		{
+#ifdef ATMA_MATH_USE_SSE
+			return owner_->sse_[row_].m128_f32[col_] = rhs;
+#else
+			return owner_->fpd_[row_][col_] = rhs;
+#endif
+		}
+
+		template <typename T>
+		cell_element_ref<T>::operator float() {
+#ifdef ATMA_MATH_USE_SSE
+			return owner_->sse_[row_].m128_f32[col_];
+#else
+			return owner_->fpd_[row_][col_];
+#endif
+		}
+
+		// cell-element-ref (const)
+		template <typename T>
+		cell_element_ref<T const>::cell_element_ref(matrix4f const* owner, uint32_t row, uint32_t col)
+		: owner_(owner), row_(row), col_(col)
+		{}
+
+		template <typename T>
+		cell_element_ref<T const>::operator float() {
+#ifdef ATMA_MATH_USE_SSE
+			return owner_->sse_[row_].m128_f32[col_];
+#else
+			return owner_->fpd_[row_][col_];
+#endif
+		}
+
+
+		// row-element-ref
+		template <typename T>
+		row_element_ref<T>::row_element_ref(matrix4f* owner, uint32_t row)
+		: owner_(owner), row_(row)
+		{}
+
+		template <typename T>
+		auto row_element_ref<T>::operator[](uint32_t i) -> cell_element_ref<T>
+		{
+			return cell_element_ref<T>(owner_, row_, i);
+		}
+
+		template <typename T>
+		auto row_element_ref<T>::operator[](uint32_t i) const -> cell_element_ref<T const>
+		{
+			return cell_element_ref<T const>(owner_, row_, i);
+		}
+
+		// row-element-ref (const)
+		template <typename T>
+		row_element_ref<T const>::row_element_ref(matrix4f const* owner, uint32_t row)
+		: owner_(owner), row_(row)
+		{}
+
+		template <typename T>
+		auto row_element_ref<T const>::operator[](uint32_t i) const -> cell_element_ref<T const>
+		{
+			return cell_element_ref<T const>(owner_, row_, i);
+		}
+	}
+
+
+
 	matrix4f::matrix4f()
 	{
 	}
 
 	matrix4f::matrix4f(matrix4f const& rhs)
 	{
-		rmd_[0] = rhs.rmd_[0];
-		rmd_[1] = rhs.rmd_[1];
-		rmd_[2] = rhs.rmd_[2];
-		rmd_[3] = rhs.rmd_[3];
+		sse_[0] = rhs.sse_[0];
+		sse_[1] = rhs.sse_[1];
+		sse_[2] = rhs.sse_[2];
+		sse_[3] = rhs.sse_[3];
 	}
 
 #ifdef ATMA_MATH_USE_SSE
 	matrix4f::matrix4f(__m128 const& r0, __m128 const& r1, __m128 const& r2, __m128 const& r3)
 	{
-		rmd_[0] = r0;
-		rmd_[1] = r1;
-		rmd_[2] = r2;
-		rmd_[3] = r3;
+		sse_[0] = r0;
+		sse_[1] = r1;
+		sse_[2] = r2;
+		sse_[3] = r3;
 	}
 
 	auto matrix4f::xmmd(uint32_t i) const -> __m128 const&
 	{
-		return rmd_[i];
+		return sse_[i];
 	}
 #endif
 
@@ -92,9 +172,9 @@ namespace math {
 	{
 		__m128 rv0 = _mm_dp_ps(lhs.xmmd(0), rhs.xmmd(), 0xf1),
 		       rv1 = _mm_dp_ps(lhs.xmmd(1), rhs.xmmd(), 0xf2),
-			   rv2 = _mm_dp_ps(lhs.xmmd(2), rhs.xmmd(), 0xf4),
-			   rv3 = _mm_dp_ps(lhs.xmmd(3), rhs.xmmd(), 0xf8)
-			   ;
+		       rv2 = _mm_dp_ps(lhs.xmmd(2), rhs.xmmd(), 0xf4),
+		       rv3 = _mm_dp_ps(lhs.xmmd(3), rhs.xmmd(), 0xf8)
+		       ;
 
 		auto k = _mm_add_ps(_mm_add_ps(rv0, rv1), _mm_add_ps(rv2, rv3));
 
@@ -106,10 +186,10 @@ namespace math {
 		__m128 ss = _mm_set_ps(f, f, f, f);
 
 		__m128 r0 = _mm_mul_ps(lhs.xmmd(0), ss),
-			   r1 = _mm_mul_ps(lhs.xmmd(1), ss),
-			   r2 = _mm_mul_ps(lhs.xmmd(2), ss),
-			   r3 = _mm_mul_ps(lhs.xmmd(3), ss)
-			   ;
+		       r1 = _mm_mul_ps(lhs.xmmd(1), ss),
+		       r2 = _mm_mul_ps(lhs.xmmd(2), ss),
+		       r3 = _mm_mul_ps(lhs.xmmd(3), ss)
+		       ;
 		
 		return matrix4f(r0, r1, r2, r3);
 	}
