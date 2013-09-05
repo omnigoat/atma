@@ -31,7 +31,14 @@ namespace math {
 		rmd_[2] = r2;
 		rmd_[3] = r3;
 	}
+
+	auto matrix4f::xmmd(uint32_t i) const -> __m128 const&
+	{
+		return rmd_[i];
+	}
 #endif
+
+	
 
 	inline auto operator * (matrix4f const& lhs, matrix4f const& rhs) -> matrix4f
 	{
