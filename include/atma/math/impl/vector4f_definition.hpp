@@ -17,9 +17,9 @@ namespace math {
 	vector4f::vector4f()
 	{
 #if ATMA_MATH_USE_SSE
-		rmd_ = _mm_setzero_ps();
+		sd_ = _mm_setzero_ps();
 #else
-		memset(fpd_, 0, 128);
+		memset(fd_, 0, 128);
 #endif
 	}
 
@@ -27,15 +27,15 @@ namespace math {
 	{
 #ifdef ATMA_MATH_USE_SSE
 		__declspec(align(16)) float fs[] = {x, y, z, w};
-		rmd_ = _mm_load_ps(fs);
+		sd_ = _mm_load_ps(fs);
 #else
-		memcpy(fpd_, &x, sizeof(float) * 4);
+		memcpy(fd_, &x, sizeof(float) * 4);
 #endif
 	}
 
 #ifdef ATMA_MATH_USE_SSE
 	vector4f::vector4f(__m128 xm)
-		: rmd_(xm)
+		: sd_(xm)
 	{
 	}
 #endif
@@ -44,10 +44,10 @@ namespace math {
 	vector4f::vector4f(impl::expr<vector4f, OP> const& expr)
 	{
 #ifdef ATMA_MATH_USE_SSE
-		rmd_ = expr.xmmd();
+		sd_ = expr.xmmd();
 #else
 		for (auto i = 0u; i != 4u; ++i)
-			fpd_[i] = &expr[i];
+			fd_[i] = &expr[i];
 #endif
 	}
 
@@ -55,10 +55,10 @@ namespace math {
 	inline auto vector4f::operator = (const impl::expr<vector4f, OP>& e) -> vector4f&
 	{
 #ifdef ATMA_MATH_USE_SSE
-		rmd_ = e.xmmd();
+		sd_ = e.xmmd();
 #else
 		for (auto i = 0u; i != E; ++i) {
-			fpd_[i] = e[i];
+			fd_[i] = e[i];
 		}
 #endif
 		return *this;
@@ -69,16 +69,16 @@ namespace math {
 	{
 		ATMA_ASSERT(i < 4);
 #ifdef ATMA_MATH_USE_SSE
-		return rmd_.m128_f32[i];
+		return sd_.m128_f32[i];
 #else
-		return fpd_[i];
+		return fd_[i];
 #endif
 	}
 
 	inline auto vector4f::magnitude() const -> float
 	{
 #ifdef ATMA_MATH_USE_SSE
-		return _mm_sqrt_ss(_mm_dp_ps(rmd_, rmd_, 0x7f)).m128_f32[0];
+		return _mm_sqrt_ss(_mm_dp_ps(sd_, sd_, 0x7f)).m128_f32[0];
 #else
 		return std::sqrt(magnitude_squared());
 #endif
@@ -87,7 +87,7 @@ namespace math {
 	inline auto vector4f::magnitude_squared() const -> float
 	{
 #ifdef ATMA_MATH_USE_SSE
-		return _mm_dp_ps(rmd_, rmd_, 0x7f).m128_f32[0];
+		return _mm_dp_ps(sd_, sd_, 0x7f).m128_f32[0];
 #else
 		return dot_product(*this, *this);
 #endif
@@ -102,10 +102,10 @@ namespace math {
 	vector4f& vector4f::operator += (impl::expr<vector4f, OP> const& rhs)
 	{
 #ifdef ATMA_MATH_USE_SSE
-		rmd_ = _mm_add_ps(rmd_, rhs.xmmd());
+		sd_ = _mm_add_ps(sd_, rhs.xmmd());
 #else
 		for (auto i = 0u; i != 4u; ++i)
-			fpd_[i] += rhs.fpd_[i];
+			fd_[i] += rhs.fd_[i];
 #endif
 		return *this;
 	}
@@ -114,10 +114,10 @@ namespace math {
 	vector4f& vector4f::operator -= (impl::expr<vector4f, OP> const& rhs)
 	{
 #ifdef ATMA_MATH_USE_SSE
-		rmd_ = _mm_sub_ps(rmd_, rhs.xmmd());
+		sd_ = _mm_sub_ps(sd_, rhs.xmmd());
 #else
 		for (auto i = 0u; i != 4u; ++i)
-			fpd_[i] -= rhs.fpd_[i];
+			fd_[i] -= rhs.fd_[i];
 #endif
 		return *this;
 	}
@@ -125,10 +125,10 @@ namespace math {
 	vector4f& vector4f::operator *= (float rhs)
 	{
 #ifdef ATMA_MATH_USE_SSE
-		rmd_ = _mm_sub_ps(rmd_, _mm_load_ps1(&rhs));
+		sd_ = _mm_sub_ps(sd_, _mm_load_ps1(&rhs));
 #else
 		for (auto i = 0u; i != 4u; ++i)
-			fpd_[i] *= rhs;
+			fd_[i] *= rhs;
 #endif
 		return *this;
 	}
@@ -136,10 +136,10 @@ namespace math {
 	auto vector4f::operator /= (float rhs) -> vector4f&
 	{
 #ifdef ATMA_MATH_USE_SSE
-		rmd_ = _mm_sub_ps(rmd_, _mm_load_ps1(&rhs));
+		sd_ = _mm_sub_ps(sd_, _mm_load_ps1(&rhs));
 #else
 		for (auto i = 0u; i != 4u; ++i)
-			fpd_[i] /= rhs;
+			fd_[i] /= rhs;
 #endif
 		return *this;
 	}
@@ -147,16 +147,16 @@ namespace math {
 	auto vector4f::set(uint32_t i, float n) -> void
 	{
 #ifdef ATMA_MATH_USE_SSE
-		rmd_.m128_f32[i] = n;
+		sd_.m128_f32[i] = n;
 #else
-		fpd_[i] = n;
+		fd_[i] = n;
 #endif
 	}
 
 	auto vector4f::normalize() -> void
 	{
 #ifdef ATMA_MATH_USE_SSE
-		rmd_ = _mm_mul_ps(rmd_, _mm_rsqrt_ps(_mm_dp_ps(rmd_, rmd_, 0x7f)));
+		sd_ = _mm_mul_ps(sd_, _mm_rsqrt_ps(_mm_dp_ps(sd_, sd_, 0x7f)));
 #else
 		*this /= magnitude();
 #endif
