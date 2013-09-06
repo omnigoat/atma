@@ -33,7 +33,7 @@ namespace math {
 
 		// access
 #ifdef ATMA_MATH_USE_SSE
-		auto xmmd() const -> __m128 { return rmd_; }
+		auto xmmd() const -> __m128 { return sd_; }
 #endif
 		auto operator[] (uint32_t i) const -> float;
 		
@@ -58,28 +58,22 @@ namespace math {
 			elem_ref_t(vector4f* owner) : owner_(owner) {}
 
 			operator float() {
-				return owner_->rmd_.m128_f32[i];
+				return owner_->sd_.m128_f32[i];
 			}
 
 			float operator = (float rhs) {
-				owner_->rmd_.m128_f32[i] = rhs;
+				owner_->sd_.m128_f32[i] = rhs;
 				return rhs;
 			}
 
 		private:
 			vector4f* owner_;
 		};
-		/*
-		elem_ref_t<0> x;
-		elem_ref_t<1> y;
-		elem_ref_t<2> z;
-		elem_ref_t<3> w;
-		*/
-
+		
 	private:
 #ifdef ATMA_MATH_USE_SSE
 		union {
-			__m128 rmd_;
+			__m128 sd_;
 			struct { float x, y, z, w; };
 		};
 #else

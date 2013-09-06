@@ -101,6 +101,12 @@
     <ClInclude Include="..\include\atma\math\impl\constants.hpp">
       <Filter>include\math\impl</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\math\impl\matrix4f_operators.hpp">
+      <Filter>include\math\impl\matrix4f</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\math\impl\matrix4f_functions.hpp">
+      <Filter>include\math\impl\matrix4f</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\source\math\vector.cpp">
