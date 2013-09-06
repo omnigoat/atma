@@ -6,6 +6,7 @@
 //=====================================================================
 #include <atma/math/impl/matrix4f_declaration.hpp>
 #include <atma/math/impl/matrix4f_definition.hpp>
+#include <atma/math/impl/matrix4f_operators.hpp>
 //=====================================================================
 #endif
 //=====================================================================
