@@ -32,7 +32,7 @@ namespace math {
 			xmmd_identity_r3_ps
 		);
 
-		return transpose(result);
+		return result.transposed();
 	}
 
 	inline auto look_to(vector4f const& position, vector4f const& target, vector4f const& up) -> matrix4f
