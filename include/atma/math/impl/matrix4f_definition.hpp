@@ -149,7 +149,7 @@ namespace math {
 		sd_[3] = t3;
 	}
 
-	auto matrix4f::transposed() -> matrix4f
+	auto matrix4f::transposed() const -> matrix4f
 	{
 		__m128 t0 = _mm_shuffle_ps(sd_[0], sd_[1], _MM_SHUFFLE(1, 0, 1, 0));
 		__m128 t1 = _mm_shuffle_ps(sd_[0], sd_[1], _MM_SHUFFLE(3, 2, 3, 2));
