@@ -116,7 +116,19 @@ namespace math {
 		sd_[2] = r2;
 		sd_[3] = r3;
 	}
+#endif
 
+	auto matrix4f::operator[](uint32_t i) -> impl::row_element_ref<float>
+	{
+		return {this, i};
+	}
+
+	auto matrix4f::operator[](uint32_t i) const -> impl::row_element_ref<float const>
+	{
+		return {this, i};
+	}
+
+#ifdef ATMA_MATH_USE_SSE
 	auto matrix4f::xmmd(uint32_t i) const -> __m128 const&
 	{
 		return sd_[i];
@@ -137,12 +149,12 @@ namespace math {
 		sd_[3] = t3;
 	}
 
-	inline auto transpose(matrix4f const& x) -> matrix4f
+	auto matrix4f::transposed() -> matrix4f
 	{
-		__m128 t0 = _mm_shuffle_ps(x.xmmd(0), x.xmmd(1), _MM_SHUFFLE(1, 0, 1, 0));
-		__m128 t1 = _mm_shuffle_ps(x.xmmd(0), x.xmmd(1), _MM_SHUFFLE(3, 2, 3, 2));
-		__m128 t2 = _mm_shuffle_ps(x.xmmd(2), x.xmmd(3), _MM_SHUFFLE(1, 0, 1, 0));
-		__m128 t3 = _mm_shuffle_ps(x.xmmd(2), x.xmmd(3), _MM_SHUFFLE(3, 2, 3, 2));
+		__m128 t0 = _mm_shuffle_ps(sd_[0], sd_[1], _MM_SHUFFLE(1, 0, 1, 0));
+		__m128 t1 = _mm_shuffle_ps(sd_[0], sd_[1], _MM_SHUFFLE(3, 2, 3, 2));
+		__m128 t2 = _mm_shuffle_ps(sd_[2], sd_[3], _MM_SHUFFLE(1, 0, 1, 0));
+		__m128 t3 = _mm_shuffle_ps(sd_[2], sd_[3], _MM_SHUFFLE(3, 2, 3, 2));
 		
 		return matrix4f(
 			_mm_shuffle_ps(t0, t2, _MM_SHUFFLE(2, 0, 2, 0)),
