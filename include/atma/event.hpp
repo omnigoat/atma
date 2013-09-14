@@ -46,13 +46,20 @@ namespace atma {
 		typedef std::function<void(event_flow_t&, Args...)> delegate_t;
 
 		// connect
-		auto connect(delegate_t const& t) -> void {
+		auto connect(delegate_t const& t) -> uint32_t {
 			delegates_.push_back(t);
+			return delegates_.size() - 1;
 		}
 
 		auto operator += (delegate_t const& t) -> void
 		{
 			connect(t);
+		}
+
+		// disconnect
+		auto disconnect(uint32_t handle) -> void
+		{
+			delegates_.erase(delegates_.begin() + handle);
 		}
 
 		// fire
