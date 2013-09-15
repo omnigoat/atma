@@ -27,8 +27,8 @@ namespace atma {
 		auto stop_execution() -> void { break_ = true; }
 		auto prevent_default_behaviour() -> void { prevent_default_ = true; }
 
-		auto broke() const -> bool { return break_; }
-		auto prevented() const -> bool { return prevent_default_; }
+		auto is_broken() const -> bool { return break_; }
+		auto is_prevented() const -> bool { return prevent_default_; }
 
 	private:
 		bool break_;
@@ -69,7 +69,7 @@ namespace atma {
 			event_flow_t fc;
 			for (auto const& x : delegates_) {
 				x(fc, std::forward<Args>(args)...);
-				if (fc.broke())
+				if (fc.is_broken())
 					break;
 			}
 

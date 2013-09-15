@@ -12,15 +12,23 @@
 namespace atma {
 //=====================================================================
 	
+	template <typename T>
+	struct intrusive_ptr;
 
 	//=====================================================================
 	// ref_counted
 	// -------------
 	//   this is a *non-virtual* base class.
 	//=====================================================================
+	template <typename T>
 	struct ref_counted
 	{
 		virtual ~ref_counted() {}
+
+		auto shared_from_this() -> intrusive_ptr<T>
+		{
+			return intrusive_ptr<T>(static_cast<T*>(this));
+		}
 
 	protected:
 		ref_counted() : ref_count_() {}
@@ -28,8 +36,8 @@ namespace atma {
 	private:
 		std::atomic_uint32_t ref_count_;
 
-		friend auto add_ref_count(ref_counted*) -> void;
-		friend auto rm_ref_count(ref_counted*) -> void;
+		template <typename T> friend auto add_ref_count(ref_counted<T>*) -> void;
+		template <typename T> friend auto rm_ref_count(ref_counted<T>*) -> void;
 	};
 
 
@@ -39,11 +47,13 @@ namespace atma {
 	// ------------------
 	//   called by intrusive_ptr
 	//=====================================================================
-	inline auto add_ref_count(ref_counted* t) -> void {
+	template <typename T>
+	inline auto add_ref_count(ref_counted<T>* t) -> void {
 		t && ++t->ref_count_;
 	}
 
-	inline auto rm_ref_count(ref_counted* t) -> void {
+	template <typename T>
+	inline auto rm_ref_count(ref_counted<T>* t) -> void {
 		ATMA_ASSERT(!t || t->ref_count_ >= 0);
 
 		if (t && --t->ref_count_ == 0) {
@@ -166,10 +176,18 @@ namespace atma {
 		}
 
 	private:
+		intrusive_ptr(T* t, void*) : px(t) {}
+
+		static auto noaddref_ptr(T* t) -> intrusive_ptr<T>
+		{
+			return intrusive_ptr<T>(t, nullptr);
+		}
+
 		T* px;
 
 		template <typename Y>
 		friend struct intrusive_ptr;
+		friend struct ref_counted<T>;
 	};
 
 	template <typename T>
