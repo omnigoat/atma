@@ -83,13 +83,6 @@ namespace atma {
 			add_ref_count(t);
 		}
 
-		//template <typename Y>
-		//explicit intrusive_ptr(Y* t) 
-		//: px(static_cast<T*>(t))
-		//{
-		//	add_ref_count(t);
-		//}
-
 		intrusive_ptr(intrusive_ptr<T> const& rhs)
 		: px(rhs.px)
 		{
