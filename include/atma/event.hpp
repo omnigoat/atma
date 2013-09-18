@@ -7,6 +7,7 @@
 #define ATMA_EVENTED_EVENT_HPP
 //=====================================================================
 #include <atma/assert.hpp>
+#include <atma/lockfree/queue.hpp>
 #include <atomic>
 #include <functional>
 #include <vector>
@@ -35,7 +36,28 @@ namespace atma {
 		bool prevent_default_;
 	};
 
+#if 0
+	struct event_handle_t
+	{
+	private:
+		event_handle_t(void* ptr)
+			: ptr_(ptr)
+		{
+		}
 
+		void* ptr_;
+
+		template <typename... Args>
+		friend struct event_t;
+
+		friend auto operator == (event_handle_t const& lhs, event_handle_t const& rhs) -> bool;
+	};
+
+	inline auto operator == (event_handle_t const& lhs, event_handle_t const& rhs) -> bool
+	{
+		return lhs.ptr() == rhs.ptr();
+	}
+#endif
 
 	//=====================================================================
 	// event_t
@@ -44,11 +66,12 @@ namespace atma {
 	struct event_t
 	{
 		typedef std::function<void(event_flow_t&, Args...)> delegate_t;
+		typedef typename atma::lockfree::queue_t<delegate_t>::iterator delegate_handle_t;
 
 		// connect
-		auto connect(delegate_t const& t) -> uint32_t {
-			delegates_.push_back(t);
-			return delegates_.size() - 1;
+		auto connect(delegate_t const& t) -> delegate_handle_t
+		{
+			return delegates_.push(t);
 		}
 
 		auto operator += (delegate_t const& t) -> void
@@ -57,9 +80,9 @@ namespace atma {
 		}
 
 		// disconnect
-		auto disconnect(uint32_t handle) -> void
+		auto disconnect(delegate_handle_t handle) -> void
 		{
-			delegates_.erase(delegates_.begin() + handle);
+			delegates_.erase(handle);
 		}
 
 		// fire
@@ -78,7 +101,7 @@ namespace atma {
 
 
 	private:
-		typedef std::vector<delegate_t> delegates_t;
+		typedef atma::lockfree::queue_t<delegate_t> delegates_t;
 		delegates_t delegates_;
 	};
 
