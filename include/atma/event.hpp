@@ -36,29 +36,6 @@ namespace atma {
 		bool prevent_default_;
 	};
 
-#if 0
-	struct event_handle_t
-	{
-	private:
-		event_handle_t(void* ptr)
-			: ptr_(ptr)
-		{
-		}
-
-		void* ptr_;
-
-		template <typename... Args>
-		friend struct event_t;
-
-		friend auto operator == (event_handle_t const& lhs, event_handle_t const& rhs) -> bool;
-	};
-
-	inline auto operator == (event_handle_t const& lhs, event_handle_t const& rhs) -> bool
-	{
-		return lhs.ptr() == rhs.ptr();
-	}
-#endif
-
 	//=====================================================================
 	// event_t
 	//=====================================================================
