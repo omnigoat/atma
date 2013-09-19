@@ -4,6 +4,10 @@
 #ifndef ATMA_MATH_IMPL_MATRIX4F_FUNCTIONS_HPP
 #define ATMA_MATH_IMPL_MATRIX4F_FUNCTIONS_HPP
 //=====================================================================
+#ifndef ATMA_MATH_MATRIX4F_SCOPE
+#	error "this file needs to be included solely from matrix4.hpp"
+#endif
+//=====================================================================
 #include <atma/math/impl/constants.hpp>
 #include <atma/assert.hpp>
 //=====================================================================
