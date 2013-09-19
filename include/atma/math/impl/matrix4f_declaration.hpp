@@ -4,6 +4,10 @@
 #ifndef ATMA_MATH_IMPL_MATRIX_DECLARATION_HPP
 #define ATMA_MATH_IMPL_MATRIX_DECLARATION_HPP
 //=====================================================================
+#ifndef ATMA_MATH_MATRIX4F_SCOPE
+#	error "this file needs to be included solely from matrix4.hpp"
+#endif
+//=====================================================================
 #include <array>
 #include <numeric>
 #include <type_traits>
