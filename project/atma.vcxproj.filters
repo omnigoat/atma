@@ -30,6 +30,15 @@
     <Filter Include="include\lockfree">
       <UniqueIdentifier>{145f0927-0d27-44fe-92f1-ab9ad4710a05}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\math\impl\vector4i">
+      <UniqueIdentifier>{56f835d3-d1fa-4921-bd46-c3f329861c55}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\xtm">
+      <UniqueIdentifier>{f07830a1-3c6a-4594-8b2b-79d8ec8b3fdd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\utf">
+      <UniqueIdentifier>{56575bb8-07a7-4c79-9adb-214074d8fee8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\atma\algorithm.hpp">
@@ -112,6 +121,36 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\lockfree\queue.hpp">
       <Filter>include\lockfree</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\math\vector4i.hpp">
+      <Filter>include\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\math\impl\vector4i_declaration.hpp">
+      <Filter>include\math\impl\vector4i</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\math\impl\vector4i_definition.hpp">
+      <Filter>include\math\impl\vector4i</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\xtm\function.hpp">
+      <Filter>include\xtm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\xtm\tuple.hpp">
+      <Filter>include\xtm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\utf\algorithm.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\utf\utf8_istream.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\utf\utf8_string.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\utf\utf8_string_range.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\utf\utf8_iterator.hpp">
+      <Filter>include\utf</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -32,6 +32,10 @@ namespace atma {
 		return begin;
 	}
 	
+	inline auto utf8_next_char(char* begin) -> char*
+	{
+		return const_cast<char*>(utf8_next_char(const_cast<char const*>(begin)));
+	}
 
 
 //=====================================================================
