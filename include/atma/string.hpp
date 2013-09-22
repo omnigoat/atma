@@ -129,7 +129,10 @@ namespace atma {
 		uint32_t char_count_;
 
 		friend class utf16_string_t;
+		friend auto operator < (utf8_string_t const& lhs, utf8_string_t const& rhs) -> bool;
 	};
+
+	
 
 	class utf16_string_t
 	{
