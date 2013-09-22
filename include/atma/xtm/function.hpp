@@ -11,6 +11,8 @@ namespace xtm {
 	struct function_traits
 		: public function_traits<decltype(&T::operator())>
 	{
+		//typedef int result_type;
+		//typedef typename super_tupled_params_type tupled_params_type;
 	};
 	
 	template <typename C, typename R, typename... Params>

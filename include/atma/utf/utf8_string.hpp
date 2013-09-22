@@ -15,8 +15,8 @@ namespace atma {
 		utf8_string_t();
 		utf8_string_t(char const* str);
 		utf8_string_t(char const* str_begin, char const* str_end);
-		explicit utf8_string_t(const utf16_string_t&);
-		utf8_string_t(const utf8_string_t&);
+		explicit utf8_string_t(utf16_string_t const&);
+		utf8_string_t(utf8_string_t const&);
 		utf8_string_t(utf8_string_t&&);
 
 		class iterator;
@@ -27,6 +27,7 @@ namespace atma {
 		uint32_t char_count_;
 
 		friend class utf16_string_t;
+		friend auto operator < (utf8_string_t const& lhs, utf8_string_t const& rhs) -> bool;
 	};
 
 	//=====================================================================
@@ -78,6 +79,13 @@ namespace atma {
 	{
 	}
 	
+	//=====================================================================
+	// operators
+	//=====================================================================
+	inline auto operator < (utf8_string_t const& lhs, utf8_string_t const& rhs) -> bool
+	{
+		return std::lexicographical_compare(lhs.chars_.begin(), lhs.chars_.end(), rhs.chars_.begin(), rhs.chars_.end());
+	}
 
 
 //=====================================================================

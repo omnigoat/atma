@@ -74,10 +74,13 @@ namespace lockfree {
 		auto begin() const->iterator;
 		auto end() const->iterator;
 		
-		auto push(const T&) -> iterator;
+		auto push(T const&) -> iterator;
 		auto push(batch_t&) -> void;
 		auto pop(T& result) -> bool;
 		auto erase(iterator) -> void;
+		auto erase(T const&) -> void;
+		template <typename PR>
+		auto erase_if(PR pred) -> void;
 
 	private:
 		queue_t(queue_t const&);

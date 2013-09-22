@@ -200,7 +200,7 @@ namespace atma {
 		return *this;
 	}
 
-
+	#if 0
 	inline bool operator == (const utf8_stream_iterator& lhs, const utf8_stream_iterator& rhs) {
 		return
 		  (
@@ -221,7 +221,7 @@ namespace atma {
 		  !std::equal(lhs.begin(), lhs.end(), rhs.end())
 		  ;
 	}
-
+	#endif
 
 
 
