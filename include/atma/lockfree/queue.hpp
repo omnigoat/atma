@@ -27,7 +27,8 @@ namespace lockfree {
 			node_t() : value(nullptr), next(nullptr) {}
 			node_t(const T& value) : value(new T(value)), next(nullptr) {}
 			~node_t() { }
-			auto value_ptr() -> T* { return value; }
+			auto value_ptr() -> T * { return value; }
+			auto value_ptr() const -> T const* { return value; }
 			auto clear_value_ptr() -> void { value = nullptr; }
 
 			T* value;
@@ -44,7 +45,8 @@ namespace lockfree {
 			}
 			~node_t() {}
 
-			auto value_ptr() -> T* { return reinterpret_cast<T*>(&value_buffer[0]); }
+			auto value_ptr() -> T * { return reinterpret_cast<T*>(&value_buffer[0]); }
+			auto value_ptr() const -> T const* { return reinterpret_cast<T const*>(&value_buffer[0]); }
 			auto clear_value_ptr() -> void { 
 				if (value_ptr()) value_ptr()->~T();
 				memset(value_buffer, 0, sizeof(T));
@@ -104,6 +106,8 @@ namespace lockfree {
 
 		std::atomic_bool producer_lock_;
 		char pad4[sizeof(std::atomic_bool) % cache_line_size];
+
+		friend struct iterator;
 	};
 	
 
@@ -173,8 +177,39 @@ namespace lockfree {
 		friend struct queue_t<T>;
 	};
 	
+	//=====================================================================
+	// queue_t::iterator
+	//=====================================================================
+	template <typename T>
+	struct queue_t<T>::iterator
+	{
+		auto operator ++ () -> iterator&
+		{
+			node_ = node_->next;
+			return *this;
+		}
 
+		auto operator * () -> T*
+		{
+			return node_->value_ptr();
+		}
 
+		auto operator -> () -> T*
+		{
+			return node_->value_ptr();
+		}
+
+	private:
+		iterator(queue_t<T>* owner)
+			: owner_(owner)
+		{
+		}
+
+		
+
+		typename queue_t<T>::node_t node_;
+		queue_t<T>* owner_;
+	};
 
 
 	//=====================================================================
