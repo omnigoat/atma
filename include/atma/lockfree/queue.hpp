@@ -178,41 +178,6 @@ namespace lockfree {
 	};
 	
 	//=====================================================================
-	// queue_t::iterator
-	//=====================================================================
-	template <typename T>
-	struct queue_t<T>::iterator
-	{
-		auto operator ++ () -> iterator&
-		{
-			node_ = node_->next;
-			return *this;
-		}
-
-		auto operator * () -> T*
-		{
-			return node_->value_ptr();
-		}
-
-		auto operator -> () -> T*
-		{
-			return node_->value_ptr();
-		}
-
-	private:
-		iterator(queue_t<T>* owner)
-			: owner_(owner)
-		{
-		}
-
-		
-
-		typename queue_t<T>::node_t node_;
-		queue_t<T>* owner_;
-	};
-
-
-	//=====================================================================
 	// queue_t implementation
 	//=====================================================================
 	template <typename T>
