@@ -39,6 +39,9 @@
     <Filter Include="include\utf">
       <UniqueIdentifier>{56575bb8-07a7-4c79-9adb-214074d8fee8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\config">
+      <UniqueIdentifier>{24f56b7f-e2dd-40a2-836e-a21f2f8164a9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\atma\algorithm.hpp">
@@ -151,6 +154,12 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\utf\utf8_iterator.hpp">
       <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\config\platform.hpp">
+      <Filter>include\config</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\enable_multiple_shared_from_this.hpp">
+      <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
