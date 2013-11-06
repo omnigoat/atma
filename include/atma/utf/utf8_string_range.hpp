@@ -28,7 +28,7 @@ namespace atma {
 		utf8_string_range_t(utf8_string_range_t const&);
 
 		auto bytes() const -> uint32_t;
-
+		
 		auto begin() const -> iterator;
 		auto end() const -> iterator;
 
@@ -46,6 +46,11 @@ namespace atma {
 	inline auto operator == (utf8_string_range_t const& lhs, utf8_string_range_t const& rhs) -> bool
 	{
 		return lhs.bytes() == rhs.bytes() && memcmp(lhs.begin(), rhs.begin(), lhs.bytes()) == 0;
+	}
+
+	inline auto operator == (utf8_string_range_t const& lhs, char const* rhs) -> bool
+	{
+		return strncmp(lhs.begin(), rhs, lhs.bytes()) == 0;
 	}
 
 	inline auto operator != (utf8_string_range_t const& lhs, utf8_string_range_t const& rhs) -> bool
