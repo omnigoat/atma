@@ -26,12 +26,20 @@ namespace atma {
 		auto bytes() const -> uint32_t { return chars_.size(); }
 		auto bytes_begin() const -> char const* { return &chars_[0]; }
 		auto bytes_end() const -> char const* { return &chars_[0] + chars_.size(); }
+		auto bytes_begin() -> char* { return &chars_[0]; }
+		auto bytes_end() -> char* { return &chars_[0]; }
 
 		// push back a single character is valid only for code-points < 128
 		auto push_back(char c) -> void { 
 			ATMA_ASSERT(c ^ 0x80);
 			chars_.push_back(c);
 			++char_count_;
+		}
+
+		auto operator += (utf8_string_t const& rhs) -> utf8_string_t&
+		{
+			chars_.insert(chars_.end(), rhs.bytes_begin(), rhs.bytes_end());
+			return *this;
 		}
 
 	private:

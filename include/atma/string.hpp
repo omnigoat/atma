@@ -18,15 +18,15 @@ namespace atma {
 	typedef utf8_string_t string;
 
 
-	auto to_string(uint32_t n) -> string
+	inline auto to_string(uint32_t n) -> atma::string
 	{
-		string s;
+		atma::string s;
 		while (n) {
-			s.push_back(n % 10 + 32);
+			s.push_back(n % 10 + 0x30);
 			n /= 10;
 		}
 
-		std::reverse(s.begin(), s.end());
+		std::reverse(s.bytes_begin(), s.bytes_end());
 
 		return s;
 	}
