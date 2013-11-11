@@ -75,6 +75,15 @@ namespace atma {
 
 
 
+	//=====================================================================
+	// functions
+	//=====================================================================
+	inline auto strncmp(utf8_string_range_t const& lhs, char const* str, uint32_t n) -> uint32_t
+	{
+		return std::strncmp(lhs.begin(), str, n);
+	}
+
+
 
 	//=====================================================================
 	// utf8_string_range_t implementation
