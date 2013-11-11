@@ -23,6 +23,7 @@ namespace atma {
 
 		class iterator;
 
+		auto empty() const -> bool { return chars_.empty(); }
 		auto bytes() const -> uint32_t { return chars_.size(); }
 		auto bytes_begin() const -> char const* { return &chars_[0]; }
 		auto bytes_end() const -> char const* { return &chars_[0] + chars_.size(); }
