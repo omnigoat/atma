@@ -5,6 +5,7 @@
 #include <atma/utf/algorithm.hpp>
 #include <atma/utf/utf8_string_range.hpp>
 #include <string>
+#include <vector>
 //=====================================================================
 namespace atma {
 //=====================================================================
@@ -51,6 +52,7 @@ namespace atma {
 
 		friend class utf16_string_t;
 		friend auto operator < (utf8_string_t const& lhs, utf8_string_t const& rhs) -> bool;
+		friend auto operator + (utf8_string_t const& lhs, utf8_string_t const& rhs) -> utf8_string_t;
 		friend auto operator + (utf8_string_t const& lhs, std::string const& rhs) -> utf8_string_t;
 		friend auto operator + (utf8_string_t const& lhs, utf8_string_range_t const& rhs) -> utf8_string_t;
 		friend auto operator << (std::ostream& out, utf8_string_t const& rhs) -> std::ostream&;
@@ -119,6 +121,13 @@ namespace atma {
 	{
 		auto result = lhs;
 		result.chars_.insert(result.chars_.end(), rhs.begin(), rhs.end());
+		return result;
+	}
+
+	inline auto operator + (utf8_string_t const& lhs, utf8_string_t const& rhs) -> utf8_string_t
+	{
+		auto result = lhs;
+		result.chars_.insert(result.chars_.end(), rhs.chars_.begin(), rhs.chars_.end());
 		return result;
 	}
 
