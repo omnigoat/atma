@@ -48,6 +48,7 @@
     <ClInclude Include="..\include\atma\utf\utf8_iterator.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string_range.hpp" />
+    <ClInclude Include="..\include\atma\utf\utf8_string_range_implementation.hpp" />
     <ClInclude Include="..\include\atma\xtm\function.hpp" />
     <ClInclude Include="..\include\atma\xtm\tuple.hpp" />
   </ItemGroup>
