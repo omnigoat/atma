@@ -6,6 +6,8 @@
 //=====================================================================
 namespace atma {
 //=====================================================================
+	
+	class utf8_string_t;
 
 	//=====================================================================
 	// utf8_string_range_t
@@ -24,8 +26,10 @@ namespace atma {
 		typedef char const* iterator;
 
 		utf8_string_range_t();
+		utf8_string_range_t(char const*);
 		utf8_string_range_t(char const* begin, char const* end);
 		utf8_string_range_t(utf8_string_range_t const&);
+		utf8_string_range_t(utf8_string_t const&);
 
 		auto bytes() const -> uint32_t;
 		
@@ -83,43 +87,11 @@ namespace atma {
 		return std::strncmp(lhs.begin(), str, n);
 	}
 
-
-
-	//=====================================================================
-	// utf8_string_range_t implementation
-	//=====================================================================
-	inline utf8_string_range_t::utf8_string_range_t()
-		: begin_(), end_()
-	{
-	}
-
-	inline utf8_string_range_t::utf8_string_range_t(char const* begin, char const* end)
-		: begin_(begin), end_(end)
-	{
-	}
-
-	inline utf8_string_range_t::utf8_string_range_t(utf8_string_range_t const& rhs)
-		: begin_(rhs.begin_), end_(rhs.end_)
-	{
-	}
-
-	inline auto utf8_string_range_t::bytes() const -> uint32_t
-	{
-		return end_ - begin_;
-	}
-
-	inline auto utf8_string_range_t::begin() const -> iterator
-	{
-		return begin_;
-	}
-
-	inline auto utf8_string_range_t::end() const -> iterator
-	{
-		return end_;
-	}
-
 //=====================================================================
 } // namespace atma
 //=====================================================================
 #endif // inclusion guard
 //=====================================================================
+
+#include <atma/utf/utf8_string_range_implementation.hpp>
+
