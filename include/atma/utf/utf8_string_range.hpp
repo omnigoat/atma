@@ -28,6 +28,7 @@ namespace atma {
 		utf8_string_range_t();
 		utf8_string_range_t(char const*);
 		utf8_string_range_t(char const* begin, char const* end);
+		utf8_string_range_t(utf8_string_t::const_iterator const&, utf8_string_t::const_iterator const&);
 		utf8_string_range_t(utf8_string_range_t const&);
 		utf8_string_range_t(utf8_string_t const&);
 
