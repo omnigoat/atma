@@ -1,65 +1,14 @@
-#ifndef ATMA_UTF_UTF8_STRING
-#define ATMA_UTF_UTF8_STRING
+#ifndef ATMA_UTF_UTF8_STRING_IMPLEMENTATION_HPP
+#define ATMA_UTF_UTF8_STRING_IMPLEMENTATION_HPP
 //=====================================================================
-#include <atma/assert.hpp>
-#include <atma/utf/algorithm.hpp>
-#include <atma/utf/utf8_string_range.hpp>
-#include <string>
-#include <vector>
+#include <atma/utf/utf8_string_header.hpp>
+#include <atma/utf/utf8_string_range_header.hpp>
 //=====================================================================
 namespace atma {
 //=====================================================================
 
-	class utf8_string_t
-	{
-	public:
-		typedef char value_t;
-
-		utf8_string_t();
-		utf8_string_t(char const* str);
-		utf8_string_t(char const* str_begin, char const* str_end);
-		//explicit utf8_string_t(utf16_string_t const&);
-		utf8_string_t(utf8_string_t const&);
-		utf8_string_t(utf8_string_t&&);
-
-		class iterator;
-
-		auto empty() const -> bool { return chars_.empty(); }
-		auto bytes() const -> uint32_t { return chars_.size(); }
-		auto bytes_begin() const -> char const* { return &chars_[0]; }
-		auto bytes_end() const -> char const* { return &chars_[0] + chars_.size(); }
-		auto bytes_begin() -> char* { return &chars_[0]; }
-		auto bytes_end() -> char* { return &chars_[0]; }
-
-		// push back a single character is valid only for code-points < 128
-		auto push_back(char c) -> void { 
-			ATMA_ASSERT(c ^ 0x80);
-			chars_.push_back(c);
-			++char_count_;
-		}
-
-		auto operator += (utf8_string_t const& rhs) -> utf8_string_t&
-		{
-			chars_.insert(chars_.end(), rhs.bytes_begin(), rhs.bytes_end());
-			return *this;
-		}
-
-	private:
-		typedef std::vector<value_t> chars_t;
-		chars_t chars_;
-		uint32_t char_count_;
-
-
-		friend class utf16_string_t;
-		friend auto operator < (utf8_string_t const& lhs, utf8_string_t const& rhs) -> bool;
-		friend auto operator + (utf8_string_t const& lhs, utf8_string_t const& rhs) -> utf8_string_t;
-		friend auto operator + (utf8_string_t const& lhs, std::string const& rhs) -> utf8_string_t;
-		friend auto operator + (utf8_string_t const& lhs, utf8_string_range_t const& rhs) -> utf8_string_t;
-		friend auto operator << (std::ostream& out, utf8_string_t const& rhs) -> std::ostream&;
-	};
-
 	//=====================================================================
-	// implementation
+	// utf8_string_range_t implementation
 	//=====================================================================
 	inline utf8_string_t::utf8_string_t()
 	: char_count_()
@@ -109,6 +58,23 @@ namespace atma {
 	{
 	}
 	
+	inline auto utf8_string_t::begin() const -> const_iterator {
+		return const_iterator(*this, bytes_begin());
+	}
+
+	inline auto utf8_string_t::end() const -> const_iterator {
+		return const_iterator(*this, bytes_end());
+	}
+
+	inline auto utf8_string_t::begin() -> iterator {
+		return iterator(*this, bytes_begin());
+	}
+
+	inline auto utf8_string_t::end() -> iterator {
+		return iterator(*this, bytes_end());
+	}
+
+
 	//=====================================================================
 	// operators
 	//=====================================================================
@@ -140,10 +106,25 @@ namespace atma {
 
 	inline auto operator << (std::ostream& out, utf8_string_t const& rhs) -> std::ostream&
 	{
-		for (auto const& x : rhs.chars_)
-			out.put(x);
-		//return out << rhs.chars_;
+		out.write(&rhs.chars_[0], rhs.chars_.size());
 		return out;
+	}
+
+
+	//=====================================================================
+	// functions
+	//=====================================================================
+	inline auto find_first_of(utf8_string_t const& str, utf8_string_t::const_iterator const& i, char x) -> utf8_string_t::const_iterator
+	{
+		ATMA_ASSERT(is_ascii(x));
+
+		auto i2 = std::find(i->begin, str.bytes_end(), x);
+		return{str, i2};
+	}
+
+	inline auto find_first_of(utf8_string_t const& str, char x) -> utf8_string_t::const_iterator
+	{
+		return find_first_of(str, str.begin(), x);
 	}
 
 
