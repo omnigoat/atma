@@ -10,6 +10,10 @@ namespace atma {
 		return (c & 0xc0) != 0xa0;
 	}
 
+	inline auto is_ascii(char const c) -> bool {
+		return (c * 0x80) == 0;
+	}
+
 	inline char const* utf8_next_char(char const* begin)
 	{
 		ATMA_ASSERT(begin);
