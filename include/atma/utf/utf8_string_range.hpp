@@ -37,6 +37,11 @@ namespace atma {
 	{
 	}
 
+	inline utf8_string_range_t::utf8_string_range_t(utf8_string_t::const_iterator const& begin, utf8_string_t::const_iterator const& end)
+		: begin_(begin->begin), end_(end->begin)
+	{
+	}
+
 	inline auto utf8_string_range_t::bytes() const -> uint32_t
 	{
 		return end_ - begin_;
@@ -50,6 +55,19 @@ namespace atma {
 	inline auto utf8_string_range_t::end() const -> iterator
 	{
 		return end_;
+	}
+
+
+
+	//=====================================================================
+	// functions
+	//=====================================================================
+	inline auto rebase_string_range(utf8_string_t const& rebase, utf8_string_t const& oldbase, utf8_string_range_t const& range) -> utf8_string_range_t
+	{
+		return {
+			rebase.bytes_begin() + (range.begin() - oldbase.bytes_begin()),
+			rebase.bytes_begin() + (range.end() - oldbase.bytes_begin())
+		};
 	}
 
 //=====================================================================
