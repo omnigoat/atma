@@ -21,6 +21,17 @@ namespace atma {
 
 	struct utf8_char_t
 	{
+		utf8_char_t(char const* begin, char const* end)
+		: begin(begin), end(end)
+		{}
+
+		auto operator = (utf8_char_t const& rhs) -> utf8_char_t&
+		{
+			begin = rhs.begin;
+			end = rhs.end;
+			return *this;
+		}
+
 		char const* begin;
 		char const* end;
 	};
@@ -69,7 +80,7 @@ namespace atma {
 		auto bytes_begin() const -> char const* { return &chars_[0]; }
 		auto bytes_end() const -> char const* { return &chars_[0] + chars_.size(); }
 		auto bytes_begin() -> char* { return &chars_[0]; }
-		auto bytes_end() -> char* { return &chars_[0]; }
+		auto bytes_end() -> char* { return &chars_[0] + chars_.size(); }
 
 		// push back a single character is valid only for code-points < 128
 		auto push_back(char c) -> void { 
@@ -107,15 +118,19 @@ namespace atma {
 	class utf8_string_t::iterator_t : std::iterator<std::bidirectional_iterator_tag, T>
 	{
 	public:
-		typedef typename std::conditional<std::is_const<T>::value, utf8_string_t const, utf8_string_t>::type& container_ref;
+		typedef typename std::conditional<std::is_const<T>::value, utf8_string_t const, utf8_string_t>::type container_t;
 		typedef typename std::conditional<std::is_const<T>::value, char const*, char*>::type char_ptr;
-		typedef typename std::conditional<std::is_const<T>::value, utf8_char_t const, utf8_char_t>::type char_t;
-
-		iterator_t(container_ref owner, char_ptr x)
-		: owner_(owner), char_(x, utf8_next_char(x))
+		
+		iterator_t(container_t& owner, decltype(std::declval<T>().begin) x)
+		: owner_(&owner), char_{x, utf8_next_char(x)}
 		{}
 
-		iterator_t(iterator_t<typename std::remove_const<T>::type> const& rhs)
+		iterator_t(iterator_t const& rhs)
+			: owner_(rhs.owner_), char_(rhs.char_)
+		{}
+
+		template <typename U>
+		iterator_t(iterator_t<U> const& rhs, std::enable_if_t<std::is_convertible<U*, T*>::value, int> = int())
 		: owner_(rhs.owner_), char_(rhs.char_)
 		{}
 		
@@ -126,33 +141,36 @@ namespace atma {
 			return *this;
 		}
 
-		auto operator * () -> char_t& {
+		auto operator * () -> utf8_char_t& {
 			return char_;
 		}
 
 		auto operator ++ () -> iterator_t& {
-			ATMA_ASSERT(x_ != owner_.bytes_end());
+			ATMA_ASSERT(char_.begin != owner_->bytes_end());
 			char_.begin = char_.end;
-			char_.end += utf8_next_char(x_);
+			char_.end = utf8_next_char(char_.end);
 			return *this;
 		}
 
-		auto operator -> () const -> char_t* {
-			return &utf8_char_t;
+		auto operator -> () const -> T* {
+			return &char_;
 		}
 
 	private:
-		container_ref owner_;
-		char_t char_;
+		container_t* owner_;
+		utf8_char_t char_;
 
-		template <typename T>
-		friend auto operator == (iterator_t<T> const&, iterator_t<T> const&) -> bool;
+		template <typename>
+		friend class iterator_t;
+
+		template <typename T, typename U>
+		friend auto operator == (iterator_t<T> const&, iterator_t<U> const&) -> bool;
 	};
 
 	template <typename T, typename U>
 	inline auto operator == (utf8_string_t::iterator_t<T> const& lhs, utf8_string_t::iterator_t<U> const& rhs) -> bool
 	{
-		return lhs.x_ == rhs.x_;
+		return lhs.char_.begin == rhs.char_.begin;
 	}
 
 	template <typename T, typename U>
