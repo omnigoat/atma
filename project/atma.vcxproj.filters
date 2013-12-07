@@ -146,12 +146,6 @@
     <ClInclude Include="..\include\atma\utf\utf8_istream.hpp">
       <Filter>include\utf</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\atma\utf\utf8_string.hpp">
-      <Filter>include\utf</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\utf\utf8_string_range.hpp">
-      <Filter>include\utf</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\atma\utf\utf8_iterator.hpp">
       <Filter>include\utf</Filter>
     </ClInclude>
@@ -161,7 +155,16 @@
     <ClInclude Include="..\include\atma\enable_multiple_shared_from_this.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\atma\utf\utf8_string_range_implementation.hpp">
+    <ClInclude Include="..\include\atma\utf\utf8_string_header.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\utf\utf8_string.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\utf\utf8_string_range_header.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\utf\utf8_string_range.hpp">
       <Filter>include\utf</Filter>
     </ClInclude>
   </ItemGroup>
