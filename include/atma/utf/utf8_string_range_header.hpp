@@ -65,10 +65,13 @@ namespace atma {
 
 	inline auto operator < (utf8_string_range_t const& lhs, utf8_string_range_t const& rhs) -> bool
 	{
+		auto cmp = ::strncmp(
+			lhs.begin(), rhs.begin(),
+			std::min(lhs.bytes(), rhs.bytes()));
+
 		return
-		  lhs.bytes() < rhs.bytes() || !(rhs.bytes() < lhs.bytes()) &&
-		  memcmp(lhs.begin(), rhs.begin(), lhs.bytes()) < 0
-		  ;
+			cmp < 0 || (!(0 < cmp) && (
+			lhs.bytes() < rhs.bytes()));
 	}
 
 	inline auto operator << (std::ostream& stream, utf8_string_range_t const& xs) -> std::ostream&
