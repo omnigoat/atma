@@ -167,6 +167,9 @@
     <ClInclude Include="..\include\atma\utf\utf8_string_range.hpp">
       <Filter>include\utf</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\com_ptr.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\source\math\vector.cpp">
