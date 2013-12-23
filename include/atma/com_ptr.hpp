@@ -33,9 +33,8 @@ namespace atma {
 		}
 
 		com_ptr(com_ptr const& rhs)
+			: x_(rhs.x_)
 		{
-			if (x_) x_->Release();
-			x_ = rhs.x_;
 			if (x_) x_->AddRef();
 		}
 
@@ -56,7 +55,8 @@ namespace atma {
 			return *this;
 		}
 
-		auto operator & () -> T** {
+		auto assign() -> T** {
+			reset();
 			return &x_;
 		}
 
@@ -65,12 +65,23 @@ namespace atma {
 		}
 
 		auto get() const -> T* { return x_; }
+		auto reset() -> void {
+			if (x_) {
+				x_->Release();
+				x_ = nullptr;
+			}
+		}
+
+		auto operator == (T* rhs) const -> bool
+		{
+			return x_ == rhs;
+		}
 
 	private:
 		T* x_;
 	};
 
-
+	
 
 	// make_com_ptr
 	template <typename T>
@@ -78,7 +89,6 @@ namespace atma {
 	{
 		return com_ptr<T>(t);
 	}
-
 
 //=====================================================================
 } // namespace atma
