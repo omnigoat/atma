@@ -43,7 +43,7 @@ namespace atma {
 			if (x_) x_->Release();
 		}
 
-		auto operator -> () -> T* {
+		auto operator -> () const -> T* {
 			return x_;
 		}
 
@@ -82,6 +82,14 @@ namespace atma {
 	};
 
 	
+	template <typename T>
+	inline auto operator < (com_ptr<T> const& lhs, com_ptr<T> const& rhs) -> bool
+	{
+		return lhs.get() < rhs.get();
+	}
+
+
+
 
 	// make_com_ptr
 	template <typename T>
