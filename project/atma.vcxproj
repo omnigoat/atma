@@ -43,6 +43,7 @@
     <ClInclude Include="..\include\atma\math\matrix4f.hpp" />
     <ClInclude Include="..\include\atma\math\vector4f.hpp" />
     <ClInclude Include="..\include\atma\math\vector4i.hpp" />
+    <ClInclude Include="..\include\atma\signal_hq.hpp" />
     <ClInclude Include="..\include\atma\string.hpp" />
     <ClInclude Include="..\include\atma\utf\algorithm.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_istream.hpp" />
@@ -53,9 +54,6 @@
     <ClInclude Include="..\include\atma\utf\utf8_string_range.hpp" />
     <ClInclude Include="..\include\atma\xtm\function.hpp" />
     <ClInclude Include="..\include\atma\xtm\tuple.hpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\source\math\vector.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{3301E1FA-9F23-43C6-A5E1-183204867D44}</ProjectGuid>
