@@ -5,10 +5,6 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
-    <Filter Include="source">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
     <Filter Include="include\assert">
       <UniqueIdentifier>{367e8418-1f84-466c-93c0-5c5543d1bc66}</UniqueIdentifier>
     </Filter>
@@ -17,9 +13,6 @@
     </Filter>
     <Filter Include="include\math\impl">
       <UniqueIdentifier>{4378cc9b-a9ac-412f-a43a-643675efc68a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="source\math">
-      <UniqueIdentifier>{f2035016-9fc4-4fa6-be7b-1b361dbfbfe1}</UniqueIdentifier>
     </Filter>
     <Filter Include="include\math\impl\vector4f">
       <UniqueIdentifier>{1b9895e6-ece7-494f-b1df-6fd66f4476aa}</UniqueIdentifier>
@@ -170,10 +163,8 @@
     <ClInclude Include="..\include\atma\com_ptr.hpp">
       <Filter>include</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\source\math\vector.cpp">
-      <Filter>source\math</Filter>
-    </ClCompile>
+    <ClInclude Include="..\include\atma\signal_hq.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
