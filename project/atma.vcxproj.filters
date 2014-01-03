@@ -35,6 +35,9 @@
     <Filter Include="include\config">
       <UniqueIdentifier>{24f56b7f-e2dd-40a2-836e-a21f2f8164a9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\thread">
+      <UniqueIdentifier>{ed4438da-80b5-405f-9b06-d7ee5e25a7bf}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\atma\algorithm.hpp">
@@ -163,8 +166,8 @@
     <ClInclude Include="..\include\atma\com_ptr.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\atma\signal_hq.hpp">
-      <Filter>include</Filter>
+    <ClInclude Include="..\include\atma\thread\engine.hpp">
+      <Filter>include\thread</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
