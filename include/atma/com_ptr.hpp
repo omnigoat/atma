@@ -65,6 +65,8 @@ namespace atma {
 		}
 
 		auto get() const -> T* { return x_; }
+		auto get_ref() -> T*& { return x_; }
+
 		auto reset() -> void {
 			if (x_) {
 				x_->Release();
