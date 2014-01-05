@@ -18,6 +18,7 @@ namespace thread {
 		~engine_t();
 
 		auto signal(signal_t const&) -> void;
+		auto signal_evergreen(signal_t const&) -> void;
 		auto signal_block() -> void;
 		
 	private:
@@ -26,6 +27,7 @@ namespace thread {
 		std::thread handle_;
 		bool running_;
 		atma::lockfree::queue_t<signal_t> queue_;
+		atma::lockfree::queue_t<signal_t> evergreen_;
 	};
 
 
@@ -36,7 +38,12 @@ namespace thread {
 		handle_ = std::thread([&]
 		{
 			// continue performing all commands always and forever
-			while (running_) {
+			while (running_)
+			{
+				for (auto const& x : evergreen_) {
+					x();
+				}
+
 				signal_t x;
 				while (queue_.pop(x)) {
 					x();
@@ -66,6 +73,13 @@ namespace thread {
 		if (!running_)
 			return;
 		queue_.push(fn);
+	}
+
+	inline auto engine_t::signal_evergreen(signal_t const& fn) -> void
+	{
+		if (!running_)
+			return;
+		evergreen_.push(fn);
 	}
 
 	inline auto engine_t::signal_block() -> void
