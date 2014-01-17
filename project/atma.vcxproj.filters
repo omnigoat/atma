@@ -169,5 +169,8 @@
     <ClInclude Include="..\include\atma\thread\engine.hpp">
       <Filter>include\thread</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\aligned_allocator.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
