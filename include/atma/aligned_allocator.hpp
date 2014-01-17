@@ -39,26 +39,17 @@ namespace atma {
 		typedef std::true_type propagate_on_container_move_assignment_t;
 
 		template <typename U>
-		struct rebind { typedef aligned_allocator_t<U, A> other_t; };
+		struct rebind { typedef aligned_allocator_t<U, A> other; };
 
 		aligned_allocator_t() {}
 		template <typename U> aligned_allocator_t(aligned_allocator_t<U, A> const&) {}
 
 		auto max_size() const -> size_type;
-		auto address(reference x) const -> pointer { return std::addressof(x); }
-		auto address(const_reference x) const -> const_pointer { return std::addressof(x); }
-		auto allocate(size_type n, typename aligned_allocator_t<void, A>::const_pointer = 0) -> pointer
-		{
-			size_type const alignment = static_cast<size_type>(A);
-			void* ptr = detail::allocate_aligned_memory(alignment, n * sizeof(T));
-			if (ptr == nullptr) {
-				throw std::bad_alloc();
-			}
+		auto address(reference x) const -> pointer;
+		auto address(const_reference x) const -> const_pointer;
+		auto allocate(size_type n, typename aligned_allocator_t<void, A>::const_pointer = 0) -> pointer;
 
-			return reinterpret_cast<pointer>(ptr);
-		}
-
-		auto deallocate(pointer p, size_type) -> void { return detail::deallocate_aligned_memory(p); }
+		auto deallocate(pointer p, size_type) -> void;
 
 		template <typename U, class... Args>
 		auto construct(U* p, Args&&... args) -> void
@@ -98,6 +89,22 @@ namespace atma {
 		}
 
 		return reinterpret_cast<pointer>(ptr);
+	}
+
+
+	//======================================================================
+	// operators
+	//======================================================================
+	template <typename T, uint32_t TA, typename U, uint32_t UA>
+	inline bool operator == (aligned_allocator_t<T, TA> const&, aligned_allocator_t<U, UA> const&)
+	{
+		return TA == UA;
+	}
+
+	template <typename T, uint32_t TA, typename U, uint32_t UA>
+	inline bool operator != (aligned_allocator_t<T, TA> const&, aligned_allocator_t<U, UA> const&)
+	{
+		return TA != UA;
 	}
 
 
