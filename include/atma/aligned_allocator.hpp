@@ -7,8 +7,8 @@ namespace atma {
 //======================================================================
 	
 	namespace detail {
-		void* allocate_aligned_memory(uint32_t alignment, uint32_t size);
-		void* deallocate_aligned_memory(void*);
+		auto allocate_aligned_memory(uint32_t alignment, uint32_t size) -> void*;
+		auto deallocate_aligned_memory(void*) -> void;
 	}
 
 	template <typename T, uint32_t A>
@@ -65,22 +65,22 @@ namespace atma {
 	// IMPLEMENTATION
 	//======================================================================
 	template <typename T, uint32_t A>
-	auto aligned_allocator_t<T, A>::max_size() const -> size_type {
+	inline auto aligned_allocator_t<T, A>::max_size() const -> size_type {
 		return (size_type(~0) - size_type(A)) / sizeof(T);
 	}
 
 	template <typename T, uint32_t A>
-	auto aligned_allocator_t<T, A>::address(reference x) const -> pointer {
+	inline auto aligned_allocator_t<T, A>::address(reference x) const -> pointer {
 		return std::addressof(x);
 	}
 
 	template <typename T, uint32_t A>
-	auto aligned_allocator_t<T, A>::address(const_reference x) const -> const_pointer {
+	inline auto aligned_allocator_t<T, A>::address(const_reference x) const -> const_pointer {
 		return std::addressof(x);
 	}
 
 	template <typename T, uint32_t A>
-	auto aligned_allocator_t<T, A>::allocate(size_type n, typename aligned_allocator_t<void, A>::const_pointer = 0) -> pointer
+	inline auto aligned_allocator_t<T, A>::allocate(size_type n, typename aligned_allocator_t<void, A>::const_pointer = 0) -> pointer
 	{
 		size_type const alignment = static_cast<size_type>(A);
 		void* ptr = detail::allocate_aligned_memory(alignment, n * sizeof(T));
@@ -89,6 +89,11 @@ namespace atma {
 		}
 
 		return reinterpret_cast<pointer>(ptr);
+	}
+
+	template <typename T, uint32_t A>
+	inline auto aligned_allocator_t<T, A>::deallocate(pointer p, size_type) -> void {
+		detail::deallocate_aligned_memory(p);
 	}
 
 
@@ -107,6 +112,34 @@ namespace atma {
 		return TA != UA;
 	}
 
+
+
+
+	//======================================================================
+	// PLATFORM STUFF
+	//======================================================================
+	namespace detail
+	{
+		#ifdef ATMA_PLATFORM_WIN32
+			inline auto allocate_aligned_memory(uint32_t align, uint32_t size) -> void*
+			{
+				ATMA_ASSERT(align >= sizeof(void*));
+				//ATMA_ASSERT(nail::is_power_of_two(align));
+
+				if (size == 0) {
+					return nullptr;
+				}
+
+				return _aligned_malloc(size, align);
+			}
+
+
+			inline auto deallocate_aligned_memory(void *ptr) -> void
+			{
+				return _aligned_free(ptr);
+			}
+		#endif
+	}
 
 //======================================================================
 } // namespace atma
