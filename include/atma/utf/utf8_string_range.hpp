@@ -42,7 +42,7 @@ namespace atma {
 	{
 	}
 
-	inline auto utf8_string_range_t::bytes() const -> uint32_t
+	inline auto utf8_string_range_t::bytes() const -> size_t
 	{
 		return end_ - begin_;
 	}
