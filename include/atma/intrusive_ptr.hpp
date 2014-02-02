@@ -20,11 +20,11 @@ namespace atma {
 	// -------------
 	//   this is a *non-virtual* base class.
 	//=====================================================================
-	template <typename T>
 	struct ref_counted
 	{
 		virtual ~ref_counted() {}
 
+		template <typename T>
 		auto shared_from_this() -> intrusive_ptr<T>
 		{
 			return intrusive_ptr<T>(static_cast<T*>(this));
@@ -36,8 +36,8 @@ namespace atma {
 	private:
 		std::atomic_uint32_t ref_count_;
 
-		template <typename T> friend auto add_ref_count(ref_counted<T>*) -> void;
-		template <typename T> friend auto rm_ref_count(ref_counted<T>*) -> void;
+		friend auto add_ref_count(ref_counted*) -> void;
+		friend auto rm_ref_count(ref_counted*) -> void;
 	};
 
 
@@ -47,13 +47,11 @@ namespace atma {
 	// ------------------
 	//   called by intrusive_ptr
 	//=====================================================================
-	template <typename T>
-	inline auto add_ref_count(ref_counted<T>* t) -> void {
+	inline auto add_ref_count(ref_counted* t) -> void {
 		t && ++t->ref_count_;
 	}
 
-	template <typename T>
-	inline auto rm_ref_count(ref_counted<T>* t) -> void {
+	inline auto rm_ref_count(ref_counted* t) -> void {
 		ATMA_ASSERT(!t || t->ref_count_ >= 0);
 
 		if (t && --t->ref_count_ == 0) {
@@ -180,7 +178,7 @@ namespace atma {
 
 		template <typename Y>
 		friend struct intrusive_ptr;
-		friend struct ref_counted<T>;
+		friend struct ref_counted;
 	};
 
 	template <typename T>
