@@ -4,6 +4,7 @@
 #include <atma/assert.hpp>
 #include <atma/utf/algorithm.hpp>
 #include <atma/utf/utf8_string_header.hpp>
+#include <algorithm>
 //=====================================================================
 namespace atma {
 //=====================================================================
@@ -32,7 +33,7 @@ namespace atma {
 		utf8_string_range_t(utf8_string_range_t const&);
 		utf8_string_range_t(utf8_string_t const&);
 
-		auto bytes() const -> uint32_t;
+		auto bytes() const -> size_t;
 		
 		auto begin() const -> iterator;
 		auto end() const -> iterator;

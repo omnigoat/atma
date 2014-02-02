@@ -70,7 +70,7 @@ namespace atma {
 		
 
 		auto empty() const -> bool { return chars_.empty(); }
-		auto bytes() const -> uint32_t { return chars_.size(); }
+		auto bytes() const -> size_t { return chars_.size(); }
 
 		auto begin() const -> const_iterator;
 		auto end() const -> const_iterator;
@@ -122,7 +122,7 @@ namespace atma {
 		typedef typename std::conditional<std::is_const<T>::value, char const*, char*>::type char_ptr;
 		
 		iterator_t(container_t& owner, decltype(std::declval<T>().begin) x)
-		: owner_(&owner), char_{x, utf8_next_char(x)}
+		: owner_(&owner), char_(x, utf8_next_char(x))
 		{}
 
 		iterator_t(iterator_t const& rhs)

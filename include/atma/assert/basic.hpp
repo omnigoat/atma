@@ -1,14 +1,8 @@
-//=====================================================================
-//
-//
-//
-//=====================================================================
-#ifndef ATMA_ASSERT_BASIC_HPP
-#define ATMA_ASSERT_BASIC_HPP
-//=====================================================================
+#pragma once
+
 #include <atma/assert/config.hpp>
 #include <atma/assert/handling.hpp>
-//=====================================================================
+
 #include <boost/preprocessor/seq.hpp>
 #include <boost/preprocessor/tuple/to_seq.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
@@ -25,7 +19,7 @@
 	#define ATMA_ASSERT_MSG(x, msg) \
 		do { \
 			if ( !(x) && ::atma::assert::detail::handle(msg, __FILE__, __LINE__) ) \
-				{ __asm int 3 } \
+				{ ATMA_DEBUGBREAK(); } \
 		} while (false)
 
 
@@ -130,6 +124,4 @@
 
 //=====================================================================
 #endif // ATMA_ENABLE_ASSERTS
-//=====================================================================
-#endif // inclusion guard
 //=====================================================================
