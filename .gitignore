@@ -1,10 +1,10 @@
 
-; visual studio 2012 files
-project/*.ncb
-project/*.sdf
-project/*.opensdf
-project/*.suo
-project/*.user
-project/Debug
-project/Release
-
+; ignore visual studio files
+Debug/
+Release/
+x64/
+*.opensdf
+*.suo
+*.sdf
+*.user
+*.lib
