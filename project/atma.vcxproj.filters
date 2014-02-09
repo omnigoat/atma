@@ -172,5 +172,8 @@
     <ClInclude Include="..\include\atma\aligned_allocator.hpp">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\types.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

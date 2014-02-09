@@ -54,6 +54,7 @@
     <ClInclude Include="..\include\atma\math\vector4i.hpp" />
     <ClInclude Include="..\include\atma\string.hpp" />
     <ClInclude Include="..\include\atma\thread\engine.hpp" />
+    <ClInclude Include="..\include\atma\types.hpp" />
     <ClInclude Include="..\include\atma\utf\algorithm.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_istream.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_iterator.hpp" />

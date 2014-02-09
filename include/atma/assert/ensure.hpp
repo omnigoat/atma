@@ -22,7 +22,11 @@
 	//   ensures that the expression @x evaluates to @r
 	//=====================================================================
 	#define ATMA_ENSURE_IS(r, x) \
-		ATMA_ENSURE((r) == (x))
+		do { \
+			auto _xr = (x); \
+			ATMA_ENSURE((r) == _xr); \
+		} while (0)
+		
 
 //=====================================================================
 #endif
