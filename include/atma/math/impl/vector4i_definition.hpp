@@ -55,7 +55,7 @@ namespace math {
 	}
 
 
-	inline auto vector4i::operator[](uint32_t i) const -> int32_t
+	inline auto vector4i::operator[](uint32 i) const -> int32_t
 	{
 		ATMA_ASSERT(i < 4);
 #ifdef ATMA_MATH_USE_SSE
@@ -116,7 +116,7 @@ namespace math {
 		return *this;
 	}
 
-	auto vector4i::set(uint32_t i, int32_t n) -> void
+	auto vector4i::set(uint32 i, int32_t n) -> void
 	{
 #ifdef ATMA_MATH_USE_SSE
 		sse_.m128_f32[i] = n;

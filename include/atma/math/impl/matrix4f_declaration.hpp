@@ -50,8 +50,8 @@ namespace math {
 
 		// operators
 		auto operator = (matrix4f const&)-> matrix4f&;
-		auto operator[](uint32_t i) -> impl::row_element_ref<float>;
-		auto operator[](uint32_t i) const -> impl::row_element_ref<float const>;
+		auto operator[](uint32 i) -> impl::row_element_ref<float>;
+		auto operator[](uint32 i) const -> impl::row_element_ref<float const>;
 
 		// computation
 		auto transposed() const -> matrix4f;
@@ -63,7 +63,7 @@ namespace math {
 
 
 #ifdef ATMA_MATH_USE_SSE
-		auto xmmd(uint32_t i) const -> __m128 const&;
+		auto xmmd(uint32 i) const -> __m128 const&;
 #endif
 
 	private:
@@ -87,48 +87,48 @@ namespace math {
 		template <typename T>
 		struct cell_element_ref
 		{
-			cell_element_ref(matrix4f* owner, uint32_t row, uint32_t col);
+			cell_element_ref(matrix4f* owner, uint32 row, uint32 col);
 			auto operator = (float rhs) -> float;
 			operator float();
 
 		private:
 			matrix4f* owner_;
-			uint32_t row_, col_;
+			uint32 row_, col_;
 		};
 
 		template <typename T>
 		struct cell_element_ref<T const>
 		{
-			cell_element_ref(matrix4f const* owner, uint32_t row, uint32_t col);
+			cell_element_ref(matrix4f const* owner, uint32 row, uint32 col);
 			operator float();
 
 		private:
 			matrix4f const* owner_;
-			uint32_t row_, col_;
+			uint32 row_, col_;
 		};
 
 
 		template <typename T>
 		struct row_element_ref
 		{
-			row_element_ref(matrix4f* owner, uint32_t row);
-			auto operator[](uint32_t i) -> cell_element_ref<T>;
-			auto operator[](uint32_t i) const -> cell_element_ref<T const>;
+			row_element_ref(matrix4f* owner, uint32 row);
+			auto operator[](uint32 i) -> cell_element_ref<T>;
+			auto operator[](uint32 i) const -> cell_element_ref<T const>;
 
 		private:
 			matrix4f* owner_;
-			uint32_t row_;
+			uint32 row_;
 		};
 
 		template <typename T>
 		struct row_element_ref<T const>
 		{
-			row_element_ref(matrix4f const* owner, uint32_t row);
-			auto operator[](uint32_t i) const -> cell_element_ref<T const>;
+			row_element_ref(matrix4f const* owner, uint32 row);
+			auto operator[](uint32 i) const -> cell_element_ref<T const>;
 
 		private:
 			matrix4f const* owner_;
-			uint32_t row_;
+			uint32 row_;
 		};
 	}
 
