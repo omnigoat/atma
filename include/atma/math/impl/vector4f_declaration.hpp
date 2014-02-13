@@ -35,7 +35,7 @@ namespace math {
 #ifdef ATMA_MATH_USE_SSE
 		auto xmmd() const -> __m128 { return sd_; }
 #endif
-		auto operator[] (uint32_t i) const -> float;
+		auto operator[] (uint32 i) const -> float;
 		
 		// computation
 		auto is_zero() const -> bool;
@@ -49,7 +49,7 @@ namespace math {
 		template <typename OP> vector4f& operator -= (impl::expr<vector4f, OP> const&);
 		vector4f& operator *= (float rhs);
 		vector4f& operator /= (float rhs);
-		auto set(uint32_t i, float n) -> void;
+		auto set(uint32 i, float n) -> void;
 		auto normalize() -> void;
 
 		template <uint8_t i>

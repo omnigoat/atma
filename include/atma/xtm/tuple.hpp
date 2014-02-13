@@ -10,8 +10,8 @@ namespace xtm {
 //=====================================================================
 	
 	namespace detail {
-		template <uint32_t N> struct tuple_applier_t;
-		template <uint32_t M> struct bound_tuple_applier_t;
+		template <uint32 N> struct tuple_applier_t;
+		template <uint32 M> struct bound_tuple_applier_t;
 	}
 
 	template <typename F, typename... Bindings>
@@ -94,7 +94,7 @@ namespace xtm {
 
 	namespace detail
 	{
-		template <uint32_t I> struct xtm_ph {};
+		template <uint32 I> struct xtm_ph {};
 
 
 		//=====================================================================
@@ -109,7 +109,7 @@ namespace xtm {
 		};
 
 		// when a placeholder is passed in, pick the argument in that slot
-		template <uint32_t I, typename T>
+		template <uint32 I, typename T>
 		struct select_element_t<xtm_ph<I>, T> {
 			static __forceinline auto apply(xtm_ph<I>&&, T&& t) -> typename std::tuple_element<I, T>::type&& {
 				return std::forward<typename std::tuple_element<I, T>::type>
@@ -122,7 +122,7 @@ namespace xtm {
 		// bound_tuple_applier_t
 		//=====================================================================
 		// bindings and values still present
-		template <uint32_t M>
+		template <uint32 M>
 		struct bound_tuple_applier_t
 		{
 			template <typename F, typename B, typename T, typename... Args>
@@ -176,7 +176,7 @@ namespace xtm {
 
 
 
-		template <uint32_t N>
+		template <uint32 N>
 		struct tuple_applier_t
 		{
 			template <typename F, typename T, typename... Args>
