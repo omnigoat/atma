@@ -32,7 +32,7 @@ namespace math {
 #ifdef ATMA_MATH_USE_SSE
 		auto xmmd() const -> __m128i { return sse_; }
 #endif
-		auto operator[] (uint32_t i) const -> int32_t;
+		auto operator[] (uint32 i) const -> int32_t;
 		
 		// computation
 		auto is_zero() const -> bool;

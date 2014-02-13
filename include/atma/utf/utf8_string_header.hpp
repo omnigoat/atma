@@ -1,8 +1,9 @@
-#ifndef ATMA_UTF_UTF8_STRING
-#define ATMA_UTF_UTF8_STRING
+#pragma once
 //=====================================================================
+#include <atma/types.hpp>
 #include <atma/assert.hpp>
 #include <atma/utf/algorithm.hpp>
+
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -100,7 +101,7 @@ namespace atma {
 	private:
 		typedef std::vector<value_t> chars_t;
 		chars_t chars_;
-		uint32_t char_count_;
+		uint32 char_count_;
 
 
 		friend class utf16_string_t;
@@ -182,6 +183,4 @@ namespace atma {
 	
 //=====================================================================
 } // namespace atma
-//=====================================================================
-#endif // inclusion guard
 //=====================================================================

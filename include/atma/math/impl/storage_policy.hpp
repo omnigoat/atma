@@ -53,12 +53,12 @@ namespace impl {
 
 #else
 	template <typename T>
-	auto element_of(T const& x, uint32_t i) -> float
+	auto element_of(T const& x, uint32 i) -> float
 	{
 		return x[i];
 	}
 
-	auto element_of(float x, uint32_t) -> float
+	auto element_of(float x, uint32) -> float
 	{
 		return x;
 	}

@@ -20,7 +20,7 @@ namespace impl {
 			return static_cast<OPER const*>(this)->xmmd();
 		}
 #else
-		auto element(uint32_t i) const
+		auto element(uint32 i) const
 		-> typename element_type_of<OPER>::type
 		{
 			return static_cast<OPER const*>(this)->element(i);

@@ -23,7 +23,7 @@ namespace math {
 	{
 		// cell-element-ref
 		template <typename T>
-		cell_element_ref<T>::cell_element_ref(matrix4f* owner, uint32_t row, uint32_t col)
+		cell_element_ref<T>::cell_element_ref(matrix4f* owner, uint32 row, uint32 col)
 		: owner_(owner), row_(row), col_(col)
 		{}
 
@@ -48,7 +48,7 @@ namespace math {
 
 		// cell-element-ref (const)
 		template <typename T>
-		cell_element_ref<T const>::cell_element_ref(matrix4f const* owner, uint32_t row, uint32_t col)
+		cell_element_ref<T const>::cell_element_ref(matrix4f const* owner, uint32 row, uint32 col)
 		: owner_(owner), row_(row), col_(col)
 		{}
 
@@ -64,30 +64,30 @@ namespace math {
 
 		// row-element-ref
 		template <typename T>
-		row_element_ref<T>::row_element_ref(matrix4f* owner, uint32_t row)
+		row_element_ref<T>::row_element_ref(matrix4f* owner, uint32 row)
 		: owner_(owner), row_(row)
 		{}
 
 		template <typename T>
-		auto row_element_ref<T>::operator[](uint32_t i) -> cell_element_ref<T>
+		auto row_element_ref<T>::operator[](uint32 i) -> cell_element_ref<T>
 		{
 			return cell_element_ref<T>(owner_, row_, i);
 		}
 
 		template <typename T>
-		auto row_element_ref<T>::operator[](uint32_t i) const -> cell_element_ref<T const>
+		auto row_element_ref<T>::operator[](uint32 i) const -> cell_element_ref<T const>
 		{
 			return cell_element_ref<T const>(owner_, row_, i);
 		}
 
 		// row-element-ref (const)
 		template <typename T>
-		row_element_ref<T const>::row_element_ref(matrix4f const* owner, uint32_t row)
+		row_element_ref<T const>::row_element_ref(matrix4f const* owner, uint32 row)
 		: owner_(owner), row_(row)
 		{}
 
 		template <typename T>
-		auto row_element_ref<T const>::operator[](uint32_t i) const -> cell_element_ref<T const>
+		auto row_element_ref<T const>::operator[](uint32 i) const -> cell_element_ref<T const>
 		{
 			return cell_element_ref<T const>(owner_, row_, i);
 		}
@@ -122,18 +122,18 @@ namespace math {
 	}
 #endif
 
-	auto matrix4f::operator[](uint32_t i) -> impl::row_element_ref<float>
+	auto matrix4f::operator[](uint32 i) -> impl::row_element_ref<float>
 	{
 		return {this, i};
 	}
 
-	auto matrix4f::operator[](uint32_t i) const -> impl::row_element_ref<float const>
+	auto matrix4f::operator[](uint32 i) const -> impl::row_element_ref<float const>
 	{
 		return {this, i};
 	}
 
 #ifdef ATMA_MATH_USE_SSE
-	auto matrix4f::xmmd(uint32_t i) const -> __m128 const&
+	auto matrix4f::xmmd(uint32 i) const -> __m128 const&
 	{
 		return sd_[i];
 	}

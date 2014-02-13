@@ -7,15 +7,15 @@ namespace atma {
 //======================================================================
 	
 	namespace detail {
-		auto allocate_aligned_memory(uint32_t alignment, uint32_t size) -> void*;
+		auto allocate_aligned_memory(uint32 alignment, uint32 size) -> void*;
 		auto deallocate_aligned_memory(void*) -> void;
 	}
 
-	template <typename T, uint32_t A>
+	template <typename T, uint32 A>
 	struct aligned_allocator_t;
 
 
-	template <uint32_t A>
+	template <uint32 A>
 	struct aligned_allocator_t<void, A>
 	{
 		typedef void* pointer;
@@ -25,7 +25,7 @@ namespace atma {
 		template <typename U> struct rebind { typedef aligned_allocator_t<U, A> other_t; };
 	};
 
-	template <typename T, uint32_t A>
+	template <typename T, uint32 A>
 	struct aligned_allocator_t
 	{
 		typedef T value_type;
@@ -33,7 +33,7 @@ namespace atma {
 		typedef T const* const_pointer;
 		typedef T& reference;
 		typedef T const& const_reference;
-		typedef uint32_t size_type;
+		typedef uint32 size_type;
 		typedef ptrdiff_t difference_type;
 
 		typedef std::true_type propagate_on_container_move_assignment_t;
@@ -64,22 +64,22 @@ namespace atma {
 	//======================================================================
 	// IMPLEMENTATION
 	//======================================================================
-	template <typename T, uint32_t A>
+	template <typename T, uint32 A>
 	inline auto aligned_allocator_t<T, A>::max_size() const -> size_type {
 		return (size_type(~0) - size_type(A)) / sizeof(T);
 	}
 
-	template <typename T, uint32_t A>
+	template <typename T, uint32 A>
 	inline auto aligned_allocator_t<T, A>::address(reference x) const -> pointer {
 		return std::addressof(x);
 	}
 
-	template <typename T, uint32_t A>
+	template <typename T, uint32 A>
 	inline auto aligned_allocator_t<T, A>::address(const_reference x) const -> const_pointer {
 		return std::addressof(x);
 	}
 
-	template <typename T, uint32_t A>
+	template <typename T, uint32 A>
 	inline auto aligned_allocator_t<T, A>::allocate(size_type n, typename aligned_allocator_t<void, A>::const_pointer = 0) -> pointer
 	{
 		size_type const alignment = static_cast<size_type>(A);
@@ -91,7 +91,7 @@ namespace atma {
 		return reinterpret_cast<pointer>(ptr);
 	}
 
-	template <typename T, uint32_t A>
+	template <typename T, uint32 A>
 	inline auto aligned_allocator_t<T, A>::deallocate(pointer p, size_type) -> void {
 		detail::deallocate_aligned_memory(p);
 	}
@@ -100,13 +100,13 @@ namespace atma {
 	//======================================================================
 	// operators
 	//======================================================================
-	template <typename T, uint32_t TA, typename U, uint32_t UA>
+	template <typename T, uint32 TA, typename U, uint32 UA>
 	inline bool operator == (aligned_allocator_t<T, TA> const&, aligned_allocator_t<U, UA> const&)
 	{
 		return TA == UA;
 	}
 
-	template <typename T, uint32_t TA, typename U, uint32_t UA>
+	template <typename T, uint32 TA, typename U, uint32 UA>
 	inline bool operator != (aligned_allocator_t<T, TA> const&, aligned_allocator_t<U, UA> const&)
 	{
 		return TA != UA;
@@ -121,7 +121,7 @@ namespace atma {
 	namespace detail
 	{
 		#ifdef ATMA_PLATFORM_WIN32
-			inline auto allocate_aligned_memory(uint32_t align, uint32_t size) -> void*
+			inline auto allocate_aligned_memory(uint32 align, uint32 size) -> void*
 			{
 				ATMA_ASSERT(align >= sizeof(void*));
 				//ATMA_ASSERT(nail::is_power_of_two(align));

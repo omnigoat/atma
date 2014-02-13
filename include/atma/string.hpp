@@ -18,7 +18,7 @@ namespace atma {
 	typedef utf8_string_t string;
 
 
-	inline auto to_string(uint32_t n) -> atma::string
+	inline auto to_string(uint32 n) -> atma::string
 	{
 		atma::string s;
 		while (n) {

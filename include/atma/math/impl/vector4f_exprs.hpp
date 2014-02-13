@@ -24,7 +24,7 @@ namespace impl {
 #ifdef ATMA_MATH_USE_SSE
 		auto xmmd() const -> __m128 { return _mm_add_ps(xmmd_of(lhs), xmmd_of(rhs)); }
 #else
-		auto element(uint32_t i) const -> float { return element_of(lhs, i) + element_of(rhs, i); }
+		auto element(uint32 i) const -> float { return element_of(lhs, i) + element_of(rhs, i); }
 #endif
 	};
 
@@ -37,7 +37,7 @@ namespace impl {
 #ifdef ATMA_MATH_USE_SSE
 		auto xmmd() const -> __m128 { return _mm_sub_ps(xmmd_of(lhs), xmmd_of(rhs)); }
 #else
-		auto element(uint32_t i) const -> float { return element_of(lhs, i) - element_of(rhs, i); }
+		auto element(uint32 i) const -> float { return element_of(lhs, i) - element_of(rhs, i); }
 #endif
 	};
 
@@ -50,7 +50,7 @@ namespace impl {
 #ifdef ATMA_MATH_USE_SSE
 		auto xmmd() const -> __m128 { return _mm_mul_ps(xmmd_of(lhs), xmmd_of(rhs)); }
 #else
-		auto element(uint32_t i) const -> float { return element_of(lhs, i) * element_of(rhs, i); }
+		auto element(uint32 i) const -> float { return element_of(lhs, i) * element_of(rhs, i); }
 #endif
 	};
 
@@ -63,7 +63,7 @@ namespace impl {
 #ifdef ATMA_MATH_USE_SSE
 		auto xmmd() const -> __m128 { return _mm_div_ps(xmmd_of(lhs), xmmd_of(rhs)); }
 #else
-		auto element(uint32_t i) const -> float { return element_of(lhs, i) / element_of(rhs, i); }
+		auto element(uint32 i) const -> float { return element_of(lhs, i) / element_of(rhs, i); }
 #endif
 	};
 
