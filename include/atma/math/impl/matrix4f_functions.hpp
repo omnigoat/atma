@@ -39,7 +39,7 @@ namespace math {
 		return result.transposed();
 	}
 	
-	inline auto look_to(vector4f const& position, vector4f const& target, vector4f const& up) -> matrix4f
+	inline auto look_at(vector4f const& position, vector4f const& target, vector4f const& up) -> matrix4f
 	{
 		return look_along(position, target - position, up);
 	}
