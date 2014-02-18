@@ -168,6 +168,16 @@ namespace math {
 	//=====================================================================
 	// functions
 	//=====================================================================
+	inline auto point4f(float x, float y, float z) -> vector4f
+	{
+		return vector4f(x, y, z, 1.f);
+	}
+
+	inline auto point4f() -> vector4f
+	{
+		return vector4f(0.f, 0.f, 0.f, 1.f);
+	}
+
 	inline auto dot_product(vector4f const& lhs, vector4f const& rhs) -> float
 	{
 #if ATMA_MATH_USE_SSE

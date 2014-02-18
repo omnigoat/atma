@@ -85,6 +85,11 @@ namespace math {
 	//=====================================================================
 	// functions
 	//=====================================================================
+
+	// returns a vector4f with the w-component set to 1.f
+	inline auto point4f(float x, float y, float z) -> vector4f;
+	inline auto point4f() -> vector4f;
+
 	inline auto dot_product(vector4f const& lhs, vector4f const& rhs) -> float;
 
 	template <typename LOP, typename ROP>
