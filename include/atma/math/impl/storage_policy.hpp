@@ -41,12 +41,12 @@ namespace impl {
 	//=====================================================================
 #ifdef ATMA_MATH_USE_SSE
 	template <typename R, typename OP>
-	auto xmmd_of(expr<R, OP> const& expr) -> __m128
+	inline auto xmmd_of(expr<R, OP> const& expr) -> __m128
 	{
 		return expr.xmmd();
 	}
 
-	auto xmmd_of(float x) -> __m128
+	inline auto xmmd_of(float x) -> __m128
 	{
 		return _mm_load_ps1(&x);
 	}
