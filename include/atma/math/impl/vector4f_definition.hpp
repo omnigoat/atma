@@ -14,7 +14,7 @@ namespace atma {
 namespace math {
 //=====================================================================
 	
-	vector4f::vector4f()
+	inline vector4f::vector4f()
 	{
 #if ATMA_MATH_USE_SSE
 		sd_ = _mm_setzero_ps();
@@ -23,7 +23,7 @@ namespace math {
 #endif
 	}
 
-	vector4f::vector4f(float x, float y, float z, float w)
+	inline vector4f::vector4f(float x, float y, float z, float w)
 	{
 #ifdef ATMA_MATH_USE_SSE
 		__declspec(align(16)) float fs[] = {x, y, z, w};
@@ -34,14 +34,14 @@ namespace math {
 	}
 
 #ifdef ATMA_MATH_USE_SSE
-	vector4f::vector4f(__m128 xm)
+	inline vector4f::vector4f(__m128 xm)
 		: sd_(xm)
 	{
 	}
 #endif
 
 	template <typename OP>
-	vector4f::vector4f(impl::expr<vector4f, OP> const& expr)
+	inline vector4f::vector4f(impl::expr<vector4f, OP> const& expr)
 	{
 #ifdef ATMA_MATH_USE_SSE
 		sd_ = expr.xmmd();
@@ -99,7 +99,7 @@ namespace math {
 	}
 
 	template <typename OP>
-	vector4f& vector4f::operator += (impl::expr<vector4f, OP> const& rhs)
+	inline vector4f& vector4f::operator += (impl::expr<vector4f, OP> const& rhs)
 	{
 #ifdef ATMA_MATH_USE_SSE
 		sd_ = _mm_add_ps(sd_, rhs.xmmd());
@@ -111,7 +111,7 @@ namespace math {
 	}
 
 	template <typename OP>
-	vector4f& vector4f::operator -= (impl::expr<vector4f, OP> const& rhs)
+	inline vector4f& vector4f::operator -= (impl::expr<vector4f, OP> const& rhs)
 	{
 #ifdef ATMA_MATH_USE_SSE
 		sd_ = _mm_sub_ps(sd_, rhs.xmmd());
@@ -122,7 +122,7 @@ namespace math {
 		return *this;
 	}
 
-	vector4f& vector4f::operator *= (float rhs)
+	inline auto vector4f::operator *= (float rhs) -> vector4f&
 	{
 #ifdef ATMA_MATH_USE_SSE
 		sd_ = _mm_sub_ps(sd_, _mm_load_ps1(&rhs));
@@ -133,7 +133,7 @@ namespace math {
 		return *this;
 	}
 
-	auto vector4f::operator /= (float rhs) -> vector4f&
+	inline auto vector4f::operator /= (float rhs) -> vector4f&
 	{
 #ifdef ATMA_MATH_USE_SSE
 		sd_ = _mm_sub_ps(sd_, _mm_load_ps1(&rhs));
@@ -144,7 +144,7 @@ namespace math {
 		return *this;
 	}
 
-	auto vector4f::set(uint32 i, float n) -> void
+	inline auto vector4f::set(uint32 i, float n) -> void
 	{
 #ifdef ATMA_MATH_USE_SSE
 		sd_.m128_f32[i] = n;
@@ -153,7 +153,7 @@ namespace math {
 #endif
 	}
 
-	auto vector4f::normalize() -> void
+	inline auto vector4f::normalize() -> void
 	{
 #ifdef ATMA_MATH_USE_SSE
 		sd_ = _mm_mul_ps(sd_, _mm_rsqrt_ps(_mm_dp_ps(sd_, sd_, 0x7f)));

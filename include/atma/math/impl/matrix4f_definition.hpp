@@ -23,12 +23,12 @@ namespace math {
 	{
 		// cell-element-ref
 		template <typename T>
-		cell_element_ref<T>::cell_element_ref(matrix4f* owner, uint32 row, uint32 col)
+		inline cell_element_ref<T>::cell_element_ref(matrix4f* owner, uint32 row, uint32 col)
 		: owner_(owner), row_(row), col_(col)
 		{}
 
 		template <typename T>
-		auto cell_element_ref<T>::operator = (float rhs) -> float
+		inline auto cell_element_ref<T>::operator = (float rhs) -> float
 		{
 #ifdef ATMA_MATH_USE_SSE
 			return owner_->sd_[row_].m128_f32[col_] = rhs;
@@ -38,7 +38,7 @@ namespace math {
 		}
 
 		template <typename T>
-		cell_element_ref<T>::operator float() {
+		inline cell_element_ref<T>::operator float() {
 #ifdef ATMA_MATH_USE_SSE
 			return owner_->sd_[row_].m128_f32[col_];
 #else
@@ -48,12 +48,12 @@ namespace math {
 
 		// cell-element-ref (const)
 		template <typename T>
-		cell_element_ref<T const>::cell_element_ref(matrix4f const* owner, uint32 row, uint32 col)
+		inline cell_element_ref<T const>::cell_element_ref(matrix4f const* owner, uint32 row, uint32 col)
 		: owner_(owner), row_(row), col_(col)
 		{}
 
 		template <typename T>
-		cell_element_ref<T const>::operator float() {
+		inline cell_element_ref<T const>::operator float() {
 #ifdef ATMA_MATH_USE_SSE
 			return owner_->sd_[row_].m128_f32[col_];
 #else
@@ -64,30 +64,30 @@ namespace math {
 
 		// row-element-ref
 		template <typename T>
-		row_element_ref<T>::row_element_ref(matrix4f* owner, uint32 row)
+		inline row_element_ref<T>::row_element_ref(matrix4f* owner, uint32 row)
 		: owner_(owner), row_(row)
 		{}
 
 		template <typename T>
-		auto row_element_ref<T>::operator[](uint32 i) -> cell_element_ref<T>
+		inline auto row_element_ref<T>::operator[](uint32 i) -> cell_element_ref<T>
 		{
 			return cell_element_ref<T>(owner_, row_, i);
 		}
 
 		template <typename T>
-		auto row_element_ref<T>::operator[](uint32 i) const -> cell_element_ref<T const>
+		inline auto row_element_ref<T>::operator[](uint32 i) const -> cell_element_ref<T const>
 		{
 			return cell_element_ref<T const>(owner_, row_, i);
 		}
 
 		// row-element-ref (const)
 		template <typename T>
-		row_element_ref<T const>::row_element_ref(matrix4f const* owner, uint32 row)
+		inline row_element_ref<T const>::row_element_ref(matrix4f const* owner, uint32 row)
 		: owner_(owner), row_(row)
 		{}
 
 		template <typename T>
-		auto row_element_ref<T const>::operator[](uint32 i) const -> cell_element_ref<T const>
+		inline auto row_element_ref<T const>::operator[](uint32 i) const -> cell_element_ref<T const>
 		{
 			return cell_element_ref<T const>(owner_, row_, i);
 		}
@@ -100,11 +100,11 @@ namespace math {
 	//=====================================================================
 	// matrix4f
 	//=====================================================================
-	matrix4f::matrix4f()
+	inline matrix4f::matrix4f()
 	{
 	}
 
-	matrix4f::matrix4f(matrix4f const& rhs)
+	inline matrix4f::matrix4f(matrix4f const& rhs)
 	{
 		sd_[0] = rhs.sd_[0];
 		sd_[1] = rhs.sd_[1];
@@ -113,7 +113,7 @@ namespace math {
 	}
 
 #ifdef ATMA_MATH_USE_SSE
-	matrix4f::matrix4f(__m128 const& r0, __m128 const& r1, __m128 const& r2, __m128 const& r3)
+	inline matrix4f::matrix4f(__m128 const& r0, __m128 const& r1, __m128 const& r2, __m128 const& r3)
 	{
 		sd_[0] = r0;
 		sd_[1] = r1;
@@ -122,25 +122,29 @@ namespace math {
 	}
 #endif
 
-	auto matrix4f::operator[](uint32 i) -> impl::row_element_ref<float>
+	inline auto matrix4f::operator[](uint32 i) -> impl::row_element_ref<float>
 	{
 		return {this, i};
 	}
 
-	auto matrix4f::operator[](uint32 i) const -> impl::row_element_ref<float const>
+	inline auto matrix4f::operator[](uint32 i) const -> impl::row_element_ref<float const>
 	{
 		return {this, i};
 	}
 
 #ifdef ATMA_MATH_USE_SSE
-	auto matrix4f::xmmd(uint32 i) const -> __m128 const&
+	inline auto matrix4f::xmmd(uint32 i) const -> __m128 const&
 	{
 		return sd_[i];
 	}
 #endif
 
+	inline auto matrix4f::identity() -> matrix4f
+	{
+		return matrix4f(xmmd_identity_r0_ps, xmmd_identity_r1_ps, xmmd_identity_r2_ps, xmmd_identity_r3_ps);
+	}
 	
-	auto matrix4f::transpose() -> void
+	inline auto matrix4f::transpose() -> void
 	{
 		__m128 t0 = _mm_shuffle_ps(sd_[0], sd_[1], _MM_SHUFFLE(1, 0, 1, 0));
 		__m128 t1 = _mm_shuffle_ps(sd_[0], sd_[1], _MM_SHUFFLE(3, 2, 3, 2));
@@ -153,7 +157,7 @@ namespace math {
 		sd_[3] = t3;
 	}
 
-	auto matrix4f::transposed() const -> matrix4f
+	inline auto matrix4f::transposed() const -> matrix4f
 	{
 		__m128 t0 = _mm_shuffle_ps(sd_[0], sd_[1], _MM_SHUFFLE(1, 0, 1, 0));
 		__m128 t1 = _mm_shuffle_ps(sd_[0], sd_[1], _MM_SHUFFLE(3, 2, 3, 2));
