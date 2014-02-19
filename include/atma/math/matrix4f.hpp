@@ -7,6 +7,7 @@
 #define ATMA_MATH_MATRIX4F_SCOPE
 //=====================================================================
 #include <cstdint>
+#include <atma/math/impl/constants.hpp>
 #include <atma/math/impl/matrix4f_declaration.hpp>
 #include <atma/math/impl/matrix4f_definition.hpp>
 #include <atma/math/impl/matrix4f_operators.hpp>
