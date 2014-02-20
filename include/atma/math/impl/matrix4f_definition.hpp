@@ -102,6 +102,10 @@ namespace math {
 	//=====================================================================
 	inline matrix4f::matrix4f()
 	{
+		sd_[0] = _mm_setzero_ps();
+		sd_[1] = _mm_setzero_ps();
+		sd_[2] = _mm_setzero_ps();
+		sd_[3] = _mm_setzero_ps();
 	}
 
 	inline matrix4f::matrix4f(matrix4f const& rhs)
@@ -130,6 +134,16 @@ namespace math {
 	inline auto matrix4f::operator[](uint32 i) const -> impl::row_element_ref<float const>
 	{
 		return {this, i};
+	}
+
+	inline auto matrix4f::operator = (matrix4f const& rhs) -> matrix4f&
+	{
+		sd_[0] = rhs.sd_[0];
+		sd_[1] = rhs.sd_[1];
+		sd_[2] = rhs.sd_[2];
+		sd_[3] = rhs.sd_[3];
+
+		return *this;
 	}
 
 #ifdef ATMA_MATH_USE_SSE
