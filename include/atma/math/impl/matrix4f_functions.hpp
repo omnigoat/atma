@@ -25,9 +25,9 @@ namespace math {
 		vector4f r1 = cross_product(r2, r0);
 		vector4f npos = vector4f(_mm_mul_ps(position.xmmd(), xmmd_negone_ps));
 
-		__m128 d0 = _mm_dp_ps(r0.xmmd(), npos.xmmd(), 0xef);
-		__m128 d1 = _mm_dp_ps(r1.xmmd(), npos.xmmd(), 0xef);
-		__m128 d2 = _mm_dp_ps(r2.xmmd(), npos.xmmd(), 0xef);
+		__m128 d0 = _mm_dp_ps(r0.xmmd(), npos.xmmd(), 0x7f);
+		__m128 d1 = _mm_dp_ps(r1.xmmd(), npos.xmmd(), 0x7f);
+		__m128 d2 = _mm_dp_ps(r2.xmmd(), npos.xmmd(), 0x7f);
 
 		auto result = matrix4f(
 			_am_select_ps(d0, r0.xmmd(), xmmd_mask_1110_ps),
@@ -51,7 +51,7 @@ namespace math {
 		float nn = near + near;
 		float range = far / (far - near);
 
-		__m128 rmem = _am_load_f32x4(nn / width, nn / height, range, -range * near);
+		__m128 rmem = _am_load_f32x4(-range * near, range, nn / height, nn / width);
 		__m128 t0 = _mm_setzero_ps();
 
 		__m128 r0 = _mm_move_ss(t0, rmem);
@@ -62,6 +62,42 @@ namespace math {
 
 		return matrix4f{r0, r1, r2, r3};
 	}
+
+
+	inline auto perspective_fov(float fov, float aspect, float near, float far) -> matrix4f
+	{
+		//
+		// General form of the Projection Matrix
+		//
+		// uh = Cot( fov/2 ) == 1/Tan(fov/2)
+		// uw / uh = 1/aspect
+		// 
+		//   uw         0       0       0
+		//    0        uh       0       0
+		//    0         0      f/(f-n)  1
+		//    0         0    -fn/(f-n)  0
+		//
+		// Make result to be identity first
+
+		// check for bad parameters to avoid divide by zero:
+		// if found, assert and return an identity matrix.
+		if (fov <= 0 || aspect == 0)
+			ATMA_ASSERT(fov > 0 && aspect != 0);
+
+		float depth = far - near;
+		float one_over_depth = 1.f / depth;
+
+		math::matrix4f result;
+		result[1][1] = 1 / tan(0.5f * fov);
+		result[0][0] = result[1][1] / aspect;
+		result[2][2] = far * one_over_depth;
+		result[3][2] = (-far * near) * one_over_depth;
+		result[2][3] = 1;
+		result[3][3] = 0;
+
+		return result;
+	}
+
 
 //=====================================================================
 } // namespace math
