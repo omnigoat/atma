@@ -194,14 +194,16 @@ namespace math {
 	inline auto cross_product(impl::expr<vector4f, LOP> const& lhs, impl::expr<vector4f, ROP> const& rhs) -> vector4f
 	{
 #ifdef ATMA_MATH_USE_SSE
-		return vector4f(
-			_mm_sub_ps(
-				_mm_mul_ps(
-					_mm_shuffle_ps(lhs.xmmd(), lhs.xmmd(), _MM_SHUFFLE(3, 0, 2, 1)),
-					_mm_shuffle_ps(rhs.xmmd(), rhs.xmmd(), _MM_SHUFFLE(3, 1, 0, 2))),
-				_mm_mul_ps(
-					_mm_shuffle_ps(lhs.xmmd(), lhs.xmmd(), _MM_SHUFFLE(3, 1, 0, 2)),
-					_mm_shuffle_ps(rhs.xmmd(), rhs.xmmd(), _MM_SHUFFLE(3, 0, 2, 1)))));
+		auto t0 = _mm_shuffle_ps(lhs.xmmd(), lhs.xmmd(), _MM_SHUFFLE(3, 0, 2, 1));
+		auto t1 = _mm_shuffle_ps(rhs.xmmd(), rhs.xmmd(), _MM_SHUFFLE(3, 1, 0, 2));
+		auto R = _mm_mul_ps(t0, t1);
+		
+		t0 = _mm_shuffle_ps(t0, t0, _MM_SHUFFLE(3, 0, 2, 1));
+		t1 = _mm_shuffle_ps(t1, t1, _MM_SHUFFLE(3, 1, 0, 2));
+		t0 = _mm_mul_ps(t0, t1);
+		R = _mm_sub_ps(R, t0);
+
+		return vector4f(_mm_and_ps(R, xmmd_mask_1110_ps));
 #else
 		return vector4f<3, float>{
 			lhs[1]*rhs[2] - lhs[2]*rhs[1],
