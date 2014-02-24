@@ -74,16 +74,16 @@ namespace math {
 		float scale = cos_fov / sin_fov;
 
 		auto zero = _mm_setzero_ps();
-		auto values = vector4f(scale / aspect, scale, range, -range * near);
+		auto values = _am_load_f32x4(scale / aspect, scale, range, -range * near);
 		// range,-range * near,0,1.0f
-		auto values2 = _mm_shuffle_ps(values.xmmd(), xmmd_identity_r3_ps, _MM_SHUFFLE(3, 2, 3, 2));
+		auto values2 = _mm_shuffle_ps(values, xmmd_identity_r3_ps, _MM_SHUFFLE(3, 2, 3, 2));
 
 		// scale/aspect,0,0,0
 		return matrix4f(
 			// cos(fov)/sin(fov), 0, 0, 0
-			_mm_move_ss(zero, values.xmmd()),
+			_mm_move_ss(zero, values),
 			// 0, height/aspect, 0, 0
-			_mm_and_ps(values.xmmd(), xmmd_mask_0100_ps),
+			_mm_and_ps(values, xmmd_mask_0100_ps),
 			// 0, 0, range, 1.f
 			_mm_shuffle_ps(zero, values2, _MM_SHUFFLE(3, 0, 0, 0)),
 			// 0, 0, -range*near, 0
@@ -124,6 +124,106 @@ namespace math {
 	}
 
 
+
+	inline auto rotation_y(float angle) -> matrix4f
+	{
+#ifdef ATMA_MATH_USE_SSE
+		float sin_angle;
+		float cos_angle;
+		retrieve_sin_cos(sin_angle, cos_angle, angle);
+
+		auto sin = _mm_set_ss(sin_angle);
+		auto cos = _mm_set_ss(cos_angle);
+		
+		return matrix4f(
+			// cos,0,-sin,0
+			_mm_shuffle_ps(cos, _mm_mul_ps(sin, xmmd_neg_x_ps), _MM_SHUFFLE(3, 0, 3, 0)),
+			// 0,1,0,0
+			xmmd_identity_r1_ps,
+			// sin,0,cos,0
+			_mm_shuffle_ps(sin, cos, _MM_SHUFFLE(3, 0, 3, 0)),
+			// 0,0,0,1
+			xmmd_identity_r3_ps
+		);
+
+#else
+		float    fSinangle;
+		float    fCosangle;
+		XMScalarSinCos(&fSinangle, &fCosangle, angle);
+
+		XMMATRIX M;
+		M.m[0][0] = 1.0f;
+		M.m[0][1] = 0.0f;
+		M.m[0][2] = 0.0f;
+		M.m[0][3] = 0.0f;
+
+		M.m[1][0] = 0.0f;
+		M.m[1][1] = fCosangle;
+		M.m[1][2] = fSinangle;
+		M.m[1][3] = 0.0f;
+
+		M.m[2][0] = 0.0f;
+		M.m[2][1] = -fSinangle;
+		M.m[2][2] = fCosangle;
+		M.m[2][3] = 0.0f;
+
+		M.m[3][0] = 0.0f;
+		M.m[3][1] = 0.0f;
+		M.m[3][2] = 0.0f;
+		M.m[3][3] = 1.0f;
+		return M;
+#endif
+	}
+
+	inline auto rotation_x(float angle) -> matrix4f
+	{
+#ifdef ATMA_MATH_USE_SSE
+		float sin_angle;
+		float cos_angle;
+		retrieve_sin_cos(sin_angle, cos_angle, angle);
+
+		auto sin = _mm_set_ss(sin_angle);
+		auto cos = _mm_set_ss(cos_angle);
+
+		return matrix4f(
+			// 1,0,0,0
+			xmmd_identity_r0_ps,
+			// 0,cos,sin,0
+			_mm_shuffle_ps(cos, sin, _MM_SHUFFLE(3, 0, 0, 3)),
+			// 0,-sin,cos,0
+			_mm_shuffle_ps(_mm_mul_ps(sin, xmmd_neg_x_ps), cos, _MM_SHUFFLE(3, 0, 0, 3)),
+			// 0,0,0,1
+			xmmd_identity_r3_ps
+		);
+
+#else
+		float    fSinangle;
+		float    fCosangle;
+		XMScalarSinCos(&fSinangle, &fCosangle, angle);
+
+		XMMATRIX M;
+		M.m[0][0] = 1.0f;
+		M.m[0][1] = 0.0f;
+		M.m[0][2] = 0.0f;
+		M.m[0][3] = 0.0f;
+
+		M.m[1][0] = 0.0f;
+		M.m[1][1] = fCosangle;
+		M.m[1][2] = fSinangle;
+		M.m[1][3] = 0.0f;
+
+		M.m[2][0] = 0.0f;
+		M.m[2][1] = -fSinangle;
+		M.m[2][2] = fCosangle;
+		M.m[2][3] = 0.0f;
+
+		M.m[3][0] = 0.0f;
+		M.m[3][1] = 0.0f;
+		M.m[3][2] = 0.0f;
+		M.m[3][3] = 1.0f;
+		return M;
+#endif
+	}
 //=====================================================================
 } // namespace math
 } // namespace atma

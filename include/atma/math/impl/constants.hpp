@@ -41,6 +41,11 @@ namespace math {
 	__m128 const xmmd_identity_r2_ps = _mm_setr_ps(0.f, 0.f, 1.f, 0.f);
 	__m128 const xmmd_identity_r3_ps = _mm_setr_ps(0.f, 0.f, 0.f, 1.f);
 
+	__m128 const xmmd_neg_x_ps = _mm_setr_ps(-1.f, 0.f, 0.f, 0.f);
+	__m128 const xmmd_neg_y_ps = _mm_setr_ps(0.f, -1.f, 0.f, 0.f);
+	__m128 const xmmd_neg_z_ps = _mm_setr_ps(0.f, 0.f, -1.f, 0.f);
+	__m128 const xmmd_neg_w_ps = _mm_setr_ps(0.f, 0.f, 0.f, -1.f);
+
 
 	// SERIOUSLY, find a better spot for this
 	inline auto _am_select_ps(__m128 const& a, __m128 const& b, __m128 const& mask) -> __m128
@@ -50,7 +55,7 @@ namespace math {
 
 	inline auto _am_load_f32x4(float f0, float f1, float f2, float f3) -> __m128
 	{
-		__declspec(align(16)) float fs[] = {f3, f2, f1, f0};
+		__declspec(align(16)) float fs[] = {f0, f1, f2, f3};
 		return _mm_load_ps(fs);
 	}
 
