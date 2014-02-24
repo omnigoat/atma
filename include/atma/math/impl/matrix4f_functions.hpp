@@ -66,6 +66,30 @@ namespace math {
 
 	inline auto perspective_fov(float fov, float aspect, float near, float far) -> matrix4f
 	{
+#ifdef ATMA_MATH_USE_SSE
+		float sin_fov, cos_fov;
+		retrieve_sin_cos(sin_fov, cos_fov, 0.5f * fov);
+
+		float range = far / (far-near);
+		float scale = cos_fov / sin_fov;
+
+		auto zero = _mm_setzero_ps();
+		auto values = vector4f(scale / aspect, scale, range, -range * near);
+		// range,-range * near,0,1.0f
+		auto values2 = _mm_shuffle_ps(values.xmmd(), xmmd_identity_r3_ps, _MM_SHUFFLE(3, 2, 3, 2));
+
+		// scale/aspect,0,0,0
+		return matrix4f(
+			// cos(fov)/sin(fov), 0, 0, 0
+			_mm_move_ss(zero, values.xmmd()),
+			// 0, height/aspect, 0, 0
+			_mm_and_ps(values.xmmd(), xmmd_mask_0100_ps),
+			// 0, 0, range, 1.f
+			_mm_shuffle_ps(zero, values2, _MM_SHUFFLE(3, 0, 0, 0)),
+			// 0, 0, -range*near, 0
+			_mm_shuffle_ps(zero, values2, _MM_SHUFFLE(2, 1, 0, 0))
+		);
+#else
 		//
 		// General form of the Projection Matrix
 		//
@@ -96,6 +120,7 @@ namespace math {
 		result[3][3] = 0;
 
 		return result;
+#endif
 	}
 
 
