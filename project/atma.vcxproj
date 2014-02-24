@@ -50,6 +50,7 @@
     <ClInclude Include="..\include\atma\math\impl\vector4i_declaration.hpp" />
     <ClInclude Include="..\include\atma\math\impl\vector4i_definition.hpp" />
     <ClInclude Include="..\include\atma\math\matrix4f.hpp" />
+    <ClInclude Include="..\include\atma\math\scalar.hpp" />
     <ClInclude Include="..\include\atma\math\vector4f.hpp" />
     <ClInclude Include="..\include\atma\math\vector4i.hpp" />
     <ClInclude Include="..\include\atma\string.hpp" />
