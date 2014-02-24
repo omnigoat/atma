@@ -6,11 +6,23 @@
 //=====================================================================
 #ifdef ATMA_MATH_USE_SSE
 #include <xmmintrin.h>
+#undef min
+#undef max
+#undef near
+#undef far
 #endif
 //=====================================================================
 namespace atma {
 namespace math {
 //=====================================================================
+
+	float const pi = 3.141592654f;
+	float const two_pi = 6.283185307f;
+	float const one_over_pi = 0.318309886f;
+	float const one_over_two_pi = 0.159154943f;
+	float const pi_over_two = 1.570796327f;
+	float const pi_over_four = 0.785398163f;
+
 #ifdef ATMA_MATH_USE_SSE
 
 	__m128 const xmmd_zero_ps = _mm_setzero_ps();
