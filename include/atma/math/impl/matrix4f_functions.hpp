@@ -51,7 +51,7 @@ namespace math {
 		float nn = near + near;
 		float range = far / (far - near);
 
-		__m128 rmem = _am_load_f32x4(-range * near, range, nn / height, nn / width);
+		__m128 rmem = _am_load_ps(-range * near, range, nn / height, nn / width);
 		__m128 t0 = _mm_setzero_ps();
 
 		__m128 r0 = _mm_move_ss(t0, rmem);
@@ -73,21 +73,20 @@ namespace math {
 		float range = far / (far-near);
 		float scale = cos_fov / sin_fov;
 
-		auto zero = _mm_setzero_ps();
-		auto values = _am_load_f32x4(scale / aspect, scale, range, -range * near);
+		auto values = _am_load_ps(scale / aspect, scale, range, -range * near);
 		// range,-range * near,0,1.0f
 		auto values2 = _mm_shuffle_ps(values, xmmd_identity_r3_ps, _MM_SHUFFLE(3, 2, 3, 2));
 
 		// scale/aspect,0,0,0
 		return matrix4f(
 			// cos(fov)/sin(fov), 0, 0, 0
-			_mm_move_ss(zero, values),
+			_mm_move_ss(xmmd_zero_ps, values),
 			// 0, height/aspect, 0, 0
 			_mm_and_ps(values, xmmd_mask_0100_ps),
 			// 0, 0, range, 1.f
-			_mm_shuffle_ps(zero, values2, _MM_SHUFFLE(3, 0, 0, 0)),
+			_mm_shuffle_ps(xmmd_zero_ps, values2, _MM_SHUFFLE(3, 0, 0, 0)),
 			// 0, 0, -range*near, 0
-			_mm_shuffle_ps(zero, values2, _MM_SHUFFLE(2, 1, 0, 0))
+			_mm_shuffle_ps(xmmd_zero_ps, values2, _MM_SHUFFLE(2, 1, 0, 0))
 		);
 #else
 		//

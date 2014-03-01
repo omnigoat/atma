@@ -53,7 +53,7 @@ namespace math {
 		return _mm_or_ps(_mm_andnot_ps(mask, a), _mm_and_ps(b, mask));
 	}
 
-	inline auto _am_load_f32x4(float f0, float f1, float f2, float f3) -> __m128
+	inline auto _am_load_ps(float f0, float f1, float f2, float f3) -> __m128
 	{
 		__declspec(align(16)) float fs[] = {f0, f1, f2, f3};
 		return _mm_load_ps(fs);
