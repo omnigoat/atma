@@ -1,5 +1,4 @@
-#ifndef ATMA_THREAD_ENGINE_HP
-#define ATMA_THREAD_ENGINE_HP
+#pragma once
 //=====================================================================
 #include <atma/lockfree/queue.hpp>
 #include <vector>
@@ -13,6 +12,7 @@ namespace thread {
 	struct engine_t
 	{
 		typedef std::function<void()> signal_t;
+		typedef atma::lockfree::queue_t<signal_t> queue_t;
 
 		engine_t();
 		~engine_t();
@@ -25,9 +25,8 @@ namespace thread {
 		auto reenter(std::atomic_bool const& blocked) -> void;
 
 		std::thread handle_;
+		queue_t queue_, evergreen_;
 		bool running_;
-		atma::lockfree::queue_t<signal_t> queue_;
-		atma::lockfree::queue_t<signal_t> evergreen_;
 	};
 
 
@@ -108,6 +107,3 @@ namespace thread {
 } // namespace thread
 } // namespace atma
 //=====================================================================
-#endif // inclusion guard
-//=====================================================================
-
