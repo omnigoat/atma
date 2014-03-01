@@ -158,7 +158,7 @@ namespace math {
 	//=====================================================================
 	inline auto operator * (matrix4f const& lhs, float f) -> matrix4f
 	{
-		__m128 ss = _am_load_f32x4(f, f, f, f);
+		__m128 ss = _am_load_ps(f, f, f, f);
 
 		__m128 r0 = _mm_mul_ps(lhs.xmmd(0), ss),
 		       r1 = _mm_mul_ps(lhs.xmmd(1), ss),
@@ -171,7 +171,7 @@ namespace math {
 
 	inline auto operator / (matrix4f const& lhs, float f) -> matrix4f
 	{
-		__m128 ss = _am_load_f32x4(f, f, f, f);
+		__m128 ss = _am_load_ps(f, f, f, f);
 
 		__m128 r0 = _mm_div_ps(lhs.xmmd(0), ss),
 			   r1 = _mm_div_ps(lhs.xmmd(1), ss),
