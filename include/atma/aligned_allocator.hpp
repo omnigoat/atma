@@ -1,17 +1,13 @@
 #pragma once
 //======================================================================
 #include <atma/types.hpp>
+#include <atma/platform/allocation.hpp>
 
 #include <cstdint>
 //======================================================================
 namespace atma {
 //======================================================================
 	
-	namespace detail {
-		auto allocate_aligned_memory(uint32 alignment, uint32 size) -> void*;
-		auto deallocate_aligned_memory(void*) -> void;
-	}
-
 	template <typename T, uint32 A>
 	struct aligned_allocator_t;
 
@@ -84,7 +80,7 @@ namespace atma {
 	inline auto aligned_allocator_t<T, A>::allocate(size_type n, typename aligned_allocator_t<void, A>::const_pointer = 0) -> pointer
 	{
 		size_type const alignment = static_cast<size_type>(A);
-		void* ptr = detail::allocate_aligned_memory(alignment, n * sizeof(T));
+		void* ptr = platform::allocate_aligned_memory(alignment, n * sizeof(T));
 		if (ptr == nullptr) {
 			throw std::bad_alloc();
 		}
@@ -94,7 +90,7 @@ namespace atma {
 
 	template <typename T, uint32 A>
 	inline auto aligned_allocator_t<T, A>::deallocate(pointer p, size_type) -> void {
-		detail::deallocate_aligned_memory(p);
+		platform::deallocate_aligned_memory(p);
 	}
 
 
@@ -115,32 +111,6 @@ namespace atma {
 
 
 
-
-	//======================================================================
-	// PLATFORM STUFF
-	//======================================================================
-	namespace detail
-	{
-		#ifdef ATMA_PLATFORM_WIN32
-			inline auto allocate_aligned_memory(uint32 align, uint32 size) -> void*
-			{
-				ATMA_ASSERT(align >= sizeof(void*));
-				//ATMA_ASSERT(nail::is_power_of_two(align));
-
-				if (size == 0) {
-					return nullptr;
-				}
-
-				return _aligned_malloc(size, align);
-			}
-
-
-			inline auto deallocate_aligned_memory(void *ptr) -> void
-			{
-				return _aligned_free(ptr);
-			}
-		#endif
-	}
 
 //======================================================================
 } // namespace atma

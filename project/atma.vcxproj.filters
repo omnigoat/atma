@@ -38,6 +38,9 @@
     <Filter Include="include\thread">
       <UniqueIdentifier>{ed4438da-80b5-405f-9b06-d7ee5e25a7bf}</UniqueIdentifier>
     </Filter>
+    <Filter Include="include\platform">
+      <UniqueIdentifier>{4b60b3f3-e111-4d4f-a0b4-891b036c28bc}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\atma\algorithm.hpp">
@@ -177,6 +180,12 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\math\scalar.hpp">
       <Filter>include\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\platform\allocation.hpp">
+      <Filter>include\platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\shared_memory.hpp">
+      <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
