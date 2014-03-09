@@ -53,6 +53,8 @@
     <ClInclude Include="..\include\atma\math\scalar.hpp" />
     <ClInclude Include="..\include\atma\math\vector4f.hpp" />
     <ClInclude Include="..\include\atma\math\vector4i.hpp" />
+    <ClInclude Include="..\include\atma\platform\allocation.hpp" />
+    <ClInclude Include="..\include\atma\shared_memory.hpp" />
     <ClInclude Include="..\include\atma\string.hpp" />
     <ClInclude Include="..\include\atma\thread\engine.hpp" />
     <ClInclude Include="..\include\atma\types.hpp" />

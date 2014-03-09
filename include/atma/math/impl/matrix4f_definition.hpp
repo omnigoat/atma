@@ -186,6 +186,13 @@ namespace math {
 		);
 	}
 
+	inline auto matrix4f::inverted() const -> matrix4f
+	{
+		auto r = *this;
+		r.invert();
+		return r;
+	}
+
 	inline auto matrix4f::invert() -> void
 	{
 		auto t = this->transposed();
