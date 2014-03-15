@@ -41,7 +41,7 @@ namespace atma {
 
 	private:
 		char* data_;
-		uint* ref_;
+		std::atomic_int32_t* ref_;
 	};
 
 
@@ -52,38 +52,25 @@ namespace atma {
 	}
 
 	inline shared_memory::shared_memory(uint size)
-		: data_(new char[size + sizeof(int)]),
-		  ref_((uint*)(data_ + size))
+		: shared_memory(4, size)
 	{
-		// set refcount to 1
-		*ref_ = 1;
 	}
 
 	inline shared_memory::shared_memory(uint size, void* data)
-		: data_(new char[size + sizeof(int)]),
-		  ref_((uint*)(data_ + size))
+		: shared_memory(4, size, data)
 	{
-		// set refcount to 1
-		*ref_ = 1;
-
-		memcpy(data_, data, size);
 	}
 
 	inline shared_memory::shared_memory(uint alignment, uint size)
-		: data_((char*)platform::allocate_aligned_memory(alignment, size + sizeof(int))),
-		  ref_((uint*)(data_ + size))
+		: data_((char*)platform::allocate_aligned_memory(alignment, size + sizeof(std::atomic_int32_t))),
+		  ref_(new (data_ + size) std::atomic_int32_t{1})
 	{
-		// set refcount to 1
-		*ref_ = 1;
 	}
 
 	inline shared_memory::shared_memory(uint alignment, uint size, void* data)
-		: data_((char*)platform::allocate_aligned_memory(alignment, size + sizeof(int))),
-		  ref_((uint*)(data_ + size))
+		: data_((char*)platform::allocate_aligned_memory(alignment, size + sizeof(std::atomic_int32_t))),
+		  ref_(new (data_ + size) std::atomic_int32_t{1})
 	{
-		// set refcount to 1
-		*ref_ = 1;
-
 		memcpy(data_, data, size);
 	}
 
@@ -143,7 +130,7 @@ namespace atma {
 	{
 		if (ref_ && --*ref_ == 0)
 		{
-			delete [] data_;
+			atma::platform::deallocate_aligned_memory(data_);
 			data_ = nullptr;
 			ref_ = nullptr;
 		}
