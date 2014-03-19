@@ -1,5 +1,4 @@
-#ifndef ATMA_UTF_UTF8_STRING_IMPLEMENTATION_HPP
-#define ATMA_UTF_UTF8_STRING_IMPLEMENTATION_HPP
+#pragma once
 //=====================================================================
 #include <atma/utf/utf8_string_header.hpp>
 #include <atma/utf/utf8_string_range_header.hpp>
@@ -11,29 +10,17 @@ namespace atma {
 	// utf8_string_range_t implementation
 	//=====================================================================
 	inline utf8_string_t::utf8_string_t()
-	: char_count_()
 	{
 	}
 
 	inline utf8_string_t::utf8_string_t(char const* begin, char const* end)
-	: chars_(begin, end), char_count_()
+	: chars_(begin, end)
 	{
-		for (char x : chars_) {
-			if (is_utf8_leading_byte(x))
-				++char_count_;
-		}
 	}
 
 	inline utf8_string_t::utf8_string_t(char const* str)
-	: char_count_()
+	: utf8_string_t(str, str + strlen(str))
 	{
-		ATMA_ASSERT(str != nullptr);
-
-		for (char const* i = str; *i != '\0'; ++i) {
-			chars_.push_back(*i);
-			if (is_utf8_leading_byte(*i))
-				++char_count_;
-		}
 	}
 
 #if 0
@@ -48,16 +35,22 @@ namespace atma {
 	}
 #endif
 
-	inline utf8_string_t::utf8_string_t(const utf8_string_t& rhs)
-	: chars_(rhs.chars_), char_count_(rhs.char_count_)
+	inline utf8_string_t::utf8_string_t(utf8_string_t const& rhs)
+	: chars_(rhs.chars_)
 	{
 	}
 
 	inline utf8_string_t::utf8_string_t(utf8_string_t&& rhs)
-	: chars_(std::move(rhs.chars_)), char_count_(rhs.char_count_)
+	: chars_(std::move(rhs.chars_))
 	{
 	}
-	
+
+	inline auto utf8_string_t::operator += (utf8_string_t const& rhs) -> utf8_string_t&
+	{
+		chars_.insert(chars_.end(), rhs.bytes_begin(), rhs.bytes_end());
+		return *this;
+	}
+
 	inline auto utf8_string_t::begin() const -> const_iterator {
 		return const_iterator(*this, bytes_begin());
 	}
@@ -74,6 +67,11 @@ namespace atma {
 		return iterator(*this, bytes_end());
 	}
 
+	inline auto utf8_string_t::push_back(char c) -> void {
+		// only valid for code-points < 128
+		ATMA_ASSERT(c < 128);
+		chars_.push_back(c);
+	}
 
 	//=====================================================================
 	// operators
@@ -116,7 +114,7 @@ namespace atma {
 	//=====================================================================
 	inline auto find_first_of(utf8_string_t const& str, utf8_string_t::const_iterator const& i, char x) -> utf8_string_t::const_iterator
 	{
-		ATMA_ASSERT(is_ascii(x));
+		ATMA_ASSERT(utf8_char_is_ascii(x));
 
 		auto i2 = std::find(i->begin, str.bytes_end(), x);
 		return{str, i2};
@@ -130,6 +128,4 @@ namespace atma {
 
 //=====================================================================
 } // namespace atma
-//=====================================================================
-#endif // inclusion guard
 //=====================================================================

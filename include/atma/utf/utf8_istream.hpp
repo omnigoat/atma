@@ -22,7 +22,7 @@ namespace atma {
 		utf8_stringbuf(char const* begin, char const* end)
 		: begin_(begin), end_(end), current_begin_(begin), current_end_(begin)
 		{
-			ATMA_ASSERT( is_utf8_leading_byte(*current_begin_) );
+			ATMA_ASSERT( utf8_char_is_leading(*current_begin_) );
 			if (!eof()) {
 				bump();
 			}

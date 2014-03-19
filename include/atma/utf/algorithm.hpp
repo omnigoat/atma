@@ -1,51 +1,75 @@
-#ifndef ATMA_UTF_ALGORITHM
-#define ATMA_UTF_ALGORITHM
+#pragma once
 //=====================================================================
+#include <atma/types.hpp>
 #include <atma/assert.hpp>
 //=====================================================================
 namespace atma {
 //=====================================================================
 	
-	inline bool is_utf8_leading_byte(char const c) {
-		return (c & 0xc0) != 0xa0;
-	}
-
-	inline auto is_ascii(char const c) -> bool {
-		return (c & 0x80) == 0;
-	}
-
-	inline char const* utf8_next_char(char const* begin)
+	namespace detail
 	{
+		int const char_seq_length_table[] =
+		{
+			// ascii
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+
+			// run-on bytes. zero I guess.
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+
+			// first two are invalid, rest are two-byte
+			-1, -1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+			2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+
+			// three byte!
+			3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+
+			4, 4, 4, 4, 4, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		};
+	}
+
+	// there are a few values that are just not allowed anywhere in an utf8 encoding.
+	inline auto is_valid_utf8_char(char const c) -> bool
+	{
+		return detail::char_seq_length_table[c] != -1;
+	}
+
+	// c in [0, 128)
+	inline auto utf8_char_is_ascii(char const c) -> bool {
+		return detail::char_seq_length_table[c] == 1;
+	}
+
+	// c is a valid utf8 char and the leading byte of a multi-byte sequence
+	inline auto utf8_char_is_leading(char const c) -> bool {
+		return detail::char_seq_length_table[c] > 1;
+	}
+
+	// return how many bytes we need to advance, assuming we're at a leading byte
+	inline auto utf8_charseq_length(char const* leading) -> bool {
+		ATMA_ASSERT(leading);
+		ATMA_ENSURE(utf8_char_is_leading(*leading));
+		return detail::char_seq_length_table[*leading];
+	}
+
+	inline auto utf8_charseq_advance(char const* begin) -> char const* {
 		ATMA_ASSERT(begin);
-		ATMA_ASSERT(*begin != '\0');
-		
-		// in the middle of a byte sequence, iterate until we are no longer
-		if ((*begin & 0xe0) == 0xc0) {
-			while ((*begin & 0xe0) == 0xc0)
-				++begin;
-		}
-		// at the leading byte of a sequence, use its information
-		else {
-			char marker = *begin;
-			++begin;
-			while (marker & 0x80) {
-				marker <<= 1; ++begin;
-			}
-		}
-
-		return begin;
-	}
-	
-	inline auto utf8_next_char(char* begin) -> char*
-	{
-		return const_cast<char*>(utf8_next_char(const_cast<char const*>(begin)));
+		return begin + utf8_charseq_length(begin);
 	}
 
 
 	template <typename OT, typename IT>
 	inline OT utf16_from_utf8(OT dest, IT begin, IT end)
 	{
-		static_assert(std::is_convertible<decltype(*begin), char const>::value, "type of input iterators must be char");
+		static_assert(std::is_convertible<decltype(*begin), char const>::value, "value_type of input iterators must be char");
 
 		for (auto i = begin; i != end; ++i)
 		{
@@ -95,6 +119,4 @@ namespace atma {
 
 //=====================================================================
 } // namespace atma
-//=====================================================================
-#endif // inclusion guard
 //=====================================================================
