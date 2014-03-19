@@ -46,7 +46,7 @@ namespace atma {
 	inline auto operator == (utf8_char_t const& lhs, char x) -> bool {
 		// it only makes sense to compare a character against a character, and
 		// not a character against a leading-byte in a char-seq.
-		ATMA_ASSERT(is_ascii(x));
+		ATMA_ASSERT(utf8_char_is_ascii(x));
 
 		return *lhs.begin == x;
 	}
@@ -68,7 +68,7 @@ namespace atma {
 		utf8_string_t(utf8_string_t const&);
 		utf8_string_t(utf8_string_t&&);
 
-		
+		auto operator += (utf8_string_t const& rhs) -> utf8_string_t&;
 
 		auto empty() const -> bool { return chars_.empty(); }
 		auto bytes() const -> size_t { return chars_.size(); }
@@ -83,26 +83,11 @@ namespace atma {
 		auto bytes_begin() -> char* { return &chars_[0]; }
 		auto bytes_end() -> char* { return &chars_[0] + chars_.size(); }
 
-		// push back a single character is valid only for code-points < 128
-		auto push_back(char c) -> void { 
-			ATMA_ASSERT(c ^ 0x80);
-			chars_.push_back(c);
-			++char_count_;
-		}
-
-		//auto insert()
-
-		auto operator += (utf8_string_t const& rhs) -> utf8_string_t&
-		{
-			chars_.insert(chars_.end(), rhs.bytes_begin(), rhs.bytes_end());
-			return *this;
-		}
+		auto push_back(char c) -> void;
 
 	private:
 		typedef std::vector<value_t> chars_t;
 		chars_t chars_;
-		uint32 char_count_;
-
 
 		friend class utf16_string_t;
 		friend auto operator < (utf8_string_t const& lhs, utf8_string_t const& rhs) -> bool;
