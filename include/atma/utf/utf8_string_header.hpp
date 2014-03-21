@@ -20,36 +20,7 @@ namespace atma {
 	
 
 
-	struct utf8_char_t
-	{
-		utf8_char_t(char const* begin, char const* end)
-		: begin(begin), end(end)
-		{}
-
-		auto operator = (utf8_char_t const& rhs) -> utf8_char_t&
-		{
-			begin = rhs.begin;
-			end = rhs.end;
-			return *this;
-		}
-
-		char const* begin;
-		char const* end;
-	};
-
-	inline auto operator == (utf8_char_t const& lhs, utf8_char_t const& rhs) -> bool {
-		return (lhs.end - lhs.begin) == (rhs.end - rhs.begin)
-			&& std::equal(lhs.begin, lhs.end, rhs.begin)
-			;
-	}
-
-	inline auto operator == (utf8_char_t const& lhs, char x) -> bool {
-		// it only makes sense to compare a character against a character, and
-		// not a character against a leading-byte in a char-seq.
-		ATMA_ASSERT(utf8_char_is_ascii(x));
-
-		return *lhs.begin == x;
-	}
+	
 
 
 	class utf8_string_t

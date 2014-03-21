@@ -1,34 +1,19 @@
-//=====================================================================
-//
-//
-//
-//=====================================================================
-#ifndef ATMA_UNITTEST_COMPILE_HPP
-#define ATMA_UNITTEST_COMPILE_HPP
+#pragma once
 //=====================================================================
 #include <atma/unittest/unittest.hpp>
 //=====================================================================
-namespace atma {
-namespace unittest {
-namespace detail {
-//=====================================================================
-	
+namespace atma { namespace unittest { namespace detail {
+
 	//=====================================================================
 	// entry point for verification
 	//=====================================================================
-	inline void compile(tests_t::iterator begin, tests_t::iterator end, checks_t& output)
+	inline auto compile(tests_t::iterator const& begin, tests_t::iterator const& end, checks_t& output) -> void
 	{
 		for (tests_t::iterator i = begin; i != end; ++i) {
 			test_t& test = **i;
 			test.run(output);
 		}
 	}
-	
-//=====================================================================
-} // namespace detail
-} // namespace unittest
-} // namespace atma
-//=====================================================================
-#endif // inclusion guard
-//=====================================================================
+
+} } }
 
