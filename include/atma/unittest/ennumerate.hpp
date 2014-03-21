@@ -82,6 +82,7 @@ namespace unittest {
 						++results.tests_failed;
 						current_test_failed_checks = 0;
 					}
+
 					current_test = i->test_name;
 				}
 				
@@ -93,11 +94,16 @@ namespace unittest {
 				++results.checks_performed;
 			}
 			
+			++results.tests_run;
+			if (current_test_failed_checks > 0) {
+				++current_suite_failed_tests;
+				++results.tests_failed;
+			}
+
 			// we perform this since we won't ennumerate the last suite in the list otherwise
 			++results.suites_run;
 			if (current_suite_failed_tests > 0) {
 				++results.suites_failed;
-				current_suite_failed_tests = 0;
 			}
 			
 			return results;

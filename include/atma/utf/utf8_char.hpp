@@ -60,7 +60,7 @@ namespace atma {
 			4, 4, 4, 4, 4, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 		};
 
-		char const null_byte = '\0';
+		char const zero_byte = '\0';
 	}
 
 	// there are a few values that are just not allowed anywhere in an utf8 encoding.
@@ -98,7 +98,7 @@ namespace atma {
 	struct utf8_char_t
 	{
 		utf8_char_t()
-			: begin(&detail::null_byte), end(&detail::null_byte + 1)
+			: begin(&detail::zero_byte), end(&detail::zero_byte + 1)
 		{}
 
 		utf8_char_t(char const* begin, char const* end)

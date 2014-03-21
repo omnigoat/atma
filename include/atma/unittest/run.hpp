@@ -9,7 +9,6 @@
 #include <iomanip>
 #include <iostream>
 //=====================================================================
-#include <atma/time.hpp>
 #include <atma/unittest/unittest.hpp>
 #include <atma/unittest/ennumerate.hpp>
 #include <atma/unittest/compile.hpp>
@@ -59,8 +58,10 @@ namespace unittest {
 
 	inline results_t run(const run_type& run_type = all_tests(), const detail::emitter_type& emit_type = flat_emitter(), std::ostream& output = std::cerr)
 	{
+#ifdef TIME_ALL_THE_THINGS
 		atma::time_t start = atma::time();
-		
+#endif
+
 		//detail::output_stream_ptr() = &output;
 		detail::checks_t checks;
 		detail::buffer_t buffer;
@@ -74,23 +75,36 @@ namespace unittest {
 			(*emit_type)(buffer, checks.begin(), checks.end());
 		}
 		
+#ifdef TIME_ALL_THE_THINGS
 		atma::time_t end = atma::time();
-		
-		for (detail::buffer_t::const_iterator i = buffer.begin(); i != buffer.end(); ++i)
-		{
-			output << *i;
-		}
-		
+#endif
+
+		output << "\n-------------------------------------------------" << std::endl;
 		if (results.checks_failed > 0)
 			output
-				<< "Atma.UnitTest: " 
-				<< results.tests_failed << " tests failed" << std::endl;
+				<< "atma::unittest [FAIL]: " 
+				<< results.tests_failed << "/" << results.tests_run << " tests failed" << std::endl;
 		else
+#ifdef TIME_ALL_THE_THINGS
 			output 
 				<< "Atma.UnitTest: " << results.tests_run << " tests passed in "
 				<< std::setprecision(2) << std::fixed << atma::convert_time_to_seconds(end - start) << "s"
 				<< std::endl;
+#else
+			output
+				<< "atma::unittest [PASS]: " << results.tests_run << " tests passed" << std::endl;
+#endif
 		
+		output << "-------------------------------------------------" << std::endl;
+		for (detail::buffer_t::const_iterator i = buffer.begin(); i != buffer.end(); ++i)
+		{
+			output << "  " << *i;
+		}
+		output << std::endl;
+
+		if (results.tests_failed > 30)
+			output << "  (" << results.tests_failed << " tests failed)\n" << std::endl;
+
 		return results;
 	}
 
