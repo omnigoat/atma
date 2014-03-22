@@ -1,13 +1,8 @@
-//=====================================================================
-//
-//
-//
-//=====================================================================
-#ifndef ATMA_INTRUSIVE_PTR_HPP
-#define ATMA_INTRUSIVE_PTR_HPP
+#pragma once
 //=====================================================================
 #include <atma/assert.hpp>
 #include <atomic>
+#include <type_traits>
 //=====================================================================
 namespace atma {
 //=====================================================================
@@ -34,31 +29,22 @@ namespace atma {
 		ref_counted() : ref_count_() {}
 
 	private:
-		std::atomic_uint32_t ref_count_;
+		mutable std::atomic_uint32_t ref_count_;
 
-		friend auto add_ref_count(ref_counted*) -> void;
-		friend auto rm_ref_count(ref_counted*) -> void;
-	};
-
-
-
-	//=====================================================================
-	// add/rm_ref_count
-	// ------------------
-	//   called by intrusive_ptr
-	//=====================================================================
-	inline auto add_ref_count(ref_counted* t) -> void {
-		t && ++t->ref_count_;
-	}
-
-	inline auto rm_ref_count(ref_counted* t) -> void {
-		ATMA_ASSERT(!t || t->ref_count_ >= 0);
-
-		if (t && --t->ref_count_ == 0) {
-			delete t;
+		static auto add_ref(ref_counted const* t) -> void {
+			t && ++t->ref_count_;
 		}
-	}
 
+		static auto rm_ref(ref_counted const* t) -> void {
+			ATMA_ASSERT(!t || t->ref_count_ >= 0);
+
+			if (t && --t->ref_count_ == 0) {
+				delete t;
+			}
+		}
+
+		template <typename> friend struct intrusive_ptr;
+	};
 
 
 	//=====================================================================
@@ -78,75 +64,58 @@ namespace atma {
 		explicit intrusive_ptr(T* t)
 		: px(t)
 		{
-			add_ref_count(t);
+			ref_counted::add_ref(t);
 		}
 
-		intrusive_ptr(intrusive_ptr<T> const& rhs)
+		intrusive_ptr(intrusive_ptr const& rhs)
 		: px(rhs.px)
 		{
-			add_ref_count(px);
+			ref_counted::add_ref(px);
 		}
 
-		//template <typename Y>
-		//intrusive_ptr(intrusive_ptr<Y> const& rhs)
-		//: px(static_cast<T*>(rhs.px))
-		//{
-		//	add_ref_count(px);
-		//}
+		template <class Y = typename std::enable_if<std::is_const<T>::value, typename std::remove_const<T>::type>::type>
+		intrusive_ptr(intrusive_ptr<Y> const& rhs)
+		: px(rhs.px)
+		{
+			ref_counted::add_ref(px);
+		}
+		
+		intrusive_ptr(intrusive_ptr<T>&& rhs)
+		: px(rhs.px)
+		{
+			rhs.px = nullptr;
+		}
 
-		//intrusive_ptr(intrusive_ptr<T>&& rhs)
-		//: px(rhs.px)
-		//{
-		//	rhs.px = nullptr;
-		//}
-
-		//template <typename Y>
-		//intrusive_ptr(intrusive_ptr<Y>&& rhs)
-		//: px(static_cast<T*>(rhs.px))
-		//{
-		//	rhs.px = nullptr;
-		//}
+		template <class Y = typename std::enable_if<std::is_const<T>::value, typename std::remove_const<T>::type>::type>
+		intrusive_ptr(intrusive_ptr<Y>&& rhs)
+		: px(rhs.px)
+		{
+			rhs.px = nullptr;
+		}
 
 		~intrusive_ptr() {
-			rm_ref_count(px);
+			ref_counted::rm_ref(px);
 		}
 
 		// operators
 		auto operator = (intrusive_ptr const& rhs) -> intrusive_ptr&
 		{
 			ATMA_ASSERT(this != &rhs);
-			//if (this == &rhs)
-				//return *this;
-			add_ref_count(rhs.px);
-			rm_ref_count(px);
+			ref_counted::add_ref(rhs.px);
+			ref_counted::rm_ref(px);
 			px = rhs.px;
-			
 			return *this;
 		}
 
-		//template <typename Y>
-		//auto operator = (intrusive_ptr<Y> const& rhs) -> intrusive_ptr& {
-		//	rm_ref_count(px);
-		//	px = static_cast<T*>(rhs.px);
-		//	add_ref_count(px);
-		//	return *this;
-		//}
-
-		//template <typename Y>
-		//auto operator = (intrusive_ptr<Y>&& rhs) -> intrusive_ptr& {
-		//	rm_ref_count(px);
-		//	px = static_cast<T*>(rhs.px);
-		//	rhs.px = nullptr;
-		//	return *this;
-		//}
-
-		//template <typename Y>
-		//auto operator = (Y* y) -> intrusive_ptr& {
-		//	rm_ref_count(px);
-		//	px = static_cast<T*>(y);
-		//	add_ref_count(px);
-		//	return *this;
-		//}
+		template <class Y = typename std::enable_if<std::is_const<T>::value, typename std::remove_const<T>::type>::type>
+		auto operator = (intrusive_ptr<Y> const& rhs) -> intrusive_ptr&
+		{
+			ATMA_ASSERT(this != &rhs);
+			ref_counted::add_ref(rhs.px);
+			ref_counted::rm_ref(px);
+			px = rhs.px;
+			return *this;
+		}
 
 		auto operator * () const -> T& {
 			return *px;
@@ -198,6 +167,4 @@ namespace atma {
 
 //=====================================================================
 } // namespace atma
-//=====================================================================
-#endif // inclusion guard
 //=====================================================================
