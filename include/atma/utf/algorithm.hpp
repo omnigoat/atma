@@ -1,70 +1,13 @@
 #pragma once
 //=====================================================================
+#include <atma/utf/utf8_char.hpp>
+
 #include <atma/types.hpp>
 #include <atma/assert.hpp>
 //=====================================================================
 namespace atma {
 //=====================================================================
 	
-	namespace detail
-	{
-		int const char_seq_length_table[] =
-		{
-			// ascii
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-
-			// run-on bytes. zero I guess.
-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-			// first two are invalid, rest are two-byte
-			-1, -1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-			2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-
-			// three byte!
-			3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-
-			4, 4, 4, 4, 4, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-		};
-	}
-
-	// there are a few values that are just not allowed anywhere in an utf8 encoding.
-	inline auto is_valid_utf8_char(char const c) -> bool
-	{
-		return detail::char_seq_length_table[c] != -1;
-	}
-
-	// c in [0, 128)
-	inline auto utf8_char_is_ascii(char const c) -> bool {
-		return detail::char_seq_length_table[c] == 1;
-	}
-
-	// c is a valid utf8 char and the leading byte of a multi-byte sequence
-	inline auto utf8_char_is_leading(char const c) -> bool {
-		return detail::char_seq_length_table[c] > 1;
-	}
-
-	// return how many bytes we need to advance, assuming we're at a leading byte
-	inline auto utf8_charseq_length(char const* leading) -> bool {
-		ATMA_ASSERT(leading);
-		ATMA_ENSURE(utf8_char_is_leading(*leading));
-		return detail::char_seq_length_table[*leading];
-	}
-
-	inline auto utf8_charseq_advance(char const* begin) -> char const* {
-		ATMA_ASSERT(begin);
-		return begin + utf8_charseq_length(begin);
-	}
-
 
 	template <typename OT, typename IT>
 	inline OT utf16_from_utf8(OT dest, IT begin, IT end)
