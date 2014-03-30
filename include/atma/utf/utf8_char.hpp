@@ -80,9 +80,9 @@ namespace atma {
 	}
 
 	// return how many bytes we need to advance, assuming we're at a leading byte
-	inline auto utf8_char_bytecount(char const* leading) -> bool {
+	inline auto utf8_char_bytecount(char const* leading) -> int {
 		ATMA_ASSERT(leading);
-		ATMA_ENSURE(utf8_char_is_leading(*leading));
+		ATMA_ENSURE(utf8_byte_is_leading(*leading));
 		return detail::char_length_table[*leading];
 	}
 
