@@ -3,6 +3,7 @@
 #include <atma/types.hpp>
 #include <atma/assert.hpp>
 #include <atma/utf/algorithm.hpp>
+#include <atma/utf/utf8_char.hpp>
 
 #include <string>
 #include <vector>
@@ -79,7 +80,7 @@ namespace atma {
 		typedef typename std::conditional<std::is_const<T>::value, char const*, char*>::type char_ptr;
 		
 		iterator_t(container_t& owner, decltype(std::declval<T>().begin) x)
-		: owner_(&owner), char_(x, utf8_next_char(x))
+			: owner_(&owner), char_(x, x + utf8_char_bytecount(x))
 		{}
 
 		iterator_t(iterator_t const& rhs)
