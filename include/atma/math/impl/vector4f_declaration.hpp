@@ -72,10 +72,13 @@ namespace math {
 		
 	private:
 #ifdef ATMA_MATH_USE_SSE
+#pragma warning(push)
+#pragma warning(disable: 4201)
 		union {
 			__m128 sd_;
 			struct { float x, y, z, w; };
 		};
+#pragma warning(pop)
 #else
 		float x, y, z, w;
 #endif

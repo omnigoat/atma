@@ -5,7 +5,9 @@
 #define ATMA_MATH_IMPL_CONSTANTS_HPP
 //=====================================================================
 #ifdef ATMA_MATH_USE_SSE
+#pragma warning(push,3)
 #include <xmmintrin.h>
+#pragma warning(pop)
 #undef min
 #undef max
 #undef near

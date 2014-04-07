@@ -90,7 +90,17 @@ namespace atma {
 			++char_count_;
 		}
 
-		//auto insert()
+		auto push_back(utf8_char_t const& c) -> void
+		{
+			for (auto i = c.begin; i != c.end; ++i) {
+				chars_.push_back(*i);
+			}
+		}
+
+		auto clear() -> void
+		{
+			chars_.clear();
+		}
 
 		auto operator += (utf8_string_t const& rhs) -> utf8_string_t&
 		{

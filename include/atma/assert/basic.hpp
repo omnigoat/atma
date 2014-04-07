@@ -17,10 +17,11 @@
 	//   string @msg and generates an assertion if !x, displaying the message.
 	//=====================================================================
 	#define ATMA_ASSERT_MSG(x, msg) \
-		do { \
+		for (;;) { \
 			if ( !(x) && ::atma::assert::detail::handle(msg, __FILE__, __LINE__) ) \
 				{ ATMA_DEBUGBREAK(); } \
-		} while (false)
+			break; \
+		}
 
 
 	//=====================================================================
