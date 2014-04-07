@@ -23,6 +23,8 @@ namespace impl {
 
 		typename storage_policy<typename std::decay<LHS>::type>::type lhs;
 		typename storage_policy<typename std::decay<RHS>::type>::type rhs;
+
+		binary_expr& operator = (binary_expr const&) = delete;
 	};
 		
 //=====================================================================

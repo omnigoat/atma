@@ -5,7 +5,9 @@
 #define ATMA_MATH_IMPL_EXPR_HPP
 //=====================================================================
 #include <atma/math/impl/element_type_of.hpp>
+#pragma warning(push,3)
 #include <xmmintrin.h>
+#pragma warning(pop)
 //=====================================================================
 namespace atma {
 namespace math {
