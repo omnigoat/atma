@@ -3,9 +3,8 @@
 #include <atma/types.hpp>
 #include <atma/platform/allocation.hpp>
 //=====================================================================
-namespace atma {
-//=====================================================================
-
+namespace atma
+{
 	struct shared_memory
 	{
 		explicit shared_memory();
@@ -24,16 +23,6 @@ namespace atma {
 		auto end() -> char*;
 		auto begin() const -> char const*;
 		auto end() const -> char const*;
-
-		template <typename T>
-		auto ref_at_as(uint offset) -> T& { 
-			return *(T*)&data_[offset];
-		}
-
-		template <typename T>
-		auto ref_at_as(uint offset) const -> T const& {
-			return *(T const*)&data_[offset];
-		}
 
 	private:
 		auto decrement() -> void;
@@ -142,8 +131,7 @@ namespace atma {
 			++*ref_;
 	}
 
-//=====================================================================
 }
-//=====================================================================
+
 
 
