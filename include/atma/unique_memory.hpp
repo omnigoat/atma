@@ -5,18 +5,18 @@
 //=====================================================================
 namespace atma
 {
-	struct unique_memory
+	struct unique_memory_t
 	{
-		explicit unique_memory();
-		explicit unique_memory(uint size);
-		unique_memory(uint size, void* data);
-		unique_memory(uint alignment, uint size);
-		unique_memory(uint alignment, uint size, void* data);
-		unique_memory(unique_memory&&);
-		~unique_memory();
+		explicit unique_memory_t();
+		explicit unique_memory_t(uint size);
+		unique_memory_t(uint size, void* data);
+		unique_memory_t(uint alignment, uint size);
+		unique_memory_t(uint alignment, uint size, void* data);
+		unique_memory_t(unique_memory_t&&);
+		~unique_memory_t();
 
-		unique_memory(unique_memory const&) = delete;
-		auto operator = (unique_memory const&) -> unique_memory& = delete;
+		unique_memory_t(unique_memory_t const&) = delete;
+		auto operator = (unique_memory_t const&) -> unique_memory_t& = delete;
 
 		auto operator *() -> void*;
 		auto operator *() const -> void const*;
@@ -33,66 +33,66 @@ namespace atma
 	};
 
 
-	inline unique_memory::unique_memory()
+	inline unique_memory_t::unique_memory_t()
 		: data_(), end_()
 	{
 		
 	}
 
-	inline unique_memory::unique_memory(uint size)
-		: unique_memory(4, size)
+	inline unique_memory_t::unique_memory_t(uint size)
+		: unique_memory_t(4, size)
 	{
 	}
 
-	inline unique_memory::unique_memory(uint size, void* data)
-		: unique_memory(4, size, data)
+	inline unique_memory_t::unique_memory_t(uint size, void* data)
+		: unique_memory_t(4, size, data)
 	{
 	}
 
-	inline unique_memory::unique_memory(uint alignment, uint size)
+	inline unique_memory_t::unique_memory_t(uint alignment, uint size)
 		: data_(platform::allocate_aligned_memory(alignment, size)), end_(reinterpret_cast<char*>(data_) + size)
 	{
 	}
 
-	inline unique_memory::unique_memory(uint alignment, uint size, void* data)
+	inline unique_memory_t::unique_memory_t(uint alignment, uint size, void* data)
 		: data_(platform::allocate_aligned_memory(alignment, size)), end_(reinterpret_cast<char*>(data_)+ size)
 	{
 		memcpy(data_, data, size);
 	}
 
-	inline unique_memory::unique_memory(unique_memory&& rhs)
+	inline unique_memory_t::unique_memory_t(unique_memory_t&& rhs)
 		: data_(rhs.data_), end_(rhs.end_)
 	{
 		rhs.data_ = nullptr;
 		rhs.end_ = nullptr;
 	}
 
-	inline unique_memory::~unique_memory()
+	inline unique_memory_t::~unique_memory_t()
 	{
 		platform::deallocate_aligned_memory(data_);
 	}
 
-	inline auto unique_memory::size() const -> uint
+	inline auto unique_memory_t::size() const -> uint
 	{
 		return reinterpret_cast<char const*>(end_) - reinterpret_cast<char const*>(data_);
 	}
 
-	inline auto unique_memory::begin() -> void*
+	inline auto unique_memory_t::begin() -> void*
 	{
 		return data_;
 	}
 
-	inline auto unique_memory::end() -> void*
+	inline auto unique_memory_t::end() -> void*
 	{
 		return end_;
 	}
 
-	inline auto unique_memory::begin() const -> void const*
+	inline auto unique_memory_t::begin() const -> void const*
 	{
 		return data_;
 	}
 
-	inline auto unique_memory::end() const -> void const*
+	inline auto unique_memory_t::end() const -> void const*
 	{
 		return end_;
 	}
