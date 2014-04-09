@@ -64,8 +64,7 @@ namespace atma {
 			return x_ != nullptr;
 		}
 
-		auto get() const -> T* { return x_; }
-		auto get_ref() -> T*& { return x_; }
+		auto get() const -> T* const& { return x_; }
 
 		auto reset() -> void {
 			if (x_) {
