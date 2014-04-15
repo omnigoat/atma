@@ -117,6 +117,14 @@ namespace atma {
 			return *this;
 		}
 
+		operator bool () {
+			return px != nullptr;
+		}
+
+		auto operator ! () const -> bool {
+			return px == nullptr;
+		}
+
 		auto operator * () const -> T& {
 			return *px;
 		}
