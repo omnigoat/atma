@@ -49,6 +49,15 @@ namespace atma
 			return *this;
 		}
 
+		template <typename Y>
+		auto operator = (com_ptr<Y> const& rhs) -> typename std::enable_if<std::is_convertible<Y, T>::value, com_ptr>::type&
+		{
+			if (x_) x_->Release();
+			x_ = rhs.x_;
+			if (x_) x_->AddRef();
+			return *this;
+		}
+
 		auto assign() -> T** {
 			reset();
 			return &x_;
@@ -74,6 +83,8 @@ namespace atma
 
 	private:
 		T* x_;
+
+		template <typename T> friend class com_ptr;
 	};
 
 	
