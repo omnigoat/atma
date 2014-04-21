@@ -1,11 +1,8 @@
-#ifndef ATMA_XTM_FUNCTION_HPP
-#define ATMA_XTM_FUNCTION_HPP
+#pragma once
 //=====================================================================
 #include <tuple>
 //=====================================================================
-namespace atma {
-namespace xtm {
-//=====================================================================
+namespace atma { namespace xtm {
 	
 	template <typename T>
 	struct function_traits
@@ -60,12 +57,9 @@ namespace xtm {
 		};
 	};
 
-//=====================================================================
-} // namespace xtm
-} // namespace atma
-//=====================================================================
-#endif // inclusion guard
-//=====================================================================
 
+	template <typename FN, int A>
+	struct arity_equal_to : std::integral_constant<bool, function_traits<FN>::arity == A>
+	{};
 
-
+} }
