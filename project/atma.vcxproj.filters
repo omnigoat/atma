@@ -187,5 +187,8 @@
     <ClInclude Include="..\include\atma\shared_memory.hpp">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\enable_if.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
