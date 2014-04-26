@@ -64,6 +64,7 @@ namespace atma {
 		utf8_string_t();
 		utf8_string_t(char const* str);
 		utf8_string_t(char const* str_begin, char const* str_end);
+		utf8_string_t(utf8_string_range_t const&);
 		//explicit utf8_string_t(utf16_string_t const&);
 		utf8_string_t(utf8_string_t const&);
 		utf8_string_t(utf8_string_t&&);

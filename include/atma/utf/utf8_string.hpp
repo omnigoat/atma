@@ -36,6 +36,15 @@ namespace atma {
 		}
 	}
 
+	inline utf8_string_t::utf8_string_t(utf8_string_range_t const& str)
+	: chars_(str.begin(), str.end()), char_count_()
+	{
+		for (char x : chars_) {
+			if (is_utf8_leading_byte(x))
+				++char_count_;
+		}
+	}
+
 #if 0
 	utf8_string_t::utf8_string_t(const utf16_string_t& rhs)
 	: char_count_()
