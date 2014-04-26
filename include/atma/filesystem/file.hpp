@@ -4,7 +4,6 @@
 //======================================================================
 namespace atma { namespace filesystem {
 
-
 	struct file_t
 	{
 		file_t()
@@ -30,7 +29,7 @@ namespace atma { namespace filesystem {
 			return r;
 		}
 
-		auto read(void* dest, uint size) -> void {
+		auto read(void* dest, size_t size) -> void {
 			fread(dest, size, 1, file_);
 		}
 
