@@ -18,7 +18,7 @@ namespace atma
 
 		auto operator = (shared_memory_t const&) -> shared_memory_t&;
 
-		auto size() const -> uint;
+		auto size() const -> size_t;
 		auto begin() -> char*;
 		auto end() -> char*;
 		auto begin() const -> char const*;
@@ -90,7 +90,7 @@ namespace atma
 		return *this;
 	}
 
-	inline auto shared_memory_t::size() const -> uint
+	inline auto shared_memory_t::size() const -> size_t
 	{
 		return reinterpret_cast<char*>(ref_) - data_;
 	}
