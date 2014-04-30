@@ -47,6 +47,11 @@ namespace atma {
 		return end_ - begin_;
 	}
 
+	inline auto utf8_string_range_t::empty() const -> bool
+	{
+		return begin_ == end_;
+	}
+
 	inline auto utf8_string_range_t::begin() const -> iterator
 	{
 		return begin_;
