@@ -34,7 +34,8 @@ namespace atma {
 		utf8_string_range_t(utf8_string_t const&);
 
 		auto bytes() const -> size_t;
-		
+		auto empty() const -> bool;
+
 		auto begin() const -> iterator;
 		auto end() const -> iterator;
 
