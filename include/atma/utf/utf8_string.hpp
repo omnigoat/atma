@@ -11,38 +11,26 @@ namespace atma {
 	// utf8_string_range_t implementation
 	//=====================================================================
 	inline utf8_string_t::utf8_string_t()
-	: char_count_()
 	{
 	}
 
 	inline utf8_string_t::utf8_string_t(char const* begin, char const* end)
-	: chars_(begin, end), char_count_()
+	: chars_(begin, end)
 	{
-		for (char x : chars_) {
-			if (is_utf8_leading_byte(x))
-				++char_count_;
-		}
 	}
 
 	inline utf8_string_t::utf8_string_t(char const* str)
-	: char_count_()
 	{
 		ATMA_ASSERT(str != nullptr);
 
 		for (char const* i = str; *i != '\0'; ++i) {
 			chars_.push_back(*i);
-			if (is_utf8_leading_byte(*i))
-				++char_count_;
 		}
 	}
 
 	inline utf8_string_t::utf8_string_t(utf8_string_range_t const& str)
-	: chars_(str.begin(), str.end()), char_count_()
+	: chars_(str.begin(), str.end())
 	{
-		for (char x : chars_) {
-			if (is_utf8_leading_byte(x))
-				++char_count_;
-		}
 	}
 
 #if 0
@@ -57,13 +45,13 @@ namespace atma {
 	}
 #endif
 
-	inline utf8_string_t::utf8_string_t(const utf8_string_t& rhs)
-	: chars_(rhs.chars_), char_count_(rhs.char_count_)
+	inline utf8_string_t::utf8_string_t(utf8_string_t const& rhs)
+	: chars_(rhs.chars_)
 	{
 	}
 
 	inline utf8_string_t::utf8_string_t(utf8_string_t&& rhs)
-	: chars_(std::move(rhs.chars_)), char_count_(rhs.char_count_)
+	: chars_(std::move(rhs.chars_))
 	{
 	}
 	
@@ -115,7 +103,8 @@ namespace atma {
 
 	inline auto operator << (std::ostream& out, utf8_string_t const& rhs) -> std::ostream&
 	{
-		out.write(&rhs.chars_[0], rhs.chars_.size());
+		if (!rhs.chars_.empty())
+			out.write(&rhs.chars_[0], rhs.chars_.size());
 		return out;
 	}
 
