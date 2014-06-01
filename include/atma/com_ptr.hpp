@@ -20,6 +20,13 @@ namespace atma
 			: x_(x)
 		{}
 
+		template <typename Y>
+		com_ptr(com_ptr<Y> const& rhs)
+		: x_(static_cast<Y*>(rhs.get()))
+		{
+			x_->AddRef();
+		}
+
 		com_ptr(com_ptr&& rhs)
 			: x_(rhs.x_)
 		{
