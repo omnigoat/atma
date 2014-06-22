@@ -1,6 +1,7 @@
 #pragma once
 //======================================================================
 #include <atma/string.hpp>
+#include <atma/unique_memory.hpp>
 //======================================================================
 namespace atma { namespace filesystem {
 
@@ -31,6 +32,13 @@ namespace atma { namespace filesystem {
 
 		auto read(void* dest, size_t size) -> void {
 			fread(dest, size, 1, file_);
+		}
+
+		auto read_into_memory() -> atma::unique_memory_t
+		{
+			auto m = atma::unique_memory_t(size());
+			read(m.begin(), size());
+			return m;
 		}
 
 	private:

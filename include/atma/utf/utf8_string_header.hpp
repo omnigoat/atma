@@ -71,48 +71,30 @@ namespace atma {
 
 		
 
-		auto empty() const -> bool { return chars_.empty(); }
-		auto bytes() const -> size_t { return chars_.size(); }
+		auto empty() const -> bool;
+		auto bytes() const -> size_t;
 
 		auto begin() const -> const_iterator;
 		auto end() const -> const_iterator;
 		auto begin() -> iterator;
 		auto end() -> iterator;
 
-		auto bytes_begin() const -> char const* { return &chars_[0]; }
-		auto bytes_end() const -> char const* { return &chars_[0] + chars_.size(); }
-		auto bytes_begin() -> char* { return &chars_[0]; }
-		auto bytes_end() -> char* { return &chars_[0] + chars_.size(); }
+		auto bytes_begin() const -> char const*;
+		auto bytes_end() const -> char const*;
+		auto bytes_begin() -> char*;
+		auto bytes_end() -> char*;
 
 		// push back a single character is valid only for code-points < 128
-		auto push_back(char c) -> void { 
-			ATMA_ASSERT(c ^ 0x80);
-			chars_.push_back(c);
-			++char_count_;
-		}
+		auto push_back(char c) -> void;
+		auto push_back(utf8_char_t const& c) -> void;
 
-		auto push_back(utf8_char_t const& c) -> void
-		{
-			for (auto i = c.begin; i != c.end; ++i) {
-				chars_.push_back(*i);
-			}
-		}
+		auto clear() -> void;
 
-		auto clear() -> void
-		{
-			chars_.clear();
-		}
-
-		auto operator += (utf8_string_t const& rhs) -> utf8_string_t&
-		{
-			chars_.insert(chars_.end(), rhs.bytes_begin(), rhs.bytes_end());
-			return *this;
-		}
+		auto operator += (utf8_string_t const& rhs) -> utf8_string_t&;
 
 	private:
 		typedef std::vector<value_t> chars_t;
 		chars_t chars_;
-		uint32 char_count_;
 
 
 		friend class utf16_string_t;
