@@ -27,6 +27,7 @@ namespace atma {
 
 	protected:
 		ref_counted() : ref_count_() {}
+		ref_counted(ref_counted const&) : ref_count_() {}
 
 	private:
 		mutable std::atomic_uint32_t ref_count_;
@@ -110,7 +111,6 @@ namespace atma {
 		template <class Y = typename std::enable_if<std::is_const<T>::value, typename std::remove_const<T>::type>::type>
 		auto operator = (intrusive_ptr<Y> const& rhs) -> intrusive_ptr&
 		{
-			ATMA_ASSERT(this != &rhs);
 			ref_counted::add_ref(rhs.px);
 			ref_counted::rm_ref(px);
 			px = rhs.px;

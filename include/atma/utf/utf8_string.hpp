@@ -12,11 +12,14 @@ namespace atma {
 	//=====================================================================
 	inline utf8_string_t::utf8_string_t()
 	{
+		chars_.reserve(8);
+		chars_.push_back('\0');
 	}
 
 	inline utf8_string_t::utf8_string_t(char const* begin, char const* end)
 	: chars_(begin, end)
 	{
+		chars_.push_back('\0');
 	}
 
 	inline utf8_string_t::utf8_string_t(char const* str)
@@ -26,22 +29,24 @@ namespace atma {
 		for (char const* i = str; *i != '\0'; ++i) {
 			chars_.push_back(*i);
 		}
+
+		chars_.push_back('\0');
 	}
 
 	inline utf8_string_t::utf8_string_t(utf8_string_range_t const& str)
 	: chars_(str.begin(), str.end())
 	{
+		chars_.push_back('\0');
 	}
 
 #if 0
 	utf8_string_t::utf8_string_t(const utf16_string_t& rhs)
-	: char_count_()
 	{
 		// optimistically reserve one char per char16_t. this will work optimally
 		// for english text, and will still totes work fine for anything else.
 		chars_.reserve(rhs.char_count_);
 
-		char_count_ = utf8_from_utf16(std::back_inserter(chars_), rhs.chars_.begin(), rhs.chars_.end());
+		utf8_from_utf16(std::back_inserter(chars_), rhs.chars_.begin(), rhs.chars_.end());
 	}
 #endif
 
@@ -54,23 +59,77 @@ namespace atma {
 	: chars_(std::move(rhs.chars_))
 	{
 	}
+
+	inline auto utf8_string_t::empty() const -> bool
+	{
+		// null-terminator always present
+		return chars_.size() == 1;
+	}
+
+	inline auto utf8_string_t::bytes() const -> size_t
+	{
+		// don't count null-terminator
+		return chars_.size() - 1;
+	}
+
+	inline auto utf8_string_t::bytes_begin() const -> char const*
+	{
+		return &chars_[0];
+	}
+
+	inline auto utf8_string_t::bytes_end() const -> char const*
+	{
+		return &chars_[0] + chars_.size();
+	}
+
+	inline auto utf8_string_t::bytes_begin() -> char*
+	{
+		return &chars_[0];
+	}
+
+	inline auto utf8_string_t::bytes_end() -> char*
+	{
+		return &chars_[0] + chars_.size();
+	}
 	
-	inline auto utf8_string_t::begin() const -> const_iterator {
+	inline auto utf8_string_t::begin() const -> const_iterator
+	{
 		return const_iterator(*this, bytes_begin());
 	}
 
-	inline auto utf8_string_t::end() const -> const_iterator {
+	inline auto utf8_string_t::end() const -> const_iterator
+	{
 		return const_iterator(*this, bytes_end());
 	}
 
-	inline auto utf8_string_t::begin() -> iterator {
+	inline auto utf8_string_t::begin() -> iterator
+	{
 		return iterator(*this, bytes_begin());
 	}
 
-	inline auto utf8_string_t::end() -> iterator {
+	inline auto utf8_string_t::end() -> iterator
+	{
 		return iterator(*this, bytes_end());
 	}
 
+	inline auto utf8_string_t::push_back(char c) -> void {
+		ATMA_ASSERT(c ^ 0x80);
+		chars_.back() = c;
+		chars_.push_back('\0');
+	}
+
+	inline auto utf8_string_t::push_back(utf8_char_t const& c) -> void
+	{
+		for (auto i = c.begin; i != c.end; ++i) {
+			chars_.push_back(*i);
+		}
+	}
+
+	inline auto utf8_string_t::operator += (utf8_string_t const& rhs) -> utf8_string_t&
+	{
+		chars_.insert(chars_.end() - 1, rhs.bytes_begin(), rhs.bytes_end());
+		return *this;
+	}
 
 	//=====================================================================
 	// operators
