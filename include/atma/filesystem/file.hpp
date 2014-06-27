@@ -16,8 +16,14 @@ namespace atma { namespace filesystem {
 		}
 
 		~file_t() {
+			close();
+		}
+
+		auto close() -> void
+		{
 			if (file_)
 				fclose(file_);
+			file_ = nullptr;
 		}
 
 		auto is_valid() const -> bool { return file_ != nullptr; }
