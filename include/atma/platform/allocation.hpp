@@ -7,7 +7,7 @@ namespace atma { namespace platform {
 
 	inline auto allocate_aligned_memory(uint32 align, size_t size) -> void*
 	{
-		ATMA_ASSERT(align >= sizeof(void*));
+		//ATMA_ASSERT(align >= sizeof(void*));
 		
 		if (size == 0) {
 			return nullptr;
