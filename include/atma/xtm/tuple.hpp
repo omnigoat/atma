@@ -1,9 +1,8 @@
-#ifndef ATMA_XTM_TUPLE_HPP
-#define ATMA_XTM_TUPLE_HPP
-//=====================================================================
+#include <atma/types.hpp>
+#include <atma/xtm/function.hpp>
+
 #include <tuple>
 #include <cstdint>
-#include <atma/xtm/function.hpp>
 //=====================================================================
 namespace atma {
 namespace xtm {
@@ -36,8 +35,7 @@ namespace xtm {
 	};
 
 	template <typename F, typename... Bindings>
-	__forceinline
-	auto bind(F&& f, Bindings&&... bindings) -> bind_t<F, Bindings...>
+	inline auto bind(F&& f, Bindings&&... bindings) -> bind_t<F, Bindings...>
 	{
 		return bind_t<F, Bindings...>(std::forward<F>(f), std::forward<Bindings>(bindings)...);
 	}
@@ -57,7 +55,7 @@ namespace xtm {
 	//   For speeeed.
 	//=====================================================================
 	template <typename F, typename... Args>
-	__forceinline auto apply_tuple(F&& f, std::tuple<Args...>&& t)
+	inline auto apply_tuple(F&& f, std::tuple<Args...>&& t)
 	-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
 	{
 		typedef typename std::decay<decltype(t)>::type DT;
@@ -68,7 +66,7 @@ namespace xtm {
 
 
 	template <typename R, typename C, typename... Params, typename... Args>
-	__forceinline auto apply_tuple(R(C::*f)(Params...), C* c, std::tuple<Args...>&& t)
+	inline auto apply_tuple(R(C::*f)(Params...), C* c, std::tuple<Args...>&& t)
 	-> R
 	{
 		typedef typename std::decay<decltype(t)>::type DT;
@@ -78,7 +76,7 @@ namespace xtm {
 	}
 
 	template <typename F, typename... Bindings, typename... Args>
-	__forceinline auto apply_tuple_ex(F&& f, std::tuple<Bindings...>&& b, std::tuple<Args...>&& t)
+	inline auto apply_tuple_ex(F&& f, std::tuple<Bindings...>&& b, std::tuple<Args...>&& t)
 	-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
 	{
 		typedef typename std::decay<decltype(t)>::type DT;
@@ -98,27 +96,6 @@ namespace xtm {
 
 
 		//=====================================================================
-		// select_element_t
-		//=====================================================================
-		// generic types, pass the binding value through
-		template <typename A, typename T>
-		struct select_element_t {
-			static __forceinline auto apply(A&& a, T&& b)->A&& {
-				return std::forward<A>(a);
-			}
-		};
-
-		// when a placeholder is passed in, pick the argument in that slot
-		template <uint32 I, typename T>
-		struct select_element_t<xtm_ph<I>, T> {
-			static __forceinline auto apply(xtm_ph<I>&&, T&& t) -> typename std::tuple_element<I, T>::type&& {
-				return std::forward<typename std::tuple_element<I, T>::type>
-					(std::get<I>(std::forward<T>(t)));
-			}
-		};
-
-		
-		//=====================================================================
 		// bound_tuple_applier_t
 		//=====================================================================
 		// bindings and values still present
@@ -126,15 +103,12 @@ namespace xtm {
 		struct bound_tuple_applier_t
 		{
 			template <typename F, typename B, typename T, typename... Args>
-			static __forceinline auto apply(F&& f, B&& b, T&& t, Args&&... args)
+			static auto apply(F&& f, B&& b, T&& t, Args&&... args)
 			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
 			{
 				// binding element type
-				//typedef typename  B_T;
-				auto&& element = 
-					select_element_t<typename std::decay<typename std::tuple_element<M - 1, B>::type>::type, T>
-					::apply(std::forward<typename std::decay<typename std::tuple_element<M - 1, B>::type>::type>
-						(std::get<M - 1>(std::forward<B>(b))), std::forward<T>(t));
+				auto&& element = select_element(
+					std::get<M - 1>(std::forward<B>(b)), std::forward<T>(t));
 
 				return bound_tuple_applier_t<M - 1>::apply(
 					std::forward<F>(f),
@@ -142,6 +116,24 @@ namespace xtm {
 					std::forward<T>(t),
 					std::forward<decltype(element)>(element),
 					std::forward<Args>(args)...);
+			}
+
+		private:
+			// generic types, pass the binding value through
+			template <typename A, typename T>
+			static auto select_element(A&& a, T&& b)
+				-> A&&
+			{
+				return std::forward<A>(a);
+			}
+
+			// when a placeholder is passed in, pick the argument in that slot
+			template <uint32 I, typename T>
+			static auto select_element(xtm_ph<I>&&, T&& t)
+				-> typename std::tuple_element<I, T>::type&&
+			{
+				return std::forward<typename std::tuple_element<I, T>::type>
+					(std::get<I>(std::forward<T>(t)));
 			}
 		};
 
@@ -151,7 +143,7 @@ namespace xtm {
 		{
 			// fnptr
 			template <typename R, typename... Params, typename B, typename T, typename... Args>
-			static __forceinline auto apply(R(*f)(Params...), B&&, T&&, Args&&... args)
+			static auto apply(R(*f)(Params...), B&&, T&&, Args&&... args)
 			-> R
 			{
 				return (*f)(std::forward<Args>(args)...);
@@ -159,7 +151,7 @@ namespace xtm {
 
 			// memfnptr
 			template <typename R, typename C, typename... Params, typename B, typename T, typename... Args>
-			static __forceinline auto apply(R(C::*f)(Params...), B&&, T&&, C* c, Args&&... args)
+			static auto apply(R(C::*f)(Params...), B&&, T&&, C* c, Args&&... args)
 			-> R
 			{
 				return (c->*f)(std::forward<Args>(args)...);
@@ -167,7 +159,7 @@ namespace xtm {
 
 			// callable
 			template <typename F, typename B, typename T, typename... A>
-			static __forceinline auto apply(F&& f, B&&, T&&, A&&... a)
+			static auto apply(F&& f, B&&, T&&, A&&... a)
 			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
 			{
 				return f(std::forward<A>(a)...);
@@ -180,7 +172,7 @@ namespace xtm {
 		struct tuple_applier_t
 		{
 			template <typename F, typename T, typename... Args>
-			static __forceinline auto apply(F&& f, T&& t, Args&&... args)
+			static auto apply(F&& f, T&& t, Args&&... args)
 			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
 			{
 				return tuple_applier_t<N - 1>::apply(std::forward<F>(f), std::forward<T>(t),
@@ -188,7 +180,7 @@ namespace xtm {
 			}
 
 			template <typename R, typename C, typename... Params, typename T, typename... Args>
-			static __forceinline auto apply(R(C::*f)(Params...), T&& t, C* c, Args&&... args)
+			static auto apply(R(C::*f)(Params...), T&& t, C* c, Args&&... args)
 			-> R
 			{
 				return tuple_applier_t<N - 1>::apply(f, std::forward<T>(t), c,
@@ -201,7 +193,7 @@ namespace xtm {
 		{
 			// fnptr
 			template <typename R, typename... Params, typename T, typename... Args>
-			static __forceinline auto apply(R(*f)(Params...), T&&, Args&&... args)
+			static auto apply(R(*f)(Params...), T&&, Args&&... args)
 			-> R
 			{
 				return (*f)(std::forward<Args>(args)...);
@@ -209,7 +201,7 @@ namespace xtm {
 
 			// memfnptr
 			template <typename R, typename C, typename... Params, typename T, typename... Args>
-			static __forceinline auto apply(R(C::*f)(Params...), T&&, C* c, Args&&... args)
+			static auto apply(R(C::*f)(Params...), T&&, C* c, Args&&... args)
 			-> R
 			{
 				return (c->*f)(std::forward<Args>(args)...);
@@ -217,7 +209,7 @@ namespace xtm {
 
 			// callable
 			template <typename F, typename T, typename... A>
-			static __forceinline auto apply(F&& f, T&&, A&&... a)
+			static auto apply(F&& f, T&&, A&&... a)
 			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
 			{
 				return f(std::forward<A>(a)...);
@@ -225,11 +217,4 @@ namespace xtm {
 		};
 	}
 
-
-//=====================================================================
-} // namespace xtm
-} // namespace atma
-//=====================================================================
-#endif // inclusion guard
-//=====================================================================
-
+} }

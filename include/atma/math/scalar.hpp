@@ -4,9 +4,7 @@
 
 #include <cmath>
 //=====================================================================
-namespace atma {
-namespace math {
-//=====================================================================
+namespace atma { namespace math {
 
 	inline void retrieve_sin_cos(float& sin, float& cos, float v)
 	{
@@ -48,7 +46,10 @@ namespace math {
 		cos = sign * (((((-2.6051615e-07f * y2 + 2.4760495e-05f) * y2 - 0.0013888378f) * y2 + 0.041666638f) * y2 - 0.5f) * y2 + 1.0f);
 	}
 
-//=====================================================================
-} // namespace math
-} // namespace atma
-//=====================================================================
+
+	inline float arctan(float x)
+	{
+		return atan(x);
+	}
+
+} }
