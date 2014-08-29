@@ -1,5 +1,8 @@
+#pragma once
+
 #include <atma/types.hpp>
 #include <atma/xtm/function.hpp>
+#include <atma/enable_if.hpp>
 
 #include <tuple>
 #include <cstdint>
@@ -9,10 +12,12 @@ namespace xtm {
 //=====================================================================
 	
 	namespace detail {
-		template <uint32 N> struct tuple_applier_t;
-		template <uint32 M> struct bound_tuple_applier_t;
+		template <size_t N> struct tuple_applier_t;
+		template <size_t M> struct bound_tuple_applier_t;
 	}
 
+
+#if 0
 	template <typename F, typename... Bindings>
 	struct bind_t
 	{
@@ -23,7 +28,7 @@ namespace xtm {
 
 		template <typename... Args>
 		auto operator ()(Args&&... args)
-		-> typename function_traits<typename std::decay<F>::type>::result_type
+		-> typename function_traits<std::decay_t<F>>::result_type
 		{
 			return apply_tuple_ex(fn_, std::forward<decltype(bindings_)>(bindings_),
 				std::forward<std::tuple<Args...>>(std::tuple<Args...>(std::forward<Args>(args)...)));
@@ -39,7 +44,12 @@ namespace xtm {
 	{
 		return bind_t<F, Bindings...>(std::forward<F>(f), std::forward<Bindings>(bindings)...);
 	}
+#endif
 
+	#pragma warning(push)
+	#pragma warning(disable:4305)
+	template <typename R, typename from, typename to>
+	using type_if_convertible_t = typename std::enable_if<std::is_same<from, to>::value, R>::type;
 
 	//=====================================================================
 	// apply_tuple
@@ -54,27 +64,46 @@ namespace xtm {
 	//   the pointer to the instantiation isn't in the tuple to begin with.
 	//   For speeeed.
 	//=====================================================================
-	template <typename F, typename... Args>
-	inline auto apply_tuple(F&& f, std::tuple<Args...>&& t)
+#if 0
+	template <typename F, typename Tuple>
+	inline auto apply_tuple(F&& f, Tuple&& xs)
 	-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
 	{
-		typedef typename std::decay<decltype(t)>::type DT;
-		typedef typename std::remove_reference<decltype(t)>::type RRT;
+		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
 
-		return detail::tuple_applier_t<std::tuple_size<DT>::value>::apply(std::forward<F>(f), std::forward<RRT>(t));
+		return detail::tuple_applier_t<tuple_size>::apply(
+			std::forward<F>(f),
+			std::forward<Tuple>(xs));
 	}
+#endif
 
-
-	template <typename R, typename C, typename... Params, typename... Args>
-	inline auto apply_tuple(R(C::*f)(Params...), C* c, std::tuple<Args...>&& t)
+#if 0
+	template <typename R, typename C, typename... Params, typename Tuple>
+	inline auto apply_tuple(R(C::*f)(Params...), C* c, Tuple&& xs)
 	-> R
 	{
-		typedef typename std::decay<decltype(t)>::type DT;
-		typedef typename std::remove_reference<decltype(t)>::type RRT;
+		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
 
-		return detail::tuple_applier_t<std::tuple_size<DT>::value>::apply(f, std::forward<RRT>(t), c);
+		return detail::tuple_applier_t<tuple_size>::apply(
+			f,
+			std::forward<Tuple>(xs),
+			c);
+	}
+#endif
+
+	template <typename R, typename C, typename... Params, typename CC, typename Tuple>
+	inline auto apply_tuple(R(C::*f)(Params...), CC&& c, Tuple&& xs)
+	-> type_if_convertible_t<R, std::remove_reference_t<CC>, std::remove_reference_t<C>>
+	{
+		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
+
+		return detail::tuple_applier_t<tuple_size>::apply(
+			f,
+			std::forward<Tuple>(xs),
+			std::forward<CC>(c));
 	}
 
+#if 0
 	template <typename F, typename... Bindings, typename... Args>
 	inline auto apply_tuple_ex(F&& f, std::tuple<Bindings...>&& b, std::tuple<Args...>&& t)
 	-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
@@ -87,19 +116,20 @@ namespace xtm {
 			std::forward<std::remove_reference<decltype(b)>::type>(b),
 			std::forward<std::remove_reference<decltype(t)>::type>(t));
 	}
-
+#endif
 
 
 	namespace detail
 	{
-		template <uint32 I> struct xtm_ph {};
+#if 0
+		template <size_t I> struct xtm_ph {};
 
 
 		//=====================================================================
 		// bound_tuple_applier_t
 		//=====================================================================
 		// bindings and values still present
-		template <uint32 M>
+		template <size_t M>
 		struct bound_tuple_applier_t
 		{
 			template <typename F, typename B, typename T, typename... Args>
@@ -128,7 +158,7 @@ namespace xtm {
 			}
 
 			// when a placeholder is passed in, pick the argument in that slot
-			template <uint32 I, typename T>
+			template <size_t I, typename T>
 			static auto select_element(xtm_ph<I>&&, T&& t)
 				-> typename std::tuple_element<I, T>::type&&
 			{
@@ -139,7 +169,7 @@ namespace xtm {
 
 		// termination
 		template <>
-		struct bound_tuple_applier_t<0>
+		struct bound_tuple_applier_t<false>
 		{
 			// fnptr
 			template <typename R, typename... Params, typename B, typename T, typename... Args>
@@ -157,6 +187,13 @@ namespace xtm {
 				return (c->*f)(std::forward<Args>(args)...);
 			}
 
+			template <typename R, typename C, typename... Params, typename B, typename T, typename... Args>
+			static auto apply(R(C::*f)(Params...), B&&, T&&, C& c, Args&&... args)
+			-> R
+			{
+				return (c.*f)(std::forward<Args>(args)...);
+			}
+
 			// callable
 			template <typename F, typename B, typename T, typename... A>
 			static auto apply(F&& f, B&&, T&&, A&&... a)
@@ -165,29 +202,57 @@ namespace xtm {
 				return f(std::forward<A>(a)...);
 			}
 		};
+#endif
 
-
-
-		template <uint32 N>
+		template <size_t N>
 		struct tuple_applier_t
 		{
+#if 0
+			// callable
 			template <typename F, typename T, typename... Args>
-			static auto apply(F&& f, T&& t, Args&&... args)
+			static auto apply(F&& f, T&& xs, Args&&... acc)
 			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
 			{
-				return tuple_applier_t<N - 1>::apply(std::forward<F>(f), std::forward<T>(t),
-					std::forward<typename std::tuple_element<N - 1, T>::type>(std::get<N - 1>(std::forward<T>(t))), std::forward<Args>(args)...);
+				// 'acc' will become the expanded list of arguments
+				return tuple_applier_t<N - 1>::apply(
+					std::forward<F>(f),
+					std::forward<T>(xs),
+					std::get<N - 1>(xs),
+					std::forward<Args>(acc)...);
 			}
-
+#endif
+			// memfunptr
+#if 0
 			template <typename R, typename C, typename... Params, typename T, typename... Args>
-			static auto apply(R(C::*f)(Params...), T&& t, C* c, Args&&... args)
+			static auto apply(R(C::*f)(Params...), T&& xs, C* c, Args&&... acc)
 			-> R
 			{
-				return tuple_applier_t<N - 1>::apply(f, std::forward<T>(t), c,
-					std::forward<typename std::tuple_element<N - 1, T>::type>(std::get<N - 1>(std::forward<T>(t))), std::forward<Args>(args)...);
+				return tuple_applier_t<N - 1>::apply(
+					f,
+					std::forward<T>(xs),
+					c,
+					std::get<N - 1>(xs),
+					std::forward<Args>(acc)...);
+			}
+#endif
+
+			template <typename R, typename C, typename... Params, typename T, typename CC, typename... Args>
+			static auto apply(R(C::*f)(Params...), T&& xs, CC&& c, Args&&... acc)
+			-> type_if_convertible_t<R, std::remove_reference_t<CC>, std::remove_reference_t<C>>
+			{
+				return R();
+#if 0
+				return tuple_applier_t<N - 1>::apply(
+					f,
+					std::forward<T>(xs),
+					std::forward<CC>(c),
+					std::get<N - 1>(xs),
+					std::forward<Args>(acc)...);
+#endif
 			}
 		};
 
+#if 0
 		template <>
 		struct tuple_applier_t<0>
 		{
@@ -207,6 +272,28 @@ namespace xtm {
 				return (c->*f)(std::forward<Args>(args)...);
 			}
 
+			template <typename R, typename C, typename... Params, typename T, typename CC, typename... Args>
+			static auto apply(R(C::*f)(Params...), T&&, CC&& c, Args&&... args)
+			-> type_if_convertible_t<R, CC, C>
+			{
+				return R();
+				//return (c.*f)(std::forward<Args>(args)...);
+			}
+
+			template <typename R, typename C, typename... Params, typename T, typename... Args>
+			static auto apply(R(C::*f)(Params...) const, T&&, C const* c, Args&&... args)
+				-> R
+			{
+				return (c->*f)(std::forward<Args>(args)...);
+			}
+
+			template <typename R, typename C, typename... Params, typename T, typename... Args>
+			static auto apply(R(C::*f)(Params...) const, T&&, C const& c, Args&&... args)
+				-> R
+			{
+				return (c.*f)(std::forward<Args>(args)...);
+			}
+
 			// callable
 			template <typename F, typename T, typename... A>
 			static auto apply(F&& f, T&&, A&&... a)
@@ -215,6 +302,9 @@ namespace xtm {
 				return f(std::forward<A>(a)...);
 			}
 		};
+#endif
 	}
+
+	#pragma warning(pop)
 
 } }
