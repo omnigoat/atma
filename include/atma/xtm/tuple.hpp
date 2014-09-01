@@ -14,6 +14,18 @@
 
 namespace atma { namespace xtm {
 
+	template <size_t I> struct placeholder_t {};
+
+}}
+
+namespace
+{
+	atma::xtm::placeholder_t<0> const arg1;
+	atma::xtm::placeholder_t<1> const arg2;
+	atma::xtm::placeholder_t<2> const arg3;
+}
+
+namespace atma { namespace xtm {
 	
 	namespace detail {
 		template <size_t N> struct tuple_applier_t;
@@ -21,7 +33,6 @@ namespace atma { namespace xtm {
 	}
 
 
-#if 0
 	template <typename F, typename... Bindings>
 	struct bind_t
 	{
@@ -35,7 +46,7 @@ namespace atma { namespace xtm {
 		-> typename function_traits<std::decay_t<F>>::result_type
 		{
 			return apply_tuple_ex(fn_, std::forward<decltype(bindings_)>(bindings_),
-				std::forward<std::tuple<Args...>>(std::tuple<Args...>(std::forward<Args>(args)...)));
+				std::make_tuple(std::forward<Args>(args)...);
 		}
 
 	private:
@@ -48,7 +59,6 @@ namespace atma { namespace xtm {
 	{
 		return bind_t<F, Bindings...>(std::forward<F>(f), std::forward<Bindings>(bindings)...);
 	}
-#endif
 
 	
 	template <typename R, typename from, typename to>
@@ -73,206 +83,214 @@ namespace atma { namespace xtm {
 	//   the pointer to the instantiation isn't in the tuple to begin with.
 	//   For speeeed.
 	//=====================================================================
-	// callable/fnptr
+
+	// catch-all
 	template <typename F, typename Tuple>
 	inline auto apply_tuple(F&& f, Tuple&& xs)
 	-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
 	{
+		auto const f_size = function_traits<F>::arity;
 		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
+
+		// member-functions screw with this for the moment
+		//static_assert(f_size == tuple_size, "incorrect number of args");
 
 		return detail::tuple_applier_t<tuple_size>::apply(
 			std::forward<F>(f),
 			std::forward<Tuple>(xs));
 	}
 
-	// memfnptr
+	// memfnptr helpers
 	template <typename R, typename C, typename... Params, typename CC, typename Tuple>
 	inline auto apply_tuple(R(C::*f)(Params...), CC* c, Tuple&& xs)
 	-> typename type_if_castible<R, CC, C>::type
 	{
+		auto const f_size = sizeof...(Params);
 		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
 
-		return detail::tuple_applier_t<tuple_size>::apply(
+		static_assert(f_size == tuple_size, "incorrect number of bindings (must match parameter-count)");
+
+		return detail::tuple_applier_t<tuple_size + 1>::apply(
 			f,
-			std::forward<Tuple>(xs),
-			c);
+			std::tuple_cat(std::make_tuple(c), xs));
 	}
 
-	template <typename R, typename C, typename... Params, typename Tuple>
-	inline auto apply_tuple(R(C::*f)(Params...) const, C const* c, Tuple&& xs)
-		-> R
+	template <typename R, typename C, typename... Params, typename CC, typename Tuple>
+	inline auto apply_tuple(R(C::*f)(Params...) const, CC* c, Tuple&& xs)
+	-> typename type_if_castible<R, CC, C const>::type
 	{
+		auto const f_size = sizeof...(Params);
 		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
 
-		return detail::tuple_applier_t<tuple_size>::apply(
+		static_assert(f_size == tuple_size, "incorrect number of bindings (must match parameter-count)");
+
+		return detail::tuple_applier_t<tuple_size + 1>::apply(
 			f,
-			std::forward<Tuple>(xs),
-			c);
+			std::tuple_cat(std::make_tuple(c), xs));
 	}
 
 	template <typename R, typename C, typename... Params, typename CC, typename Tuple>
 	inline auto apply_tuple(R(C::*f)(Params...), CC&& c, Tuple&& xs)
 	-> typename type_if_castible<R, CC, C>::type
 	{
+		auto const f_size = sizeof...(Params);
 		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
 
-		return detail::tuple_applier_t<tuple_size>::apply(
+		static_assert(f_size == tuple_size, "incorrect number of bindings (must match parameter-count)");
+
+		return detail::tuple_applier_t<tuple_size + 1>::apply(
 			f,
-			std::forward<Tuple>(xs),
-			std::forward<CC>(c));
+			std::tuple_cat(std::make_tuple(c), xs));
 	}
 
-	template <typename R, typename C, typename... Params, typename Tuple>
-	inline auto apply_tuple(R(C::*f)(Params...) const, C const& c, Tuple&& xs)
-	-> R
+	template <typename R, typename C, typename... Params, typename CC, typename Tuple>
+	inline auto apply_tuple(R(C::*f)(Params...) const, CC&& c, Tuple&& xs)
+	-> typename type_if_castible<R, CC, C const>::type
 	{
+		auto const f_size = sizeof...(Params);
 		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
 
-		return detail::tuple_applier_t<tuple_size>::apply(
+		static_assert(f_size == tuple_size, "incorrect number of bindings (must match parameter-count)");
+
+		return detail::tuple_applier_t<tuple_size + 1>::apply(
 			f,
-			std::forward<Tuple>(xs),
-			c);
+			std::tuple_cat(std::make_tuple(c), xs));
 	}
 
-#if 0
-	template <typename F, typename... Bindings, typename... Args>
-	inline auto apply_tuple_ex(F&& f, std::tuple<Bindings...>&& b, std::tuple<Args...>&& t)
+
+	//=====================================================================
+	// apply_tuple_ex
+	// ----------------
+	//   
+	//=====================================================================
+	template <typename F, typename Bindings, typename Args>
+	inline auto apply_tuple_ex(F&& f, Bindings&& b, Args&& a)
 	-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
 	{
-		typedef typename std::decay<decltype(t)>::type DT;
-		typedef typename std::decay<decltype(b)>::type DB;
-		
-		return detail::bound_tuple_applier_t<sizeof...(Bindings)>::apply(
+		auto const f_size = function_traits<F>::arity;
+		auto const binding_size = std::tuple_size<std::decay_t<Bindings>>::value;
+
+		static_assert(f_size == binding_size, "incorrect number of bindings (must match parameter-count)");
+
+		return detail::bound_tuple_applier_t<binding_size>::apply(
 			std::forward<F>(f),
-			std::forward<std::remove_reference<decltype(b)>::type>(b),
-			std::forward<std::remove_reference<decltype(t)>::type>(t));
+			std::forward<Bindings>(b),
+			std::forward<Args>(a));
 	}
-#endif
+
+
 
 
 	namespace detail
 	{
-#if 0
-		template <size_t I> struct xtm_ph {};
-
-
 		//=====================================================================
 		// bound_tuple_applier_t
+		//
+		//
+		//
 		//=====================================================================
-		// bindings and values still present
 		template <size_t M>
 		struct bound_tuple_applier_t
 		{
-			template <typename F, typename B, typename T, typename... Args>
-			static auto apply(F&& f, B&& b, T&& t, Args&&... args)
+			template <typename F, typename Bindings, typename Args, typename... Unpacked>
+			static auto apply(F&& f, Bindings&& b, Args&& a, Unpacked&&... u)
 			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
 			{
-				// binding element type
 				auto&& element = select_element(
-					std::get<M - 1>(std::forward<B>(b)), std::forward<T>(t));
+					std::get<M - 1>(std::forward<Bindings>(b)), std::forward<Args>(a));
 
 				return bound_tuple_applier_t<M - 1>::apply(
 					std::forward<F>(f),
-					std::forward<B>(b),
-					std::forward<T>(t),
+					std::forward<Bindings>(b),
+					std::forward<Args>(a),
 					std::forward<decltype(element)>(element),
-					std::forward<Args>(args)...);
+					std::forward<Unpacked>(u)...);
 			}
 
 		private:
-			// generic types, pass the binding value through
-			template <typename A, typename T>
-			static auto select_element(A&& a, T&& b)
-				-> A&&
+			template <typename Binding, typename Args>
+			static auto select_element(Binding&& b, Args&&)
+			-> decltype(b)
 			{
-				return std::forward<A>(a);
+				return std::forward<Binding>(b);
 			}
 
-			// when a placeholder is passed in, pick the argument in that slot
-			template <size_t I, typename T>
-			static auto select_element(xtm_ph<I>&&, T&& t)
-				-> typename std::tuple_element<I, T>::type&&
+			template <size_t I, typename Args>
+			static auto select_element(placeholder_t<I>&&, Args&& args)
+			-> typename std::tuple_element<I, Args>::type
 			{
-				return std::forward<typename std::tuple_element<I, T>::type>
-					(std::get<I>(std::forward<T>(t)));
+				return std::get<I>(std::forward<Args>(args));
 			}
 		};
 
-		// termination
+
 		template <>
-		struct bound_tuple_applier_t<false>
+		struct bound_tuple_applier_t<0>
 		{
+			// callable
+			template <typename F, typename Bindings, typename Args, typename... Unpacked>
+			static auto apply(F&& f, Bindings&&, Args&&, Unpacked&&... u)
+			-> typename atma::xtm::function_traits<std::decay_t<F>>::result_type
+			{
+				return f(std::forward<Unpacked>(u)...);
+			}
+
 			// fnptr
-			template <typename R, typename... Params, typename B, typename T, typename... Args>
-			static auto apply(R(*f)(Params...), B&&, T&&, Args&&... args)
+			template <typename R, typename... Params, typename Bindings, typename Args, typename... Unpacked>
+			static auto apply(R(*f)(Params...), Bindings&&, Args&&, Unpacked&&... u)
 			-> R
 			{
-				return (*f)(std::forward<Args>(args)...);
+				return (*f)(std::forward<Unpacked>(u)...);
 			}
 
 			// memfnptr
-			template <typename R, typename C, typename... Params, typename B, typename T, typename... Args>
-			static auto apply(R(C::*f)(Params...), B&&, T&&, C* c, Args&&... args)
-			-> R
+			template <typename R, typename C, typename... Params, typename Bindings, typename Args, typename CC, typename... Unpacked>
+			static auto apply(R(C::*f)(Params...) const, Bindings&&, Args&&, CC* c, Unpacked&&... u)
+			-> type_if_castible<R, CC, C>
 			{
-				return (c->*f)(std::forward<Args>(args)...);
+				static_assert(sizeof...(Params) == sizeof...(u));
+				return (c->*f)(std::forward<Unpacked>(u)...);
 			}
 
-			template <typename R, typename C, typename... Params, typename B, typename T, typename... Args>
-			static auto apply(R(C::*f)(Params...), B&&, T&&, C& c, Args&&... args)
-			-> R
+			template <typename R, typename C, typename... Params, typename Bindings, typename Args, typename CC, typename... Unpacked>
+			static auto apply(R(C::*f)(Params...) const, Bindings&&, Args&&, CC& c, Unpacked&&... u)
+			-> type_if_castible<R, CC, C>
 			{
-				return (c.*f)(std::forward<Args>(args)...);
+				return (c.*f)(std::forward<Unpacked>(u)...);
 			}
 
-			// callable
-			template <typename F, typename B, typename T, typename... A>
-			static auto apply(F&& f, B&&, T&&, A&&... a)
-			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
+			template <typename R, typename C, typename... Params, typename Bindings, typename Args, typename CC, typename... Unpacked>
+			static auto apply(R(C::*f)(Params...), Bindings&&, Args&&, CC* c, Unpacked&&... u)
+			-> type_if_castible<R, CC, C>
 			{
-				return f(std::forward<A>(a)...);
+				return (c->*f)(std::forward<Unpacked>(u)...);
+			}
+
+			template <typename R, typename C, typename... Params, typename Bindings, typename Args, typename CC, typename... Unpacked>
+			static auto apply(R(C::*f)(Params...), Bindings&&, Args&&, CC& c, Unpacked&&... u)
+			-> type_if_castible<R, CC, C>
+			{
+				return (c.*f)(std::forward<Unpacked>(u)...);
 			}
 		};
-#endif
+
+
+
+
+
 
 		template <size_t N>
 		struct tuple_applier_t
 		{
-			// callable/fnptr
-			template <typename F, typename T, typename... Args>
-			static auto apply(F&& f, T&& xs, Args&&... acc)
+			template <typename F, typename Args, typename... Unpacked>
+			static auto apply(F&& f, Args&& a, Unpacked&&... u)
 			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
 			{
 				return tuple_applier_t<N - 1>::apply(
 					std::forward<F>(f),
-					std::forward<T>(xs),
-					std::get<N - 1>(xs),
-					std::forward<Args>(acc)...);
-			}
-
-			// memfunptr
-			template <typename R, typename C, typename... Params, typename T, typename CC, typename... Args>
-			static auto apply(R(C::*f)(Params...), T&& xs, CC&& c, Args&&... acc)
-			-> R
-			{
-				return tuple_applier_t<N - 1>::apply(
-					f,
-					std::forward<T>(xs),
-					std::forward<CC>(c),
-					std::get<N - 1>(xs),
-					std::forward<Args>(acc)...);
-			}
-
-			template <typename R, typename C, typename... Params, typename T, typename CC, typename... Args>
-			static auto apply(R(C::*f)(Params...) const, T&& xs, CC&& c, Args&&... acc)
-				-> R
-			{
-				return tuple_applier_t<N - 1>::apply(
-					f,
-					std::forward<T>(xs),
-					std::forward<CC>(c),
-					std::get<N - 1>(xs),
-					std::forward<Args>(acc)...);
+					std::forward<Args>(a),
+					std::get<N - 1>(a),
+					std::forward<Unpacked>(u)...);
 			}
 		};
 
@@ -280,50 +298,56 @@ namespace atma { namespace xtm {
 		template <>
 		struct tuple_applier_t<0>
 		{
+			// callable
+			template <typename F, typename Args, typename... Unpacked>
+			static auto apply(F&& f, Args&&, Unpacked&&... a)
+				-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
+			{
+				auto const fsize = xtm::function_traits<F>::arity;
+				static_assert(fsize == sizeof...(Unpacked), "incorrect number of arguments");
+				return f(std::forward<Unpacked>(a)...);
+			}
+
 			// fnptr
-			template <typename R, typename... Params, typename T, typename... Args>
-			static auto apply(R(*f)(Params...), T&&, Args&&... args)
+			template <typename R, typename... Params, typename Args, typename... Unpacked>
+			static auto apply(R(*f)(Params...), Args&&, Unpacked&&... u)
 			-> R
 			{
-				return (*f)(std::forward<Args>(args)...);
+				static_assert(sizeof...(Params) == sizeof...(Unpacked), "incorrect number of arguments");
+				return (*f)(std::forward<Unpacked>(u)...);
 			}
 
 			// memfnptr
-			template <typename R, typename C, typename... Params, typename T, typename... Args>
-			static auto apply(R(C::*f)(Params...), T&&, C* c, Args&&... args)
-			-> R
+			template <typename R, typename C, typename... Params, typename Args, typename CC, typename... Unpacked>
+			static auto apply(R(C::*f)(Params...) const, Args&&, CC* c, Unpacked&&... u)
+			-> typename type_if_castible<R, CC, C const>::type
 			{
-				return (c->*f)(std::forward<Args>(args)...);
+				static_assert(sizeof...(Params) == sizeof...(Unpacked), "incorrect number of arguments");
+				return (c->*f)(std::forward<Unpacked>(u)...);
 			}
 
-			template <typename R, typename C, typename... Params, typename T, typename... Args>
-			static auto apply(R(C::*f)(Params...) const, T&&, C const* c, Args&&... args)
-			-> R
+			template <typename R, typename C, typename... Params, typename Args, typename CC, typename... Unpacked>
+			static auto apply(R(C::*f)(Params...) const, Args&&, CC&& c, Unpacked&&... u)
+			-> typename type_if_castible<R, CC, C const>::type
 			{
-				return (c->*f)(std::forward<Args>(args)...);
+				static_assert(sizeof...(Params) == sizeof...(Unpacked), "incorrect number of arguments");
+				return (c.*f)(std::forward<Unpacked>(u)...);
 			}
 
-			template <typename R, typename C, typename... Params, typename T, typename CC, typename... Args>
-			static auto apply(R(C::*f)(Params...), T&&, CC&& c, Args&&... args)
-			-> R
+			template <typename R, typename C, typename... Params, typename Args, typename CC, typename... Unpacked>
+			static auto apply(R(C::*f)(Params...), Args&&, CC* c, Unpacked&&... u)
+			-> typename type_if_castible<R, CC, C>::type
 			{
-				return (c.*f)(std::forward<Args>(args)...);
+				static_assert(sizeof...(Params) == sizeof...(Unpacked), "incorrect number of arguments");
+				return (c->*f)(std::forward<Unpacked>(u)...);
 			}
 
-			template <typename R, typename C, typename... Params, typename T, typename... Args>
-			static auto apply(R(C::*f)(Params...) const, T&&, C const& c, Args&&... args)
-			-> R
+			template <typename R, typename C, typename... Params, typename Args, typename CC, typename... Unpacked>
+			static auto apply(R(C::*f)(Params...), Args&&, CC&& c, Unpacked&&... u)
+			-> typename type_if_castible<R, CC, C>::type
 			{
-				return (c.*f)(std::forward<Args>(args)...);
-			}
-
-
-			// callable
-			template <typename F, typename T, typename... A>
-			static auto apply(F&& f, T&&, A&&... a)
-			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
-			{
-				return f(std::forward<A>(a)...);
+				static_assert(sizeof...(Params) == sizeof...(Unpacked), "incorrect number of arguments");
+				return (c.*f)(std::forward<Unpacked>(u)...);
 			}
 		};
 	}
