@@ -6,9 +6,10 @@ namespace atma { namespace xtm {
 	
 	template <typename T>
 	struct function_traits
-		: public function_traits<decltype(&T::operator())>
+		: public function_traits<decltype(&std::decay<T>::type::operator())>
 	{
 	};
+
 
 	template <typename C, typename R, typename... Params>
 	struct function_traits<R(C::*)(Params...) const>
