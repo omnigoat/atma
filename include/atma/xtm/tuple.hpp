@@ -27,17 +27,37 @@ namespace
 
 namespace atma { namespace xtm {
 	
+	template <size_t Count, typename... Acc>
+	struct placeholder_tuple_args_t
+	{
+		typedef typename placeholder_tuple_args_t<Count - 1, placeholder_t<Count - 1>, Acc...>::type type;
+	};
+
+	template <typename... Acc>
+	struct placeholder_tuple_args_t<0, Acc...>
+	{
+		typedef std::tuple<Acc...> type;
+	};
+
+	template <typename F, typename... B>
+	struct filled_bindings_t
+	{
+		typedef typename placeholder_tuple_args_t<function_traits<F>::arity - sizeof...(B)>::type trailing_bindings;
+		typedef decltype(std::tuple_cat(std::tuple<B...>(), trailing_bindings())) type;
+	};
+
 	namespace detail {
 		template <size_t N> struct tuple_applier_t;
 		template <size_t M> struct bound_tuple_applier_t;
 	}
 
 
-	template <typename F, typename... Bindings>
+	template <typename F, typename Bindings>
 	struct bind_t
 	{
-		bind_t(F&& fn, Bindings... bindings)
-			: fn_(fn), bindings_(bindings...)
+		template <typename FF, typename BB>
+		bind_t(FF&& fn, BB&& bindings)
+			: fn_(std::forward<FF>(fn)), bindings_(std::forward<BB>(bindings))
 		{
 		}
 
@@ -45,22 +65,38 @@ namespace atma { namespace xtm {
 		auto operator ()(Args&&... args)
 		-> typename function_traits<std::decay_t<F>>::result_type
 		{
-			return apply_tuple_ex(fn_, std::forward<decltype(bindings_)>(bindings_),
-				std::make_tuple(std::forward<Args>(args)...);
+			return apply_tuple_ex(fn_, bindings_, std::forward_as_tuple(args...));
 		}
 
 	private:
 		F fn_;
-		std::tuple<typename std::remove_reference<Bindings>::type...> bindings_;
+		Bindings bindings_;
 	};
 
 	template <typename F, typename... Bindings>
-	inline auto bind(F&& f, Bindings&&... bindings) -> bind_t<F, Bindings...>
+	inline auto bind(F&& f, Bindings&&... bindings) -> bind_t<F, std::tuple<Bindings...>>
 	{
-		return bind_t<F, Bindings...>(std::forward<F>(f), std::forward<Bindings>(bindings)...);
+		return {std::forward<F>(f), std::forward_as_tuple(bindings...)};
 	}
 
-	
+
+	template <typename F, typename... Bindings>
+	inline auto curry(F&& f, Bindings&&... bindings)
+	-> bind_t<F, typename filled_bindings_t<F, Bindings...>::type>
+	{
+		auto const f_size = function_traits<F>::arity;
+		auto const binding_size = sizeof...(Bindings);
+
+		//static_assert(f_size - binding_size >= 0, "uh-oh");
+
+		auto const rem_args = typename placeholder_tuple_args_t<f_size - binding_size>::type();
+		auto merged_bindings = std::tuple_cat(std::make_tuple(bindings...), rem_args);
+
+		//return xtm::bind(f, merged_bindings);
+		return bind_t<F, decltype(merged_bindings)>(f, merged_bindings);
+	}
+
+
 	template <typename R, typename from, typename to>
 	struct type_if_castible : 
 		std::enable_if<
@@ -216,7 +252,7 @@ namespace atma { namespace xtm {
 			}
 
 			template <size_t I, typename Args>
-			static auto select_element(placeholder_t<I>&&, Args&& args)
+			static auto select_element(placeholder_t<I>, Args&& args)
 			-> typename std::tuple_element<I, Args>::type
 			{
 				return std::get<I>(std::forward<Args>(args));
