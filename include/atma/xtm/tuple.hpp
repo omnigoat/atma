@@ -26,30 +26,86 @@ namespace
 }
 
 namespace atma { namespace xtm {
-	
-	template <size_t Count, typename... Acc>
-	struct placeholder_tuple_args_t
+		
+	//
+	//  tuple_cat_t
+	//  -------------
+	//    the type of two concatenated tuples
+	//
+	//      tuple_cat_t<std::tuple<int>, std::tuple<float, string>>
+	//         === std::tuple<int, float, string>
+	//
+	template <typename Lhs, typename Rhs>
+	struct tuple_cat_tt
+	{};
+
+	template <typename... Lhs, typename... Rhs>
+	struct tuple_cat_tt<std::tuple<Lhs...>, std::tuple<Rhs...>>
 	{
-		typedef typename placeholder_tuple_args_t<Count - 1, placeholder_t<Count - 1>, Acc...>::type type;
+		typedef std::tuple<Lhs..., Rhs...> type;
+	};
+
+	template <typename Lhs, typename Rhs>
+	using tuple_cat_t = typename tuple_cat_tt<Lhs, Rhs>::type;
+
+
+
+
+	//
+	//  placeholder_list_t
+	//  --------------------
+	//    generates a std::tuple<> of atma::placeholder<>, like so [ex]:
+	//      std::tuple<placeholder_t<0>, placeholder_t<1>, placeholder_t<2>>
+	//
+	template <uint Count, typename... Acc>
+	struct placeholder_list_tt
+	{
+		typedef typename placeholder_list_tt<Count - 1, placeholder_t<Count - 1>, Acc...>::type type;
 	};
 
 	template <typename... Acc>
-	struct placeholder_tuple_args_t<0, Acc...>
+	struct placeholder_list_tt<0, Acc...>
 	{
 		typedef std::tuple<Acc...> type;
 	};
 
+	template <uint Count>
+	using placeholder_list_t = typename placeholder_list_tt<Count>::type;
+
+
+
+
+	//
+	//  curried_bindings_t
+	//  --------------------
+	//    takes a 'callable' and a list of arguments, and returns the completed
+	//    bindings for a curried function. i.e:
+	//
+	//      assuming a function: int plus3(int a, int b, int c) { return a + b + c; }
+	//
+	//      curried_bindings_t<&plus3, int>    ==  std::tuple<int, placeholder_t<0>, placeholder_t<1>>
+	//
 	template <typename F, typename... B>
-	struct filled_bindings_t
+	struct curried_bindings_tt
 	{
-		typedef typename placeholder_tuple_args_t<function_traits<F>::arity - sizeof...(B)>::type trailing_bindings;
-		typedef decltype(std::tuple_cat(std::tuple<B...>(), trailing_bindings())) type;
+		using type = tuple_cat_t<
+			std::tuple<B...>,
+			placeholder_list_t<function_traits<F>::arity - sizeof...(B)>>;
 	};
+
+	template <typename F, typename... B>
+	using curried_bindings_t = typename curried_bindings_tt<F, B...>::type;
+
+
 
 	namespace detail {
 		template <size_t N> struct tuple_applier_t;
 		template <size_t M> struct bound_tuple_applier_t;
 	}
+
+
+
+
 
 
 	template <typename F, typename Bindings>
@@ -82,18 +138,15 @@ namespace atma { namespace xtm {
 
 	template <typename F, typename... Bindings>
 	inline auto curry(F&& f, Bindings&&... bindings)
-	-> bind_t<F, typename filled_bindings_t<F, Bindings...>::type>
+	-> bind_t<F, curried_bindings_t<F, Bindings...>> // typename filled_bindings_t<F, Bindings...>::type>
 	{
 		auto const f_size = function_traits<F>::arity;
 		auto const binding_size = sizeof...(Bindings);
 
-		//static_assert(f_size - binding_size >= 0, "uh-oh");
-
-		auto const rem_args = typename placeholder_tuple_args_t<f_size - binding_size>::type();
+		auto const rem_args = placeholder_list_t<f_size - binding_size>();
 		auto merged_bindings = std::tuple_cat(std::make_tuple(bindings...), rem_args);
 
-		//return xtm::bind(f, merged_bindings);
-		return bind_t<F, decltype(merged_bindings)>(f, merged_bindings);
+		return {f, merged_bindings};
 	}
 
 
