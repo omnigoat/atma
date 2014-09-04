@@ -26,14 +26,111 @@ namespace
 }
 
 namespace atma { namespace xtm {
-		
+
+	//
+	//  tuple_head_t
+	//  --------------
+	//    returns the first type in a tuple
+	//
+	template <typename Tuple>
+	struct tuple_head_tt
+	{
+		// empty tuples are bad
+	};
+
+	template <typename Head, typename... Tail>
+	struct tuple_head_tt<std::tuple<Head, Tail...>>
+	{
+		using type = Head;
+	};
+
+	template <typename Tuple>
+	using tuple_head_t = typename tuple_head_tt<Tuple>::type;
+
+
+
+
+	//
+	//  tuple_tail_t
+	//  --------------
+	//    returns a tuple of the trailing types of a tuple
+	//
+	//      tuple_tail_t<std::tuple<int, float, string>> === std::tuple<float, string>
+	//
+	template <typename Tuple>
+	struct tuple_tail_tt
+	{
+		// empty tuples are bad
+	};
+
+	template <typename Head, typename... Tail>
+	struct tuple_tail_tt<std::tuple<Head, Tail...>>
+	{
+		using type = std::tuple<Tail...>;
+	};
+
+	template <typename Tuple>
+	using tuple_tail_t = typename tuple_tail_tt<Tuple>::type;
+
+
+
+
+	//
+	//  tuple_push_front_t
+	//  -------------------
+	//    takes a tuple and an additional type and returns a tuple with the
+	//    other type inserted at the beginning
+	//
+	//      tuple_push_front_t<std::tuple<A, B>, C> === std::tuple<C, A, B>
+	//
+	template <typename Tuple, typename X>
+	struct tuple_push_front_tt
+	{
+	};
+
+	template <typename... Args, typename X>
+	struct tuple_push_front_tt<std::tuple<Args...>, X>
+	{
+		typedef std::tuple<X, Args...> type;
+	};
+
+	template <typename Tuple, typename X>
+	using tuple_push_front_t = typename tuple_push_front_tt<Tuple, X>::type;
+
+
+
+
+	//
+	//  tuple_push_back_t
+	//  -------------------
+	//    takes a tuple and an additional type and returns a tuple with the
+	//    other type inserted at the end
+	//
+	//      tuple_push_back_t<std::tuple<A, B>, C> === std::tuple<A, B, C>
+	//
+	template <typename Tuple, typename X>
+	struct tuple_push_back_tt
+	{
+	};
+
+	template <typename... Args, typename X>
+	struct tuple_push_back_tt<std::tuple<Args...>, X>
+	{
+		typedef std::tuple<Args..., X> type;
+	};
+
+	template <typename Tuple, typename X>
+	using tuple_push_back_t = typename tuple_push_back_tt<Tuple, X>::type;
+
+
+
+
 	//
 	//  tuple_cat_t
 	//  -------------
 	//    the type of two concatenated tuples
 	//
-	//      tuple_cat_t<std::tuple<int>, std::tuple<float, string>>
-	//         === std::tuple<int, float, string>
+	//      tuple_cat_t<std::tuple<int>, std::tuple<float, string>> === std::tuple<int, float, string>
 	//
 	template <typename Lhs, typename Rhs>
 	struct tuple_cat_tt
@@ -52,49 +149,64 @@ namespace atma { namespace xtm {
 
 
 	//
-	//  placeholder_list_t
-	//  --------------------
-	//    generates a std::tuple<> of atma::placeholder<>, like so [ex]:
-	//      std::tuple<placeholder_t<0>, placeholder_t<1>, placeholder_t<2>>
+	//  tuple_flip_tt
+	//  ---------------
+	//    flips the arguments in a tuple:
 	//
-	template <uint Count, typename... Acc>
+	//      tuple_flip_t<std::tuple<A, B, C>> === std::tuple<C, B, A>
+	//      tuple_flip_t<std::tuple<A>> === std::tuple<A>
+	//      tuple_flip_t<std::tuple<>> === std::tuple<>
+	//
+	template <typename Tuple>
+	struct tuple_flip_tt
+	{
+		using type =
+			tuple_push_back_t<
+				typename tuple_flip_tt<tuple_tail_t<Tuple>>::type,
+				tuple_head_t<Tuple>>;
+	};
+
+	template <typename T>
+	struct tuple_flip_tt<std::tuple<T>>
+	{
+		using type = std::tuple<T>;
+	};
+
+	template <>
+	struct tuple_flip_tt<std::tuple<>>
+	{
+		using type = std::tuple<>;
+	};
+	
+	template <typename Tuple>
+	using tuple_flip_t = typename tuple_flip_tt<Tuple>::type;
+
+
+	//
+	//  placeholder_list_t
+	//  placeholder_range_t
+	//  ---------------------
+	//
+	template <uint Rem, uint Idx>
 	struct placeholder_list_tt
 	{
-		typedef typename placeholder_list_tt<Count - 1, placeholder_t<Count - 1>, Acc...>::type type;
+		using type =
+			tuple_push_back_t<
+			typename placeholder_list_tt<Rem - 1, Idx>::type,
+			placeholder_t<Idx + Rem - 1>>;
 	};
 
-	template <typename... Acc>
-	struct placeholder_list_tt<0, Acc...>
+	template <uint Idx>
+	struct placeholder_list_tt<0, Idx>
 	{
-		typedef std::tuple<Acc...> type;
+		using type = std::tuple<>;
 	};
 
 	template <uint Count>
-	using placeholder_list_t = typename placeholder_list_tt<Count>::type;
+	using placeholder_list_t = typename placeholder_list_tt<Count, 0>::type;
 
-
-
-	//
-	//  placeholder_list_desc_t
-	//  -------------------------
-	//    generates a std::tuple<> of descinding atma::placeholder<>, like so [ex]:
-	//      std::tuple<placeholder_t<2>, placeholder_t<1>, placeholder_t<0>>
-	//
-	template <uint Idx, uint Count, typename... Acc>
-	struct placeholder_list_desc_tt
-	{
-		typedef typename placeholder_list_desc_tt<Idx + 1, Count - 1, placeholder_t<Idx>, Acc...>::type type;
-	};
-
-	template <uint Idx, typename... Acc>
-	struct placeholder_list_desc_tt<Idx, 0, Acc...>
-	{
-		typedef std::tuple<Acc...> type;
-	};
-
-	template <uint Count>
-	using placeholder_list_desc_t = typename placeholder_list_desc_tt<0, Count>::type;
-
+	template <uint Begin, uint End>
+	using placeholder_range_t = typename placeholder_list_tt<End - Begin, Begin>::type;
 
 
 
@@ -122,13 +234,9 @@ namespace atma { namespace xtm {
 
 
 	template <typename F>
-	struct flipped_bindings_tt
-	{
-		using type = placeholder_list_desc_t<function_traits<F>::arity>;
-	};
+	using flipped_bindings_t =
+		tuple_flip_t<curried_bindings_t<F>>;
 
-	template <typename F>
-	using flipped_bindings_t = typename flipped_bindings_tt<F>::type;
 
 
 
@@ -145,14 +253,12 @@ namespace atma { namespace xtm {
 	struct bound_arguments_tt
 	{
 	private:
-#if 0
 		template <typename Binding, typename AArgs>
 		static auto select_element(Binding&& b, AArgs&&)
 		-> decltype(b)
 		{
 			return std::forward<Binding>(b);
 		}
-#endif
 
 		template <size_t I, typename AArgs>
 		static auto select_element(placeholder_t<I>, AArgs&& args)
@@ -177,15 +283,11 @@ namespace atma { namespace xtm {
 				std::get<N - 1>(std::forward<BBindings>(bindings)),
 				std::forward<AArgs>(args));
 
-#if 0
-			return std::make_tuple(arg1, element);
-#else
 			return std::tuple_cat(
 				bound_arguments_tt<N - 1, Bindings, Args>::apply(
 					std::forward<BBindings>(bindings),
 					std::forward<AArgs>(args)),
 				std::make_tuple(element));
-#endif
 		}
 
 
