@@ -14,7 +14,7 @@
 
 namespace atma { namespace xtm {
 
-	template <size_t I> struct placeholder_t {};
+	template <uint I> struct placeholder_t {};
 
 }}
 
@@ -32,20 +32,27 @@ namespace atma { namespace xtm {
 	//  --------------
 	//    returns the first type in a tuple
 	//
-	template <typename Tuple>
-	struct tuple_head_tt
+	namespace detail
 	{
-		// empty tuples are bad
-	};
+		template <typename Tuple>
+		struct tuple_head_tt
+		{};
 
-	template <typename Head, typename... Tail>
-	struct tuple_head_tt<std::tuple<Head, Tail...>>
+		template <typename Head, typename... Tail>
+		struct tuple_head_tt<std::tuple<Head, Tail...>>
+		{
+			using type = Head;
+		};
+	}
+
+	template <typename xs>
+	using tuple_head_t = typename detail::tuple_head_tt<xs>::type;
+
+	template <typename xs_t>
+	inline auto tuple_head(xs_t&& xs) -> tuple_head_t<std::decay_t<xs_t>>
 	{
-		using type = Head;
-	};
-
-	template <typename Tuple>
-	using tuple_head_t = typename tuple_head_tt<Tuple>::type;
+		return std::get<0>(std::forward<xs_t>(xs));
+	}
 
 
 
@@ -57,22 +64,176 @@ namespace atma { namespace xtm {
 	//
 	//      tuple_tail_t<std::tuple<int, float, string>> === std::tuple<float, string>
 	//
-	template <typename Tuple>
-	struct tuple_tail_tt
+	namespace detail
 	{
-		// empty tuples are bad
+		template <typename>
+		struct tuple_tail_tt
+		{};
+
+		template <typename x, typename... xs>
+		struct tuple_tail_tt<std::tuple<x, xs...>>
+		{
+			using type = std::tuple<xs...>;
+		};
+
+
+		template <uint iter, uint... idxs>
+		struct tuple_tail_impl_t
+		{
+			template <typename xs_t>
+			static auto apply(xs_t&& xs) -> typename tuple_tail_tt<std::decay_t<xs_t>>::type {
+				return tuple_tail_impl_t<iter - 1, iter - 1, idxs...>::apply(xs);
+			}
+		};
+
+		template <uint... idxs>
+		struct tuple_tail_impl_t<1, idxs...>
+		{
+			template <typename xs_t>
+			static auto apply(xs_t&& xs) -> typename tuple_tail_tt<std::decay_t<xs_t>>::type {
+				return std::make_tuple(std::get<idxs>(xs)...);
+			}
+		};
+	}
+
+	template <typename xs>
+	using tuple_tail_t = typename detail::tuple_tail_tt<xs>::type;
+
+	template <typename xs_t>
+	inline auto tuple_tail(xs_t&& xs) -> tuple_tail_t<std::decay_t<xs_t>>
+	{
+		return detail::tuple_tail_impl_t<std::tuple_size<std::decay_t<xs_t>>::value>::apply(xs);
+	}
+
+
+
+	//
+	//
+	//
+	namespace detail
+	{
+		template <typename, typename>
+		struct tuple_join_tt
+		{};
+
+		template <typename... xs, typename x>
+		struct tuple_join_tt<std::tuple<xs...>, x>
+		{
+			typedef std::tuple<xs..., x> type;
+		};
+
+		template <typename... xs, typename x>
+		struct tuple_join_tt<x, std::tuple<xs...>>
+		{
+			typedef std::tuple<x, xs...> type;
+		};
+
+		template <typename A, typename B>
+		using tuple_join_t = typename tuple_join_tt<A, B>::type;
+	}
+
+
+
+
+	//
+	//  tuple_map_natnum_t
+	//  --------------------
+	//    note: we include zero, naturally.
+	//    maps a type-constructor that takes a natural number.
+	//
+	template <typename T, template <T E> class F, T Begin, T End, T... Acc>
+	struct tuple_map_natnum_tt
+	{
+		using type = typename tuple_map_natnum_tt<T, F, Begin, End - 1, End - 1, Acc...>::type;
 	};
 
-	template <typename Head, typename... Tail>
-	struct tuple_tail_tt<std::tuple<Head, Tail...>>
+	template <typename T, template <T E> class F, T Terminal, T... Acc>
+	struct tuple_map_natnum_tt<T, F, Terminal, Terminal, Acc...>
 	{
-		using type = std::tuple<Tail...>;
+		using type = std::tuple<F<Acc>...>;
 	};
 
-	template <typename Tuple>
-	using tuple_tail_t = typename tuple_tail_tt<Tuple>::type;
+	template <typename T, template <T E> class F, T Begin, T End>
+	using tuple_map_natnum_t = typename tuple_map_natnum_tt<T, F, Begin, End>::type;
 
 
+
+
+	//
+	//  tuple_map_natnumT_t
+	//  --------------------
+	//    note: we include zero, naturally.
+	//    maps a type-constructor that takes first the type of integral, and a natural number
+	//
+	template <typename T, template <typename, T E> class F, T Begin, T End, T... Acc>
+	struct tuple_map_natnumT_tt
+	{
+		using type = typename tuple_map_natnumT_tt<T, F, Begin, End - 1, End - 1, Acc...>::type;
+	};
+
+	template <typename T, template <typename, T E> class F, T Terminal, T... Acc>
+	struct tuple_map_natnumT_tt<T, F, Terminal, Terminal, Acc...>
+	{
+		using type = std::tuple<F<T, Acc>...>;
+	};
+
+	template <typename T, template <typename, T E> class F, T Begin, T End>
+	using tuple_map_natnumT_t = typename tuple_map_natnumT_tt<T, F, Begin, End>::type;
+
+
+
+
+	//
+	//  tuple_integral_list_t
+	//  tuple_integral_range_t
+	//  ------------------------
+	//
+	template <typename T, T Count>
+	using tuple_integral_list_t = typename tuple_map_natnumT_tt<T, std::integral_constant, 0, Count>::type;
+
+	template <typename T, T Begin, T End>
+	using tuple_integral_range_t = typename tuple_map_natnumT_tt<T, std::integral_constant, Begin, End>::type;
+
+
+
+
+	//
+	//  tuple_placeholder_list_t
+	//  tuple_placeholder_range_t
+	//  ---------------------------
+	//
+	template <uint Begin, uint End>
+	using tuple_placeholder_range_t = typename tuple_map_natnum_tt<uint, placeholder_t, Begin, End>::type;
+
+	template <uint Count>
+	using tuple_placeholder_list_t = typename tuple_map_natnum_tt<uint, placeholder_t, 0, Count>::type;
+
+
+
+	
+
+
+
+	
+
+
+
+
+	//
+	//
+	//
+	template <template <typename, typename> class F, typename Y, typename XS>
+	struct tuple_fold_tt
+	{
+		using type =
+			typename tuple_fold_tt<F, F<Y, tuple_head_t<XS>>, tuple_tail_t<XS>>::type;
+	};
+
+	template <template <typename, typename> class F, typename Y>
+	struct tuple_fold_tt<F, Y, std::tuple<>>
+	{
+		using type = Y;
+	};
 
 
 	//
@@ -83,10 +244,9 @@ namespace atma { namespace xtm {
 	//
 	//      tuple_push_front_t<std::tuple<A, B>, C> === std::tuple<C, A, B>
 	//
-	template <typename Tuple, typename X>
+	template <typename xs, typename x>
 	struct tuple_push_front_tt
-	{
-	};
+	{};
 
 	template <typename... Args, typename X>
 	struct tuple_push_front_tt<std::tuple<Args...>, X>
@@ -147,6 +307,32 @@ namespace atma { namespace xtm {
 
 
 
+	//
+	//  tuple_map_t
+	//  --------------------
+	//
+	namespace detail
+	{
+		template <template <typename> class f, typename xs>
+		struct tuple_map_tt
+		{
+			using type =
+				tuple_join_t<
+					typename f<tuple_head_t<xs>>::type,
+					typename tuple_map_tt<f, tuple_tail_t<xs>>::type>;
+		};
+
+		template <template <typename> class f>
+		struct tuple_map_tt<f, std::tuple<>>
+		{
+			using type = std::tuple<>;
+		};
+	}
+
+	template <template <typename> class f, typename xs>
+	using tuple_map_t = typename detail::tuple_map_tt<f, xs>::type;
+
+
 
 	//
 	//  tuple_flip_tt
@@ -183,10 +369,11 @@ namespace atma { namespace xtm {
 
 
 	//
-	//  placeholder_list_t
-	//  placeholder_range_t
+	//  tuple_placeholder_list_t
+	//  tuple_placeholder_range_t
 	//  ---------------------
 	//
+#if 0
 	template <uint Rem, uint Idx>
 	struct placeholder_list_tt
 	{
@@ -203,11 +390,11 @@ namespace atma { namespace xtm {
 	};
 
 	template <uint Count>
-	using placeholder_list_t = typename placeholder_list_tt<Count, 0>::type;
+	using tuple_placeholder_list_t = typename placeholder_list_tt<Count, 0>::type;
 
 	template <uint Begin, uint End>
-	using placeholder_range_t = typename placeholder_list_tt<End - Begin, Begin>::type;
-
+	using tuple_placeholder_range_t = typename placeholder_list_tt<End - Begin, Begin>::type;
+#endif
 
 
 	//
@@ -225,7 +412,7 @@ namespace atma { namespace xtm {
 	{
 		using type = tuple_cat_t<
 			std::tuple<B...>,
-			placeholder_list_t<function_traits<F>::arity - sizeof...(B)>>;
+			tuple_placeholder_list_t<function_traits<F>::arity - sizeof...(B)>>;
 	};
 
 	template <typename F, typename... B>
@@ -398,7 +585,7 @@ namespace atma { namespace xtm {
 		auto const f_size = function_traits<F>::arity;
 		auto const binding_size = sizeof...(Bindings);
 
-		auto const rem_args = placeholder_list_t<f_size - binding_size>();
+		auto const rem_args = tuple_placeholder_list_t<f_size - binding_size>();
 		auto merged_bindings = std::tuple_cat(std::make_tuple(bindings...), rem_args);
 
 		return {f, merged_bindings};
