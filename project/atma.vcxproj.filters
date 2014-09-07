@@ -196,5 +196,8 @@
     <ClInclude Include="..\include\atma\filesystem\file.hpp">
       <Filter>include\filesystem</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\xtm\idxs.hpp">
+      <Filter>include\xtm</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
