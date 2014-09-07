@@ -68,6 +68,7 @@
     <ClInclude Include="..\include\atma\utf\utf8_string_range_header.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string_range.hpp" />
     <ClInclude Include="..\include\atma\xtm\function.hpp" />
+    <ClInclude Include="..\include\atma\xtm\idxs.hpp" />
     <ClInclude Include="..\include\atma\xtm\tuple.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
