@@ -16,7 +16,11 @@
 
 namespace atma { namespace xtm {
 
-	template <uint I> struct placeholder_t {};
+	template <int I> struct placeholder_t
+	{
+		// placeholder_t is an identity function (i.e., it constructs itself)
+		using type = placeholder_t<I>;
+	};
 
 }}
 
@@ -25,6 +29,11 @@ namespace
 	atma::xtm::placeholder_t<0> const arg1;
 	atma::xtm::placeholder_t<1> const arg2;
 	atma::xtm::placeholder_t<2> const arg3;
+	atma::xtm::placeholder_t<3> const arg4;
+	atma::xtm::placeholder_t<4> const arg5;
+	atma::xtm::placeholder_t<5> const arg6;
+	atma::xtm::placeholder_t<6> const arg7;
+	atma::xtm::placeholder_t<7> const arg8;
 }
 
 
@@ -32,7 +41,9 @@ namespace atma { namespace xtm {
 
 	namespace detail
 	{
-		template <typename, uint>     struct tuple_get_tx;
+		template <template <int> class, typename> struct tuple_idxs_map_tx;
+
+		template <uint, typename>     struct tuple_get_tx;
 		template <typename, typename> struct tuple_select_tx;
 
 		template <typename> struct tuple_head_tt;
@@ -43,27 +54,49 @@ namespace atma { namespace xtm {
 
 
 
+	//
+	//  tuple_idxs_map_t
+	//  ------------------
+	//    maps a function over an idxs_t and generates a tuple
+	//
+	//    tuple_idxs_map_t<placeholder_t, idxs_t<0, 1, 2>> ===
+	//      std::tuple<placeholder_t<0>, placeholder_t<1>, placeholder_t<2>>
+	//
+	template <template <int> class f, typename idxs>
+	using tuple_idxs_map_t = typename detail::tuple_idxs_map_tx<f, idxs>::type;
+
+	namespace detail
+	{
+		template <template <int> class f, int... idxs>
+		struct tuple_idxs_map_tx<f, idxs_t<idxs...>>
+		{
+			using type = std::tuple<typename f<idxs>::type...>;
+		};
+	}
+
+
+
 
 	//
 	//  tuple_get
 	//  -----------
 	//    gets an element from a tuple
 	//
-	//    tuple_get_t<std::tuple<int, float, string, dragon>, 1>
+	//    tuple_get_t<1, std::tuple<int, float, string, dragon>>
 	//      === std::tuple<float>
 	//
-	template <typename xs, uint idx>
-	using tuple_get_t = typename detail::tuple_get_tx<std::decay_t<xs>, idx>::type;
+	template <uint idx, typename xs>
+	using tuple_get_t = typename detail::tuple_get_tx<idx, std::decay_t<xs>>::type;
 
-	template <typename xs_t, uint idx>
-	inline auto tuple_get(xs_t&& xs) -> tuple_get_t<xs_t, idx>
+	template <uint idx, typename xs_t>
+	inline auto tuple_get(xs_t&& xs) -> tuple_get_t<idx, xs_t>
 	{
-		return detail::tuple_get_tx<std::decay_t<xs_t>, idx>::call(std::forward<xs_t>(xs));
+		return detail::tuple_get_tx<idx, std::decay_t<xs_t>>::call(std::forward<xs_t>(xs));
 	}
 
 	namespace detail
 	{
-		template <typename xxs, uint idx>
+		template <uint idx, typename xxs>
 		struct tuple_get_tx
 		{
 			using type = typename std::tuple_element<idx, xxs>::type;
@@ -78,9 +111,26 @@ namespace atma { namespace xtm {
 		};
 	}
 
-	
 
-	
+
+	template <template <typename...> class f, typename... args>
+	struct type_curry_tx
+	{
+	private:
+		template <typename... lhs>
+		struct impl : f<lhs..., args...>::type
+		{};
+
+	public:
+		template <typename... lhs>
+		using type = impl<lhs...>;
+	};
+
+	template <template <typename...> class f, typename... args>
+	using type_curry_t = typename type_curry_tx<f, args...>::type;
+
+
+
 
 
 	//
@@ -105,12 +155,12 @@ namespace atma { namespace xtm {
 		template <uint... idxs, typename ys>
 		struct tuple_select_tx<idxs_t<idxs...>, ys>
 		{
-			using type = std::tuple<typename detail::tuple_get_tx<ys, idxs>::type...>;
+			using type = std::tuple<typename detail::tuple_get_tx<idxs, ys>::type...>;
 
 			template <typename xs_t>
 			static auto call(xs_t&& xs) -> type
 			{
-				return std::make_tuple(detail::tuple_get_tx<typename std::decay<xs_t>::type, idxs>::call(std::forward<xs_t>(xs))...);
+				return std::make_tuple(detail::tuple_get_tx<idxs, typename std::decay<xs_t>::type>::call(std::forward<xs_t>(xs))...);
 			}
 		};
 	}
@@ -177,8 +227,11 @@ namespace atma { namespace xtm {
 	//
 	//  tuple_join_t
 	//  --------------
-	//    joins a type to a tuple, on either end, or two tuples together
+	//    joins a type to a tuple, on either end
 	//
+	template <typename lhs, typename rhs>
+	using tuple_join_t = typename detail::tuple_join_tt<lhs, rhs>::type;
+	
 	namespace detail
 	{
 		template <typename... xs, typename x>
@@ -193,80 +246,32 @@ namespace atma { namespace xtm {
 			typedef std::tuple<x, xs...> type;
 		};
 
-		template <typename... xs, typename... ys>
-		struct tuple_join_tt<std::tuple<xs...>, std::tuple<ys...>>
-		{
-			typedef std::tuple<xs..., ys...> type;
-		};
-
 		template <typename A, typename B>
 		using tuple_join_t = typename tuple_join_tt<A, B>::type;
 	}
 
-	template <typename lhs, typename rhs>
-	using tuple_join_t = typename detail::tuple_join_tt<lhs, rhs>::type;
 
 
 
-#if 0
 	//
-	//  tuple_map_natnum_t
-	//  --------------------
-	//    note: we include zero, naturally.
-	//    maps a type-constructor that takes a natural number.
+	//  tuple_cat_t
+	//  -------------
+	//    the type of two concatenated tuples
 	//
-	template <typename T, template <T E> class F, T Begin, T End, T... Acc>
-	struct tuple_map_natnum_tt
+	//      tuple_cat_t<std::tuple<int>, std::tuple<float, string>> === std::tuple<int, float, string>
+	//
+	template <typename Lhs, typename Rhs>
+	struct tuple_cat_tt
+	{};
+
+	template <typename... Lhs, typename... Rhs>
+	struct tuple_cat_tt<std::tuple<Lhs...>, std::tuple<Rhs...>>
 	{
-		using type = typename tuple_map_natnum_tt<T, F, Begin, End - 1, End - 1, Acc...>::type;
+		typedef std::tuple<Lhs..., Rhs...> type;
 	};
 
-	template <typename T, template <T E> class F, T Terminal, T... Acc>
-	struct tuple_map_natnum_tt<T, F, Terminal, Terminal, Acc...>
-	{
-		using type = std::tuple<F<Acc>...>;
-	};
-
-	template <typename T, template <T E> class F, T Begin, T End>
-	using tuple_map_natnum_t = typename tuple_map_natnum_tt<T, F, Begin, End>::type;
-
-
-
-
-	//
-	//  tuple_map_natnumT_t
-	//  --------------------
-	//    note: we include zero, naturally.
-	//    maps a type-constructor that takes first the type of integral, and a natural number
-	//
-	template <typename T, template <typename, T E> class F, T Begin, T End, T... Acc>
-	struct tuple_map_natnumT_tt
-	{
-		using type = typename tuple_map_natnumT_tt<T, F, Begin, End - 1, End - 1, Acc...>::type;
-	};
-
-	template <typename T, template <typename, T E> class F, T Terminal, T... Acc>
-	struct tuple_map_natnumT_tt<T, F, Terminal, Terminal, Acc...>
-	{
-		using type = std::tuple<F<T, Acc>...>;
-	};
-
-	template <typename T, template <typename, T E> class F, T Begin, T End>
-	using tuple_map_natnumT_t = typename tuple_map_natnumT_tt<T, F, Begin, End>::type;
-#endif
-
-
-
-	//
-	//  tuple_integral_list_t
-	//  tuple_integral_range_t
-	//  ------------------------
-	//
-	template <typename T, T Count>
-	using tuple_integral_list_t = typename tuple_map_natnumT_tt<T, std::integral_constant, 0, Count>::type;
-
-	template <typename T, T Begin, T End>
-	using tuple_integral_range_t = typename tuple_map_natnumT_tt<T, std::integral_constant, Begin, End>::type;
+	template <typename Lhs, typename Rhs>
+	using tuple_cat_t = typename tuple_cat_tt<Lhs, Rhs>::type;
 
 
 
@@ -276,11 +281,13 @@ namespace atma { namespace xtm {
 	//  tuple_placeholder_range_t
 	//  ---------------------------
 	//
-	template <uint Begin, uint End>
-	using tuple_placeholder_range_t = typename tuple_map_natnum_tt<uint, placeholder_t, Begin, End>::type;
+	template <uint begin, uint end>
+	using tuple_placeholder_range_t =
+		typename detail::tuple_idxs_map_tx<placeholder_t, typename detail::idxs_range_impl<begin, end>::type>::type;
 
-	template <uint Count>
-	using tuple_placeholder_list_t = typename tuple_map_natnum_tt<uint, placeholder_t, 0, Count>::type;
+	template <uint count>
+	using tuple_placeholder_list_t =
+		typename detail::tuple_idxs_map_tx<placeholder_t, typename detail::idxs_range_impl<0, count>::type>::type;
 
 
 
@@ -312,25 +319,7 @@ namespace atma { namespace xtm {
 
 
 
-	//
-	//  tuple_cat_t
-	//  -------------
-	//    the type of two concatenated tuples
-	//
-	//      tuple_cat_t<std::tuple<int>, std::tuple<float, string>> === std::tuple<int, float, string>
-	//
-	template <typename Lhs, typename Rhs>
-	struct tuple_cat_tt
-	{};
-
-	template <typename... Lhs, typename... Rhs>
-	struct tuple_cat_tt<std::tuple<Lhs...>, std::tuple<Rhs...>>
-	{
-		typedef std::tuple<Lhs..., Rhs...> type;
-	};
-
-	template <typename Lhs, typename Rhs>
-	using tuple_cat_t = typename tuple_cat_tt<Lhs, Rhs>::type;
+	
 
 
 
