@@ -46,10 +46,10 @@ namespace atma { namespace xtm {
 		template <uint, typename>     struct tuple_get_tx;
 		template <typename, typename> struct tuple_select_tx;
 
-		template <typename> struct tuple_head_tt;
-		template <typename> struct tuple_tail_tt;
+		template <typename> struct tuple_head_tx;
+		template <typename> struct tuple_tail_tx;
 
-		template <typename, typename> struct tuple_join_tt;
+		template <typename, typename> struct tuple_join_tx;
 	}
 
 
@@ -113,6 +113,17 @@ namespace atma { namespace xtm {
 
 
 
+
+
+	//
+	//  type_curry_t
+	//  --------------
+	//    tuple_select_t<idxs_t<1, 3>, std::tuple<int, float, string, dragon>>
+	//      === std::tuple<float, dragon>
+	//
+	//    tuple_select<ids_t<1>>(std::tuple<float, int>()) == std::tuple<int>()
+	//
+#if 0
 	template <template <typename...> class f, typename... args>
 	struct type_curry_tx
 	{
@@ -128,9 +139,7 @@ namespace atma { namespace xtm {
 
 	template <template <typename...> class f, typename... args>
 	using type_curry_t = typename type_curry_tx<f, args...>::type;
-
-
-
+#endif
 
 
 	//
@@ -174,7 +183,7 @@ namespace atma { namespace xtm {
 	//    returns the first type in a tuple
 	//
 	template <typename xs>
-	using tuple_head_t = typename detail::tuple_head_tt<typename std::decay<xs>::type>::type;
+	using tuple_head_t = typename detail::tuple_head_tx<typename std::decay<xs>::type>::type;
 
 	template <typename xs_t>
 	inline auto tuple_head(xs_t&& xs) -> tuple_head_t<xs_t>
@@ -185,7 +194,7 @@ namespace atma { namespace xtm {
 	namespace detail
 	{
 		template <typename x, typename... xs>
-		struct tuple_head_tt<std::tuple<x, xs...>>
+		struct tuple_head_tx<std::tuple<x, xs...>>
 		{
 			using type = x;
 		};
@@ -204,14 +213,15 @@ namespace atma { namespace xtm {
 	namespace detail
 	{
 		template <typename x, typename... xs>
-		struct tuple_tail_tt<std::tuple<x, xs...>>
+		struct tuple_tail_tx<std::tuple<x, xs...>>
 		{
 			using type = std::tuple<xs...>;
 		};
 	}
 
 	template <typename xs>
-	using tuple_tail_t = typename detail::tuple_tail_tt<typename std::decay<xs>::type>::type;
+	using tuple_tail_t = typename detail::tuple_tail_tx<typename std::decay<xs>::type>::type;
+	
 
 	template <typename xs_t>
 	inline auto tuple_tail(xs_t&& xs) -> tuple_tail_t<xs_t>
@@ -230,24 +240,48 @@ namespace atma { namespace xtm {
 	//    joins a type to a tuple, on either end
 	//
 	template <typename lhs, typename rhs>
-	using tuple_join_t = typename detail::tuple_join_tt<lhs, rhs>::type;
+	using tuple_join_t = typename detail::tuple_join_tx<lhs, rhs>::type;
 	
 	namespace detail
 	{
 		template <typename... xs, typename x>
-		struct tuple_join_tt<std::tuple<xs...>, x>
+		struct tuple_join_tx<std::tuple<xs...>, x>
 		{
 			typedef std::tuple<xs..., x> type;
 		};
 
 		template <typename... xs, typename x>
-		struct tuple_join_tt<x, std::tuple<xs...>>
+		struct tuple_join_tx<x, std::tuple<xs...>>
 		{
 			typedef std::tuple<x, xs...> type;
+
+			template <typename y_t, typename ys_t>
+			static auto call(y_t&& y, ys_t&& ys) -> type
+			{
+				auto const tail_size = std::tuple_size<std::decay_t<ys_t>>::value;
+
+				return call2(std::forward<y_t>(y), std::forward<ys_t>(ys), idxs_list_t<tail_size>());
+			}
+
+		private:
+			template <typename y_t, typename ys_t, int... idxs>
+			static auto call2(y_t&& y, ys_t&& ys, idxs_t<idxs...>) -> type
+			{
+				return type(std::forward<y_t>(y), tuple_get<idxs>(std::forward<ys_t>(ys))...);
+			}
 		};
 
 		template <typename A, typename B>
-		using tuple_join_t = typename tuple_join_tt<A, B>::type;
+		using tuple_join_t = typename tuple_join_tx<A, B>::type;
+	}
+
+	template <typename y_t, typename ys_t>
+	static auto tuple_join(y_t&& y, ys_t&& ys) -> tuple_join_t<std::decay_t<y_t>, std::decay_t<ys_t>>
+	{
+		return detail::tuple_join_tx<
+			std::decay_t<y_t>,
+			std::decay_t<ys_t>>
+				::call(std::forward<y_t>(y), std::forward<ys_t>(ys));
 	}
 
 
@@ -261,17 +295,17 @@ namespace atma { namespace xtm {
 	//      tuple_cat_t<std::tuple<int>, std::tuple<float, string>> === std::tuple<int, float, string>
 	//
 	template <typename Lhs, typename Rhs>
-	struct tuple_cat_tt
+	struct tuple_cat_tx
 	{};
 
 	template <typename... Lhs, typename... Rhs>
-	struct tuple_cat_tt<std::tuple<Lhs...>, std::tuple<Rhs...>>
+	struct tuple_cat_tx<std::tuple<Lhs...>, std::tuple<Rhs...>>
 	{
 		typedef std::tuple<Lhs..., Rhs...> type;
 	};
 
 	template <typename Lhs, typename Rhs>
-	using tuple_cat_t = typename tuple_cat_tt<Lhs, Rhs>::type;
+	using tuple_cat_t = typename tuple_cat_tx<Lhs, Rhs>::type;
 
 
 
@@ -304,14 +338,14 @@ namespace atma { namespace xtm {
 	//
 	//
 	template <template <typename, typename> class F, typename Y, typename XS>
-	struct tuple_fold_tt
+	struct tuple_fold_tx
 	{
 		using type =
-			typename tuple_fold_tt<F, F<Y, tuple_head_t<XS>>, tuple_tail_t<XS>>::type;
+			typename tuple_fold_tx<F, F<Y, tuple_head_t<XS>>, tuple_tail_t<XS>>::type;
 	};
 
 	template <template <typename, typename> class F, typename Y>
-	struct tuple_fold_tt<F, Y, std::tuple<>>
+	struct tuple_fold_tx<F, Y, std::tuple<>>
 	{
 		using type = Y;
 	};
@@ -330,22 +364,22 @@ namespace atma { namespace xtm {
 	namespace detail
 	{
 		template <template <typename...> class f, typename xs>
-		struct tuple_map_tt;
+		struct tuple_map_tx;
 
 		template <template <typename...> class f, typename... xs>
-		struct tuple_map_tt<f, std::tuple<xs...>>
+		struct tuple_map_tx<f, std::tuple<xs...>>
 		{
 			using type = std::tuple<typename f<xs>::type...>;
 		};
 	}
 
 	template <template <typename> class f, typename xs>
-	using tuple_map_t = typename detail::tuple_map_tt<f, xs>::type;
+	using tuple_map_t = typename detail::tuple_map_tx<f, xs>::type;
 
 
 
 	//
-	//  tuple_flip_tt
+	//  tuple_flip_tx
 	//  ---------------
 	//    flips the arguments in a tuple:
 	//
@@ -353,40 +387,40 @@ namespace atma { namespace xtm {
 	//      tuple_flip_t<std::tuple<A>> === std::tuple<A>
 	//      tuple_flip_t<std::tuple<>> === std::tuple<>
 	//
-	template <typename Tuple> struct tuple_flip_tt;
-	template <typename Tuple> using tuple_flip_t = typename tuple_flip_tt<Tuple>::type;
+	template <typename Tuple> struct tuple_flip_tx;
+	template <typename Tuple> using tuple_flip_t = typename tuple_flip_tx<Tuple>::type;
 
 #if 0
 	template <typename Tuple>
-	struct tuple_flip_tt
+	struct tuple_flip_tx
 	{
 		using type =
 			tuple_join_t<
-				typename tuple_flip_tt<tuple_tail_t<Tuple>>::type,
+				typename tuple_flip_tx<tuple_tail_t<Tuple>>::type,
 				tuple_head_t<Tuple>>;
 	};
 
 	template <typename T>
-	struct tuple_flip_tt<std::tuple<T>>
+	struct tuple_flip_tx<std::tuple<T>>
 	{
 		using type = std::tuple<T>;
 	};
 
 	template <>
-	struct tuple_flip_tt<std::tuple<>>
+	struct tuple_flip_tx<std::tuple<>>
 	{
 		using type = std::tuple<>;
 	};
 
 #else
 	template <typename>
-	struct tuple_flip_tt
+	struct tuple_flip_tx
 	{
 		using type = std::tuple<>;
 	};
 
 	template <typename head, typename... tail>
-	struct tuple_flip_tt<std::tuple<head, tail...>>
+	struct tuple_flip_tx<std::tuple<head, tail...>>
 	{
 		using type =
 			tuple_join_t<
@@ -395,14 +429,14 @@ namespace atma { namespace xtm {
 	};
 
 	template <typename T>
-	struct tuple_flip_tt<std::tuple<T>>
+	struct tuple_flip_tx<std::tuple<T>>
 	{
 		using type = std::tuple<T>;
 	};
 #endif
 
 	//template <typename Tuple>
-	//using tuple_flip_t = typename tuple_flip_tt<Tuple>::type;
+	//using tuple_flip_t = typename tuple_flip_tx<Tuple>::type;
 
 	//
 	//  tuple_placeholder_list_t
@@ -411,25 +445,25 @@ namespace atma { namespace xtm {
 	//
 #if 0
 	template <uint Rem, uint Idx>
-	struct placeholder_list_tt
+	struct placeholder_list_tx
 	{
 		using type =
 			tuple_join_t<
-			typename placeholder_list_tt<Rem - 1, Idx>::type,
+			typename placeholder_list_tx<Rem - 1, Idx>::type,
 			placeholder_t<Idx + Rem - 1>>;
 	};
 
 	template <uint Idx>
-	struct placeholder_list_tt<0, Idx>
+	struct placeholder_list_tx<0, Idx>
 	{
 		using type = std::tuple<>;
 	};
 
 	template <uint Count>
-	using tuple_placeholder_list_t = typename placeholder_list_tt<Count, 0>::type;
+	using tuple_placeholder_list_t = typename placeholder_list_tx<Count, 0>::type;
 
 	template <uint Begin, uint End>
-	using tuple_placeholder_range_t = typename placeholder_list_tt<End - Begin, Begin>::type;
+	using tuple_placeholder_range_t = typename placeholder_list_tx<End - Begin, Begin>::type;
 #endif
 
 
@@ -444,7 +478,7 @@ namespace atma { namespace xtm {
 	//      curried_bindings_t<&plus3, int>    ==  std::tuple<int, placeholder_t<0>, placeholder_t<1>>
 	//
 	template <typename F, typename... B>
-	struct curried_bindings_tt
+	struct curried_bindings_tx
 	{
 		using type = tuple_cat_t<
 			std::tuple<B...>,
@@ -452,7 +486,7 @@ namespace atma { namespace xtm {
 	};
 
 	template <typename F, typename... B>
-	using curried_bindings_t = typename curried_bindings_tt<F, B...>::type;
+	using curried_bindings_t = typename curried_bindings_tx<F, B...>::type;
 
 
 
@@ -473,7 +507,7 @@ namespace atma { namespace xtm {
 	// takes bindings and arguments and applies the arguments to the bindings
 	//
 	template <size_t N, typename Bindings, typename Args>
-	struct bound_arguments_tt
+	struct bound_arguments_tx
 	{
 	private:
 		template <typename Binding, typename AArgs>
@@ -493,7 +527,7 @@ namespace atma { namespace xtm {
 	public:
 		using type =
 			tuple_join_t<
-				typename bound_arguments_tt<N - 1, Bindings, Args>::type,
+				typename bound_arguments_tx<N - 1, Bindings, Args>::type,
 				std::remove_reference_t<decltype(select_element(
 					std::get<N - 1>(std::declval<Bindings>()),
 					std::declval<Args>()))>>;
@@ -507,7 +541,7 @@ namespace atma { namespace xtm {
 				std::forward<AArgs>(args));
 
 			return std::tuple_cat(
-				bound_arguments_tt<N - 1, Bindings, Args>::apply(
+				bound_arguments_tx<N - 1, Bindings, Args>::apply(
 					std::forward<BBindings>(bindings),
 					std::forward<AArgs>(args)),
 				std::make_tuple(element));
@@ -518,7 +552,7 @@ namespace atma { namespace xtm {
 	};
 
 	template <typename Bindings, typename Args>
-	struct bound_arguments_tt<0, Bindings, Args>
+	struct bound_arguments_tx<0, Bindings, Args>
 	{
 		using type = std::tuple<>;
 
@@ -530,14 +564,14 @@ namespace atma { namespace xtm {
 
 
 	template <typename Bindings, typename Args>
-	using bound_arguments_t = typename bound_arguments_tt<std::tuple_size<
+	using bound_arguments_t = typename bound_arguments_tx<std::tuple_size<
 		std::remove_reference_t<Bindings>>::value, Bindings, Args>::type;
 
 	template <typename Bindings, typename Args>
 	inline auto bind_arguments(Bindings&& bindings, Args&& args) -> bound_arguments_t<Bindings, Args>
 	{
 		auto const bindings_count = std::tuple_size<std::remove_reference_t<Bindings>>::value;
-		return bound_arguments_tt<bindings_count, Bindings, Args>::apply(
+		return bound_arguments_tx<bindings_count, Bindings, Args>::apply(
 			std::forward<Bindings>(bindings),
 			std::forward<Args>(args));
 	}
@@ -582,33 +616,33 @@ namespace atma { namespace xtm {
 		return{std::forward<F>(f), std::forward_as_tuple(bindings...)};
 	}
 
-	// bind taking a bind compresses the binds
+	// bind taking a bind: recompose the binds
 	template <typename PreF, typename Prebindings, typename... Bindings>
 	inline auto bind(bind_t<PreF, Prebindings> const& b, Bindings&&... bindings)
-	-> bind_t<PreF, bound_arguments_t<Prebindings, std::tuple<Bindings...>>>
+		-> bind_t<PreF, bound_arguments_t<Prebindings, std::tuple<Bindings...>>>
 	{
-		return{b.fn(), bind_arguments(b.bindings(), std::forward_as_tuple(bindings...))};
+		return {b.fn(), bind_arguments(b.bindings(), std::forward_as_tuple(bindings...))};
 	}
 
 	template <typename PreF, typename Prebindings, typename... Bindings>
 	inline auto bind(bind_t<PreF, Prebindings>& b, Bindings&&... bindings)
 		-> bind_t<PreF, bound_arguments_t<Prebindings, std::tuple<Bindings...>>>
 	{
-		return{b.fn(), bind_arguments(b.bindings(), std::forward_as_tuple(bindings...))};
+		return {b.fn(), bind_arguments(b.bindings(), std::forward_as_tuple(bindings...))};
 	}
 
 	template <typename PreF, typename Prebindings, typename... Bindings>
 	inline auto bind(bind_t<PreF, Prebindings>&& b, Bindings&&... bindings)
 		-> bind_t<PreF, bound_arguments_t<Prebindings, std::tuple<Bindings...>>>
 	{
-		return{b.fn(), bind_arguments(b.bindings(), std::forward_as_tuple(bindings...))};
+		return {b.fn(), bind_arguments(b.bindings(), std::forward_as_tuple(bindings...))};
 	}
 
 	template <typename PreF, typename Prebindings, typename... Bindings>
 	inline auto bind(bind_t<PreF, Prebindings> const&& b, Bindings&&... bindings)
 		-> bind_t<PreF, bound_arguments_t<Prebindings, std::tuple<Bindings...>>>
 	{
-		return{b.fn(), bind_arguments(b.bindings(), std::forward_as_tuple(bindings...))};
+		return {b.fn(), bind_arguments(b.bindings(), std::forward_as_tuple(bindings...))};
 	}
 
 	
