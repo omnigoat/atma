@@ -43,7 +43,7 @@ namespace atma { namespace xtm {
 		template <int begin, int end, int... idxs>
 		struct idxs_range_impl
 		{
-			using type = typename idxs_range_impl<begin + 1, end, begin, idxs...>::type;
+			using type = typename idxs_range_impl<begin + 1, end, idxs..., begin>::type;
 		};
 
 		template <int t, int... idxs>
