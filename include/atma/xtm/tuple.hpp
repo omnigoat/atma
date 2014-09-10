@@ -76,6 +76,21 @@ namespace atma { namespace xtm {
 
 
 
+	template <typename T, size_t S>
+	struct tuple_integral_list_tx
+	{
+		template <int>
+		struct make_integral { using type = T; };
+
+		using type =
+			tuple_idxs_map_t<make_integral, idxs_list_t<S>>;
+	};
+
+	template <typename T, size_t S>
+	using tuple_integral_list_t = typename tuple_integral_list_tx<T, S>::type;
+
+
+
 
 	//
 	//  tuple_get
