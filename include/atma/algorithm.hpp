@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atma/xtm/function.hpp>
+
 #include <algorithm>
 
 
@@ -16,10 +18,13 @@ namespace atma
 
 	template <typename C, typename F> struct filtered_range_t;
 	template <typename R> struct filtered_range_iterator_t;
+	template <typename C, typename F> struct mapped_range_t;
+	template <typename R> struct mapped_range_iterator_t;
 
 
-
-
+	//=====================================================================
+	//
+	//=====================================================================
 	template <typename C, typename F>
 	struct filtered_range_t
 	{
@@ -57,8 +62,8 @@ namespace atma
 		F predicate_;
 	};
 
-	template <typename C, typename F>
-	auto filter(C&& container, F&& predicate) -> filtered_range_t<C, F>
+	template <typename F, typename C>
+	auto filter(F&& predicate, C&& container) -> filtered_range_t<C, F>
 	{
 		return filtered_range_t<C, F>(
 			std::forward<C>(container),
@@ -172,41 +177,230 @@ namespace atma
 
 
 
-
-#if 0
+	//=====================================================================
+	//
+	//=====================================================================
 	template <typename C, typename F>
 	struct mapped_range_t
 	{
-		using self_t = mapped_range_t<C, F>;
+		using self_t             = mapped_range_t<C, F>;
 		using source_container_t = std::remove_reference_t<C>;
-		using source_iterator_t = typename source_container_t::const_iterator;
+		using source_iterator_t  = decltype(std::declval<source_container_t>().begin());
 
-		using value_type = typename source_container_t::value_type;
-		using reference = typename source_container_t::reference;
-		using const_reference = typename source_container_t::const_reference;
-		using iterator = mapped_range_iterator_t<self_t>;
-		using const_iterator = mapped_range_iterator_t<self_t const>;
+		using value_type      = typename xtm::function_traits<F>::result_type;
+		using reference       = value_type&;
+		using const_reference = value_type const&;
+		using iterator        = mapped_range_iterator_t<self_t>;
+		using const_iterator  = mapped_range_iterator_t<self_t const>;
 		using difference_type = typename source_container_t::difference_type;
-		using size_type = typename source_container_t::size_type;
+		using size_type       = typename source_container_t::size_type;
+
+		// if our source container is const, then even if we are not const, we can only provide const iterators.
+		using either_iterator = std::conditional_t<std::is_const<source_container_t>::value, const_iterator, iterator>;
 
 
-		mapped_range_t(C, source_iterator_t const&, source_iterator_t const&, F);
+		template <typename CC, typename FF>
+		mapped_range_t(CC&&, source_iterator_t const&, source_iterator_t const&, FF&&);
 		mapped_range_t(mapped_range_t const&) = delete;
 
 		auto source_container() const -> C { return container_; }
-		auto fn() const -> F { return fn_; }
+		auto f() const -> F { return fn_; }
 
 		auto begin() const -> const_iterator;
 		auto end() const -> const_iterator;
+		auto begin() -> either_iterator;
+		auto end() -> either_iterator;
 
 	private:
 		C container_;
 		source_iterator_t begin_, end_;
 		F fn_;
 	};
-#endif
+
+	template <typename C, typename F>
+	auto map(F&& f, C&& xs) -> mapped_range_t<C, F>
+	{
+		return mapped_range_t<C, F>(
+			std::forward<C>(xs),
+			xs.begin(),
+			xs.end(),
+			std::forward<F>(f));
+	}
 
 
+
+
+	template <typename C, typename F>
+	template <typename CC, typename FF>
+	mapped_range_t<C, F>::mapped_range_t(CC&& source, source_iterator_t const& begin, source_iterator_t const& end, FF&& f)
+		: container_(std::forward<CC>(source)), begin_(begin), end_(end), fn_(std::forward<FF>(f))
+	{
+	}
+
+	template <typename C, typename F>
+	auto mapped_range_t<C, F>::begin() -> either_iterator
+	{
+		return{this, begin_, end_};
+	}
+
+	template <typename C, typename F>
+	auto mapped_range_t<C, F>::end() -> either_iterator
+	{
+		return{this, end_, end_};
+	}
+
+	template <typename C, typename F>
+	auto mapped_range_t<C, F>::begin() const -> const_iterator
+	{
+		return{this, begin_, end_};
+	}
+
+	template <typename C, typename F>
+	auto mapped_range_t<C, F>::end() const -> const_iterator
+	{
+		return{this, end_, end_};
+	}
+
+
+
+
+
+	template <typename C>
+	struct mapped_range_iterator_t
+	{
+		template <typename C2>
+		friend auto operator == (mapped_range_iterator_t<C2> const&, mapped_range_iterator_t<C2> const&) -> bool;
+
+		typedef C owner_t;
+		typedef typename owner_t::source_iterator_t source_iterator_t;
+
+		using iterator_category = std::forward_iterator_tag;
+		using value_type        = typename owner_t::value_type;
+		using difference_type   = ptrdiff_t;
+		using distance_type     = ptrdiff_t;
+		using pointer           = value_type*;
+		using reference         = value_type&;
+		using const_reference   = value_type const&;
+
+		mapped_range_iterator_t(C*, source_iterator_t const& begin, source_iterator_t const& end);
+
+		auto operator  *() -> value_type;
+		auto operator ++() -> mapped_range_iterator_t&;
+
+	private:
+		C* owner_;
+		source_iterator_t pos_, end_;
+	};
+
+	template <typename C>
+	inline auto operator == (mapped_range_iterator_t<C> const& lhs, mapped_range_iterator_t<C> const& rhs) -> bool
+	{
+		ATMA_ASSERT(lhs.owner_ == rhs.owner_);
+		return lhs.pos_ == rhs.pos_;
+	}
+
+	template <typename C>
+	inline auto operator != (mapped_range_iterator_t<C> const& lhs, mapped_range_iterator_t<C> const& rhs) -> bool
+	{
+		return !operator == (lhs, rhs);
+	}
+
+
+
+	template <typename C>
+	mapped_range_iterator_t<C>::mapped_range_iterator_t(owner_t* owner, source_iterator_t const& begin, source_iterator_t const& end)
+		: owner_(owner), pos_(begin), end_(end)
+	{
+	}
+
+	template <typename C>
+	auto mapped_range_iterator_t<C>::operator *() -> value_type
+	{
+		return owner_->f()(*pos_);
+	}
+
+	template <typename C>
+	auto mapped_range_iterator_t<C>::operator ++() -> mapped_range_iterator_t&
+	{
+		++pos_;
+		return *this;
+	}
+
+
+
+	template <typename C>
+	struct range_t
+	{
+		using self_t             = range_t<C>;
+		using source_container_t = std::remove_reference_t<C>;
+		using source_iterator_t  = decltype(std::declval<source_container_t>().begin());
+
+		using value_type      = typename source_container_t::value_type;
+		using reference       = typename source_container_t::reference;
+		using const_reference = typename source_container_t::const_reference;
+		using iterator        = typename source_container_t::iterator;
+		using const_iterator  = typename source_container_t::const_iterator;
+		using difference_type = typename source_container_t::difference_type;
+		using size_type       = typename source_container_t::size_type;
+
+		// if our source container is const, then even if we are not const, we can only provide const iterators.
+		using either_iterator = std::conditional_t<std::is_const<source_container_t>::value, const_iterator, iterator>;
+
+		template <typename CC>
+		range_t(CC&&, source_iterator_t const&, source_iterator_t const&);
+		range_t(range_t const&) = delete;
+
+		auto begin() const -> const_iterator;
+		auto end() const -> const_iterator;
+		auto begin() -> either_iterator;
+		auto end() -> either_iterator;
+
+	private:
+		C container_;
+		source_iterator_t begin_, end_;
+	};
+
+	template <typename xs_t>
+	auto slice(xs_t&& xs, uint begin, uint stop) -> range_t<xs_t>
+	{
+		return {xs, xs.begin() + begin, xs.begin() + stop};
+	}
+
+
+
+	template <typename C>
+	template <typename CC>
+	range_t<C>::range_t(CC&& source, source_iterator_t const& begin, source_iterator_t const& end)
+		: container_(std::forward<CC>(source)), begin_(begin), end_(end)
+	{
+	}
+
+	template <typename C>
+	auto range_t<C>::begin() -> either_iterator
+	{
+		return begin_;
+	}
+
+	template <typename C>
+	auto range_t<C>::end() -> either_iterator
+	{
+		return end_;
+	}
+
+	template <typename C>
+	auto range_t<C>::begin() const -> const_iterator
+	{
+		return begin_;
+	}
+
+	template <typename C>
+	auto range_t<C>::end() const -> const_iterator
+	{
+		return end_;
+	}
+
+
+	
 
 
 
