@@ -86,6 +86,10 @@ namespace atma {
 		return detail::char_length_table[*leading];
 	}
 
+	inline auto utf8_char_advance(char const* leading) -> char const* {
+		return leading + utf8_char_bytecount(leading);
+	}
+
 
 	//=====================================================================
 	// utf8_char_t

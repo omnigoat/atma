@@ -3,11 +3,9 @@
 #include <atma/utf/utf8_string_header.hpp>
 #include <atma/utf/utf8_string_range_header.hpp>
 
+
 namespace atma {
 
-	//=====================================================================
-	// utf8_string_range_t implementation
-	//=====================================================================
 	inline utf8_string_t::utf8_string_t()
 	{
 		chars_.reserve(8);
@@ -101,7 +99,7 @@ namespace atma {
 	{
 		return &chars_[0] + bytes();
 	}
-	
+
 	inline auto utf8_string_t::begin() const -> const_iterator
 	{
 		return const_iterator(*this, begin_raw());
@@ -210,7 +208,7 @@ namespace atma {
 		ATMA_ASSERT(delims);
 
 		for (auto i = delims; *i; ++i)
-			ATMA_ASSERT(is_ascii(*i));
+			ATMA_ASSERT(utf8_char_is_ascii(*i));
 
 		auto i2 = std::find_first_of(whhere, str.end(), delims, delims + strlen(delims));
 		return {str, i2->begin};
@@ -218,7 +216,7 @@ namespace atma {
 
 	inline auto find_first_of(utf8_string_t const& str, utf8_string_t::const_iterator const& i, char x) -> utf8_string_t::const_iterator
 	{
-		ATMA_ASSERT(is_ascii(x));
+		ATMA_ASSERT(utf8_char_is_ascii(x));
 
 		auto i2 = std::find(i->begin, str.end_raw(), x);
 		return{str, i2};
@@ -228,4 +226,6 @@ namespace atma {
 	{
 		return find_first_of(str, str.begin(), x);
 	}
+
 }
+
