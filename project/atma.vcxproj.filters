@@ -199,5 +199,8 @@
     <ClInclude Include="..\include\atma\xtm\idxs.hpp">
       <Filter>include\xtm</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\utf\utf8_char.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -60,7 +60,13 @@
     <ClInclude Include="..\include\atma\string.hpp" />
     <ClInclude Include="..\include\atma\thread\engine.hpp" />
     <ClInclude Include="..\include\atma\types.hpp" />
+    <ClInclude Include="..\include\atma\unittest\compile.hpp" />
+    <ClInclude Include="..\include\atma\unittest\emission.hpp" />
+    <ClInclude Include="..\include\atma\unittest\ennumerate.hpp" />
+    <ClInclude Include="..\include\atma\unittest\run.hpp" />
+    <ClInclude Include="..\include\atma\unittest\unittest.hpp" />
     <ClInclude Include="..\include\atma\utf\algorithm.hpp" />
+    <ClInclude Include="..\include\atma\utf\utf8_char.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_istream.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_iterator.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string_header.hpp" />
@@ -140,6 +146,9 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <Lib>
+      <AdditionalOptions>-D_SCL_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
