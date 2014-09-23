@@ -72,6 +72,21 @@ namespace atma
 			std::forward<F>(predicate));
 	}
 
+#if 0
+	template <typename xs_t, typename c_t, typename mf_t>
+	auto filter(c_t (mf_t::*method)(), xs_t&& xs)
+	-> filtered_range_t<C, decltype(method)>
+	{
+		auto lambda = [method](c_t const& x) { return (x.*method)(); };
+
+		return filtered_range_t<xs_t, decltype(lambda)>(
+			std::forward<xs_t>(xs),
+			container.begin(),
+			container.end(),
+			lambda);
+	}
+#endif
+
 	template <typename C, typename F>
 	template <typename CC, typename FF>
 	filtered_range_t<C, F>::filtered_range_t(CC&& source, source_iterator_t const& begin, source_iterator_t const& end, FF&& predicate)
@@ -401,9 +416,105 @@ namespace atma
 
 
 	
+#if 0
+	template <typename source_t>
+	inline auto make_vector(source_t&& source)
+		-> std::vector<typename std::remove_reference<source_t>::type::value_type>
+	{
+		return{source.begin(), source.end()};
+	}
 
+	template <size_t E, typename R, typename V, typename F, typename... FS>
+	auto count_all_impl(R& result, V const& value, F&& fn1, FS&&... fns) -> void
+	{
+		if (fn1(value))
+			++std::get<E>(result);
 
+		count_all_impl<E + 1>(result, value, fns...);
+	}
 
+	template <size_t E, typename R, typename V>
+	auto count_all_impl(R& result, V const& value) -> void
+	{
+	}
+
+	template <typename xs_t, typename... fns_t>
+	auto count_all(xs_t&& xs, fns_t&&... fns) -> atma::xtm::tuple_integral_list_t<uint, sizeof...(fns_t)>
+	{
+		atma::xtm::tuple_integral_list_t<uint, sizeof...(fns_t)> result;
+
+		for (auto const& x : xs)
+		{
+			count_all_impl<0>(result, x, fns...);
+		}
+
+		return result;
+	}
+
+	template <typename xs_t, typename f_t>
+	auto all_of(xs_t&& xs, f_t&& f)
+		-> typename std::enable_if<std::is_same<typename atma::xtm::function_traits<f_t>::result_type, bool>::value, bool>::type
+	{
+		for (auto const& x : xs)
+			if (!f(x))
+				return false;
+
+		return true;
+	}
+
+	template <typename xs_t, typename c_t, typename m_t>
+	auto copy_if(xs_t&& xs, m_t c_t::*member)
+		-> std::enable_if_t<std::is_same<typename std::decay<xs_t>::type::value_type, c_t>::value, std::decay_t<xs_t>>
+	{
+		std::decay_t<xs_t> result;
+
+		for (auto&& x : xs)
+		{
+			if (x.*member)
+				result.push_back(x);
+		}
+
+		return result;
+	}
+
+	template <typename xs_t, typename c_t, typename m_t>
+	auto copy_if(xs_t&& xs, m_t(c_t::*member)())
+		-> std::enable_if_t<std::is_same<typename std::decay<xs_t>::type::value_type, c_t>::value, std::decay_t<xs_t>>
+	{
+		std::decay_t<xs_t> result;
+
+		for (auto&& x : xs)
+		{
+			if ((x.*member)())
+				result.push_back(x);
+		}
+
+		return result;
+	}
+
+	template <typename xs_t, typename c_t, typename m_t>
+	auto copy_if(xs_t&& xs, m_t(c_t::*member)() const)
+		-> std::enable_if_t<std::is_same<typename std::decay<xs_t>::type::value_type, c_t>::value, std::decay_t<xs_t>>
+	{
+		std::decay_t<xs_t> result;
+
+		for (auto&& x : xs)
+		{
+			if ((x.*member)())
+				result.push_back(x);
+		}
+
+		return result;
+	}
+
+#endif
+	
+	template <typename xs_t, typename f_t>
+	inline auto for_each(xs_t&& xs, f_t&& f) -> void
+	{
+		for (auto&& x : xs)
+			f(x);
+	}
 
 
 	//=====================================================================
