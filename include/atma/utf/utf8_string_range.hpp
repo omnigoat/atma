@@ -33,7 +33,7 @@ namespace atma {
 	}
 
 	inline utf8_string_range_t::utf8_string_range_t(utf8_string_t const& rhs)
-		: begin_(rhs.bytes_begin()), end_(rhs.bytes_end())
+		: begin_(rhs.begin_raw()), end_(rhs.end_raw())
 	{
 	}
 
@@ -70,8 +70,8 @@ namespace atma {
 	inline auto rebase_string_range(utf8_string_t const& rebase, utf8_string_t const& oldbase, utf8_string_range_t const& range) -> utf8_string_range_t
 	{
 		return {
-			rebase.bytes_begin() + (range.begin() - oldbase.bytes_begin()),
-			rebase.bytes_begin() + (range.end() - oldbase.bytes_begin())
+			rebase.begin_raw() + (range.begin() - oldbase.begin_raw()),
+			rebase.begin_raw() + (range.end() - oldbase.begin_raw())
 		};
 	}
 

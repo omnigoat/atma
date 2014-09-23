@@ -17,10 +17,14 @@ namespace atma {
 	inline char const* utf8_next_char(char const* begin)
 	{
 		ATMA_ASSERT(begin);
-		ATMA_ASSERT(*begin != '\0');
-		
+
+		// null-terminator means we end here
+		if (*begin == '\0')
+		{
+			// do nothing.
+		}
 		// in the middle of a byte sequence, iterate until we are no longer
-		if ((*begin & 0xe0) == 0xc0) {
+		else if ((*begin & 0xe0) == 0xc0) {
 			while ((*begin & 0xe0) == 0xc0)
 				++begin;
 		}

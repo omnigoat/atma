@@ -26,7 +26,7 @@ namespace atma {
 			n /= 10;
 		}
 
-		std::reverse(s.bytes_begin(), s.bytes_end());
+		std::reverse(s.begin_raw(), s.end_raw());
 
 		return s;
 	}
