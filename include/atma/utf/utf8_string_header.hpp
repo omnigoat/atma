@@ -3,6 +3,7 @@
 #include <atma/types.hpp>
 #include <atma/assert.hpp>
 #include <atma/utf/algorithm.hpp>
+#include <atma/utf/utf8_char.hpp>
 
 #include <string>
 #include <vector>
@@ -14,38 +15,6 @@ namespace atma {
 	struct utf8_char_t;
 	class utf8_string_t;
 	class utf8_string_range_t;
-
-
-	struct utf8_char_t
-	{
-		utf8_char_t(char const* begin, char const* end)
-		: begin(begin), end(end)
-		{}
-
-		auto operator = (utf8_char_t const& rhs) -> utf8_char_t&
-		{
-			begin = rhs.begin;
-			end = rhs.end;
-			return *this;
-		}
-
-		char const* begin;
-		char const* end;
-	};
-
-	inline auto operator == (utf8_char_t const& lhs, utf8_char_t const& rhs) -> bool {
-		return (lhs.end - lhs.begin) == (rhs.end - rhs.begin)
-			&& std::equal(lhs.begin, lhs.end, rhs.begin)
-			;
-	}
-
-	inline auto operator == (utf8_char_t const& lhs, char x) -> bool {
-		// it only makes sense to compare a character against a character, and
-		// not a character against a leading-byte in a char-seq.
-		ATMA_ASSERT(is_ascii(x));
-
-		return *lhs.begin == x;
-	}
 
 
 	class utf8_string_t
@@ -69,6 +38,7 @@ namespace atma {
 		auto bytes() const -> size_t;
 		auto c_str() const -> char const*;
 
+
 		auto begin() const -> const_iterator;
 		auto end() const -> const_iterator;
 		auto begin() -> iterator;
@@ -78,7 +48,6 @@ namespace atma {
 		auto end_raw() const -> char const*;
 		auto begin_raw() -> char*;
 		auto end_raw() -> char*;
-
 
 		auto push_back(char c) -> void;
 		auto push_back(utf8_char_t const& c) -> void;
@@ -93,7 +62,6 @@ namespace atma {
 	private:
 		typedef std::vector<value_t> chars_t;
 		chars_t chars_;
-
 
 		friend class utf16_string_t;
 		friend auto operator < (utf8_string_t const& lhs, utf8_string_t const& rhs) -> bool;
@@ -122,7 +90,7 @@ namespace atma {
 
 	public:
 		iterator_t(source_container_t& owner, source_char_t* x)
-			: owner_(&owner), char_(x, utf8_next_char(x))
+		: owner_(&owner), char_(x, x + utf8_char_bytecount(x))
 		{}
 
 		iterator_t(iterator_t const& rhs)
@@ -150,7 +118,7 @@ namespace atma {
 			ATMA_ASSERT(char_.begin != owner_->end_raw());
 			auto mv = 
 			char_.begin = char_.end;
-			char_.end = utf8_next_char(char_.end);
+			char_.end = utf8_char_advance(char_.end);
 			return *this;
 		}
 
