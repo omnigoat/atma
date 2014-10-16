@@ -264,7 +264,6 @@ namespace atma
 	}
 
 
-
 	template <typename T>
 	auto vector<T>::elements_allocate(size_t capacity) -> T*
 	{

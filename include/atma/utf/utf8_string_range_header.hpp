@@ -33,7 +33,7 @@ namespace atma {
 		utf8_string_range_t(utf8_string_range_t const&);
 		utf8_string_range_t(utf8_string_t const&);
 
-		auto bytes() const -> size_t;
+		auto raw_size() const -> size_t;
 		auto empty() const -> bool;
 
 		auto begin() const -> iterator;
@@ -52,12 +52,12 @@ namespace atma {
 	//=====================================================================
 	inline auto operator == (utf8_string_range_t const& lhs, utf8_string_range_t const& rhs) -> bool
 	{
-		return lhs.bytes() == rhs.bytes() && memcmp(lhs.begin(), rhs.begin(), lhs.bytes()) == 0;
+		return lhs.raw_size() == rhs.raw_size() && memcmp(lhs.begin(), rhs.begin(), lhs.raw_size()) == 0;
 	}
 
 	inline auto operator == (utf8_string_range_t const& lhs, char const* rhs) -> bool
 	{
-		return strncmp(lhs.begin(), rhs, lhs.bytes()) == 0;
+		return strncmp(lhs.begin(), rhs, lhs.raw_size()) == 0;
 	}
 
 	inline auto operator != (utf8_string_range_t const& lhs, utf8_string_range_t const& rhs) -> bool
@@ -69,11 +69,11 @@ namespace atma {
 	{
 		auto cmp = ::strncmp(
 			lhs.begin(), rhs.begin(),
-			std::min(lhs.bytes(), rhs.bytes()));
+			std::min(lhs.raw_size(), rhs.raw_size()));
 
 		return
 			cmp < 0 || (!(0 < cmp) && (
-			lhs.bytes() < rhs.bytes()));
+			lhs.raw_size() < rhs.raw_size()));
 	}
 
 	inline auto operator << (std::ostream& stream, utf8_string_range_t const& xs) -> std::ostream&
