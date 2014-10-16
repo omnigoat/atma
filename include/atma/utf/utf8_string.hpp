@@ -7,39 +7,41 @@
 namespace atma {
 
 	inline utf8_string_t::utf8_string_t()
+		: capacity_(8)
+		, size_()
+		, data_(new char[capacity_])
 	{
-		chars_.reserve(8);
-		chars_.push_back('\0');
 	}
 
 	inline utf8_string_t::utf8_string_t(const_iterator const& begin, const_iterator const& end)
-		: chars_((end->begin - begin->begin) + 1)
+		: capacity_(imem_quantize_capacity(std::distance(begin, end)))
+		, size_(std::distance(begin, end))
+		, data_(new char[capacity_])
 	{
-		memcpy(&chars_.front(), begin->begin, (end->begin - begin->begin));
-		chars_.back() = '\0';
+		memcpy(data_, begin->begin, end->begin - begin->begin);
 	}
 
 	inline utf8_string_t::utf8_string_t(char const* begin, char const* end)
-		: chars_(begin, end)
+		: capacity_(imem_quantize_capacity(end - begin))
+		, size_(end - begin)
+		, data_(new char[capacity_])
 	{
-		chars_.push_back('\0');
+		memcpy(data_, begin, size_);
+		data_[size_] = '\0';
 	}
 
 	inline utf8_string_t::utf8_string_t(char const* str)
+		: utf8_string_t(str, str + strlen(str))
 	{
-		ATMA_ASSERT(str != nullptr);
-
-		for (char const* i = str; *i != '\0'; ++i) {
-			chars_.push_back(*i);
-		}
-
-		chars_.push_back('\0');
 	}
 
-	inline utf8_string_t::utf8_string_t(utf8_string_range_t const& str)
-	: chars_(str.begin(), str.end())
+	inline utf8_string_t::utf8_string_t(utf8_string_t const& str)
+		: capacity_(str.capacity_)
+		, size_(str.size_)
+		, data_(new char[capacity_])
 	{
-		chars_.push_back('\0');
+		memcpy(data_, str.data_, size_);
+		data_[size_] = '\0';
 	}
 
 #if 0
@@ -53,90 +55,148 @@ namespace atma {
 	}
 #endif
 
-	inline utf8_string_t::utf8_string_t(utf8_string_t const& rhs)
-	: chars_(rhs.chars_)
-	{
-	}
-
 	inline utf8_string_t::utf8_string_t(utf8_string_t&& rhs)
-	: chars_(std::move(rhs.chars_))
+		: capacity_(rhs.capacity_)
+		, size_(rhs.size_)
+		, data_(rhs.data_)
 	{
+		rhs.capacity_ = 0;
+		rhs.size_ = 0;
+		rhs.data_ = nullptr;
 	}
 
 	inline auto utf8_string_t::empty() const -> bool
 	{
-		// null-terminator always present
-		return chars_.size() == 1;
+		return size_ == 0;
 	}
 
-	inline auto utf8_string_t::bytes() const -> size_t
+	inline auto utf8_string_t::raw_size() const -> size_t
 	{
-		// don't count null-terminator
-		return chars_.size() - 1;
+		return size_;
 	}
 
 	inline auto utf8_string_t::c_str() const -> char const*
 	{
-		return begin_raw();
+		return raw_begin();
 	}
 
-	inline auto utf8_string_t::begin_raw() const -> char const*
+	inline auto utf8_string_t::raw_begin() const -> char const*
 	{
-		return &chars_[0];
+		return data_;
 	}
 
-	inline auto utf8_string_t::end_raw() const -> char const*
+	inline auto utf8_string_t::raw_end() const -> char const*
 	{
-		return &chars_[0] + bytes();
+		return data_ + size_;
 	}
 
-	inline auto utf8_string_t::begin_raw() -> char*
+	inline auto utf8_string_t::raw_begin() -> char*
 	{
-		return &chars_[0];
+		return data_;
 	}
 
-	inline auto utf8_string_t::end_raw() -> char*
+	inline auto utf8_string_t::raw_end() -> char*
 	{
-		return &chars_[0] + bytes();
+		return data_ + size_;
 	}
 
 	inline auto utf8_string_t::begin() const -> const_iterator
 	{
-		return const_iterator(*this, begin_raw());
+		return const_iterator(*this, raw_begin());
 	}
 
 	inline auto utf8_string_t::end() const -> const_iterator
 	{
-		return const_iterator(*this, end_raw());
+		return const_iterator(*this, raw_end());
 	}
 
 	inline auto utf8_string_t::begin() -> iterator
 	{
-		return iterator(*this, begin_raw());
+		return iterator(*this, raw_begin());
 	}
 
 	inline auto utf8_string_t::end() -> iterator
 	{
-		return iterator(*this, end_raw());
+		return iterator(*this, raw_end());
 	}
 
-	inline auto utf8_string_t::push_back(char c) -> void {
+	inline auto utf8_string_t::raw_iter_of(const_iterator const& iter) const -> char const*
+	{
+		return iter.char_.begin;
+	}
+
+	inline auto utf8_string_t::push_back(char c) -> void
+	{
 		ATMA_ASSERT(c ^ 0x80);
-		chars_.back() = c;
-		chars_.push_back('\0');
+
+		if (size_ == capacity_)
+			imem_realloc(capacity_ * 2);
+
+		data_[size_++] = c;
+		data_[size_] = '\0';
 	}
 
+#if 0
 	inline auto utf8_string_t::push_back(utf8_char_t const& c) -> void
 	{
 		for (auto i = c.begin; i != c.end; ++i) {
 			chars_.push_back(*i);
 		}
 	}
+#endif
+
+	inline auto utf8_string_t::clear() -> void
+	{
+		capacity_ = 0;
+		size_ = 0;
+		delete data_;
+		data_ = nullptr;
+	}
 
 	inline auto utf8_string_t::operator += (utf8_string_t const& rhs) -> utf8_string_t&
 	{
-		chars_.insert(chars_.end() - 1, rhs.begin_raw(), rhs.end_raw());
+		size_t reqsize = size_ + rhs.size_;
+		if (reqsize > capacity_)
+			imem_realloc(imem_quantize_capacity(reqsize));
+
+		memcpy(data_ + size_, rhs.data_, rhs.size_);
+		size_ += rhs.size_;
+		data_[size_] = '\0';
+
 		return *this;
+	}
+
+	inline auto utf8_string_t::operator += (char const* rhs) -> utf8_string_t&
+	{
+		size_t rhslen = strlen(rhs);
+		size_t reqsize = size_ + rhslen;
+		if (reqsize > capacity_)
+			imem_realloc(imem_quantize_capacity(reqsize));
+
+		memcpy(data_ + size_, rhs, rhslen);
+		size_ += rhslen;
+		data_[size_] = '\0';
+
+		return *this;
+	}
+
+	inline auto utf8_string_t::imem_quantize_capacity(size_t size) const -> size_t
+	{
+		size_t result = 8;
+		while (size > 8)
+			result *= 2, size /= 2;
+
+		// place one for null-terminator
+		return result + 1;
+	}
+
+	inline auto utf8_string_t::imem_realloc(size_t size) -> void
+	{
+		auto tmp = data_;
+		data_ = new char[size];
+		memcpy(data_, tmp, size_);
+		data_[size_] = '\0';
+		delete tmp;
 	}
 
 	//=====================================================================
@@ -144,7 +204,7 @@ namespace atma {
 	//=====================================================================
 	inline auto operator == (utf8_string_t const& lhs, utf8_string_t const& rhs) -> bool
 	{
-		return lhs.bytes() == rhs.bytes() && ::strncmp(lhs.begin_raw(), rhs.begin_raw(), lhs.bytes()) == 0;
+		return lhs.raw_size() == rhs.raw_size() && ::strcmp(lhs.raw_begin(), rhs.raw_begin()) == 0;
 	}
 
 	inline auto operator != (utf8_string_t const& lhs, utf8_string_t const& rhs) -> bool
@@ -154,18 +214,20 @@ namespace atma {
 
 	inline auto operator == (utf8_string_t const& lhs, char const* rhs) -> bool
 	{
-		return ::strcmp(lhs.begin_raw(), rhs) == 0;
+		return ::strcmp(lhs.raw_begin(), rhs) == 0;
 	}
 
 	inline auto operator < (utf8_string_t const& lhs, utf8_string_t const& rhs) -> bool
 	{
-		return std::lexicographical_compare(lhs.chars_.begin(), lhs.chars_.end(), rhs.chars_.begin(), rhs.chars_.end());
+		return std::lexicographical_compare(lhs.raw_begin(), lhs.raw_end(), rhs.raw_begin(), rhs.raw_end());
 	}
 
+#if 0
 	inline auto operator + (utf8_string_t const& lhs, std::string const& rhs) -> utf8_string_t
 	{
 		auto result = lhs;
-		result.chars_.insert(result.chars_.end() - 1, rhs.begin(), rhs.end());
+		//result.chars_.insert(result.chars_.end() - 1, rhs.begin(), rhs.end());
+		result.insert(result.end(), rhs.begin(), rhs.end());
 		return result;
 	}
 
@@ -182,11 +244,12 @@ namespace atma {
 		result.chars_.insert(result.chars_.end() - 1, rhs.begin(), rhs.end());
 		return result;
 	}
+#endif
 
 	inline auto operator << (std::ostream& out, utf8_string_t const& rhs) -> std::ostream&
 	{
-		if (!rhs.chars_.empty())
-			out.write(&rhs.chars_[0], rhs.chars_.size() - 1);
+		if (!rhs.empty())
+			out.write(rhs.raw_begin(), rhs.raw_size());
 		return out;
 	}
 
@@ -194,12 +257,12 @@ namespace atma {
 	//=====================================================================
 	// functions
 	//=====================================================================
-	inline auto strcpy(utf8_string_t const& dest, utf8_string_t const& src) -> void
+	inline auto strcpy(utf8_string_t& dest, utf8_string_t const& src) -> void
 	{
-		ATMA_ASSERT(dest.bytes() >= src.bytes());
+		ATMA_ASSERT(dest.raw_size() >= src.raw_size());
 
 		auto i = dest.begin();
-		for (auto const& x : src)
+		for (auto& x : src)
 			*i++ = x;
 	}
 
@@ -210,16 +273,16 @@ namespace atma {
 		for (auto i = delims; *i; ++i)
 			ATMA_ASSERT(utf8_char_is_ascii(*i));
 
-		auto i2 = std::find_first_of(whhere, str.end(), delims, delims + strlen(delims));
-		return {str, i2->begin};
+		auto r = std::find_first_of(whhere->begin, str.raw_end(), delims, delims + strlen(delims));
+		return {str, r};
 	}
 
 	inline auto find_first_of(utf8_string_t const& str, utf8_string_t::const_iterator const& i, char x) -> utf8_string_t::const_iterator
 	{
 		ATMA_ASSERT(utf8_char_is_ascii(x));
 
-		auto i2 = std::find(i->begin, str.end_raw(), x);
-		return{str, i2};
+		auto r = std::find(str.raw_iter_of(i), str.raw_end(), x);
+		return {str, r};
 	}
 
 	inline auto find_first_of(utf8_string_t const& str, char x) -> utf8_string_t::const_iterator
