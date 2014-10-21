@@ -7,9 +7,9 @@
 namespace atma {
 
 	inline utf8_string_t::utf8_string_t()
-		: capacity_(8)
+		: capacity_()
 		, size_()
-		, data_(new char[capacity_])
+		, data_()
 	{
 	}
 
@@ -19,6 +19,7 @@ namespace atma {
 		, data_(new char[capacity_])
 	{
 		memcpy(data_, begin->begin, end->begin - begin->begin);
+		data_[size_] = '\0';
 	}
 
 	inline utf8_string_t::utf8_string_t(char const* begin, char const* end)
@@ -63,6 +64,14 @@ namespace atma {
 		rhs.capacity_ = 0;
 		rhs.size_ = 0;
 		rhs.data_ = nullptr;
+	}
+
+	inline utf8_string_t::~utf8_string_t()
+	{
+		delete data_;
+		capacity_ = 0;
+		size_ = 0;
+		data_ = nullptr;
 	}
 
 	inline auto utf8_string_t::empty() const -> bool
