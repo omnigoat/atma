@@ -33,6 +33,7 @@ namespace atma {
 		utf8_string_t(utf8_string_range_t const&);
 		utf8_string_t(utf8_string_t const&);
 		utf8_string_t(utf8_string_t&&);
+		~utf8_string_t();
 
 		auto empty() const -> bool;
 		auto c_str() const -> char const*;
@@ -103,10 +104,10 @@ namespace atma {
 
 
 		iterator_t(owner_t& owner, owner_iter_t iter)
-		: owner_(&owner)
+		: owner_(&owner), char_{iter, iter}
 		{
-			if (iter != owner_->raw_end())
-				char_ = utf8_char_t(iter, utf8_char_advance(iter));
+			if (char_.end != owner_->raw_end())
+				char_.end = utf8_char_advance(char_.end);
 		}
 
 		iterator_t(iterator_t const& rhs)
