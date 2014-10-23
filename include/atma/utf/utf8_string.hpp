@@ -14,34 +14,31 @@ namespace atma {
 	}
 
 	inline utf8_string_t::utf8_string_t(const_iterator const& begin, const_iterator const& end)
-		: capacity_(imem_quantize_capacity(std::distance(begin, end)))
-		, size_(std::distance(begin, end))
-		, data_(new char[capacity_])
+		: utf8_string_t(begin->begin, std::distance(begin->begin, end->begin))
 	{
-		memcpy(data_, begin->begin, end->begin - begin->begin);
-		data_[size_] = '\0';
 	}
 
 	inline utf8_string_t::utf8_string_t(char const* begin, char const* end)
-		: capacity_(imem_quantize_capacity(end - begin))
-		, size_(end - begin)
-		, data_(new char[capacity_])
+		: utf8_string_t(begin, end - begin)
 	{
-		memcpy(data_, begin, size_);
-		data_[size_] = '\0';
 	}
 
 	inline utf8_string_t::utf8_string_t(char const* str)
-		: utf8_string_t(str, str + strlen(str))
+		: utf8_string_t(str, strlen(str))
 	{
 	}
 
 	inline utf8_string_t::utf8_string_t(utf8_string_t const& str)
-		: capacity_(str.capacity_)
-		, size_(str.size_)
+		: utf8_string_t(str.raw_begin(), str.raw_size())
+	{
+	}
+
+	inline utf8_string_t::utf8_string_t(char const* str, size_t size)
+		: capacity_(imem_quantize_capacity(size))
+		, size_(size)
 		, data_(new char[capacity_])
 	{
-		memcpy(data_, str.data_, size_);
+		memcpy(data_, str, size_);
 		data_[size_] = '\0';
 	}
 
@@ -72,6 +69,40 @@ namespace atma {
 		capacity_ = 0;
 		size_ = 0;
 		data_ = nullptr;
+	}
+
+	inline auto utf8_string_t::operator += (utf8_string_t const& rhs) -> utf8_string_t&
+	{
+		imem_quantize(size_ + rhs.size_, true);
+
+		memcpy(data_ + size_, rhs.data_, rhs.size_);
+		size_ += rhs.size_;
+		data_[size_] = '\0';
+
+		return *this;
+	}
+
+	inline auto utf8_string_t::operator += (char const* rhs) -> utf8_string_t&
+	{
+		auto rhslen = strlen(rhs);
+		imem_quantize(size_ + rhslen, true);
+
+		memcpy(data_ + size_, rhs, rhslen);
+		size_ += rhslen;
+		data_[size_] = '\0';
+
+		return *this;
+	}
+
+	inline auto utf8_string_t::operator = (utf8_string_t const& rhs) -> utf8_string_t&
+	{
+		imem_quantize(rhs.size_, false);
+
+		size_ = rhs.size_;
+		memcpy(data_, rhs.data_, size_);
+		data_[size_] = '\0';
+
+		return *this;
 	}
 
 	inline auto utf8_string_t::empty() const -> bool
@@ -138,8 +169,8 @@ namespace atma {
 	{
 		ATMA_ASSERT(c ^ 0x80);
 
-		if (size_ == capacity_)
-			imem_realloc(capacity_ * 2);
+		if (size_ + 1 == capacity_)
+			imem_quantize(size_ + 1, true);
 
 		data_[size_++] = c;
 		data_[size_] = '\0';
@@ -162,50 +193,41 @@ namespace atma {
 		data_ = nullptr;
 	}
 
-	inline auto utf8_string_t::operator += (utf8_string_t const& rhs) -> utf8_string_t&
+	inline auto utf8_string_t::imem_quantize(size_t size, bool keep) -> void
 	{
-		size_t reqsize = size_ + rhs.size_;
-		if (reqsize > capacity_)
-			imem_realloc(imem_quantize_capacity(reqsize));
+		size_t newcap = imem_quantize_capacity(size);
 
-		memcpy(data_ + size_, rhs.data_, rhs.size_);
-		size_ += rhs.size_;
-		data_[size_] = '\0';
-
-		return *this;
-	}
-
-	inline auto utf8_string_t::operator += (char const* rhs) -> utf8_string_t&
-	{
-		size_t rhslen = strlen(rhs);
-		size_t reqsize = size_ + rhslen;
-		if (reqsize > capacity_)
-			imem_realloc(imem_quantize_capacity(reqsize));
-
-		memcpy(data_ + size_, rhs, rhslen);
-		size_ += rhslen;
-		data_[size_] = '\0';
-
-		return *this;
+		if (newcap != capacity_)
+			imem_realloc(newcap, keep);
 	}
 
 	inline auto utf8_string_t::imem_quantize_capacity(size_t size) const -> size_t
 	{
 		size_t result = 8;
-		while (size > 8)
+		while (size >= 8)
 			result *= 2, size /= 2;
 
 		// place one for null-terminator
-		return result + 1;
+		return result;
 	}
 
-	inline auto utf8_string_t::imem_realloc(size_t size) -> void
+	inline auto utf8_string_t::imem_realloc(size_t size, bool keep) -> void
 	{
-		auto tmp = data_;
-		data_ = new char[size];
-		memcpy(data_, tmp, size_);
-		data_[size_] = '\0';
-		delete tmp;
+		if (keep)
+		{
+			auto tmp = data_;
+			capacity_ = size;
+			data_ = new char[capacity_];
+			memcpy(data_, tmp, size_);
+			data_[size_] = '\0';
+			delete tmp;
+		}
+		else
+		{
+			delete data_;
+			capacity_ = size;
+			data_ = new char[capacity_];
+		}
 	}
 
 	//=====================================================================
@@ -231,19 +253,26 @@ namespace atma {
 		return std::lexicographical_compare(lhs.raw_begin(), lhs.raw_end(), rhs.raw_begin(), rhs.raw_end());
 	}
 
+	inline auto operator + (utf8_string_t const& lhs, utf8_string_t const& rhs) -> utf8_string_t
+	{
+		auto result = lhs;
+		result += rhs;
+		return result;
+	}
+
+	inline auto operator + (utf8_string_t const& lhs, char const* rhs) -> utf8_string_t
+	{
+		auto result = lhs;
+		result += rhs;
+		return result;
+	}
+
 #if 0
 	inline auto operator + (utf8_string_t const& lhs, std::string const& rhs) -> utf8_string_t
 	{
 		auto result = lhs;
 		//result.chars_.insert(result.chars_.end() - 1, rhs.begin(), rhs.end());
 		result.insert(result.end(), rhs.begin(), rhs.end());
-		return result;
-	}
-
-	inline auto operator + (utf8_string_t const& lhs, utf8_string_t const& rhs) -> utf8_string_t
-	{
-		auto result = lhs;
-		result.chars_.insert(result.chars_.end() - 1, rhs.chars_.begin(), rhs.chars_.end());
 		return result;
 	}
 

@@ -22,18 +22,28 @@ namespace atma {
 	public:
 		template <typename T> class iterator_t;
 		
-		typedef char value_t;
-		typedef iterator_t<utf8_char_t> iterator;
-		typedef iterator_t<utf8_char_t const> const_iterator;
+		using value_t        = char;
+		using iterator       = iterator_t<utf8_char_t>;
+		using const_iterator = iterator_t<utf8_char_t const>;
+
 
 		utf8_string_t();
+		utf8_string_t(utf8_string_t const&);
+		utf8_string_t(utf8_string_t&&);
+
 		utf8_string_t(const_iterator const&, const_iterator const&);
 		utf8_string_t(char const* str);
 		utf8_string_t(char const* str_begin, char const* str_end);
+		utf8_string_t(char const* str, size_t size);
 		utf8_string_t(utf8_string_range_t const&);
-		utf8_string_t(utf8_string_t const&);
-		utf8_string_t(utf8_string_t&&);
+
 		~utf8_string_t();
+
+		auto operator = (utf8_string_t const&) -> utf8_string_t&;
+
+		auto operator += (utf8_string_t const& rhs) -> utf8_string_t&;
+		auto operator += (char const*) -> utf8_string_t&;
+
 
 		auto empty() const -> bool;
 		auto c_str() const -> char const*;
@@ -62,12 +72,12 @@ namespace atma {
 
 		auto clear() -> void;
 
-		auto operator += (utf8_string_t const& rhs) -> utf8_string_t&;
-		auto operator += (char const*) -> utf8_string_t&;
-		
 	private:
+		auto imem_quantize(size_t, bool keep) -> void;
+		// given required minimum size, returns capacity to allcoate
 		auto imem_quantize_capacity(size_t) const -> size_t;
-		auto imem_realloc(size_t) -> void;
+		// reallocates data, optionally copying previous values into new buffer
+		auto imem_realloc(size_t, bool keep) -> void;
 
 	private:
 		size_t capacity_;
@@ -82,6 +92,15 @@ namespace atma {
 
 	auto operator == (utf8_string_t const&, char const*) -> bool;
 	auto operator == (char const*, utf8_string_t const&) -> bool;
+
+	auto operator + (utf8_string_t const&, utf8_string_t const&)       -> utf8_string_t;
+	auto operator + (utf8_string_t const&, char const*)                -> utf8_string_t;
+	auto operator + (utf8_string_t const&, std::string const&)         -> utf8_string_t;
+	auto operator + (utf8_string_t const&, utf8_string_range_t const&) -> utf8_string_t;
+
+	auto operator << (std::ostream&, utf8_string_t const&) -> std::ostream&;
+
+
 
 
 
