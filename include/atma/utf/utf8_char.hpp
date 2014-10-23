@@ -73,7 +73,7 @@ namespace atma {
 		return detail::char_length_table[c] != -1;
 	}
 
-	// c is a valid utf8 byte and the leading byte of a multi-byte sequence
+	// c is a valid utf8 byte and the leading byte of a sequence
 	inline auto utf8_byte_is_leading(char const c) -> bool {
 		return detail::char_length_table[c] >= 1;
 	}
