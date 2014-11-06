@@ -40,34 +40,18 @@ namespace atma { namespace math {
 		auto set(uint32 i, float n) -> void;
 		auto normalize() -> void;
 
-		template <uint8_t i>
-		struct elem_ref_t
-		{
-			operator float() {
-				return ((vector4f*)(this - (sizeof *this) * i)->*(&vector4f::components))[i];
-			}
-
-			float operator = (float rhs)
-			{
-				auto t = (vector4f*)(this - (sizeof *this) * i);
-				(t->*(&vector4f::components))[i] = rhs;
-				return rhs;
-			}
-		};
-
 #pragma warning(push)
 #pragma warning(disable: 4201)
 		union {
 #if defined(ATMA_MATH_USE_SSE)
 			__m128 xmmdata;
 #endif
-			struct {
-				elem_ref_t<0> x;
-				elem_ref_t<1> y;
-				elem_ref_t<2> z;
-				elem_ref_t<3> w;
-			};
+
 			float components[4];
+
+			struct {
+				float x, y, z, w;
+			};
 		};
 #pragma warning(pop)
 	};
