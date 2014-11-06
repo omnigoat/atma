@@ -13,25 +13,34 @@ namespace math {
 	inline vector4f::vector4f()
 	{
 #if ATMA_MATH_USE_SSE
-		sd_ = _mm_setzero_ps();
+		xmmdata = _mm_setzero_ps();
 #else
-		memset(fd_, 0, 128);
+		components[0] = 0.f;
+		components[1] = 0.f;
+		components[2] = 0.f;
+		components[3] = 0.f;
 #endif
 	}
 
 	inline vector4f::vector4f(float x, float y, float z, float w)
+#if !defined(ATMA_MATH_USE_SSE)
+		//: components{x, y, z, w} // x(x), y(y), z(z), w(w)
+#endif
 	{
 #ifdef ATMA_MATH_USE_SSE
 		__declspec(align(16)) float fs[] = {x, y, z, w};
-		sd_ = _mm_load_ps(fs);
+		xmmdata = _mm_load_ps(fs);
 #else
-		memcpy(fd_, &x, sizeof(float) * 4);
+		components[0] = x;
+		components[1] = x;
+		components[2] = x;
+		components[3] = x;
 #endif
 	}
 
 #ifdef ATMA_MATH_USE_SSE
 	inline vector4f::vector4f(__m128 xm)
-		: sd_(xm)
+		: xmmdata(xm)
 	{
 	}
 #endif
@@ -40,10 +49,10 @@ namespace math {
 	inline vector4f::vector4f(impl::expr<vector4f, OP> const& expr)
 	{
 #ifdef ATMA_MATH_USE_SSE
-		sd_ = expr.xmmd();
+		xmmdata = expr.xmmd();
 #else
 		for (auto i = 0u; i != 4u; ++i)
-			fd_[i] = &expr[i];
+			components[i] = expr[i];
 #endif
 	}
 
@@ -51,10 +60,10 @@ namespace math {
 	inline auto vector4f::operator = (const impl::expr<vector4f, OP>& e) -> vector4f&
 	{
 #ifdef ATMA_MATH_USE_SSE
-		sd_ = e.xmmd();
+		xmmdata = e.xmmd();
 #else
 		for (auto i = 0u; i != E; ++i) {
-			fd_[i] = e[i];
+			components[i] = e[i];
 		}
 #endif
 		return *this;
@@ -65,16 +74,16 @@ namespace math {
 	{
 		ATMA_ASSERT(i < 4);
 #ifdef ATMA_MATH_USE_SSE
-		return sd_.m128_f32[i];
+		return xmmdata.m128_f32[i];
 #else
-		return fd_[i];
+		return components[i];
 #endif
 	}
 
 	inline auto vector4f::magnitude() const -> float
 	{
 #ifdef ATMA_MATH_USE_SSE
-		return _mm_sqrt_ss(_mm_dp_ps(sd_, sd_, 0x7f)).m128_f32[0];
+		return _mm_sqrt_ss(_mm_dp_ps(xmmdata, xmmdata, 0x7f)).m128_f32[0];
 #else
 		return std::sqrt(magnitude_squared());
 #endif
@@ -83,7 +92,7 @@ namespace math {
 	inline auto vector4f::magnitude_squared() const -> float
 	{
 #ifdef ATMA_MATH_USE_SSE
-		return _mm_dp_ps(sd_, sd_, 0x7f).m128_f32[0];
+		return _mm_dp_ps(xmmdata, xmmdata, 0x7f).m128_f32[0];
 #else
 		return dot_product(*this, *this);
 #endif
@@ -98,10 +107,10 @@ namespace math {
 	inline vector4f& vector4f::operator += (impl::expr<vector4f, OP> const& rhs)
 	{
 #ifdef ATMA_MATH_USE_SSE
-		sd_ = _mm_add_ps(sd_, rhs.xmmd());
+		xmmdata = _mm_add_ps(xmmdata, rhs.xmmd());
 #else
 		for (auto i = 0u; i != 4u; ++i)
-			fd_[i] += rhs.fd_[i];
+			components[i] += rhs[i];
 #endif
 		return *this;
 	}
@@ -110,10 +119,10 @@ namespace math {
 	inline vector4f& vector4f::operator -= (impl::expr<vector4f, OP> const& rhs)
 	{
 #ifdef ATMA_MATH_USE_SSE
-		sd_ = _mm_sub_ps(sd_, rhs.xmmd());
+		xmmdata = _mm_sub_ps(xmmdata, rhs.xmmd());
 #else
 		for (auto i = 0u; i != 4u; ++i)
-			fd_[i] -= rhs.fd_[i];
+			components[i] -= rhs[i];
 #endif
 		return *this;
 	}
@@ -121,10 +130,10 @@ namespace math {
 	inline auto vector4f::operator *= (float rhs) -> vector4f&
 	{
 #ifdef ATMA_MATH_USE_SSE
-		sd_ = _mm_sub_ps(sd_, _mm_load_ps1(&rhs));
+		xmmdata = _mm_sub_ps(xmmdata, _mm_load_ps1(&rhs));
 #else
 		for (auto i = 0u; i != 4u; ++i)
-			fd_[i] *= rhs;
+			components[i] *= rhs;
 #endif
 		return *this;
 	}
@@ -132,10 +141,10 @@ namespace math {
 	inline auto vector4f::operator /= (float rhs) -> vector4f&
 	{
 #ifdef ATMA_MATH_USE_SSE
-		sd_ = _mm_sub_ps(sd_, _mm_load_ps1(&rhs));
+		xmmdata = _mm_sub_ps(xmmdata, _mm_load_ps1(&rhs));
 #else
 		for (auto i = 0u; i != 4u; ++i)
-			fd_[i] /= rhs;
+			components[i] /= rhs;
 #endif
 		return *this;
 	}
@@ -143,16 +152,16 @@ namespace math {
 	inline auto vector4f::set(uint32 i, float n) -> void
 	{
 #ifdef ATMA_MATH_USE_SSE
-		sd_.m128_f32[i] = n;
+		xmmdata.m128_f32[i] = n;
 #else
-		fd_[i] = n;
+		components[i] = n;
 #endif
 	}
 
 	inline auto vector4f::normalize() -> void
 	{
 #ifdef ATMA_MATH_USE_SSE
-		sd_ = _mm_mul_ps(sd_, _mm_rsqrt_ps(_mm_dp_ps(sd_, sd_, 0x7f)));
+		xmmdata = _mm_mul_ps(xmmdata, _mm_rsqrt_ps(_mm_dp_ps(xmmdata, xmmdata, 0x7f)));
 #else
 		*this /= magnitude();
 #endif

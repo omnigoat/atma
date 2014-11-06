@@ -202,5 +202,20 @@
     <ClInclude Include="..\include\atma\utf\utf8_char.hpp">
       <Filter>include\utf</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\unittest\compile.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\unittest\emission.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\unittest\ennumerate.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\unittest\run.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\unittest\unittest.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -1,8 +1,4 @@
-//=====================================================================
-//
-//=====================================================================
-#ifndef ATMA_MATH_IMPL_VECTOR4F_EXPRS_HPP
-#define ATMA_MATH_IMPL_VECTOR4F_EXPRS_HPP
+#pragma once
 //=====================================================================
 #ifndef ATMA_MATH_VECTOR4F_SCOPE
 #	error "this file needs to be included solely from vector4f.hpp"
@@ -10,10 +6,7 @@
 //=====================================================================
 #include <atma/math/impl/binary_expr.hpp>
 //=====================================================================
-namespace atma {
-namespace math {
-namespace impl {
-//=====================================================================
+namespace atma { namespace math { namespace impl {
 
 	// vector4f_add
 	template <typename LHS, typename RHS>
@@ -23,9 +16,8 @@ namespace impl {
 
 #ifdef ATMA_MATH_USE_SSE
 		auto xmmd() const -> __m128 { return _mm_add_ps(xmmd_of(lhs), xmmd_of(rhs)); }
-#else
-		auto element(uint32 i) const -> float { return element_of(lhs, i) + element_of(rhs, i); }
 #endif
+		auto element(uint32 i) const -> float { return element_of(lhs, i) + element_of(rhs, i); }
 	};
 
 	// vector4f_sub
@@ -36,9 +28,8 @@ namespace impl {
 
 #ifdef ATMA_MATH_USE_SSE
 		auto xmmd() const -> __m128 { return _mm_sub_ps(xmmd_of(lhs), xmmd_of(rhs)); }
-#else
-		auto element(uint32 i) const -> float { return element_of(lhs, i) - element_of(rhs, i); }
 #endif
+		auto element(uint32 i) const -> float { return element_of(lhs, i) - element_of(rhs, i); }
 	};
 
 	// vector4f_mul
@@ -49,9 +40,8 @@ namespace impl {
 
 #ifdef ATMA_MATH_USE_SSE
 		auto xmmd() const -> __m128 { return _mm_mul_ps(xmmd_of(lhs), xmmd_of(rhs)); }
-#else
-		auto element(uint32 i) const -> float { return element_of(lhs, i) * element_of(rhs, i); }
 #endif
+		auto element(uint32 i) const -> float { return element_of(lhs, i) * element_of(rhs, i); }
 	};
 
 	// vector4f_div
@@ -62,15 +52,8 @@ namespace impl {
 
 #ifdef ATMA_MATH_USE_SSE
 		auto xmmd() const -> __m128 { return _mm_div_ps(xmmd_of(lhs), xmmd_of(rhs)); }
-#else
-		auto element(uint32 i) const -> float { return element_of(lhs, i) / element_of(rhs, i); }
 #endif
+		auto element(uint32 i) const -> float { return element_of(lhs, i) / element_of(rhs, i); }
 	};
 
-//=====================================================================
-} // namespace impl
-} // namespace math
-} // namespace atma
-//=====================================================================
-#endif
-//=====================================================================
+} } }
