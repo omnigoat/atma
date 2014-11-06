@@ -1,19 +1,12 @@
-//=====================================================================
-//
-//=====================================================================
-#ifndef ATMA_MATH_IMPL_EXPR_HPP
-#define ATMA_MATH_IMPL_EXPR_HPP
+#pragma once
 //=====================================================================
 #include <atma/math/impl/element_type_of.hpp>
 #pragma warning(push,3)
 #include <xmmintrin.h>
 #pragma warning(pop)
 //=====================================================================
-namespace atma {
-namespace math {
-namespace impl {
-//=====================================================================
-	
+namespace atma { namespace math { namespace impl {
+
 	template <typename R, typename OPER>
 	struct expr
 	{
@@ -30,10 +23,5 @@ namespace impl {
 #endif
 	};
 
-//=====================================================================
-} // namespace impl
-} // namespace math
-} // namespace atma
-//=====================================================================
-#endif
-//=====================================================================
+
+} } }
