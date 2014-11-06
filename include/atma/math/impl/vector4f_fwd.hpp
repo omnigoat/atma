@@ -1,8 +1,4 @@
-//=====================================================================
-//
-//=====================================================================
-#ifndef ATMA_MATH_IMPL_VECTOR4F_FWD_HPP
-#define ATMA_MATH_IMPL_VECTOR4F_FWD_HPP
+#pragma once
 //=====================================================================
 #ifndef ATMA_MATH_VECTOR4F_SCOPE
 #	error "this file needs to be included solely from vector4f.hpp"
@@ -16,7 +12,6 @@ namespace math {
 	struct vector4f;
 
 namespace impl {
-//=====================================================================
 
 	// expression templates
 	template <typename, typename> struct vector4f_add;
@@ -31,10 +26,4 @@ namespace impl {
 		typedef float type;
 	};
 
-//=====================================================================
-} // namespace impl
-} // namespace math
-} // namespace atma
-//=====================================================================
-#endif
-//=====================================================================
+} } }

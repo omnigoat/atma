@@ -1,26 +1,14 @@
-//=====================================================================
-//
-//=====================================================================
-#ifndef ATMA_MATH_IMPL_VECTOR4F_DECLARATION_HPP
-#define ATMA_MATH_IMPL_VECTOR4F_DECLARATION_HPP
-//=====================================================================
+#pragma once
+
 #ifndef ATMA_MATH_VECTOR4F_SCOPE
 #	error "this file needs to be included solely from vector4f.hpp"
 #endif
-//=====================================================================
-namespace atma {
-namespace math {
-//=====================================================================
-	
-	//=====================================================================
-	// vector4f
-	// ----------
-	//   A four-component vector of floats, 16-byte aligned
-	//=====================================================================
+
+namespace atma { namespace math {
+
 	__declspec(align(16))
 	struct vector4f : impl::expr<vector4f, vector4f>
 	{
-		// construction
 		vector4f();
 		vector4f(float x, float y, float z, float w);
 		explicit vector4f(__m128);
@@ -33,7 +21,7 @@ namespace math {
 
 		// access
 #ifdef ATMA_MATH_USE_SSE
-		auto xmmd() const -> __m128 { return sd_; }
+		auto xmmd() const -> __m128 { return xmmdata; }
 #endif
 		auto operator[] (uint32 i) const -> float;
 		
@@ -55,33 +43,33 @@ namespace math {
 		template <uint8_t i>
 		struct elem_ref_t
 		{
-			elem_ref_t(vector4f* owner) : owner_(owner) {}
-
 			operator float() {
-				return owner_->sd_.m128_f32[i];
+				return ((vector4f*)(this - (sizeof *this) * i)->*(&vector4f::components))[i];
 			}
 
-			float operator = (float rhs) {
-				owner_->sd_.m128_f32[i] = rhs;
+			float operator = (float rhs)
+			{
+				auto t = (vector4f*)(this - (sizeof *this) * i);
+				(t->*(&vector4f::components))[i] = rhs;
 				return rhs;
 			}
-
-		private:
-			vector4f* owner_;
 		};
-		
-	private:
-#ifdef ATMA_MATH_USE_SSE
+
 #pragma warning(push)
 #pragma warning(disable: 4201)
 		union {
-			__m128 sd_;
-			struct { float x, y, z, w; };
+#if defined(ATMA_MATH_USE_SSE)
+			__m128 xmmdata;
+#endif
+			struct {
+				elem_ref_t<0> x;
+				elem_ref_t<1> y;
+				elem_ref_t<2> z;
+				elem_ref_t<3> w;
+			};
+			float components[4];
 		};
 #pragma warning(pop)
-#else
-		float x, y, z, w;
-#endif
 	};
 	
 
@@ -99,9 +87,4 @@ namespace math {
 	inline auto cross_product(impl::expr<vector4f, LOP> const&, impl::expr<vector4f, ROP> const&) -> vector4f;
 
 
-//=====================================================================
-} // namespace math
-} // namespace atma
-//=====================================================================
-#endif
-//=====================================================================
+} }

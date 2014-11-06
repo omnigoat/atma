@@ -1,16 +1,11 @@
-//=====================================================================
-//
-//=====================================================================
-#ifndef ATMA_MATH_IMPL_UTILITY_HPP
-#define ATMA_MATH_IMPL_UTILITY_HPP
-//=====================================================================
+#pragma once
+
 #include <type_traits>
-//=====================================================================
-namespace atma {
-namespace math {
-namespace impl {
-//=====================================================================
-	
+
+
+namespace atma { namespace math { namespace impl {
+
+
 	template <typename, typename> struct expr;
 
 
@@ -50,8 +45,8 @@ namespace impl {
 	{
 		return _mm_load_ps1(&x);
 	}
+#endif
 
-#else
 	template <typename T>
 	auto element_of(T const& x, uint32 i) -> float
 	{
@@ -62,13 +57,6 @@ namespace impl {
 	{
 		return x;
 	}
-#endif
 
 
-//=====================================================================
-} // namespace impl
-} // namespace math
-} // namespace atma
-//=====================================================================
-#endif
-//=====================================================================
+} } }
