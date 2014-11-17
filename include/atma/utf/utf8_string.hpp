@@ -176,14 +176,12 @@ namespace atma {
 		data_[size_] = '\0';
 	}
 
-#if 0
 	inline auto utf8_string_t::push_back(utf8_char_t const& c) -> void
 	{
 		for (auto i = c.begin; i != c.end; ++i) {
-			chars_.push_back(*i);
+			push_back(*i);
 		}
 	}
-#endif
 
 	inline auto utf8_string_t::clear() -> void
 	{
