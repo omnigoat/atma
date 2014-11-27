@@ -60,6 +60,7 @@
     <ClInclude Include="..\include\atma\string.hpp" />
     <ClInclude Include="..\include\atma\thread\engine.hpp" />
     <ClInclude Include="..\include\atma\types.hpp" />
+    <ClInclude Include="..\include\atma\unique_memory.hpp" />
     <ClInclude Include="..\include\atma\unittest\compile.hpp" />
     <ClInclude Include="..\include\atma\unittest\emission.hpp" />
     <ClInclude Include="..\include\atma\unittest\ennumerate.hpp" />
