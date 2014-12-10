@@ -1,8 +1,8 @@
 #pragma once
-//=====================================================================
+
 #include <atma/types.hpp>
 #include <atma/platform/allocation.hpp>
-//=====================================================================
+
 namespace atma
 {
 	struct shared_memory_t
@@ -34,6 +34,8 @@ namespace atma
 	};
 
 
+
+
 	inline shared_memory_t::shared_memory_t()
 		: data_(), ref_()
 	{
@@ -51,14 +53,14 @@ namespace atma
 	}
 
 	inline shared_memory_t::shared_memory_t(uint alignment, uint size)
-		: data_((char*)platform::allocate_aligned_memory(alignment, size + sizeof(std::atomic_int32_t))),
-		  ref_(new (data_ + size) std::atomic_int32_t{1})
+		: data_((char*)platform::allocate_aligned_memory(alignment, size + sizeof(std::atomic_int32_t)))
+		, ref_(new (data_ + size) std::atomic_int32_t{1})
 	{
 	}
 
 	inline shared_memory_t::shared_memory_t(uint alignment, uint size, void* data)
-		: data_((char*)platform::allocate_aligned_memory(alignment, size + sizeof(std::atomic_int32_t))),
-		  ref_(new (data_ + size) std::atomic_int32_t{1})
+		: data_((char*)platform::allocate_aligned_memory(alignment, size + sizeof(std::atomic_int32_t)))
+		, ref_(new (data_ + size) std::atomic_int32_t{1})
 	{
 		memcpy(data_, data, size);
 	}
