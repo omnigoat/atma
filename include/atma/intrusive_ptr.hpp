@@ -1,20 +1,17 @@
 #pragma once
-//=====================================================================
+
 #include <atma/assert.hpp>
 #include <atomic>
 #include <type_traits>
-//=====================================================================
-namespace atma {
-//=====================================================================
-	
-	template <typename T>
-	struct intrusive_ptr;
 
-	//=====================================================================
-	// ref_counted
-	// -------------
-	//   this is a *non-virtual* base class.
-	//=====================================================================
+namespace atma {
+	
+	struct ref_counted;
+	template <typename T> struct intrusive_ptr;
+
+
+
+
 	struct ref_counted
 	{
 		virtual ~ref_counted() {}
@@ -48,21 +45,21 @@ namespace atma {
 	};
 
 
-	//=====================================================================
-	// intrusive_ptr
-	// ---------------
-	//   atma's intrusive pointer implementation
-	//=====================================================================
+
+
 	template <typename T>
 	struct intrusive_ptr
 	{
-		// constructors/destrectuor
 		intrusive_ptr()
 		: px()
-		{
-		}
+		{}
 
-		explicit intrusive_ptr(T* t)
+		explicit intrusive_ptr(std::nullptr_t)
+		: px()
+		{}
+
+		template <typename Y, typename = std::enable_if_t<std::is_convertible<Y*, T*>>>
+		explicit intrusive_ptr(Y* t)
 		: px(t)
 		{
 			ref_counted::add_ref(t);
@@ -74,31 +71,31 @@ namespace atma {
 			ref_counted::add_ref(px);
 		}
 
-		template <class Y = typename std::enable_if<std::is_const<T>::value, typename std::remove_const<T>::type>::type>
+		template <typename Y, typename = std::enable_if_t<std::is_convertible<Y*, T*>>>
 		intrusive_ptr(intrusive_ptr<Y> const& rhs)
 		: px(rhs.px)
 		{
 			ref_counted::add_ref(px);
 		}
 		
-		intrusive_ptr(intrusive_ptr<T>&& rhs)
+		intrusive_ptr(intrusive_ptr&& rhs)
 		: px(rhs.px)
 		{
 			rhs.px = nullptr;
 		}
 
-		template <class Y = typename std::enable_if<std::is_const<T>::value, typename std::remove_const<T>::type>::type>
+		template <class Y, typename = std::enable_if_t<std::is_convertible<Y*, T*>>>
 		intrusive_ptr(intrusive_ptr<Y>&& rhs)
 		: px(rhs.px)
 		{
 			rhs.px = nullptr;
 		}
 
-		~intrusive_ptr() {
+		~intrusive_ptr()
+		{
 			ref_counted::rm_ref(px);
 		}
 
-		// operators
 		auto operator = (intrusive_ptr const& rhs) -> intrusive_ptr&
 		{
 			ATMA_ASSERT(this != &rhs);
@@ -108,7 +105,7 @@ namespace atma {
 			return *this;
 		}
 
-		template <class Y = typename std::enable_if<std::is_const<T>::value, typename std::remove_const<T>::type>::type>
+		template <typename Y, typename = std::enable_if_t<std::is_convertible<Y*, T*>>>
 		auto operator = (intrusive_ptr<Y> const& rhs) -> intrusive_ptr&
 		{
 			ref_counted::add_ref(rhs.px);
@@ -133,30 +130,28 @@ namespace atma {
 			return px;
 		}
 
-		// accessors
 		auto get() const -> T* {
 			return px;
 		}
 
 		template <typename Y>
-		auto as() const -> intrusive_ptr<Y> {
+		auto cast_static() const -> intrusive_ptr<Y> {
 			return intrusive_ptr<Y>(static_cast<Y*>(px));
 		}
 
-	private:
-		intrusive_ptr(T* t, void*) : px(t) {}
-
-		static auto noaddref_ptr(T* t) -> intrusive_ptr<T>
-		{
-			return intrusive_ptr<T>(t, nullptr);
+		template <typename Y>
+		auto cast_dynamic() const -> intrusive_ptr<Y> {
+			return intrusive_ptr<Y>(dynamic_cast<Y*>(px));
 		}
 
+	private:
 		T* px;
 
-		template <typename Y>
-		friend struct intrusive_ptr;
-		friend struct ref_counted;
+		template <typename> friend struct intrusive_ptr;
 	};
+
+
+
 
 	template <typename T>
 	inline auto operator == (intrusive_ptr<T> const& lhs, intrusive_ptr<T> const& rhs) -> bool {
@@ -173,6 +168,5 @@ namespace atma {
 		return lhs.get() < rhs.get();
 	}
 
-//=====================================================================
-} // namespace atma
-//=====================================================================
+}
+
