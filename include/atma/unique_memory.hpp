@@ -1,8 +1,8 @@
 #pragma once
-//=====================================================================
+
 #include <atma/types.hpp>
 #include <atma/platform/allocation.hpp>
-//=====================================================================
+
 namespace atma
 {
 	struct unique_memory_t
@@ -18,9 +18,6 @@ namespace atma
 		unique_memory_t(unique_memory_t const&) = delete;
 		auto operator = (unique_memory_t const&) -> unique_memory_t& = delete;
 
-		auto operator *() -> void*;
-		auto operator *() const -> void const*;
-
 		auto size() const -> size_t;
 		auto begin() -> void*;
 		auto end() -> void*;
@@ -33,8 +30,11 @@ namespace atma
 	};
 
 
+
+
 	inline unique_memory_t::unique_memory_t()
-		: data_(), end_()
+		: data_()
+		, end_()
 	{
 		
 	}
@@ -50,18 +50,21 @@ namespace atma
 	}
 
 	inline unique_memory_t::unique_memory_t(uint alignment, size_t size)
-		: data_(platform::allocate_aligned_memory(alignment, size)), end_(reinterpret_cast<char*>(data_) + size)
+		: data_(platform::allocate_aligned_memory(alignment, size))
+		, end_(reinterpret_cast<char*>(data_) + size)
 	{
 	}
 
 	inline unique_memory_t::unique_memory_t(uint alignment, size_t size, void* data)
-		: data_(platform::allocate_aligned_memory(alignment, size)), end_(reinterpret_cast<char*>(data_)+ size)
+		: data_(platform::allocate_aligned_memory(alignment, size))
+		, end_(reinterpret_cast<char*>(data_) + size)
 	{
 		memcpy(data_, data, size);
 	}
 
 	inline unique_memory_t::unique_memory_t(unique_memory_t&& rhs)
-		: data_(rhs.data_), end_(rhs.end_)
+		: data_(rhs.data_)
+		, end_(rhs.end_)
 	{
 		rhs.data_ = nullptr;
 		rhs.end_ = nullptr;
