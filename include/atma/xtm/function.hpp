@@ -19,6 +19,11 @@ namespace atma { namespace xtm {
 		: function_traits<T>
 	{};
 
+	template <typename T>
+	struct function_traits<T*>
+		: function_traits<T>
+	{};
+
 	template <typename C, typename R, typename... Params>
 	struct function_traits<R(C::*)(Params...) const>
 	{

@@ -631,6 +631,7 @@ namespace atma { namespace xtm {
 		return{std::forward<F>(f), std::forward_as_tuple(bindings...)};
 	}
 
+
 	// bind taking a bind: recompose the binds
 	template <typename PreF, typename Prebindings, typename... Bindings>
 	inline auto bind(bind_t<PreF, Prebindings> const& b, Bindings&&... bindings)
@@ -863,6 +864,16 @@ namespace atma { namespace xtm {
 			-> typename atma::xtm::function_traits<std::decay_t<F>>::result_type
 			{
 				return f(std::forward<Unpacked>(u)...);
+			}
+
+			// pointer-to-callable (unsupported)
+			//  if someone passes the address of a lambda
+			template <typename F, typename Bindings, typename Args, typename... Unpacked>
+			static auto apply(F* f, Bindings&&, Args&&, Unpacked&&... u)
+				-> typename atma::xtm::function_traits<std::decay_t<F>>::result_type
+			{
+				static_assert(false, "pointer-to-callable unsupported. did you take the address of a lambda?");
+				return typename atma::xtm::function_traits<std::decay_t<F>>::result_type();
 			}
 
 			// fnptr
