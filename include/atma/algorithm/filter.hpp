@@ -27,7 +27,7 @@ namespace atma
 
 		template <typename CC, typename FF>
 		filtered_range_t(CC&&, source_iterator_t const&, source_iterator_t const&, FF&&);
-		filtered_range_t(filtered_range_t const&) = delete;
+		filtered_range_t(filtered_range_t const&);
 
 		auto source_container() const -> C { return container_; }
 		auto predicate() const -> F { return predicate_; }
@@ -43,70 +43,29 @@ namespace atma
 		F predicate_;
 	};
 
-	template <typename F, typename C>
-	auto filter(F&& predicate, C&& container) -> filtered_range_t<C, F>
+	template <typename F>
+	struct partial_filtered_range_t
 	{
-		return filtered_range_t<C, F>(
-			std::forward<C>(container),
-			container.begin(),
-			container.end(),
-			std::forward<F>(predicate));
-	}
+		template <typename FF>
+		partial_filtered_range_t(FF&& f)
+			: fn_(std::forward<FF>(f))
+		{}
 
-#if 0
-	template <typename xs_t, typename c_t, typename mf_t>
-	auto filter(c_t(mf_t::*method)(), xs_t&& xs)
-		-> filtered_range_t<C, decltype(method)>
-	{
-		auto lambda = [method](c_t const& x) { return (x.*method)(); };
+		template <typename C>
+		inline auto operator <<= (C&& xs) -> filtered_range_t<C, F>
+		{
+			return filtered_range_t<C, F>(
+				std::forward<C>(xs),
+				xs.begin(),
+				xs.end(),
+				std::forward<F>(fn_));
+		}
 
-		return filtered_range_t<xs_t, decltype(lambda)>(
-			std::forward<xs_t>(xs),
-			container.begin(),
-			container.end(),
-			lambda);
-	}
-#endif
+	private:
+		F fn_;
+	};
 
-	template <typename C, typename F>
-	template <typename CC, typename FF>
-	filtered_range_t<C, F>::filtered_range_t(CC&& source, source_iterator_t const& begin, source_iterator_t const& end, FF&& predicate)
-		: container_(std::forward<CC>(source)), begin_(begin), end_(end), predicate_(std::forward<FF>(predicate))
-	{
-	}
-
-
-	template <typename C, typename F>
-	auto filtered_range_t<C, F>::begin() -> either_iterator
-	{
-		auto i = begin_;
-		while (i != end_ && !xtm::curry(predicate_)(*i))
-			i++;
-
-		return{this, i, end_};
-	}
-
-	template <typename C, typename F>
-	auto filtered_range_t<C, F>::end() -> either_iterator
-	{
-		return{this, end_, end_};
-	}
-
-	template <typename C, typename F>
-	auto filtered_range_t<C, F>::begin() const -> const_iterator
-	{
-		auto i = begin_;
-		while (i != end_ && !predicate_(*i))
-			i++;
-
-		return{this, i, end_};
-	}
-
-	template <typename C, typename F>
-	auto filtered_range_t<C, F>::end() const -> const_iterator
-	{
-		return{this, end_, end_};
-	}
+	
 
 
 	template <typename C>
@@ -126,9 +85,12 @@ namespace atma
 		using reference         = value_type&;
 		using const_reference   = value_type const&;
 
+		using either_reference  = std::conditional_t<std::is_const<owner_t>::value, const_reference, reference>;
+
+
 		filtered_range_iterator_t(C*, source_iterator_t const& begin, source_iterator_t const& end);
 
-		auto operator  *() -> std::conditional_t<std::is_const<owner_t>::value, const_reference, reference>;
+		auto operator  *() -> either_reference;
 		auto operator ++() -> filtered_range_iterator_t&;
 
 	private:
@@ -136,21 +98,62 @@ namespace atma
 		source_iterator_t pos_, end_;
 	};
 
-	template <typename C>
-	inline auto operator == (filtered_range_iterator_t<C> const& lhs, filtered_range_iterator_t<C> const& rhs) -> bool
+
+
+
+	//======================================================================
+	// RANGE IMPLEMENTATION
+	//======================================================================
+	template <typename C, typename F>
+	template <typename CC, typename FF>
+	filtered_range_t<C, F>::filtered_range_t(CC&& source, source_iterator_t const& begin, source_iterator_t const& end, FF&& predicate)
+		: container_(std::forward<CC>(source)), begin_(begin), end_(end), predicate_(std::forward<FF>(predicate))
 	{
-		ATMA_ASSERT(lhs.owner_ == rhs.owner_);
-		return lhs.pos_ == rhs.pos_;
 	}
 
-	template <typename C>
-	inline auto operator != (filtered_range_iterator_t<C> const& lhs, filtered_range_iterator_t<C> const& rhs) -> bool
+	template <typename C, typename F>
+	inline filtered_range_t<C, F>::filtered_range_t(filtered_range_t const& rhs)
+		: container_(rhs.container_), begin_(rhs.begin_), end_(rhs.end_), predicate_(rhs.predicate_)
+	{}
+
+	template <typename C, typename F>
+	inline auto filtered_range_t<C, F>::begin() -> either_iterator
 	{
-		return !operator == (lhs, rhs);
+		auto i = begin_;
+		while (i != end_ && !xtm::curry(predicate_)(*i))
+			++i;
+
+		return{this, i, end_};
+	}
+
+	template <typename C, typename F>
+	inline auto filtered_range_t<C, F>::end() -> either_iterator
+	{
+		return{this, end_, end_};
+	}
+
+	template <typename C, typename F>
+	inline auto filtered_range_t<C, F>::begin() const -> const_iterator
+	{
+		auto i = begin_;
+		while (i != end_ && !predicate_(*i))
+			++i;
+
+		return{this, i, end_};
+	}
+
+	template <typename C, typename F>
+	auto filtered_range_t<C, F>::end() const -> const_iterator
+	{
+		return{this, end_, end_};
 	}
 
 
 
+
+	//======================================================================
+	// ITERATOR IMPLEMENTATION
+	//======================================================================
 	template <typename C>
 	filtered_range_iterator_t<C>::filtered_range_iterator_t(owner_t* owner, source_iterator_t const& begin, source_iterator_t const& end)
 		: owner_(owner), pos_(begin), end_(end)
@@ -170,4 +173,52 @@ namespace atma
 			;
 		return *this;
 	}
+
+	template <typename C>
+	inline auto operator == (filtered_range_iterator_t<C> const& lhs, filtered_range_iterator_t<C> const& rhs) -> bool
+	{
+		ATMA_ASSERT(lhs.owner_ == rhs.owner_);
+		return lhs.pos_ == rhs.pos_;
+	}
+
+	template <typename C>
+	inline auto operator != (filtered_range_iterator_t<C> const& lhs, filtered_range_iterator_t<C> const& rhs) -> bool
+	{
+		return !operator == (lhs, rhs);
+	}
+
+
+	//======================================================================
+	// FUNCTIONS
+	//======================================================================
+	template <typename F, typename C>
+	auto filter(F&& predicate, C&& container) -> filtered_range_t<C, F>
+	{
+		return filtered_range_t<C, F>(
+			std::forward<C>(container),
+			container.begin(),
+			container.end(),
+			std::forward<F>(predicate));
+	}
+
+	template <typename F>
+	auto filter(F&& predicate) -> partial_filtered_range_t<F>
+	{
+		return {predicate};
+	}
+
+#if 0
+	template <typename xs_t, typename c_t, typename mf_t>
+	auto filter(c_t(mf_t::*method)(), xs_t&& xs)
+		-> filtered_range_t<C, decltype(method)>
+	{
+		auto lambda = [method](c_t const& x) { return (x.*method)(); };
+
+		return filtered_range_t<xs_t, decltype(lambda)>(
+			std::forward<xs_t>(xs),
+			container.begin(),
+			container.end(),
+			lambda);
+	}
+#endif
 }
