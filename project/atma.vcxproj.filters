@@ -235,5 +235,14 @@
     <ClInclude Include="..\include\atma\algorithm\filter.hpp">
       <Filter>include\algorithm</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\algorithm\map.hpp">
+      <Filter>include\algorithm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\xtm\placeholders.hpp">
+      <Filter>include\xtm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\xtm\bind.hpp">
+      <Filter>include\xtm</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
