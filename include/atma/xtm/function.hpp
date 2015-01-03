@@ -4,6 +4,9 @@
 //=====================================================================
 namespace atma { namespace xtm {
 	
+	template <typename... Args>
+	using variadic_size = std::tuple_size<std::tuple<Args...>>;
+
 	template <typename T>
 	struct function_traits
 		: function_traits<decltype(&T::operator())>
@@ -22,6 +25,11 @@ namespace atma { namespace xtm {
 	template <typename T>
 	struct function_traits<T*>
 		: function_traits<T>
+	{};
+
+	template <typename R, typename... Args>
+	struct function_traits<R(&)(Args...)>
+		: function_traits<R(*)(Args...)>
 	{};
 
 	template <typename C, typename R, typename... Params>
