@@ -16,7 +16,7 @@ namespace atma { namespace xtm {
 	//      assuming a function: int plus3(int a, int b, int c) { return a + b + c; }
 	//
 	//      curried_bindings_t<&plus3, int>  ===  std::tuple<int, placeholder_t<0>, placeholder_t<1>>
-	//      curried_bindings_t<&plus3, int, int>  ===  std::tuple<int, int, placeholder_t<1>>
+	//      curried_bindings_t<&plus3, int, int>  ===  std::tuple<int, int, placeholder_t<0>>
 	//
 	namespace detail
 	{
@@ -124,13 +124,13 @@ namespace atma { namespace xtm {
 
 
 	//
-	// call_fn
-	// ---------
-	//   takes a callable object and a variadic list of arguments, and calls the
-	//   object with those arguments. @f may be a function-pointer,
-	//   a member-function-pointer (with the first argument being a
-	//   pointer/ref to an instantiation of the class), or a generic callable
-	//   object, like a std::function<>, or even a lambda.
+	//  call_fn
+	//  ---------
+	//    takes a callable object and a variadic list of arguments, and calls the
+	//    object with those arguments. @f may be a function-pointer,
+	//    a member-function-pointer (with the first argument being a
+	//    pointer/ref to an instantiation of the class), or a generic callable
+	//    object, like a std::function<>, or even a lambda.
 	//
 	template <typename F, typename... Args>
 	auto call_fn(F&& f, Args&&... args) -> typename xtm::function_traits<F>::result_type
@@ -172,17 +172,17 @@ namespace atma { namespace xtm {
 
 
 	//
-	// call_fn_tuple
-	// ---------------
-	//   Takes a callable object and a tuple of arguments, and calls the
-	//   object with those arguments. @f may be a function-pointer,
-	//   a member-function-pointer (with the first tuple element being a
-	//   pointer/ref to an instantiation of the class), or a generic callable
-	//   object, like a std::function<>, or even a lambda.
-	//
-	//   A helper function is provided for member-function-pointers where
-	//   the pointer to the instantiation isn't in the tuple to begin with.
-	//   For speeeed.
+	//  call_fn_tuple
+	//  ---------------
+	//    Takes a callable object and a tuple of arguments, and calls the
+	//    object with those arguments. @f may be a function-pointer,
+	//    a member-function-pointer (with the first tuple element being a
+	//    pointer/ref to an instantiation of the class), or a generic callable
+	//    object, like a std::function<>, or even a lambda.
+	//  
+	//    A helper function is provided for member-function-pointers where
+	//    the pointer to the instantiation isn't in the tuple to begin with.
+	//    For speeeed.
 	//
 	namespace detail
 	{
@@ -266,9 +266,14 @@ namespace atma { namespace xtm {
 
 
 	//
-	// call_fn_bound_tuple
-	// ----------------
-	//   
+	//  call_fn_bound_tuple
+	//  ----------------
+	//    takes a function, a tuple of bindings, and a tuple of arguments, and calls
+	//    the function after "unwrapping" the bindings/args, example given:
+	//
+	//    int sub(int x, int y) { return x - y; }
+	//
+	//    call_fn_bound_tuple(&sub, std::make_tuple(arg2, 2), std::make_tuple(4, 5))  ===  3
 	//
 	namespace detail
 	{
