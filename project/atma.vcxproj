@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClInclude Include="..\include\atma\algorithm.hpp" />
     <ClInclude Include="..\include\atma\algorithm\filter.hpp" />
+    <ClInclude Include="..\include\atma\algorithm\map.hpp" />
     <ClInclude Include="..\include\atma\aligned_allocator.hpp" />
     <ClInclude Include="..\include\atma\assert.hpp" />
     <ClInclude Include="..\include\atma\assert\basic.hpp" />
@@ -77,8 +78,10 @@
     <ClInclude Include="..\include\atma\utf\utf8_string.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string_range_header.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string_range.hpp" />
+    <ClInclude Include="..\include\atma\xtm\bind.hpp" />
     <ClInclude Include="..\include\atma\xtm\function.hpp" />
     <ClInclude Include="..\include\atma\xtm\idxs.hpp" />
+    <ClInclude Include="..\include\atma\xtm\placeholders.hpp" />
     <ClInclude Include="..\include\atma\xtm\tuple.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

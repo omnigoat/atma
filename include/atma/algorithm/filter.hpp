@@ -76,16 +76,16 @@ namespace atma
 		template <typename C2>
 		friend auto operator == (filtered_range_iterator_t<C2> const&, filtered_range_iterator_t<C2> const&) -> bool;
 
-		typedef C owner_t;
-		typedef typename owner_t::source_iterator_t source_iterator_t;
+		using owner_t = C;
+		using source_iterator_t = typename owner_t::source_iterator_t;
 
 		using iterator_category = std::forward_iterator_tag;
 		using value_type        = typename owner_t::value_type;
 		using difference_type   = ptrdiff_t;
 		using distance_type     = ptrdiff_t;
 		using pointer           = value_type*;
-		using reference         = value_type&;
-		using const_reference   = value_type const&;
+		using reference         = typename owner_t::reference;
+		using const_reference   = typename owner_t::const_reference;
 
 		using either_reference  = std::conditional_t<std::is_const<owner_t>::value, const_reference, reference>;
 
@@ -163,7 +163,7 @@ namespace atma
 	}
 
 	template <typename C>
-	inline auto filtered_range_iterator_t<C>::operator *() -> std::conditional_t<std::is_const<owner_t>::value, const_reference, reference>
+	inline auto filtered_range_iterator_t<C>::operator *() -> either_reference
 	{
 		return *pos_;
 	}
@@ -196,11 +196,7 @@ namespace atma
 	template <typename F, typename C>
 	inline auto filter(F&& predicate, C&& container) -> filtered_range_t<C, F>
 	{
-		return filtered_range_t<C, F>(
-			std::forward<C>(container),
-			container.begin(),
-			container.end(),
-			std::forward<F>(predicate));
+		return {std::forward<C>(container), container.begin(), container.end(), std::forward<F>(predicate)};
 	}
 
 	template <typename F>
