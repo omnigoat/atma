@@ -84,7 +84,7 @@ namespace atma { namespace xtm {
 		struct bound_arguments_tx<Bindings, Args, idxs_t<Idxs...>>
 		{
 			using type =
-				decltype(std::forward_as_tuple(select_bound_arg(std::get<Idxs>(std::declval<Bindings>()), std::declval<Args>())...));
+				decltype(std::forward_as_tuple(select_bound_arg(std::get<Idxs>(std::declval<Bindings>()), Args())...));
 		};
 	
 		template <typename Bindings, typename Args, size_t... Idxs>
@@ -312,9 +312,13 @@ namespace atma { namespace xtm {
 	//    takes a function, and a tuple of bindings, and returns a functor taking 
 	//
 	//
-	template <typename F, typename Bindings>
+	template <typename F, typename BindingsRef>
 	struct bind_t
 	{
+		// bind doesn't take anything by reference, so we just straight-up store
+		// by value. this will still perform construct-by-reference (rvalue/lvalue)
+		using Bindings = tuple_map_t<std::remove_reference, BindingsRef>;
+
 		template <typename FF, typename BB>
 		bind_t(FF&& fn, BB&& bindings)
 			: fn_(std::forward<FF>(fn)), bindings_(std::forward<BB>(bindings))
@@ -334,30 +338,57 @@ namespace atma { namespace xtm {
 	private:
 		F fn_;
 
-		// bind doesn't take anything by reference, so we just straight-up store
-		// by value. this will still perform construct-by-reference (rvalue/lvalue)
-		tuple_map_t<std::remove_reference, Bindings> bindings_;
+		Bindings bindings_;
 	};
 
+	template <typename PreF, typename PreBindings, typename NewBindings>
+	struct bind_t<bind_t<PreF, PreBindings>, NewBindings>
+	{
+		using Bindings = tuple_map_t<std::remove_reference, bound_arguments_t<PreBindings, NewBindings>>;
+
+		template <typename FF, typename BB>
+		bind_t(FF&& fn, BB&& bindings)
+			: fn_(fn.fn()), bindings_(
+			std::forward<decltype(bind_arguments(fn.bindings(), std::forward<BB>(bindings)))>(
+				bind_arguments(fn.bindings(), std::forward<BB>(bindings))))
+		{
+			auto&& blam = bind_arguments(fn.bindings(), std::forward<BB>(bindings));
+			bindings_ = blam;
+		}
+
+		template <typename... Args>
+		auto operator ()(Args&&... args)
+			-> typename function_traits<PreF>::result_type
+		{
+			return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
+		}
+
+		auto fn() const -> PreF const& { return fn_; }
+		auto bindings() const -> Bindings const& { return bindings_; }
+
+	private:
+		PreF fn_;
+
+		// bind doesn't take anything by reference, so we just straight-up store
+		// by value. this will still perform construct-by-reference (rvalue/lvalue)
+		Bindings bindings_;
+	};
 
 	// regular bind
 	template <typename F, typename... Bindings>
 	inline auto bind(F&& f, Bindings&&... bindings)
 		-> bind_t<std::remove_reference_t<F>, std::tuple<Bindings...>>
 	{
-		return bind_t{std::forward<F>(f), std::forward_as_tuple(bindings...)};
+		return {std::forward<F>(f), std::forward_as_tuple(bindings...)};
 	}
 
 
-	// bind taking a bind: recompose the binds
-	template <typename PreF, typename Prebindings, typename... Bindings>
-	inline auto bind(bind_t<PreF, Prebindings> const& b, Bindings&&... bindings)
-		-> bind_t<PreF, bound_arguments_t<Prebindings, std::tuple<Bindings...>>>
-	{
-		return bind_t{b.fn(), bind_arguments(b.bindings(), std::forward_as_tuple(bindings...))};
-	}
 
 
+	template <typename F, typename Bindings>
+	struct function_traits<bind_t<F, Bindings>>
+		: function_traits<F>
+	{};
 
 
 	//
