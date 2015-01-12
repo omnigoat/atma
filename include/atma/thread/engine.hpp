@@ -87,7 +87,7 @@ namespace thread {
 			return;
 
 		// push blocking fn!
-		auto blocked = std::atomic_bool{true};
+		auto&& blocked = std::atomic_bool{true};
 		queue_.push([&blocked]{ blocked = false; });
 
 		// don't block if we're the prime thread blocking ourselves.
