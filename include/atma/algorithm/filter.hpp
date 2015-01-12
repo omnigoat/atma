@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atma/xtm/bind.hpp>
+
 namespace atma
 {
 	template <typename C, typename F> struct filtered_range_t;
