@@ -27,12 +27,12 @@ namespace atma { namespace lockfree {
 		template <typename T, bool = node_size_t<T>::is_small>
 		struct node_t
 		{
-			node_t() : value(nullptr), next(nullptr) {}
+			node_t() : value(), next(nullptr) {}
 			node_t(const T& value) : value(new T(value)), next(nullptr) {}
 			~node_t() { }
 			auto value_ptr() -> T * { return value; }
 			auto value_ptr() const -> T const* { return value; }
-			auto clear_value_ptr() -> void { value = nullptr; }
+			auto clear_value_ptr() -> void { delete value; value = nullptr; }
 
 			T* value;
 			std::atomic<node_t*> next;
@@ -167,10 +167,11 @@ namespace atma { namespace lockfree {
 	// queue_t implementation
 	//=====================================================================
 	template <typename T>
-	queue_t<T>::queue_t() {
-		head_ = tail_ = new node_t;
-		producer_lock_ = consumer_lock_ = false;
-	};
+	queue_t<T>::queue_t()
+		: head_(new node_t), producer_lock_{false}
+		, tail_(head_), consumer_lock_{false}
+	{
+	}
 
 	template <typename T>
 	queue_t<T>::~queue_t()

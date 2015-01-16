@@ -2,12 +2,15 @@
 
 #include <atma/math/vector4f.hpp>
 
+#include <array>
+
+
 namespace atma { namespace math {
 
 	struct aabb_t
 	{
 		aabb_t(vector4f const& origin, vector4f const& extents)
-			: origin(origin), extents(extents)
+			: origin_(origin), extents_(extents)
 		{}
 
 		static auto from_minmax(vector4f const& min, vector4f const& max) -> aabb_t
@@ -19,7 +22,21 @@ namespace atma { namespace math {
 
 		auto origin() const -> vector4f const& { return origin_; }
 		auto extents() const -> vector4f const& { return extents_; }
-		auto volume() const -> float { return 8.f * extents.x * extents.y * extents.z; }
+		auto volume() const -> float { return 8.f * extents_.x * extents_.y * extents_.z; }
+
+		auto compute_corners() const -> std::array<vector4f, 8>
+		{
+			return {
+				origin_ + point4f(-extents_.x, -extents_.y, -extents_.z),
+				origin_ + point4f( extents_.x, -extents_.y, -extents_.z),
+				origin_ + point4f(-extents_.x,  extents_.y, -extents_.z),
+				origin_ + point4f( extents_.x,  extents_.y, -extents_.z),
+				origin_ + point4f(-extents_.x, -extents_.y,  extents_.z),
+				origin_ + point4f( extents_.x, -extents_.y,  extents_.z),
+				origin_ + point4f(-extents_.x,  extents_.y,  extents_.z),
+				origin_ + point4f( extents_.x,  extents_.y,  extents_.z),
+			};
+		}
 
 		auto inside(math::vector4f const& p) const -> bool
 		{
