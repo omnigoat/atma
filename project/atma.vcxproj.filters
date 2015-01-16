@@ -244,5 +244,8 @@
     <ClInclude Include="..\include\atma\xtm\bind.hpp">
       <Filter>include\xtm</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\math\triangle.hpp">
+      <Filter>include\math</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

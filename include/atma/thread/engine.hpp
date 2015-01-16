@@ -1,18 +1,16 @@
 #pragma once
-//=====================================================================
+
 #include <atma/lockfree/queue.hpp>
 #include <vector>
 #include <thread>
 #include <algorithm>
-//=====================================================================
-namespace atma {
-namespace thread {
-//=====================================================================
+
+namespace atma { namespace thread {
 	
 	struct engine_t
 	{
-		typedef std::function<void()> signal_t;
-		typedef atma::lockfree::queue_t<signal_t> queue_t;
+		using signal_t = std::function<void()>;
+		using queue_t  = atma::lockfree::queue_t<signal_t>;
 
 		engine_t();
 		~engine_t();
@@ -76,9 +74,8 @@ namespace thread {
 
 	inline auto engine_t::signal_evergreen(signal_t const& fn) -> void
 	{
-		if (!running_)
-			return;
-		evergreen_.push(fn);
+		auto sg = [&, fn]() { fn(); signal_evergreen(fn); };
+		signal(sg);
 	}
 
 	inline auto engine_t::signal_block() -> void
@@ -103,7 +100,5 @@ namespace thread {
 		}
 	}
 
-//=====================================================================
-} // namespace thread
-} // namespace atma
-//=====================================================================
+} }
+
