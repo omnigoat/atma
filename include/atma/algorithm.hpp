@@ -8,18 +8,15 @@
 
 namespace atma
 {
+	// reimplement many std algorithms
 	template <typename C>
 	void sort(C& container)
 		{ std::sort(container.begin(), container.end()); }
-
 
 	template <typename C, typename F>
 	void sort(C& container, F&& pred)
 		{ std::sort(container.begin(), container.end(), std::forward<F>(f)); }
 
-	template <typename C, typename F> struct filtered_range_t;
-	template <typename R> struct filtered_range_iterator_t;
-	
 
 
 	template <typename C>
