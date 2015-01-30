@@ -76,6 +76,8 @@ namespace thread {
 
 	inline auto engine_t::signal_evergreen(signal_t const& fn) -> void
 	{
+		signal_t fnfn = [&]() { fn(); evergreen_.push(fnfn); };
+
 		if (!running_)
 			return;
 		evergreen_.push(fn);

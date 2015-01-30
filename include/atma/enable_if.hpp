@@ -4,6 +4,7 @@ namespace atma
 {
 	namespace detail {
 		struct enabler_t {};
+		struct disabler_t {};
 
 		template <typename V, typename... Values>
 		struct all_t
@@ -39,5 +40,5 @@ namespace atma
 	using enable_if = typename std::enable_if<detail::all_t<Condition...>::value, detail::enabler_t>::type;
 
 	template <typename... Condition>
-	using disable_if = typename std::enable_if<!detail::all_t<Condition...>::value, detail::enabler_t>::type;
+	using disable_if = typename std::enable_if<!detail::all_t<Condition...>::value, detail::disabler_t>::type;
 }
