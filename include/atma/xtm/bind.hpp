@@ -387,8 +387,17 @@ namespace atma { namespace xtm {
 
 	template <typename F, typename Bindings>
 	struct function_traits<bind_t<F, Bindings>>
-		: function_traits<F>
-	{};
+	{
+		using result_type = typename function_traits<F>::result_type;
+
+		enum { arity = function_traits<F>::arity - tuple_nonplaceholder_size_t<Bindings>::value };
+
+		template <size_t i>
+		struct arg
+		{
+			typedef typename function_traits<F>::template arg<i + tuple_nonplaceholder_size_t<Bindings>::value>::type type;
+		};
+	};
 
 
 	//
