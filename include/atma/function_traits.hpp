@@ -3,7 +3,7 @@
 #include <tuple>
 
 
-namespace atma { namespace xtm {
+namespace atma {
 
 	template <typename T>
 	struct function_traits
@@ -69,4 +69,4 @@ namespace atma { namespace xtm {
 		static size_t const arity = sizeof...(Params);
 	};
 
-} }
+}

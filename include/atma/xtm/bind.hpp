@@ -3,7 +3,7 @@
 
 #include <atma/xtm/tuple.hpp>
 #include <atma/xtm/placeholders.hpp>
-
+#include <atma/function_traits.hpp>
 
 namespace atma { namespace xtm {
 
@@ -133,7 +133,7 @@ namespace atma { namespace xtm {
 	//    object, like a std::function<>, or even a lambda.
 	//
 	template <typename F, typename... Args>
-	auto call_fn(F&& f, Args&&... args) -> typename xtm::function_traits<F>::result_type
+	auto call_fn(F&& f, Args&&... args) -> typename function_traits<F>::result_type
 	{
 		return f(std::forward<Args>(args)...);
 	}
@@ -188,7 +188,7 @@ namespace atma { namespace xtm {
 	{
 		template <typename F, typename Tuple, size_t... Idxs>
 		inline auto call_fn_tuple_impl(F&& f, Tuple&& xs, idxs_t<Idxs...>)
-			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
+			-> typename function_traits<typename std::decay<F>::type>::result_type
 		{
 			return call_fn(
 				std::forward<F>(f),
@@ -199,7 +199,7 @@ namespace atma { namespace xtm {
 	// catch-all
 	template <typename F, typename Tuple>
 	inline auto call_fn_tuple(F&& f, Tuple&& xs)
-		-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
+		-> typename function_traits<typename std::decay<F>::type>::result_type
 	{
 		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
 
@@ -279,7 +279,7 @@ namespace atma { namespace xtm {
 	{
 		template <typename F, typename Bindings, typename Args, size_t... Idxs>
 		inline auto call_fn_bound_tuple_impl(F&& f, Bindings&& bindings, Args&& args, idxs_t<Idxs...>)
-			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
+			-> typename function_traits<typename std::decay<F>::type>::result_type
 		{
 			return call_fn(
 				std::forward<F>(f),

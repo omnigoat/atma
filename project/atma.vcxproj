@@ -35,6 +35,7 @@
     <ClInclude Include="..\include\atma\enable_multiple_shared_from_this.hpp" />
     <ClInclude Include="..\include\atma\event.hpp" />
     <ClInclude Include="..\include\atma\filesystem\file.hpp" />
+    <ClInclude Include="..\include\atma\function_traits.hpp" />
     <ClInclude Include="..\include\atma\intrusive_ptr.hpp" />
     <ClInclude Include="..\include\atma\lockfree\queue.hpp" />
     <ClInclude Include="..\include\atma\math\aabb.hpp" />
@@ -80,7 +81,6 @@
     <ClInclude Include="..\include\atma\utf\utf8_string_range_header.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string_range.hpp" />
     <ClInclude Include="..\include\atma\xtm\bind.hpp" />
-    <ClInclude Include="..\include\atma\xtm\function.hpp" />
     <ClInclude Include="..\include\atma\xtm\idxs.hpp" />
     <ClInclude Include="..\include\atma\xtm\placeholders.hpp" />
     <ClInclude Include="..\include\atma\xtm\tuple.hpp" />

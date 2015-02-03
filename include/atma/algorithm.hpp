@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atma/xtm/function.hpp>
 #include <atma/xtm/tuple.hpp>
 #include <atma/algorithm/filter.hpp>
 #include <atma/algorithm/map.hpp>
