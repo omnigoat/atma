@@ -99,13 +99,13 @@ namespace atma { namespace lockfree {
 		node_t* head_;
 		char pad1[sizeof(node_t*) % cache_line_size];
 
-		std::atomic_bool consumer_lock_;
+		std::atomic<bool> consumer_lock_;
 		char pad2[sizeof(std::atomic_bool) % cache_line_size];
 		
 		node_t* tail_;
 		char pad3[sizeof(node_t*) % cache_line_size];
 
-		std::atomic_bool producer_lock_;
+		std::atomic<bool> producer_lock_;
 		char pad4[sizeof(std::atomic_bool) % cache_line_size];
 
 		friend struct iterator;
@@ -168,8 +168,8 @@ namespace atma { namespace lockfree {
 	//=====================================================================
 	template <typename T>
 	queue_t<T>::queue_t()
-		: head_(new node_t), producer_lock_{false}
-		, tail_(head_), consumer_lock_{false}
+		: head_(new node_t), producer_lock_(false)
+		, tail_(head_), consumer_lock_(false)
 	{
 	}
 
