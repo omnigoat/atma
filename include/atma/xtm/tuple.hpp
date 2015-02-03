@@ -1,7 +1,6 @@
 #pragma once
 
 #include <atma/types.hpp>
-#include <atma/xtm/function.hpp>
 #include <atma/xtm/idxs.hpp>
 #include <atma/enable_if.hpp>
 

@@ -142,9 +142,6 @@
     <ClInclude Include="..\include\atma\math\impl\vector4i_definition.hpp">
       <Filter>include\math\impl\vector4i</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\atma\xtm\function.hpp">
-      <Filter>include\xtm</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\atma\xtm\tuple.hpp">
       <Filter>include\xtm</Filter>
     </ClInclude>
@@ -246,6 +243,9 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\math\triangle.hpp">
       <Filter>include\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\function_traits.hpp">
+      <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
