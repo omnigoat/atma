@@ -289,9 +289,9 @@ namespace atma { namespace xtm {
 
 	template <typename F, typename Bindings, typename Args>
 	inline auto call_fn_bound_tuple(F&& f, Bindings&& b, Args&& a)
-		-> typename function_traits<typename std::decay<F>::type>::result_type
+		-> typename function_traits<std::decay_t<F>>::result_type
 	{
-		auto const param_size = function_traits<F>::arity + (int)std::is_member_function_pointer<F>::value;
+		auto const param_size = function_traits<F>::arity + (int)std::is_member_function_pointer<std::decay_t<F>>::value;
 		auto const binding_size = std::tuple_size<std::decay_t<Bindings>>::value;
 
 		static_assert(param_size == binding_size, "incorrect number of bindings (must match parameter-count)");
@@ -337,7 +337,6 @@ namespace atma { namespace xtm {
 
 	private:
 		F fn_;
-
 		Bindings bindings_;
 	};
 
@@ -348,9 +347,10 @@ namespace atma { namespace xtm {
 
 		template <typename FF, typename BB>
 		bind_t(FF&& fn, BB&& bindings)
-			: fn_(fn.fn()), bindings_(
-			std::forward<decltype(bind_arguments(fn.bindings(), std::forward<BB>(bindings)))>(
-				bind_arguments(fn.bindings(), std::forward<BB>(bindings))))
+			: fn_(fn.fn())
+			, bindings_(
+				std::forward<decltype(bind_arguments(fn.bindings(), std::forward<BB>(bindings)))>(
+					bind_arguments(fn.bindings(), std::forward<BB>(bindings))))
 		{
 			auto&& blam = bind_arguments(fn.bindings(), std::forward<BB>(bindings));
 			bindings_ = blam;
@@ -368,9 +368,6 @@ namespace atma { namespace xtm {
 
 	private:
 		PreF fn_;
-
-		// bind doesn't take anything by reference, so we just straight-up store
-		// by value. this will still perform construct-by-reference (rvalue/lvalue)
 		Bindings bindings_;
 	};
 
