@@ -1,5 +1,8 @@
 #pragma once
 
+#include <atma/function_traits.hpp>
+
+
 namespace atma
 {
 	template <typename C, typename F> struct mapped_range_t;
@@ -13,7 +16,7 @@ namespace atma
 		using source_container_t = std::remove_reference_t<C>;
 		using source_iterator_t  = decltype(std::declval<source_container_t>().begin());
 
-		using value_type      = typename xtm::function_traits<F>::result_type const;
+		using value_type      = typename function_traits<F>::result_type const;
 		using reference       = value_type;
 		using const_reference = value_type const;
 		using iterator        = mapped_range_iterator_t<self_t>;
@@ -105,7 +108,7 @@ namespace atma
 	mapped_range_t<C, F>::mapped_range_t(CC&& source, source_iterator_t const& begin, source_iterator_t const& end, FF&& f)
 		: container_(std::forward<CC>(source)), begin_(begin), end_(end), fn_(std::forward<FF>(f))
 	{
-		using V = typename xtm::function_traits<F>::arg_type<0>;
+		using V = typename function_traits<F>::arg_type<0>;
 
 		static_assert(
 			!std::is_reference<V>::value || std::is_const<V>::value,
