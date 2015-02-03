@@ -1,11 +1,9 @@
 #pragma once
-//=====================================================================
+
 #include <tuple>
-//=====================================================================
+
+
 namespace atma { namespace xtm {
-	
-	template <typename... Args>
-	using variadic_size = std::tuple_size<std::tuple<Args...>>;
 
 	template <typename T>
 	struct function_traits
@@ -32,56 +30,43 @@ namespace atma { namespace xtm {
 		: function_traits<R(*)(Args...)>
 	{};
 
+
+
+
 	template <typename C, typename R, typename... Params>
 	struct function_traits<R(C::*)(Params...) const>
 	{
-		typedef R result_type;
+		using result_type      = R;
+		using tupled_args_type = std::tuple<Params...>;
 		
-		enum { arity = sizeof...(Params) };
-		
-		typedef std::tuple<Params...> tupled_params_type;
-
 		template <size_t i>
-		struct arg {
-			typedef typename std::tuple_element<i, std::tuple<Params...>>::type type;
-		};
+		using arg_type = typename std::tuple_element<i, std::tuple<Params...>>::type;
+
+		static size_t const arity = sizeof...(Params);
 	};
 
 	template <typename C, typename R, typename... Params>
 	struct function_traits<R(C::*)(Params...)>
 	{
-		typedef R result_type;
-
-		enum { arity = sizeof...(Params) };
-
-		typedef std::tuple<Params...> tupled_params_type;
+		using result_type      = R;
+		using tupled_args_type = std::tuple<Params...>;
 
 		template <size_t i>
-		struct arg
-		{
-			typedef typename std::tuple_element<i, std::tuple<Params...>>::type type;
-		};
+		using arg_type = typename std::tuple_element<i, std::tuple<Params...>>::type;
+
+		static size_t const arity = sizeof...(Params);
 	};
 
 	template <typename R, typename... Params>
 	struct function_traits<R(*)(Params...)>
 	{
-		typedef R result_type;
-		
-		enum { arity = sizeof...(Params) };
-		
-		typedef std::tuple<Params...> tupled_params_type;
+		using result_type      = R;
+		using tupled_args_type = std::tuple<Params...>;
 
 		template <size_t i>
-		struct arg
-		{
-			typedef typename std::tuple_element<i, std::tuple<Params...>>::type type;
-		};
+		using arg_type = typename std::tuple_element<i, std::tuple<Params...>>::type;
+
+		static size_t const arity = sizeof...(Params);
 	};
-
-
-	template <typename FN, int A>
-	struct arity_equal_to : std::integral_constant<bool, function_traits<FN>::arity == A>
-	{};
 
 } }

@@ -105,7 +105,7 @@ namespace atma
 	mapped_range_t<C, F>::mapped_range_t(CC&& source, source_iterator_t const& begin, source_iterator_t const& end, FF&& f)
 		: container_(std::forward<CC>(source)), begin_(begin), end_(end), fn_(std::forward<FF>(f))
 	{
-		using V = typename xtm::function_traits<F>::arg<0>::type;
+		using V = typename xtm::function_traits<F>::arg_type<0>;
 
 		static_assert(
 			!std::is_reference<V>::value || std::is_const<V>::value,
