@@ -3,8 +3,8 @@
 #include <tuple>
 
 
-namespace atma {
-
+namespace atma
+{
 	template <typename F>
 	struct function_traits;
 
@@ -41,12 +41,16 @@ namespace atma {
 	template <typename C, typename R, typename... Args>
 	struct function_traits<R(C::*)(Args...) const>
 		: function_traits<R(Args...)>
-	{};
+	{
+		static bool   const is_memfnptr = true;
+	};
 
 	template <typename C, typename R, typename... Args>
 	struct function_traits<R(C::*)(Args...)>
 		: function_traits<R(Args...)>
-	{};
+	{
+		static bool   const is_memfnptr = true;
+	};
 
 
 
@@ -61,6 +65,7 @@ namespace atma {
 		using arg_type = typename std::tuple_element<i, std::tuple<Args...>>::type;
 
 		static size_t const arity = sizeof...(Args);
+		static bool   const is_memfnptr = false;
 	};
 
 }
