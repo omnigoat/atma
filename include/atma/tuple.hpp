@@ -1,7 +1,7 @@
 #pragma once
 
 #include <atma/types.hpp>
-#include <atma/xtm/idxs.hpp>
+#include <atma/idxs.hpp>
 #include <atma/enable_if.hpp>
 
 #include <tuple>
@@ -15,7 +15,7 @@
 
 
 
-namespace atma { namespace xtm {
+namespace atma {
 
 	namespace detail
 	{
@@ -199,7 +199,7 @@ namespace atma { namespace xtm {
 	template <typename xs_t, typename x_t>
 	inline auto tuple_push_back(xs_t&& xs, x_t&& x) -> tuple_push_back_t<std::decay_t<xs_t>, std::decay_t<x_t>>
 	{
-		return xtm::tuple_cat(std::forward<xs_t>(xs), std::forward_as_tuple(std::forward<x_t>(x)));
+		return atma::tuple_cat(std::forward<xs_t>(xs), std::forward_as_tuple(std::forward<x_t>(x)));
 	}
 
 
@@ -361,6 +361,6 @@ namespace atma { namespace xtm {
 
 	template <typename Tuple> using tuple_flip_t = typename detail::tuple_flip_tx<Tuple>::type;
 
-} }
+}
 
 #pragma warning(pop)

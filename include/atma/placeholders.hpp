@@ -1,9 +1,11 @@
 #pragma once
 
-#include <atma/xtm/idxs.hpp>
-#include <atma/xtm/tuple.hpp>
 
-namespace atma { namespace xtm {
+#include <atma/idxs.hpp>
+#include <atma/tuple.hpp>
+
+
+namespace atma {
 
 	//
 	//  placeholder_t
@@ -65,17 +67,17 @@ namespace atma { namespace xtm {
 		static int const value = Acc;
 	};
 
-}}
+}
 
 namespace
 {
-	atma::xtm::placeholder_t<0> const arg1;
-	atma::xtm::placeholder_t<1> const arg2;
-	atma::xtm::placeholder_t<2> const arg3;
-	atma::xtm::placeholder_t<3> const arg4;
-	atma::xtm::placeholder_t<4> const arg5;
-	atma::xtm::placeholder_t<5> const arg6;
-	atma::xtm::placeholder_t<6> const arg7;
-	atma::xtm::placeholder_t<7> const arg8;
+	atma::placeholder_t<0> const arg1;
+	atma::placeholder_t<1> const arg2;
+	atma::placeholder_t<2> const arg3;
+	atma::placeholder_t<3> const arg4;
+	atma::placeholder_t<4> const arg5;
+	atma::placeholder_t<5> const arg6;
+	atma::placeholder_t<6> const arg7;
+	atma::placeholder_t<7> const arg8;
 }
 
