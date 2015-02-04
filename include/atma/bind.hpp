@@ -1,11 +1,12 @@
 #pragma once
 
 
-#include <atma/xtm/tuple.hpp>
-#include <atma/xtm/placeholders.hpp>
+#include <atma/tuple.hpp>
+#include <atma/placeholders.hpp>
 #include <atma/function_traits.hpp>
 
-namespace atma { namespace xtm {
+
+namespace atma {
 
 	//
 	//  curried_bindings_t
@@ -29,7 +30,7 @@ namespace atma { namespace xtm {
 
 			using type = tuple_cat_t<
 				std::tuple<B...>,
-				tuple_placeholder_list_t<fn_arity + (size_t)fn_ismemfn - (size_t)bindings_size>>;
+				tuple_placeholder_list_t<fn_arity + (int)fn_ismemfn - (int)bindings_size>>;
 		};
 	}
 
@@ -423,4 +424,4 @@ namespace atma { namespace xtm {
 		return {f, tuple_flip_t<curried_bindings_t<F>>()};
 	}
 
-}}
+}
