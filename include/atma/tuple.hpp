@@ -361,6 +361,30 @@ namespace atma {
 
 	template <typename Tuple> using tuple_flip_t = typename detail::tuple_flip_tx<Tuple>::type;
 
+
+
+	namespace detail
+	{
+		template <typename Tuple> struct tuple_apply_tx;
+
+		template <typename FN, typename Tuple, size_t... idxs>
+		auto tuple_apply_impl(FN&& fn, Tuple&& tuple, idxs_t<idxs>) -> void
+		{
+			
+		}
+	}
+
+	//
+	//
+	//
+	template <typename FN, typename Tuple>
+	auto tuple_apply(FN&& fn, Tuple&& tuple) -> void
+	{
+		return fn(tuple)
+	}
+
+
+
 }
 
 #pragma warning(pop)
