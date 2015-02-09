@@ -244,5 +244,8 @@
     <ClInclude Include="..\include\atma\tuple.hpp">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\algorithm\zip.hpp">
+      <Filter>include\algorithm</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

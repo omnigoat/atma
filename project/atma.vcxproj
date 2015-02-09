@@ -22,6 +22,7 @@
     <ClInclude Include="..\include\atma\algorithm.hpp" />
     <ClInclude Include="..\include\atma\algorithm\filter.hpp" />
     <ClInclude Include="..\include\atma\algorithm\map.hpp" />
+    <ClInclude Include="..\include\atma\algorithm\zip.hpp" />
     <ClInclude Include="..\include\atma\aligned_allocator.hpp" />
     <ClInclude Include="..\include\atma\assert.hpp" />
     <ClInclude Include="..\include\atma\assert\basic.hpp" />
