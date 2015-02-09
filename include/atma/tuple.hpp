@@ -368,23 +368,132 @@ namespace atma {
 		template <typename Tuple> struct tuple_apply_tx;
 
 		template <typename FN, typename Tuple, size_t... idxs>
-		auto tuple_apply_impl(FN&& fn, Tuple&& tuple, idxs_t<idxs>) -> void
+		auto tuple_apply_impl(Tuple&& tuple, idxs_t<idxs...>)
+			-> decltype(std::make_tuple(FN::apply(std::get<idxs>(std::forward<Tuple>(tuple)))...))
 		{
-			
+			return std::make_tuple(FN::apply(std::get<idxs>(std::forward<Tuple>(tuple)))...);
+		}
+
+		template <typename FN, typename LHS, typename RHS, size_t... idxs>
+		auto tuple_binary_apply_impl(LHS&& lhs, RHS&& rhs, idxs_t<idxs...>)
+			-> decltype(std::make_tuple(FN::apply(std::get<idxs>(std::forward<LHS>(lhs)), std::get<idxs>(std::forward<RHS>(rhs)))...))
+		{
+			return std::make_tuple(FN::apply(std::get<idxs>(std::forward<LHS>(lhs)), std::get<idxs>(std::forward<RHS>(rhs)))...);
 		}
 	}
 
-	//
-	//
-	//
 	template <typename FN, typename Tuple>
-	auto tuple_apply(FN&& fn, Tuple&& tuple) -> void
+	auto tuple_apply(Tuple&& tuple)
+		-> decltype(detail::tuple_apply_impl<FN>(std::forward<Tuple>(tuple), idxs_list_t<std::tuple_size<std::remove_reference_t<Tuple>>::value>()))
 	{
-		return fn(tuple)
+		return detail::tuple_apply_impl<FN>(std::forward<Tuple>(tuple), idxs_list_t<std::tuple_size<std::remove_reference_t<Tuple>>::value>());
+	}
+
+	template <typename FN, typename LHS, typename RHS>
+	auto tuple_binary_apply(LHS&& lhs, RHS&& rhs)
+		-> decltype(detail::tuple_binary_apply_impl<FN>(
+		std::forward<LHS>(lhs),
+		std::forward<RHS>(rhs),
+		idxs_list_t<std::tuple_size<std::remove_reference_t<LHS>>::value>()))
+	{
+		auto const lhs_size = std::tuple_size<std::decay_t<LHS>>::value;
+		auto const rhs_size = std::tuple_size<std::decay_t<RHS>>::value;
+		static_assert(lhs_size == rhs_size, "sizes must be the same");
+
+		return detail::tuple_binary_apply_impl<FN>(std::forward<LHS>(lhs), std::forward<RHS>(rhs), idxs_list_t<std::tuple_size<std::remove_reference_t<LHS>>::value>());
+	}
+
+
+	struct begin_adaptor_t
+	{
+		template <typename T>
+		static auto apply(T&& t) -> decltype(std::begin(std::forward<T>(t)))
+		{
+			return std::begin(std::forward<T>(t));
+		}
+	};
+
+	struct end_adaptor_t
+	{
+		template <typename T>
+		static auto apply(T&& t) -> decltype(std::end(std::forward<T>(t)))
+		{
+			return std::end(std::forward<T>(t));
+		}
+	};
+
+	struct increment_adaptor_t
+	{
+		template <typename T>
+		static auto apply(T& t) -> decltype(++t)
+		{
+			return ++t;
+		}
+	};
+
+	struct eq_adaptor_t
+	{
+		template <typename LHS, typename RHS>
+		static auto apply(LHS&& lhs, RHS&& rhs) -> bool
+		{
+			return lhs == rhs;
+		}
+	};
+
+	struct dereference_adaptor_t
+	{
+		template <typename T>
+		static auto apply(T& t) -> decltype(*t)
+		{
+			return *t;
+		}
+	};
+
+	//
+	//
+	//
+	namespace detail
+	{
+		template <size_t idx>
+		struct tuple_any_of_tx
+		{
+			template <typename T2>
+			static auto apply(T2&& tuple) -> bool
+			{
+				return std::get<idx>(std::forward<T2>(tuple)) || tuple_any_of_tx<idx - 1>::apply(std::forward<T2>(tuple));
+			}
+		};
+
+		template <>
+		struct tuple_any_of_tx<0>
+		{
+			template <typename T2>
+			static auto apply(T2&& tuple) -> bool
+			{
+				return std::get<0>(std::forward<T2>(tuple));
+			}
+		};
+	}
+	
+	template <typename Tuple>
+	inline auto tuple_any_of(Tuple&& tuple) -> bool
+	{
+		return detail::tuple_any_of_tx<std::tuple_size<std::remove_reference_t<Tuple>>::value - 1>::apply(std::forward<Tuple>(tuple));
 	}
 
 
 
+
+	template <typename LHS, typename RHS>
+	auto tuple_any_elem_eq(LHS&& lhs, RHS&& rhs) -> bool
+	{
+		auto const lhs_size = std::tuple_size<std::decay_t<LHS>>::value;
+		auto const rhs_size = std::tuple_size<std::decay_t<RHS>>::value;
+		static_assert(lhs_size == rhs_size, "sizes must be the same");
+
+		auto vs = tuple_binary_apply<eq_adaptor_t>(lhs, rhs);
+		return tuple_any_of(vs);
+	}
 }
 
 #pragma warning(pop)
