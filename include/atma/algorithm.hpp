@@ -4,6 +4,7 @@
 #include <atma/tuple.hpp>
 #include <atma/algorithm/filter.hpp>
 #include <atma/algorithm/map.hpp>
+#include <atma/algorithm/zip.hpp>
 
 #include <algorithm>
 
