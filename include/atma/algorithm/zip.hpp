@@ -68,13 +68,13 @@ namespace atma
 
 		auto operator ++ () -> zip_range_iterator_t&
 		{
-			atma::tuple_apply<atma::increment_adaptor_t>(iters_);
+			atma::tuple_apply(atma::increment_functor_t(), iters_);
 			return *this;
 		}
 
 		auto operator *() -> value_type
 		{
-			return atma::tuple_apply<atma::dereference_adaptor_t>(iters_);
+			return atma::tuple_apply(atma::dereference_functor_t(), iters_);
 		}
 
 	private:
@@ -99,25 +99,25 @@ namespace atma
 	template <typename... Ranges>
 	auto zip_range_t<Ranges...>::begin() -> iterator
 	{
-		return {atma::tuple_apply<atma::begin_adaptor_t>(ranges_)};
+		return {atma::tuple_apply(atma::begin_functor_t(), ranges_)};
 	}
 
 	template <typename... Ranges>
 	auto zip_range_t<Ranges...>::end() -> iterator
 	{
-		return {atma::tuple_apply<atma::end_adaptor_t>(ranges_)};
+		return {atma::tuple_apply(atma::end_functor_t(), ranges_)};
 	}
 
 	template <typename... Ranges>
 	auto zip_range_t<Ranges...>::begin() const -> const_iterator
 	{
-		return {atma::tuple_apply<atma::begin_adaptor_t>(ranges_)};
+		return {atma::tuple_apply(atma::begin_functor_t(), ranges_)};
 	}
 
 	template <typename... Ranges>
 	auto zip_range_t<Ranges...>::end() const -> const_iterator
 	{
-		return {atma::tuple_apply<atma::end_adaptor_t>(ranges_)};
+		return {atma::tuple_apply(atma::end_functor_t(), ranges_)};
 	}
 
 
