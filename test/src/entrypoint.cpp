@@ -1,6 +1,6 @@
 #include <atma/unittest/run.hpp>
 #include <atma/utf/utf8_char.hpp>
-#include <atma/xtm/function.hpp>
+#include <atma/function.hpp>
 
 #include <functional>
 #include <stack>
