@@ -33,6 +33,26 @@ namespace atma {
 	}
 
 
+	//
+	//  auto_tuple
+	//  ------------
+	//    an addendum to std::make_tuple and std::forward_as_tuple.
+	//
+	//    takes a bunch of things and creates a "storable" tuple-type. this means
+	//    every rvalue-argument maps to a pure-value, and every lvalue argument
+	//    stays as an lvalue.
+	//
+	template <typename... Types>
+	inline auto auto_tuple(Types&&... types) -> std::tuple<Types...>
+	{
+		return std::tuple<Types...>(std::forward<Types>(types)...);
+	}
+
+	template <typename... Types>
+	using auto_tuple_t = decltype(auto_tuple(std::declval<Types>()...));
+
+
+
 
 	//
 	//  tuple_idxs_map_t
@@ -365,28 +385,26 @@ namespace atma {
 
 	namespace detail
 	{
-		template <typename Tuple> struct tuple_apply_tx;
-
 		template <typename FN, typename Tuple, size_t... idxs>
 		auto tuple_apply_impl(Tuple&& tuple, idxs_t<idxs...>)
-			-> decltype(std::make_tuple(FN::apply(std::get<idxs>(std::forward<Tuple>(tuple)))...))
+			-> decltype(auto_tuple(FN::apply(std::get<idxs>(tuple))...))
 		{
-			return std::make_tuple(FN::apply(std::get<idxs>(std::forward<Tuple>(tuple)))...);
+			return auto_tuple(FN::apply(std::get<idxs>(tuple))...);
 		}
 
 		template <typename FN, typename LHS, typename RHS, size_t... idxs>
 		auto tuple_binary_apply_impl(LHS&& lhs, RHS&& rhs, idxs_t<idxs...>)
-			-> decltype(std::make_tuple(FN::apply(std::get<idxs>(std::forward<LHS>(lhs)), std::get<idxs>(std::forward<RHS>(rhs)))...))
+			-> decltype(auto_tuple(FN::apply(std::get<idxs>(std::forward<LHS>(lhs)), std::get<idxs>(std::forward<RHS>(rhs)))...))
 		{
-			return std::make_tuple(FN::apply(std::get<idxs>(std::forward<LHS>(lhs)), std::get<idxs>(std::forward<RHS>(rhs)))...);
+			return auto_tuple(FN::apply(std::get<idxs>(lhs), std::get<idxs>(rhs))...);
 		}
 	}
 
 	template <typename FN, typename Tuple>
 	auto tuple_apply(Tuple&& tuple)
-		-> decltype(detail::tuple_apply_impl<FN>(std::forward<Tuple>(tuple), idxs_list_t<std::tuple_size<std::remove_reference_t<Tuple>>::value>()))
+		-> decltype(detail::tuple_apply_impl<FN>(tuple, idxs_list_t<std::tuple_size<std::remove_reference_t<Tuple>>::value>()))
 	{
-		return detail::tuple_apply_impl<FN>(std::forward<Tuple>(tuple), idxs_list_t<std::tuple_size<std::remove_reference_t<Tuple>>::value>());
+		return detail::tuple_apply_impl<FN>(tuple, idxs_list_t<std::tuple_size<std::remove_reference_t<Tuple>>::value>());
 	}
 
 	template <typename FN, typename LHS, typename RHS>
@@ -400,7 +418,7 @@ namespace atma {
 		auto const rhs_size = std::tuple_size<std::decay_t<RHS>>::value;
 		static_assert(lhs_size == rhs_size, "sizes must be the same");
 
-		return detail::tuple_binary_apply_impl<FN>(std::forward<LHS>(lhs), std::forward<RHS>(rhs), idxs_list_t<std::tuple_size<std::remove_reference_t<LHS>>::value>());
+		return detail::tuple_binary_apply_impl<FN>(lhs, rhs, idxs_list_t<std::tuple_size<std::remove_reference_t<LHS>>::value>());
 	}
 
 
