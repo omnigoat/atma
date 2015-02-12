@@ -382,6 +382,8 @@ namespace atma {
 	template <typename Tuple> using tuple_flip_t = typename detail::tuple_flip_tx<Tuple>::type;
 
 
+
+
 	//
 	//  tuple_apply/tuple_binary_apply
 	//  --------------------------------
@@ -390,6 +392,10 @@ namespace atma {
 	//      tuple_apply_t<is_four_t, std::tuple<int, int, int>> === std::tuple<bool, bool, bool>
 	//
 	//      tuple_apply(is_four_t(), make_tuple(3, 4, 5)) === make_tuple(false, true, false)
+	//
+	//      tuple_apply_binary_t<eq_t, std::tuple<int, int>, std::tuple<int, int>> === std::tuple<bool, bool>
+	//
+	//      tuple_apply_binary(eq_t(), {4, 5}, {2, 5}) === {false, true}
 	//
 	namespace detail
 	{
