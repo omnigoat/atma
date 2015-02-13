@@ -2,6 +2,7 @@
 
 #include <atma/math/vector4f.hpp>
 
+
 namespace atma { namespace math {
 
 	struct triangle_t
@@ -19,6 +20,5 @@ namespace atma { namespace math {
 		auto edge1() const -> math::vector4f { return v2 - v1; }
 		auto edge2() const -> math::vector4f { return v0 - v2; }
 	};
-
 
 }}
