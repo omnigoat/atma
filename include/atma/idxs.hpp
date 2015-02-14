@@ -1,6 +1,6 @@
 #pragma once
 
-namespace atma { namespace xtm {
+namespace atma {
 
 	namespace detail
 	{
@@ -57,5 +57,4 @@ namespace atma { namespace xtm {
 	template <int begin, int end, int step = 1>
 	using idxs_range_t = typename detail::idxs_range_tx<begin, end, step>::type;
 
-}}
-
+}

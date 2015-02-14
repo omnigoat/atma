@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -22,12 +22,14 @@
     <ClInclude Include="..\include\atma\algorithm.hpp" />
     <ClInclude Include="..\include\atma\algorithm\filter.hpp" />
     <ClInclude Include="..\include\atma\algorithm\map.hpp" />
+    <ClInclude Include="..\include\atma\algorithm\zip.hpp" />
     <ClInclude Include="..\include\atma\aligned_allocator.hpp" />
     <ClInclude Include="..\include\atma\assert.hpp" />
     <ClInclude Include="..\include\atma\assert\basic.hpp" />
     <ClInclude Include="..\include\atma\assert\config.hpp" />
     <ClInclude Include="..\include\atma\assert\ensure.hpp" />
     <ClInclude Include="..\include\atma\assert\handling.hpp" />
+    <ClInclude Include="..\include\atma\bind.hpp" />
     <ClInclude Include="..\include\atma\com_ptr.hpp" />
     <ClInclude Include="..\include\atma\config\platform.hpp" />
     <ClInclude Include="..\include\atma\console.hpp" />
@@ -35,6 +37,8 @@
     <ClInclude Include="..\include\atma\enable_multiple_shared_from_this.hpp" />
     <ClInclude Include="..\include\atma\event.hpp" />
     <ClInclude Include="..\include\atma\filesystem\file.hpp" />
+    <ClInclude Include="..\include\atma\function_traits.hpp" />
+    <ClInclude Include="..\include\atma\idxs.hpp" />
     <ClInclude Include="..\include\atma\intrusive_ptr.hpp" />
     <ClInclude Include="..\include\atma\lockfree\queue.hpp" />
     <ClInclude Include="..\include\atma\math\aabb.hpp" />
@@ -57,12 +61,15 @@
     <ClInclude Include="..\include\atma\math\intersection.hpp" />
     <ClInclude Include="..\include\atma\math\matrix4f.hpp" />
     <ClInclude Include="..\include\atma\math\scalar.hpp" />
+    <ClInclude Include="..\include\atma\math\triangle.hpp" />
     <ClInclude Include="..\include\atma\math\vector4f.hpp" />
     <ClInclude Include="..\include\atma\math\vector4i.hpp" />
+    <ClInclude Include="..\include\atma\placeholders.hpp" />
     <ClInclude Include="..\include\atma\platform\allocation.hpp" />
     <ClInclude Include="..\include\atma\shared_memory.hpp" />
     <ClInclude Include="..\include\atma\string.hpp" />
     <ClInclude Include="..\include\atma\thread\engine.hpp" />
+    <ClInclude Include="..\include\atma\tuple.hpp" />
     <ClInclude Include="..\include\atma\types.hpp" />
     <ClInclude Include="..\include\atma\unique_memory.hpp" />
     <ClInclude Include="..\include\atma\unittest\compile.hpp" />
@@ -78,11 +85,6 @@
     <ClInclude Include="..\include\atma\utf\utf8_string.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string_range_header.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string_range.hpp" />
-    <ClInclude Include="..\include\atma\xtm\bind.hpp" />
-    <ClInclude Include="..\include\atma\xtm\function.hpp" />
-    <ClInclude Include="..\include\atma\xtm\idxs.hpp" />
-    <ClInclude Include="..\include\atma\xtm\placeholders.hpp" />
-    <ClInclude Include="..\include\atma\xtm\tuple.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{3301E1FA-9F23-43C6-A5E1-183204867D44}</ProjectGuid>
@@ -93,7 +95,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">

@@ -1,18 +1,16 @@
 #pragma once
-//=====================================================================
+
 #include <atma/lockfree/queue.hpp>
 #include <vector>
 #include <thread>
-#include <algorithm>
-//=====================================================================
-namespace atma {
-namespace thread {
-//=====================================================================
-	
+
+
+namespace atma { namespace thread {
+
 	struct engine_t
 	{
-		typedef std::function<void()> signal_t;
-		typedef atma::lockfree::queue_t<signal_t> queue_t;
+		using signal_t = std::function<void()>;
+		using queue_t  = atma::lockfree::queue_t<signal_t>;
 
 		engine_t();
 		~engine_t();
@@ -22,32 +20,22 @@ namespace thread {
 		auto signal_block() -> void;
 		
 	private:
-		auto reenter(std::atomic_bool const& blocked) -> void;
+		auto reenter(std::atomic<bool> const& blocked) -> void;
 
 		std::thread handle_;
-		queue_t queue_, evergreen_;
-		bool running_;
+		queue_t queue_;
+		std::atomic<bool> running_;
 	};
 
 
 
+
 	inline engine_t::engine_t()
-		: running_(true)
+		: running_{true}
 	{
 		handle_ = std::thread([&]
 		{
-			// continue performing all commands always and forever
-			while (running_)
-			{
-				for (auto const& x : evergreen_) {
-					x();
-				}
-
-				signal_t x;
-				while (queue_.pop(x)) {
-					x();
-				}
-			}
+			reenter(running_);
 		});
 	}
 
@@ -57,12 +45,10 @@ namespace thread {
 		handle_.join();
 	}
 
-
-	inline auto engine_t::reenter(std::atomic_bool const& blocked) -> void
+	inline auto engine_t::reenter(std::atomic<bool> const& good) -> void
 	{
-		// continue performing all commands always and forever
 		signal_t x;
-		while (blocked && queue_.pop(x)) {
+		while (good && queue_.pop(x)) {
 			x();
 		}
 	}
@@ -76,11 +62,8 @@ namespace thread {
 
 	inline auto engine_t::signal_evergreen(signal_t const& fn) -> void
 	{
-		signal_t fnfn = [&]() { fn(); evergreen_.push(fnfn); };
-
-		if (!running_)
-			return;
-		evergreen_.push(fn);
+		auto sg = [&, fn]() { fn(); signal_evergreen(fn); };
+		signal(sg);
 	}
 
 	inline auto engine_t::signal_block() -> void
@@ -88,11 +71,10 @@ namespace thread {
 		if (!running_)
 			return;
 
-		// push blocking fn!
-		auto blocked = std::atomic_bool{true};
+		auto blocked = std::atomic<bool>{true};
 		queue_.push([&blocked]{ blocked = false; });
 
-		// don't block if we're the prime thread blocking ourselves.
+		// the engine thread can't block itself!
 		if (std::this_thread::get_id() == handle_.get_id())
 		{
 			reenter(blocked);
@@ -105,7 +87,5 @@ namespace thread {
 		}
 	}
 
-//=====================================================================
-} // namespace thread
-} // namespace atma
-//=====================================================================
+} }
+
