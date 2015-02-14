@@ -1,11 +1,12 @@
 #pragma once
 
 
-#include <atma/xtm/tuple.hpp>
-#include <atma/xtm/placeholders.hpp>
+#include <atma/tuple.hpp>
+#include <atma/placeholders.hpp>
+#include <atma/function_traits.hpp>
 
 
-namespace atma { namespace xtm {
+namespace atma {
 
 	//
 	//  curried_bindings_t
@@ -23,9 +24,9 @@ namespace atma { namespace xtm {
 		template <typename F, typename... B>
 		struct curried_bindings_tx
 		{
-			static const size_t fn_arity      = function_traits<F>::arity;
-			static const bool   fn_ismemfn    = std::is_member_function_pointer<F>::value;
-			static const size_t bindings_size = sizeof...(B);
+			static size_t const fn_arity      = function_traits<F>::arity;
+			static bool   const fn_ismemfn    = function_traits<F>::is_memfnptr;
+			static size_t const bindings_size = sizeof...(B);
 
 			using type = tuple_cat_t<
 				std::tuple<B...>,
@@ -86,7 +87,7 @@ namespace atma { namespace xtm {
 			using type =
 				decltype(std::forward_as_tuple(select_bound_arg(std::get<Idxs>(std::declval<Bindings>()), Args())...));
 		};
-	
+
 		template <typename Bindings, typename Args, size_t... Idxs>
 		inline auto bind_arguments_impl(Bindings&& bindings, Args&& args, idxs_t<Idxs...>)
 			-> typename bound_arguments_tx<Bindings, Args, idxs_t<Idxs...>>::type
@@ -133,7 +134,7 @@ namespace atma { namespace xtm {
 	//    object, like a std::function<>, or even a lambda.
 	//
 	template <typename F, typename... Args>
-	auto call_fn(F&& f, Args&&... args) -> typename xtm::function_traits<F>::result_type
+	auto call_fn(F&& f, Args&&... args) -> typename function_traits<F>::result_type
 	{
 		return f(std::forward<Args>(args)...);
 	}
@@ -188,7 +189,7 @@ namespace atma { namespace xtm {
 	{
 		template <typename F, typename Tuple, size_t... Idxs>
 		inline auto call_fn_tuple_impl(F&& f, Tuple&& xs, idxs_t<Idxs...>)
-			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
+			-> typename function_traits<typename std::decay<F>::type>::result_type
 		{
 			return call_fn(
 				std::forward<F>(f),
@@ -199,7 +200,7 @@ namespace atma { namespace xtm {
 	// catch-all
 	template <typename F, typename Tuple>
 	inline auto call_fn_tuple(F&& f, Tuple&& xs)
-		-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
+		-> typename function_traits<typename std::decay<F>::type>::result_type
 	{
 		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
 
@@ -279,7 +280,7 @@ namespace atma { namespace xtm {
 	{
 		template <typename F, typename Bindings, typename Args, size_t... Idxs>
 		inline auto call_fn_bound_tuple_impl(F&& f, Bindings&& bindings, Args&& args, idxs_t<Idxs...>)
-			-> typename atma::xtm::function_traits<typename std::decay<F>::type>::result_type
+			-> typename function_traits<typename std::decay<F>::type>::result_type
 		{
 			return call_fn(
 				std::forward<F>(f),
@@ -289,9 +290,9 @@ namespace atma { namespace xtm {
 
 	template <typename F, typename Bindings, typename Args>
 	inline auto call_fn_bound_tuple(F&& f, Bindings&& b, Args&& a)
-		-> typename function_traits<typename std::decay<F>::type>::result_type
+		-> typename function_traits<std::decay_t<F>>::result_type
 	{
-		auto const param_size = function_traits<F>::arity + (int)std::is_member_function_pointer<F>::value;
+		auto const param_size = function_traits<F>::arity + (size_t)function_traits<F>::is_memfnptr;
 		auto const binding_size = std::tuple_size<std::decay_t<Bindings>>::value;
 
 		static_assert(param_size == binding_size, "incorrect number of bindings (must match parameter-count)");
@@ -337,7 +338,6 @@ namespace atma { namespace xtm {
 
 	private:
 		F fn_;
-
 		Bindings bindings_;
 	};
 
@@ -348,9 +348,10 @@ namespace atma { namespace xtm {
 
 		template <typename FF, typename BB>
 		bind_t(FF&& fn, BB&& bindings)
-			: fn_(fn.fn()), bindings_(
-			std::forward<decltype(bind_arguments(fn.bindings(), std::forward<BB>(bindings)))>(
-				bind_arguments(fn.bindings(), std::forward<BB>(bindings))))
+			: fn_(fn.fn())
+			, bindings_(
+				std::forward<decltype(bind_arguments(fn.bindings(), std::forward<BB>(bindings)))>(
+					bind_arguments(fn.bindings(), std::forward<BB>(bindings))))
 		{
 			auto&& blam = bind_arguments(fn.bindings(), std::forward<BB>(bindings));
 			bindings_ = blam;
@@ -368,9 +369,6 @@ namespace atma { namespace xtm {
 
 	private:
 		PreF fn_;
-
-		// bind doesn't take anything by reference, so we just straight-up store
-		// by value. this will still perform construct-by-reference (rvalue/lvalue)
 		Bindings bindings_;
 	};
 
@@ -411,7 +409,7 @@ namespace atma { namespace xtm {
 	inline auto curry(F&& f, Bindings&&... bindings)
 		-> bind_t<F, curried_bindings_t<F, Bindings...>>
 	{
-		auto const param_size = function_traits<F>::arity + (int)std::is_member_function_pointer<F>::value;
+		auto const param_size = function_traits<F>::arity + (size_t)function_traits<F>::is_memfnptr;
 		auto const binding_size = sizeof...(Bindings);
 		auto const rem_args = tuple_placeholder_list_t<param_size - binding_size>();
 
@@ -435,4 +433,4 @@ namespace atma { namespace xtm {
 		return {f, tuple_flip_t<curried_bindings_t<F>>()};
 	}
 
-}}
+}

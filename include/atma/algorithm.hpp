@@ -1,10 +1,13 @@
 #pragma once
 
-#include <atma/xtm/function.hpp>
-#include <atma/xtm/tuple.hpp>
+
+#include <atma/tuple.hpp>
 #include <atma/algorithm/filter.hpp>
 #include <atma/algorithm/map.hpp>
+#include <atma/algorithm/zip.hpp>
+
 #include <algorithm>
+
 
 namespace atma
 {
@@ -115,9 +118,9 @@ namespace atma
 	}
 
 	template <typename xs_t, typename... fns_t>
-	auto count_all(xs_t&& xs, fns_t&&... fns) -> atma::xtm::tuple_integral_list_t<uint, sizeof...(fns_t)>
+	auto count_all(xs_t&& xs, fns_t&&... fns) -> atma::tuple_integral_list_t<uint, sizeof...(fns_t)>
 	{
-		atma::xtm::tuple_integral_list_t<uint, sizeof...(fns_t)> result;
+		atma::tuple_integral_list_t<uint, sizeof...(fns_t)> result;
 
 		for (auto const& x : xs)
 		{
@@ -129,7 +132,7 @@ namespace atma
 
 	template <typename xs_t, typename f_t>
 	auto all_of(xs_t&& xs, f_t&& f)
-		-> typename std::enable_if<std::is_same<typename atma::xtm::function_traits<f_t>::result_type, bool>::value, bool>::type
+		-> typename std::enable_if<std::is_same<typename atma::function_traits<f_t>::result_type, bool>::value, bool>::type
 	{
 		for (auto const& x : xs)
 			if (!f(x))

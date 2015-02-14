@@ -1,5 +1,8 @@
 #pragma once
 
+#include <atma/function_traits.hpp>
+
+
 namespace atma
 {
 	template <typename C, typename F> struct mapped_range_t;
@@ -13,16 +16,13 @@ namespace atma
 		using source_container_t = std::remove_reference_t<C>;
 		using source_iterator_t  = decltype(std::declval<source_container_t>().begin());
 
-		using value_type      = typename xtm::function_traits<F>::result_type const;
+		using value_type      = typename function_traits<F>::result_type const;
 		using reference       = value_type;
 		using const_reference = value_type const;
-		using iterator        = mapped_range_iterator_t<self_t>;
+		using iterator        = std::conditional_t<std::is_const<source_container_t>::value, mapped_range_iterator_t<self_t const>, mapped_range_iterator_t<self_t>>;
 		using const_iterator  = mapped_range_iterator_t<self_t const>;
 		using difference_type = typename source_container_t::difference_type;
 		using size_type       = typename source_container_t::size_type;
-
-		// if our source container is const, then even if we are not const, we can only provide const iterators.
-		using either_iterator = std::conditional_t<std::is_const<source_container_t>::value, const_iterator, iterator>;
 
 
 		template <typename CC, typename FF>
@@ -34,8 +34,8 @@ namespace atma
 
 		auto begin() const -> const_iterator;
 		auto end() const -> const_iterator;
-		auto begin() -> either_iterator;
-		auto end() -> either_iterator;
+		auto begin() -> iterator;
+		auto end() -> iterator;
 
 	private:
 		C container_;
@@ -105,7 +105,7 @@ namespace atma
 	mapped_range_t<C, F>::mapped_range_t(CC&& source, source_iterator_t const& begin, source_iterator_t const& end, FF&& f)
 		: container_(std::forward<CC>(source)), begin_(begin), end_(end), fn_(std::forward<FF>(f))
 	{
-		using V = typename xtm::function_traits<F>::arg<0>::type;
+		using V = typename function_traits<F>::arg_type<0>;
 
 		static_assert(
 			!std::is_reference<V>::value || std::is_const<V>::value,
@@ -118,13 +118,13 @@ namespace atma
 	{}
 
 	template <typename C, typename F>
-	auto mapped_range_t<C, F>::begin() -> either_iterator
+	auto mapped_range_t<C, F>::begin() -> iterator
 	{
 		return{this, begin_, end_};
 	}
 
 	template <typename C, typename F>
-	auto mapped_range_t<C, F>::end() -> either_iterator
+	auto mapped_range_t<C, F>::end() -> iterator
 	{
 		return{this, end_, end_};
 	}

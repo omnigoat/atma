@@ -58,13 +58,13 @@ namespace atma {
 		: px()
 		{}
 
-
 		explicit intrusive_ptr(T* t)
 			: px(t)
 		{
 			ref_counted::add_ref(t);
 		}
-				template <typename Y, typename = std::enable_if_t<std::is_convertible<Y*, T*>::value>>
+
+		template <typename Y, typename = std::enable_if_t<std::is_convertible<Y*, T*>::value>>
 		explicit intrusive_ptr(Y* t)
 		: px(t)
 		{
