@@ -1,6 +1,7 @@
 #pragma once
 
-#include <atma/xtm/bind.hpp>
+#include <atma/bind.hpp>
+
 
 
 namespace atma
@@ -125,7 +126,7 @@ namespace atma
 	inline auto filtered_range_t<C, F>::begin() -> either_iterator
 	{
 		auto i = begin_;
-		while (i != end_ && !xtm::curry(predicate_)(*i))
+		while (i != end_ && !predicate_(*i))
 			++i;
 
 		return{this, i, end_};
@@ -174,7 +175,7 @@ namespace atma
 	template <typename C>
 	inline auto filtered_range_iterator_t<C>::operator ++() -> filtered_range_iterator_t&
 	{
-		while (++pos_ != end_ && !xtm::curry(owner_->predicate())(*pos_))
+		while (++pos_ != end_ && !call_fn(owner_->predicate(), *pos_))
 			;
 		return *this;
 	}

@@ -1,66 +1,67 @@
-#ifndef ATMA_LOCKFREE_QUEUE_HPP
-#define ATMA_LOCKFREE_QUEUE_HPP
-//=====================================================================
+#pragma once
+
 #include <atomic>
 #include <iostream>
-//=====================================================================
-namespace atma {
-namespace lockfree {
-//=====================================================================
+
+namespace atma { namespace lockfree {
+
 	
 	// default cache-line size will be 64 bytes
 	const unsigned int cache_line_size = 64;
 
+
 	//=====================================================================
 	// detail::node_t
 	// ----------------
-	//   provides small-object optimisation
+	//   provides small-object-optimization
 	//=====================================================================
 	namespace detail
 	{
-		template <typename T, bool SMO = (sizeof(T) + sizeof(std::atomic_intptr_t) <= cache_line_size)>
-		struct node_t;
-
 		template <typename T>
-		struct node_t<T, false>
+		struct node_size_t {
+			static size_t const padding = sizeof(T) + sizeof(std::atomic<void*>) % cache_line_size;
+			static bool const is_small = sizeof(T) + sizeof(std::atomic<void*>) <= cache_line_size;
+		};
+
+
+		template <typename T, bool = node_size_t<T>::is_small>
+		struct node_t
 		{
-			node_t() : value(nullptr), next(nullptr) {}
+			node_t() : value(), next(nullptr) {}
 			node_t(const T& value) : value(new T(value)), next(nullptr) {}
 			~node_t() { }
 			auto value_ptr() -> T * { return value; }
 			auto value_ptr() const -> T const* { return value; }
-			auto clear_value_ptr() -> void { value = nullptr; }
+			auto clear_value_ptr() -> void { delete value; value = nullptr; }
 
 			T* value;
 			std::atomic<node_t*> next;
-			char pad[ (sizeof(T*) + sizeof(std::atomic<node_t*>)) % cache_line_size ];
+			char pad[node_size_t<T*>::padding];
 		};
+
 
 		template <typename T>
 		struct node_t<T, true>
 		{
-			node_t() : next(nullptr) { memset(value_buffer, 0, sizeof(T)); }
+			node_t() : next(nullptr) {}
 			node_t(T const& value) : next(nullptr) {
 				new (value_buffer) T(value);
 			}
 			~node_t() {}
 
-			auto value_ptr() -> T * { return reinterpret_cast<T*>(&value_buffer[0]); }
-			auto value_ptr() const -> T const* { return reinterpret_cast<T const*>(&value_buffer[0]); }
-			auto clear_value_ptr() -> void { 
-				if (value_ptr()) value_ptr()->~T();
-				memset(value_buffer, 0, sizeof(T));
-			}
+			auto value_ptr() -> T * { return reinterpret_cast<T*>(value_buffer); }
+			auto value_ptr() const -> T const* { return reinterpret_cast<T const*>(value_buffer); }
+			auto clear_value_ptr() -> void { value_ptr()->~T(); }
 
 			char value_buffer[sizeof(T)];
 			std::atomic<node_t*> next;
-			char pad[ (sizeof(T) + sizeof(std::atomic<node_t*>)) % cache_line_size ];
+			char pad[node_size_t<T>::padding];
 		};
 	}
 
 
 
-	
+
 	//=====================================================================
 	// queue_t
 	//=====================================================================
@@ -98,62 +99,44 @@ namespace lockfree {
 		node_t* head_;
 		char pad1[sizeof(node_t*) % cache_line_size];
 
-		std::atomic_bool consumer_lock_;
+		std::atomic<bool> consumer_lock_;
 		char pad2[sizeof(std::atomic_bool) % cache_line_size];
 		
 		node_t* tail_;
 		char pad3[sizeof(node_t*) % cache_line_size];
 
-		std::atomic_bool producer_lock_;
+		std::atomic<bool> producer_lock_;
 		char pad4[sizeof(std::atomic_bool) % cache_line_size];
 
 		friend struct iterator;
 	};
-	
+
+
 
 
 	//=====================================================================
-	// queue_t<T>::iterator
+	// queue_t::iterator
 	//=====================================================================
 	template <typename T>
 	struct queue_t<T>::iterator
 	{
-		iterator()
-			: node_()
-		{
-		}
+		iterator();
 
-		auto operator ++() -> iterator&
-		{
-			node_ = node_->next;
-			return *this;
-		}
+		auto operator ++() -> iterator&;
+		auto operator *() -> T&;
 
-		auto operator *() -> T&
-		{
-			return *node_->value_ptr();
-		}
-
-		auto operator == (iterator const& rhs) -> bool
-		{
-			return node_ == rhs.node_;
-		}
-
-		auto operator != (iterator const& rhs) -> bool
-		{
-			return !this->operator == (rhs);
-		}
+		auto operator == (iterator const& rhs) -> bool;
+		auto operator != (iterator const& rhs) -> bool;
 
 	private:
-		iterator(typename queue_t<T>::node_t* node)
-			: node_(node)
-		{
-		}
+		iterator(typename queue_t<T>::node_t* node);
 
 		typename queue_t<T>::node_t* node_;
 
 		friend struct queue_t<T>;
 	};
+
+
 
 
 	//=====================================================================
@@ -176,21 +159,31 @@ namespace lockfree {
 
 		friend struct queue_t<T>;
 	};
-	
+
+
+
+
 	//=====================================================================
 	// queue_t implementation
 	//=====================================================================
 	template <typename T>
-	queue_t<T>::queue_t() {
-		head_ = tail_ = new node_t;
-		producer_lock_ = consumer_lock_ = false;
-	};
+	queue_t<T>::queue_t()
+		: head_(new node_t), producer_lock_(false)
+		, tail_(head_), consumer_lock_(false)
+	{
+	}
 
 	template <typename T>
-	queue_t<T>::~queue_t() {
-		while (head_ != nullptr) {
+	queue_t<T>::~queue_t()
+	{
+		while (head_ != nullptr)
+		{
 			node_t* tmp = head_;
-			head_ = tmp->next;
+			node_t* tmp2 = head_->next;
+			head_ = tmp2;
+			if (tmp2) {
+				tmp2->clear_value_ptr();
+			}
 			delete tmp;
 		}
 	}
@@ -277,6 +270,51 @@ namespace lockfree {
 		}
 	}
 
+
+
+
+	//=====================================================================
+	// queue_t::iterator implementation
+	//=====================================================================
+	template <typename T>
+	queue_t<T>::iterator::iterator()
+		: node_()
+	{
+	}
+
+	template <typename T>
+	queue_t<T>::iterator::iterator(typename queue_t::node_t* node)
+		: node_(node)
+	{
+	}
+
+	template <typename T>
+	auto queue_t<T>::iterator::operator ++() -> iterator&
+	{
+		node_ = node_->next;
+		return *this;
+	}
+
+	template <typename T>
+	auto queue_t<T>::iterator::operator *() -> T&
+	{
+		return *node_->value_ptr();
+	}
+
+	template <typename T>
+	inline auto queue_t<T>::iterator::operator == (iterator const& rhs) -> bool
+	{
+		return node_ == rhs.node_;
+	}
+
+	template <typename T>
+	inline auto queue_t<T>::iterator::operator != (iterator const& rhs) -> bool
+	{
+		return node_ != rhs.node_;
+	}
+
+
+
 	//=====================================================================
 	// queue_t::batch_t implementation
 	//=====================================================================
@@ -318,9 +356,5 @@ namespace lockfree {
 	}
 
 
-//=====================================================================
-} // namespace lockfree
-} // namespace atma
-//=====================================================================
-#endif
-//=====================================================================
+} }
+
