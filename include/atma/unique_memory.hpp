@@ -5,69 +5,83 @@
 
 namespace atma
 {
-	struct unique_memory_t
-	{
-		explicit unique_memory_t();
-		explicit unique_memory_t(size_t size);
-		unique_memory_t(size_t size, void* data);
-		unique_memory_t(uint alignment, size_t size);
-		unique_memory_t(uint alignment, size_t size, void* data);
-		unique_memory_t(unique_memory_t&&);
-		~unique_memory_t();
-		unique_memory_t(unique_memory_t const&) = delete;
+	namespace detail {
+		template <typename T> struct sz { static size_t const value = sizeof(T); };
+		template <> struct sz<void> { static size_t const value = 1; };
+	}
 
-		auto operator = (unique_memory_t&&) -> unique_memory_t&;
-		auto operator = (unique_memory_t const&) -> unique_memory_t& = delete;
+
+	template <typename T = void>
+	struct typed_unique_memory_t
+	{
+		explicit typed_unique_memory_t();
+		explicit typed_unique_memory_t(size_t size);
+		typed_unique_memory_t(size_t size, T* data);
+		typed_unique_memory_t(uint alignment, size_t size);
+		typed_unique_memory_t(uint alignment, size_t size, T* data);
+		typed_unique_memory_t(typed_unique_memory_t&&);
+		~typed_unique_memory_t();
+		typed_unique_memory_t(typed_unique_memory_t const&) = delete;
+
+		auto operator = (typed_unique_memory_t&&) -> typed_unique_memory_t&;
+		auto operator = (typed_unique_memory_t const&) -> typed_unique_memory_t& = delete;
 
 		auto empty() const -> bool;
 		auto size() const -> size_t;
-		auto begin() const -> void const*;
-		auto end() const -> void const*;
+		auto begin() const -> T const*;
+		auto end() const -> T const*;
 		operator bool() const;
 
-		auto begin() -> void*;
-		auto end() -> void*;
-		auto swap(unique_memory_t&) -> void;
+		auto begin() -> T*;
+		auto end() -> T*;
+		auto swap(typed_unique_memory_t&) -> void;
 
 	private:
-		void* data_;
-		void* end_;
+		T* data_;
+		T* end_;
 	};
 
+	using unique_memory_t = typed_unique_memory_t<void>;
 
 
 
-	inline unique_memory_t::unique_memory_t()
+	template <typename T>
+	inline typed_unique_memory_t<T>::typed_unique_memory_t()
 		: data_()
 		, end_()
 	{
 		
 	}
 
-	inline unique_memory_t::unique_memory_t(size_t size)
-		: unique_memory_t(4, size)
+	template <typename T>
+	inline typed_unique_memory_t<T>::typed_unique_memory_t(size_t size)
+		: typed_unique_memory_t(4, size * detail::sz<T>::value)
 	{
 	}
 
-	inline unique_memory_t::unique_memory_t(size_t size, void* data)
-		: unique_memory_t(4, size, data)
+	template <typename T>
+	inline typed_unique_memory_t<T>::typed_unique_memory_t(size_t size, T* data)
+		: typed_unique_memory_t(4, size * detail::sz<T>::value, data)
 	{
 	}
 
-	inline unique_memory_t::unique_memory_t(uint alignment, size_t size)
-		: data_(platform::allocate_aligned_memory(alignment, size))
-		, end_(reinterpret_cast<char*>(data_) + size)
+	template <typename T>
+	inline typed_unique_memory_t<T>::typed_unique_memory_t(uint alignment, size_t size)
+		: data_(reinterpret_cast<T*>(platform::allocate_aligned_memory(alignment, size * detail::sz<T>::value)))
+		, end_(reinterpret_cast<T*>(reinterpret_cast<char*>(data_) + size * detail::sz<T>::value))
 	{
 	}
 
-	inline unique_memory_t::unique_memory_t(uint alignment, size_t size, void* data)
-		: data_(platform::allocate_aligned_memory(alignment, size))
-		, end_(reinterpret_cast<char*>(data_) + size)
+	template <typename T>
+	inline typed_unique_memory_t<T>::typed_unique_memory_t(uint alignment, size_t size, T* data)
+		: data_(reinterpret_cast<T*>(platform::allocate_aligned_memory(alignment, size * detail::sz<T>::value)))
+		, end_(reinterpret_cast<T*>(reinterpret_cast<char*>(data_)+ size * detail::sz<T>::value))
 	{
 		memcpy(data_, data, size);
 	}
 
-	inline unique_memory_t::unique_memory_t(unique_memory_t&& rhs)
+	template <typename T>
+	inline typed_unique_memory_t<T>::typed_unique_memory_t(typed_unique_memory_t&& rhs)
 		: data_(rhs.data_)
 		, end_(rhs.end_)
 	{
@@ -75,14 +89,16 @@ namespace atma
 		rhs.end_ = nullptr;
 	}
 
-	inline unique_memory_t::~unique_memory_t()
+	template <typename T>
+	inline typed_unique_memory_t<T>::~typed_unique_memory_t()
 	{
 		platform::deallocate_aligned_memory(data_);
 	}
 
-	inline auto unique_memory_t::operator = (unique_memory_t&& rhs) -> unique_memory_t&
+	template <typename T>
+	inline auto typed_unique_memory_t<T>::operator = (typed_unique_memory_t&& rhs) -> typed_unique_memory_t&
 	{
-		this->~unique_memory_t();
+		this->~typed_unique_memory_t();
 		data_ = rhs.data_;
 		end_ = rhs.end_;
 		rhs.data_ = nullptr;
@@ -90,44 +106,52 @@ namespace atma
 		return *this;
 	}
 
-	inline auto unique_memory_t::empty() const -> bool
+	template <typename T>
+	inline auto typed_unique_memory_t<T>::empty() const -> bool
 	{
 		return size() == 0;
 	}
 
-	inline auto unique_memory_t::size() const -> size_t
+	template <typename T>
+	inline auto typed_unique_memory_t<T>::size() const -> size_t
 	{
 		return reinterpret_cast<char const*>(end_) - reinterpret_cast<char const*>(data_);
 	}
 
-	inline auto unique_memory_t::begin() -> void*
+	template <typename T>
+	inline auto typed_unique_memory_t<T>::begin() -> T*
 	{
 		return data_;
 	}
 
-	inline auto unique_memory_t::end() -> void*
+	template <typename T>
+	inline auto typed_unique_memory_t<T>::end() -> T*
 	{
 		return end_;
 	}
 
-	inline auto unique_memory_t::begin() const -> void const*
+	template <typename T>
+	inline auto typed_unique_memory_t<T>::begin() const -> T const*
 	{
 		return data_;
 	}
 
-	inline auto unique_memory_t::end() const -> void const*
+	template <typename T>
+	inline auto typed_unique_memory_t<T>::end() const -> T const*
 	{
 		return end_;
 	}
 
-	inline auto unique_memory_t::swap(unique_memory_t& rhs) -> void
+	template <typename T>
+	inline auto typed_unique_memory_t<T>::swap(typed_unique_memory_t& rhs) -> void
 	{
 		auto tmp = std::move(*this);
 		*this = std::move(rhs);
 		rhs = std::move(tmp);
 	}
 
-	inline unique_memory_t::operator bool() const
+	template <typename T>
+	inline typed_unique_memory_t<T>::operator bool() const
 	{
 		return data_ != nullptr;
 	}
