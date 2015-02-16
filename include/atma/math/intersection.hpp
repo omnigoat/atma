@@ -83,7 +83,7 @@ namespace atma { namespace math {
 
 	inline auto intersect_aabc_triangle(aabc_t const& aabb, triangle_t const& tri) -> bool
 	{
-		return intersect_aabb_triangle(aabb_t {aabb.origin(), vector4f {aabb.radius(), aabb.radius(), aabb.radius(), 0.f}}, tri);
+		return intersect_aabb_triangle(aabb_t {aabb.origin(), 0.5f * vector4f{aabb.radius(), aabb.radius(), aabb.radius(), 0.f}}, tri);
 	}
 
 } }
