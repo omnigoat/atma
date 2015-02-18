@@ -22,8 +22,8 @@ namespace atma
 
 		auto operator = (typed_unique_memory_t&&) -> typed_unique_memory_t&;
 		auto operator = (typed_unique_memory_t const&) -> typed_unique_memory_t& = delete;
-		auto operator [] (size_t) -> T&;
 		auto operator [] (size_t) const -> T const&;
+		auto operator [] (size_t) -> T&;
 
 		operator bool() const;
 
@@ -42,6 +42,7 @@ namespace atma
 	};
 
 	using unique_memory_t = typed_unique_memory_t<byte>;
+
 
 
 
@@ -107,6 +108,26 @@ namespace atma
 	}
 
 	template <typename T>
+	inline auto typed_unique_memory_t<T>::operator [] (size_t i) const -> element_type const&
+	{
+		IM_ASSERT(data_);
+		return data_[i];
+	}
+
+	template <typename T>
+	inline auto typed_unique_memory_t<T>::operator [] (size_t i) -> element_type&
+	{
+		IM_ASSERT(data_);
+		return data_[i];
+	}
+
+	template <typename T>
+	inline typed_unique_memory_t<T>::operator bool() const
+	{
+		return data_ != nullptr;
+	}
+
+	template <typename T>
 	inline auto typed_unique_memory_t<T>::empty() const -> bool
 	{
 		return size() == 0;
@@ -148,12 +169,6 @@ namespace atma
 		auto tmp = std::move(*this);
 		*this = std::move(rhs);
 		rhs = std::move(tmp);
-	}
-
-	template <typename T>
-	inline typed_unique_memory_t<T>::operator bool() const
-	{
-		return data_ != nullptr;
 	}
 }
 
