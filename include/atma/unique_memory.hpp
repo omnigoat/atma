@@ -5,15 +5,12 @@
 
 namespace atma
 {
-	namespace detail {
-		template <typename T> struct sz { static size_t const value = sizeof(T); };
-		template <> struct sz<void> { static size_t const value = 1; };
-	}
-
-
-	template <typename T = void>
+	template <typename T>
 	struct typed_unique_memory_t
 	{
+		using element_type = T;
+		static size_t const element_size = sizeof(T);
+
 		explicit typed_unique_memory_t();
 		explicit typed_unique_memory_t(size_t size);
 		typed_unique_memory_t(size_t size, T* data);
@@ -25,12 +22,15 @@ namespace atma
 
 		auto operator = (typed_unique_memory_t&&) -> typed_unique_memory_t&;
 		auto operator = (typed_unique_memory_t const&) -> typed_unique_memory_t& = delete;
+		auto operator [] (size_t) -> T&;
+		auto operator [] (size_t) const -> T const&;
+
+		operator bool() const;
 
 		auto empty() const -> bool;
 		auto size() const -> size_t;
 		auto begin() const -> T const*;
 		auto end() const -> T const*;
-		operator bool() const;
 
 		auto begin() -> T*;
 		auto end() -> T*;
@@ -41,7 +41,7 @@ namespace atma
 		T* end_;
 	};
 
-	using unique_memory_t = typed_unique_memory_t<void>;
+	using unique_memory_t = typed_unique_memory_t<byte>;
 
 
 
@@ -55,27 +55,27 @@ namespace atma
 
 	template <typename T>
 	inline typed_unique_memory_t<T>::typed_unique_memory_t(size_t size)
-		: typed_unique_memory_t(4, size * detail::sz<T>::value)
+		: typed_unique_memory_t(4, size * element_size)
 	{
 	}
 
 	template <typename T>
 	inline typed_unique_memory_t<T>::typed_unique_memory_t(size_t size, T* data)
-		: typed_unique_memory_t(4, size * detail::sz<T>::value, data)
+		: typed_unique_memory_t(4, size * element_size, data)
 	{
 	}
 
 	template <typename T>
 	inline typed_unique_memory_t<T>::typed_unique_memory_t(uint alignment, size_t size)
-		: data_(reinterpret_cast<T*>(platform::allocate_aligned_memory(alignment, size * detail::sz<T>::value)))
-		, end_(reinterpret_cast<T*>(reinterpret_cast<char*>(data_) + size * detail::sz<T>::value))
+		: data_(reinterpret_cast<T*>(platform::allocate_aligned_memory(alignment, size * element_size)))
+		, end_(reinterpret_cast<T*>(reinterpret_cast<char*>(data_) + size * element_size))
 	{
 	}
 
 	template <typename T>
 	inline typed_unique_memory_t<T>::typed_unique_memory_t(uint alignment, size_t size, T* data)
-		: data_(reinterpret_cast<T*>(platform::allocate_aligned_memory(alignment, size * detail::sz<T>::value)))
-		, end_(reinterpret_cast<T*>(reinterpret_cast<char*>(data_)+ size * detail::sz<T>::value))
+		: data_(reinterpret_cast<T*>(platform::allocate_aligned_memory(alignment, size * element_size)))
+		, end_(reinterpret_cast<T*>(reinterpret_cast<char*>(data_)+ size * element_size))
 	{
 		memcpy(data_, data, size);
 	}
