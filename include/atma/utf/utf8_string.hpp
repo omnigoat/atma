@@ -169,8 +169,7 @@ namespace atma {
 	{
 		ATMA_ASSERT(c ^ 0x80);
 
-		if (capacity_ < size_ + 1)
-			imem_quantize(size_ + 1, true);
+		imem_quantize_grow(1);
 
 		data_[size_++] = c;
 		data_[size_] = '\0';
@@ -179,20 +178,28 @@ namespace atma {
 	inline auto utf8_string_t::push_back(utf8_char_t const& c) -> void
 	{
 		auto sz = std::distance(c.begin, c.end);
-		if (capacity_ < size_ + sz)
-			imem_quantize(size_ + sz, true);
+		imem_quantize_grow(sz);
 
 		memcpy(data_ + size_, c.begin, sz);
 		size_ += sz;
 		data_[size_] = '\0';
 	}
 
+	inline auto utf8_string_t::append(char const* begin, char const* end) -> void
+	{
+		auto sz = end - begin;
+		if (sz == 0)
+			return;
+		imem_quantize(sz, true);
+
+		memcpy(data_ + size_, begin, sz);
+		size_ += sz;
+		data_[size_] = '\0';
+	}
+
 	inline auto utf8_string_t::clear() -> void
 	{
-		capacity_ = 0;
 		size_ = 0;
-		delete data_;
-		data_ = nullptr;
 	}
 
 	inline auto utf8_string_t::imem_quantize(size_t size, bool keep) -> void
@@ -201,6 +208,12 @@ namespace atma {
 
 		if (newcap != capacity_)
 			imem_realloc(newcap, keep);
+	}
+
+	inline auto utf8_string_t::imem_quantize_grow(size_t size) -> void
+	{
+		if (capacity_ <= size_ + size)
+			imem_realloc(capacity_ * 2, true);
 	}
 
 	inline auto utf8_string_t::imem_quantize_capacity(size_t size) const -> size_t
@@ -215,7 +228,7 @@ namespace atma {
 
 	inline auto utf8_string_t::imem_realloc(size_t capacity, bool keep) -> void
 	{
-		if (keep)
+		if (keep && data_)
 		{
 			auto tmp = data_;
 			capacity_ = capacity;

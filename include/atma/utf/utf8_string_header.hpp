@@ -68,16 +68,19 @@ namespace atma {
 		auto push_back(utf8_char_t const& c) -> void;
 
 		//template <typename IT> auto insert(const_iterator const&, IT const&, IT const&);
-		//auto insert(const_iterator const&, char const*, char const*) -> void;
+		auto append(char const*, char const*) -> void;
 
 		auto clear() -> void;
 
 	private:
+		// changes the capacity to be a "good" size to store the requested length.
+		// optionally keeps any pre-existing data.
 		auto imem_quantize(size_t, bool keep) -> void;
-		// given required minimum size, returns capacity to allcoate
+		auto imem_quantize_grow(size_t) -> void;
+
 		auto imem_quantize_capacity(size_t) const -> size_t;
-		// reallocates data, optionally copying previous values into new buffer
 		auto imem_realloc(size_t, bool keep) -> void;
+
 
 	private:
 		size_t capacity_;

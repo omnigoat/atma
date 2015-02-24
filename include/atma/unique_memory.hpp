@@ -183,15 +183,15 @@ namespace atma
 	template <typename T, typename E>
 	struct memory_view_t
 	{
-		memory_view_t(T const& c)
+		memory_view_t(T& c)
 			: c_(c)
 		{}
 
-		auto begin() const -> E const* { return reinterpret_cast<E const*>(c_.begin()); }
-		auto end() const -> E const* { return reinterpret_cast<E const*>(c_.end()); }
+		auto begin() const -> E* { return reinterpret_cast<E*>(c_.begin()); }
+		auto end() const -> E* { return reinterpret_cast<E*>(c_.end()); }
 
 	private:
-		T const& c_;
+		T& c_;
 	};
 }
 
