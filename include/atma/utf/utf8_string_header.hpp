@@ -47,8 +47,6 @@ namespace atma {
 
 		auto empty() const -> bool;
 		auto c_str() const -> char const*;
-
-		// size in bytes, but not characters
 		auto raw_size() const -> size_t;
 
 
@@ -67,10 +65,10 @@ namespace atma {
 		auto push_back(char c) -> void;
 		auto push_back(utf8_char_t const& c) -> void;
 
-		//template <typename IT> auto insert(const_iterator const&, IT const&, IT const&);
 		auto append(char const*, char const*) -> void;
 
 		auto clear() -> void;
+		//auto shrink_to_fit() -> void;
 
 	private:
 		// changes the capacity to be a "good" size to store the requested length.

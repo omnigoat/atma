@@ -190,7 +190,7 @@ namespace atma {
 		auto sz = end - begin;
 		if (sz == 0)
 			return;
-		imem_quantize(sz, true);
+		imem_quantize_grow(sz);
 
 		memcpy(data_ + size_, begin, sz);
 		size_ += sz;
@@ -213,7 +213,7 @@ namespace atma {
 	inline auto utf8_string_t::imem_quantize_grow(size_t size) -> void
 	{
 		if (capacity_ <= size_ + size)
-			imem_realloc(capacity_ * 2, true);
+			imem_realloc(imem_quantize_capacity(size_ + size), true);
 	}
 
 	inline auto utf8_string_t::imem_quantize_capacity(size_t size) const -> size_t
