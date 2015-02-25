@@ -1,80 +1,49 @@
-//=====================================================================
-//
-//=====================================================================
-#ifndef ATMA_MATH_IMPL_VECTOR4I_DECLARATION_HPP
-#define ATMA_MATH_IMPL_VECTOR4I_DECLARATION_HPP
-//=====================================================================
+#pragma once
+
 #ifndef ATMA_MATH_VECTOR4I_SCOPE
 #	error "this file needs to be included solely from vector4i.hpp"
 #endif
-//=====================================================================
-namespace atma {
-namespace math {
-//=====================================================================
-	
-	//=====================================================================
-	// vector4i
-	// ----------
-	//   A four-component vector of int32_ts, 16-byte aligned
-	//=====================================================================
+
+
+namespace atma { namespace math {
+
 	__declspec(align(16))
 	struct vector4i
 	{
-		// construction
 		vector4i();
-		vector4i(int32_t x, int32_t y, int32_t z, int32_t w);
+		vector4i(int32 x, int32 y, int32 z, int32 w);
 		explicit vector4i(__m128i);
 		
-		// assignment
-		auto operator = (vector4i const& e) -> vector4i&;
 
-		// access
+		auto operator [] (int) const -> int32;
+		auto operator *= (int32) -> vector4i&;
+		auto operator /= (int32) -> vector4i&;
+
+		template <typename OP> auto operator  = (impl::expr<vector4i, OP> const&) -> vector4i&;
+		template <typename OP> auto operator += (impl::expr<vector4i, OP> const&) -> vector4i&;
+		template <typename OP> auto operator -= (impl::expr<vector4i, OP> const&) -> vector4i&;
+
 #ifdef ATMA_MATH_USE_SSE
-		auto xmmd() const -> __m128i { return sse_; }
+		auto xmmd() const -> __m128i { return xmmdata; }
 #endif
-		auto operator[] (uint32 i) const -> int32_t;
-		
-		// computation
+
 		auto is_zero() const -> bool;
-				
-		// mutation
-		template <typename OP> vector4i& operator += (impl::expr<vector4i, OP> const&);
-		template <typename OP> vector4i& operator -= (impl::expr<vector4i, OP> const&);
-		vector4i& operator *= (int32_t rhs);
-		vector4i& operator /= (int32_t rhs);
-		auto normalize() -> void;
 
-		template <uint8_t i>
-		struct elem_ref_t
-		{
-			elem_ref_t(vector4i* owner) : owner_(owner) {}
+#pragma warning(push)
+#pragma warning(disable: 4201)
+		union {
+			struct
+			{
+				int32 x, y, z, w;
+			};
 
-			operator int32_t() {
-				return owner_->sse_.m128i_i32[i];
-			}
+#if defined(ATMA_MATH_USE_SSE)
+			__m128i xmmdata;
+#endif
 
-			int32_t operator = (int32_t rhs) {
-				owner_->sse_.m128i_i32[i] = rhs;
-				return rhs;
-			}
-
-		private:
-			vector4i* owner_;
+			int32 components[4];
 		};
-		
-	private:
-#ifdef ATMA_MATH_USE_SSE
-		__m128i sse_;
-#else
-		int32_t x, y, z, w;
-#endif
+#pragma warning(pop)
 	};
-	
 
-
-//=====================================================================
-} // namespace math
-} // namespace atma
-//=====================================================================
-#endif
-//=====================================================================
+} }
