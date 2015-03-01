@@ -23,8 +23,11 @@ namespace atma { namespace math {
 
 		auto origin() const       -> vector4f { return point4f(data_.x, data_.y, data_.z); }
 		auto radius() const       -> float    { return 0.5f * data_.w; }
+		auto diameter() const     -> float    { return data_.w; }
 		auto volume() const       -> float    { return data_.w * data_.w * data_.w; }
 		auto surface_area() const -> float    { return 6 * data_.w * data_.w; }
+		auto min_point() const    -> vector4f { return point4f(data_.x - data_.w * 0.5f, data_.y - data_.w * 0.5f, data_.z - data_.w * 0.5f); }
+		auto max_point() const    -> vector4f { return point4f(data_.x + data_.w * 0.5f, data_.y + data_.w * 0.5f, data_.z + data_.w * 0.5f); }
 
 		auto octant_idx_of(math::vector4f const&) const -> int;
 		auto octant_of(int) const -> aabc_t;

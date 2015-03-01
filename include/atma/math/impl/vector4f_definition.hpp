@@ -185,7 +185,7 @@ namespace math {
 
 	inline auto dot_product(vector4f const& lhs, vector4f const& rhs) -> float
 	{
-#if ATMA_MATH_USE_SSE
+#if 0
 		return _mm_dp_ps(lhs.xmmd(), rhs.xmmd(), 0x7f).m128_f32[0];
 #else
 		float result{};
