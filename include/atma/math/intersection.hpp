@@ -80,23 +80,24 @@ namespace atma { namespace math {
 
 	inline auto intersect_aabc_triangle2(aabc_t const& box, triangle_t const& tri) -> bool
 	{
-		// bounding-box test
-		//if (!intersect_aabb_aabb(tri.aabb(), box))
-		//	return false;
 		auto p  = box.min_point();
 		auto pm = box.max_point();
 
+		// triangle bounding-box
 		auto tmin2 = point4f(std::min(tri.v0.x, tri.v1.x), std::min(tri.v0.y, tri.v1.y), std::min(tri.v0.z, tri.v1.z));
 		auto tmin  = point4f(std::min(tri.v2.x, tmin2.x), std::min(tri.v2.y, tmin2.y), std::min(tri.v2.z, tmin2.z));
 		auto tmax2 = point4f(std::max(tri.v0.x, tri.v1.x), std::max(tri.v0.y, tri.v1.y), std::max(tri.v0.z, tri.v1.z));
 		auto tmax  = point4f(std::max(tri.v2.x, tmax2.x), std::max(tri.v2.y, tmax2.y), std::max(tri.v2.z, tmax2.z));
 
-		// x-axis
+		// bounding-box test
 		if (tmax.x < p.x || tmax.y < p.y || tmax.z < p.z || pm.x < tmin.x || pm.y < tmin.y || pm.z < tmin.z)
 			return false;
 
-		// triangle-normal & edge normals
+		// triangle-normal & inward-facing edge normals
 		auto n = cross_product(tri.v1 - tri.v0, tri.v2 - tri.v0);
+		//auto ne0 = cross_product(tri.edge0(), n);
+		//auto ne1 = cross_product(tri.edge1(), n);
+		//auto ne2 = cross_product(tri.edge2(), n);
 
 		// delta-p, the vector of (min-point, max-point) of the bounding-box
 		vector4f dp = box.max_point() - p;
@@ -120,20 +121,21 @@ namespace atma { namespace math {
 		auto pxz = vector4f(p.x, p.z, 0.f, 0.f);
 		auto pyz = vector4f(p.y, p.z, 0.f, 0.f);
 
-		// xy-plane projection-overlap
-		auto nxy = [](vector4f const& v0, vector4f const& v1, vector4f const& v2)
+		auto edge_normal = [](int a, int b, vector4f const& v0, vector4f const& v1, vector4f const& v2)
 		{
 			auto AB = vector4f {v1 - v0};
 			auto AC = vector4f {v2 - v0};
-			auto N = vector4f {-AB.y, AB.x, 0.f, 0.f};
-			if (dot_product(N, vector4f {AC.x, AC.y, 0.f, 0.f}) < 0.f)
+			auto N = vector4f {-AB[b], AB[a], 0.f, 0.f};
+			if (v1[a]*v2[b] - v0[b]*v1[a] - v0[a]*v2[b] - v1[b]*v2[a] + v0[a]*v2[b] + v0[b]*v2[a] < 0.f)
 				N = N * -1;
 			return N;
 		};
 
-		vector4f ne0xy = nxy(tri.v0, tri.v1, tri.v2); // vector4f(-tri.edge0().y, tri.edge0().x, 0.f, 0.f) * (n.z < 0.f ? -1.f : 1.f);
-		vector4f ne1xy = nxy(tri.v1, tri.v2, tri.v0); // vector4f(-tri.edge1().y, tri.edge1().x, 0.f, 0.f) * (n.z < 0.f ? -1.f : 1.f);
-		vector4f ne2xy = nxy(tri.v2, tri.v0, tri.v1); // vector4f(-tri.edge2().y, tri.edge2().x, 0.f, 0.f) * (n.z < 0.f ? -1.f : 1.f);
+
+		// xy-plane projection-overlap
+		vector4f ne0xy = edge_normal(0,1, tri.v0, tri.v1, tri.v2);
+		vector4f ne1xy = edge_normal(0,1, tri.v1, tri.v2, tri.v0);
+		vector4f ne2xy = edge_normal(0,1, tri.v2, tri.v0, tri.v1);
 
 		auto  v0xy   = math::vector4f{tri.v0.x, tri.v0.y, 0.f, 0.f};
 		auto  v1xy   = math::vector4f{tri.v1.x, tri.v1.y, 0.f, 0.f};
@@ -148,23 +150,13 @@ namespace atma { namespace math {
 
 
 		// xz-plane projection overlap
-		auto nxz = [](vector4f const& v0, vector4f const& v1, vector4f const& v2)
-		{
-			auto AB = vector4f {v1 - v0};
-			auto AC = vector4f {v2 - v0};
-			auto N = vector4f {-AB.z, AB.x, 0.f, 0.f};
-			if (dot_product(N, vector4f {AC.x, AC.z, 0.f, 0.f}) < 0.f)
-				N = N * -1;
-			return N;
-		};
+		vector4f ne0xz = edge_normal(0,2, tri.v0, tri.v1, tri.v2);
+		vector4f ne1xz = edge_normal(0,2, tri.v1, tri.v2, tri.v0);
+		vector4f ne2xz = edge_normal(0,2, tri.v2, tri.v0, tri.v1);
 
-		vector4f ne0xz = nxz(tri.v0, tri.v1, tri.v2);
-		vector4f ne1xz = nxz(tri.v1, tri.v2, tri.v0);
-		vector4f ne2xz = nxz(tri.v2, tri.v0, tri.v1);
-
-		//vector4f ne0xz = vector4f(-tri.edge0().z, tri.edge0().x, 0.f, 0.f) * (n.y < 0.f ? -1.f : 1.f);
-		//vector4f ne1xz = vector4f(-tri.edge1().z, tri.edge1().x, 0.f, 0.f) * (n.y < 0.f ? -1.f : 1.f);
-		//vector4f ne2xz = vector4f(-tri.edge2().z, tri.edge2().x, 0.f, 0.f) * (n.y < 0.f ? -1.f : 1.f);
+		vector4f ne0xz2 = vector4f(-tri.edge0().z, tri.edge0().x, 0.f, 0.f) * (n.z < 0.f ? -1.f : 1.f);
+		vector4f ne1xz2 = vector4f(-tri.edge1().z, tri.edge1().x, 0.f, 0.f) * (n.z < 0.f ? -1.f : 1.f);
+		vector4f ne2xz2 = vector4f(-tri.edge2().z, tri.edge2().x, 0.f, 0.f) * (n.z < 0.f ? -1.f : 1.f);
 
 		auto  v0xz   = math::vector4f{tri.v0.x, tri.v0.z, 0.f, 0.f};
 		auto  v1xz   = math::vector4f{tri.v1.x, tri.v1.z, 0.f, 0.f};
@@ -179,19 +171,9 @@ namespace atma { namespace math {
 
 
 		// yz-plane projection overlap
-		auto nyz = [](vector4f const& v0, vector4f const& v1, vector4f const& v2)
-		{
-			auto AB = vector4f{v1 - v0};
-			auto AC = vector4f{v2 - v0};
-			auto N = vector4f{-AB.z, AB.y, 0.f, 0.f};
-			if (dot_product(N, vector4f{AC.y, AC.z, 0.f, 0.f}) < 0.f)
-				N = N * -1;
-			return N;
-		};
-
-		vector4f ne0yz = nyz(tri.v0, tri.v1, tri.v2); // vector4f(-tri.edge0().z, tri.edge0().y, 0.f, 0.f) * (n.x < 0.f ? -1.f : 1.f);
-		vector4f ne1yz = nyz(tri.v1, tri.v2, tri.v0); // vector4f(-tri.edge1().z, tri.edge1().y, 0.f, 0.f) * (n.x < 0.f ? -1.f : 1.f);
-		vector4f ne2yz = nyz(tri.v2, tri.v0, tri.v1); // vector4f(-tri.edge2().z, tri.edge2().y, 0.f, 0.f) * (n.x < 0.f ? -1.f : 1.f);
+		vector4f ne0yz = edge_normal(1,2, tri.v0, tri.v1, tri.v2);
+		vector4f ne1yz = edge_normal(1,2, tri.v1, tri.v2, tri.v0);
+		vector4f ne2yz = edge_normal(1,2, tri.v2, tri.v0, tri.v1);
 
 		auto  v0yz   = math::vector4f{tri.v0.y, tri.v0.z, 0.f, 0.f};
 		auto  v1yz   = math::vector4f{tri.v1.y, tri.v1.z, 0.f, 0.f};
