@@ -48,8 +48,9 @@ namespace atma { namespace thread {
 	inline auto engine_t::reenter(std::atomic<bool> const& good) -> void
 	{
 		signal_t x;
-		while (good && queue_.pop(x)) {
-			x();
+		while (good) {
+			if (queue_.pop(x))
+				x();
 		}
 	}
 
