@@ -157,7 +157,37 @@ namespace math {
 	{
 		return matrix4f(xmmd_identity_r0_ps, xmmd_identity_r1_ps, xmmd_identity_r2_ps, xmmd_identity_r3_ps);
 	}
-	
+
+	inline auto matrix4f::scale(float s) -> matrix4f
+	{
+		return scale(s, s, s);
+	}
+
+	inline auto matrix4f::scale(float x, float y, float z) -> matrix4f
+	{
+		//[[align(16)]]
+		__declspec(align(16))
+		float values[16] = {
+			x, 0.f, 0.f, 0.f,
+			0.f, y, 0.f, 0.f,
+			0.f, 0.f, z, 0.f,
+			0.f, 0.f, 0.f, 1.f};
+
+		auto r0 = _mm_load_ps(values);
+		auto r1 = _mm_load_ps(values + 4);
+		auto r2 = _mm_load_ps(values + 8);
+		auto r3 = _mm_load_ps(values + 12);
+
+		return matrix4f{r0, r1, r2, r3};
+	}
+
+	inline auto matrix4f::translate(vector4f const& v) -> matrix4f
+	{
+		auto v2 = v;
+		v2.w = 1.f;
+		return matrix4f{xmmd_identity_r0_ps, xmmd_identity_r1_ps, xmmd_identity_r2_ps, v2.xmmd()};
+	}
+
 	inline auto matrix4f::transpose() -> void
 	{
 		__m128 t0 = _mm_shuffle_ps(sd_[0], sd_[1], _MM_SHUFFLE(1, 0, 1, 0));
