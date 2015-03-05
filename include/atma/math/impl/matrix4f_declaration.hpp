@@ -68,7 +68,9 @@ namespace math {
 
 
 		static auto identity() -> matrix4f;
-
+		static auto scale(float) -> matrix4f;
+		static auto scale(float, float, float) -> matrix4f;
+		static auto translate(vector4f const&) -> matrix4f;
 
 	private:
 #ifdef ATMA_MATH_USE_SSE

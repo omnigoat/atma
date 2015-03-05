@@ -4,6 +4,11 @@
 #	error "this file needs to be included solely from vector4f.hpp"
 #endif
 
+#pragma warning(push,3)
+#include <xmmintrin.h>
+#pragma warning(pop)
+
+
 namespace atma { namespace math {
 
 	__declspec(align(16))

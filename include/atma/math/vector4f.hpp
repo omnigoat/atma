@@ -11,4 +11,6 @@
 #include <atma/math/impl/vector4f_definition.hpp>
 #include <atma/math/impl/vector4f_operators.hpp>
 
+namespace aml = atma::math;
+
 #undef ATMA_MATH_VECTOR4F_SCOPE
