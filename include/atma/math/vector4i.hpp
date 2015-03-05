@@ -9,4 +9,6 @@
 #include <emmintrin.h>
 #pragma warning(pop)
 
+namespace aml = atma::math;
+
 #undef ATMA_MATH_VECTOR4I_SCOPE
