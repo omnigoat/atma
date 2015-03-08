@@ -250,5 +250,8 @@
     <ClInclude Include="..\include\atma\math\aabc.hpp">
       <Filter>include\math</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\hash.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
