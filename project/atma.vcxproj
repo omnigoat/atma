@@ -38,6 +38,7 @@
     <ClInclude Include="..\include\atma\event.hpp" />
     <ClInclude Include="..\include\atma\filesystem\file.hpp" />
     <ClInclude Include="..\include\atma\function_traits.hpp" />
+    <ClInclude Include="..\include\atma\hash.hpp" />
     <ClInclude Include="..\include\atma\idxs.hpp" />
     <ClInclude Include="..\include\atma\intrusive_ptr.hpp" />
     <ClInclude Include="..\include\atma\lockfree\queue.hpp" />
