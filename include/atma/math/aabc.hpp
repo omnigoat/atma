@@ -13,15 +13,15 @@ namespace atma { namespace math {
 			: data_(0.f, 0.f, 0.f, 1.f)
 		{}
 
-		aabc_t(vector4f const& origin, float width)
-			: data_(origin.x, origin.y, origin.z, width)
+		aabc_t(vector4f const& center, float width)
+			: data_(center.x, center.y, center.z, width)
 		{}
 
 		aabc_t(float x, float y, float z, float w)
 			: data_(x, y, z, w)
 		{}
 
-		auto origin() const       -> vector4f { return point4f(data_.x, data_.y, data_.z); }
+		auto center() const       -> vector4f { return point4f(data_.x, data_.y, data_.z); }
 		auto radius() const       -> float    { return 0.5f * data_.w; }
 		auto diameter() const     -> float    { return data_.w; }
 		auto volume() const       -> float    { return data_.w * data_.w * data_.w; }
@@ -69,17 +69,17 @@ namespace atma { namespace math {
 
 	auto aabc_t::compute_corners() const -> std::array<vector4f, 8>
 	{
-		auto origin = vector4f {data_.x, data_.y, data_.z, 1.f};
+		auto center = vector4f {data_.x, data_.y, data_.z, 1.f};
 
 		return {
-			origin + 0.5f * vector4f(-data_.w, -data_.w, -data_.w, 0.f),
-			origin + 0.5f * vector4f(data_.w, -data_.w, -data_.w, 0.f),
-			origin + 0.5f * vector4f(-data_.w, data_.w, -data_.w, 0.f),
-			origin + 0.5f * vector4f(data_.w, data_.w, -data_.w, 0.f),
-			origin + 0.5f * vector4f(-data_.w, -data_.w, data_.w, 0.f),
-			origin + 0.5f * vector4f(data_.w, -data_.w, data_.w, 0.f),
-			origin + 0.5f * vector4f(-data_.w, data_.w, data_.w, 0.f),
-			origin + 0.5f * vector4f(data_.w, data_.w, data_.w, 0.f),
+			center + 0.5f * vector4f(-data_.w, -data_.w, -data_.w, 0.f),
+			center + 0.5f * vector4f(data_.w, -data_.w, -data_.w, 0.f),
+			center + 0.5f * vector4f(-data_.w, data_.w, -data_.w, 0.f),
+			center + 0.5f * vector4f(data_.w, data_.w, -data_.w, 0.f),
+			center + 0.5f * vector4f(-data_.w, -data_.w, data_.w, 0.f),
+			center + 0.5f * vector4f(data_.w, -data_.w, data_.w, 0.f),
+			center + 0.5f * vector4f(-data_.w, data_.w, data_.w, 0.f),
+			center + 0.5f * vector4f(data_.w, data_.w, data_.w, 0.f),
 		};
 	}
 
