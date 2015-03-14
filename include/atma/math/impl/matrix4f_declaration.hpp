@@ -1,8 +1,4 @@
-//=====================================================================
-//
-//=====================================================================
-#ifndef ATMA_MATH_IMPL_MATRIX_DECLARATION_HPP
-#define ATMA_MATH_IMPL_MATRIX_DECLARATION_HPP
+#pragma once
 //=====================================================================
 #ifndef ATMA_MATH_MATRIX4F_SCOPE
 #	error "this file needs to be included solely from matrix4.hpp"

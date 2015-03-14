@@ -1,6 +1,5 @@
 #pragma once
-//=====================================================================
-#ifdef ATMA_MATH_USE_SSE
+
 #pragma warning(push,3)
 #include <xmmintrin.h>
 #pragma warning(pop)
@@ -8,11 +7,9 @@
 #undef max
 #undef near
 #undef far
-#endif
-//=====================================================================
-namespace atma {
-namespace math {
-//=====================================================================
+
+
+namespace atma { namespace math {
 
 	float const pi = 3.141592654f;
 	float const two_pi = 6.283185307f;
@@ -20,8 +17,6 @@ namespace math {
 	float const one_over_two_pi = 0.159154943f;
 	float const pi_over_two = 1.570796327f;
 	float const pi_over_four = 0.785398163f;
-
-#ifdef ATMA_MATH_USE_SSE
 
 	__m128 const xmmd_zero_ps = _mm_setzero_ps();
 	__m128 const xmmd_one_ps = _mm_setr_ps(1.f, 1.f, 1.f, 1.f);
@@ -46,7 +41,7 @@ namespace math {
 
 
 	// SERIOUSLY, find a better spot for this
-	inline auto _am_select_ps(__m128 const& a, __m128 const& b, __m128 const& mask) -> __m128
+	inline auto _am_select_ps(__m128 a, __m128 b, __m128 mask) -> __m128
 	{
 		return _mm_or_ps(_mm_andnot_ps(mask, a), _mm_and_ps(b, mask));
 	}
@@ -56,7 +51,5 @@ namespace math {
 		__declspec(align(16)) float fs[] = {f0, f1, f2, f3};
 		return _mm_load_ps(fs);
 	}
-
-#endif
 
 } }

@@ -14,9 +14,6 @@
     <Filter Include="include\math\impl">
       <UniqueIdentifier>{4378cc9b-a9ac-412f-a43a-643675efc68a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="include\math\impl\matrix4f">
-      <UniqueIdentifier>{ae18dc78-415d-41de-a835-875e8bc82395}</UniqueIdentifier>
-    </Filter>
     <Filter Include="include\lockfree">
       <UniqueIdentifier>{145f0927-0d27-44fe-92f1-ab9ad4710a05}</UniqueIdentifier>
     </Filter>
@@ -93,21 +90,6 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\event.hpp">
       <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\math\impl\matrix4f_declaration.hpp">
-      <Filter>include\math\impl\matrix4f</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\math\impl\matrix4f_definition.hpp">
-      <Filter>include\math\impl\matrix4f</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\math\impl\constants.hpp">
-      <Filter>include\math\impl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\math\impl\matrix4f_operators.hpp">
-      <Filter>include\math\impl\matrix4f</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\math\impl\matrix4f_functions.hpp">
-      <Filter>include\math\impl\matrix4f</Filter>
     </ClInclude>
     <ClInclude Include="..\include\atma\lockfree\queue.hpp">
       <Filter>include\lockfree</Filter>
@@ -234,6 +216,9 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\hash.hpp">
       <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\atma\math\constants.hpp">
+      <Filter>include\math</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

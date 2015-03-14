@@ -1,9 +1,10 @@
 #pragma once
-//=====================================================================
-#include <atma/math/impl/constants.hpp>
+
+#include <atma/math/constants.hpp>
 
 #include <cmath>
-//=====================================================================
+
+
 namespace atma { namespace math {
 
 	inline void retrieve_sin_cos(float& sin, float& cos, float v)
