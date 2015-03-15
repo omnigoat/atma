@@ -367,7 +367,7 @@ namespace atma { namespace math {
 	//=====================================================================
 	// functions
 	//=====================================================================
-	inline auto transpose(matrix4f const& x) const -> matrix4f
+	inline auto transpose(matrix4f const& x) -> matrix4f
 	{
 		__m128 t0 = _mm_shuffle_ps(x.xmmdata[0], x.xmmdata[1], _MM_SHUFFLE(1, 0, 1, 0));
 		__m128 t1 = _mm_shuffle_ps(x.xmmdata[0], x.xmmdata[1], _MM_SHUFFLE(3, 2, 3, 2));
@@ -381,7 +381,7 @@ namespace atma { namespace math {
 			_mm_shuffle_ps(t1, t3, _MM_SHUFFLE(3, 1, 3, 1))};
 	}
 
-	inline auto invert(matrix4f const& x) -> void
+	inline auto invert(matrix4f const& x) -> matrix4f
 	{
 		auto t = transpose(x);
 		
@@ -480,10 +480,11 @@ namespace atma { namespace math {
 		__m128 det = _mm_dp_ps(c0, t.xmmdata[0], 0xff);
 		det = _mm_div_ps(xmmd_one_ps, det);
 
-		sd_[0] = _mm_mul_ps(c0, det);
-		sd_[1] = _mm_mul_ps(c2, det);
-		sd_[2] = _mm_mul_ps(c4, det);
-		sd_[3] = _mm_mul_ps(c6, det);
+		return matrix4f{
+			_mm_mul_ps(c0, det),
+			_mm_mul_ps(c2, det),
+			_mm_mul_ps(c4, det),
+			_mm_mul_ps(c6, det)};
 	}
 	
 	inline auto look_along(vector4f const& position, vector4f const& direction, vector4f const& up) -> matrix4f
@@ -497,14 +498,13 @@ namespace atma { namespace math {
 		__m128 d1 = _mm_dp_ps(r1.xmmdata, npos.xmmdata, 0x7f);
 		__m128 d2 = _mm_dp_ps(r2.xmmdata, npos.xmmdata, 0x7f);
 
-		auto result = matrix4f(
+		auto result = matrix4f{
 			_am_select_ps(d0, r0.xmmdata, xmmd_mask_1110_ps),
 			_am_select_ps(d1, r1.xmmdata, xmmd_mask_1110_ps),
 			_am_select_ps(d2, r2.xmmdata, xmmd_mask_1110_ps),
-			xmmd_identity_r3_ps
-			);
+			xmmd_identity_r3_ps};
 
-		return result.transposed();
+		return transpose(result);
 	}
 
 	inline auto look_at(vector4f const& position, vector4f const& target, vector4f const& up) -> matrix4f
@@ -512,12 +512,12 @@ namespace atma { namespace math {
 		return look_along(position, target - position, up);
 	}
 
-	inline auto pespective(float width, float height, float near, float far) -> matrix4f
+	inline auto pespective(float width, float height, float near_plane, float far_plane) -> matrix4f
 	{
-		float nn = near + near;
-		float range = far / (far - near);
+		float nn = near_plane + near_plane;
+		float range = far_plane / (far_plane - near_plane);
 
-		__m128 rmem = _am_load_ps(-range * near, range, nn / height, nn / width);
+		__m128 rmem = _am_load_ps(-range * near_plane, range, nn / height, nn / width);
 		__m128 t0 = _mm_setzero_ps();
 
 		__m128 r0 = _mm_move_ss(t0, rmem);
@@ -529,16 +529,16 @@ namespace atma { namespace math {
 		return matrix4f{r0, r1, r2, r3};
 	}
 
-	inline auto perspective_fov(float fov, float aspect, float near, float far) -> matrix4f
+	inline auto perspective_fov(float fov, float aspect, float near_plane, float far_plane) -> matrix4f
 	{
 		float sin_fov, cos_fov;
 		retrieve_sin_cos(sin_fov, cos_fov, 0.5f * fov);
 
-		float range = far / (far-near);
+		float range = far_plane / (far_plane-near_plane);
 		float scale = cos_fov / sin_fov;
 
-		auto values = _am_load_ps(scale, scale / aspect, range, -range * near);
-		// range,-range * near,0,1.0f
+		auto values = _am_load_ps(scale, scale / aspect, range, -range * near_plane);
+		// range,-range * near_plane,0,1.0f
 		auto values2 = _mm_shuffle_ps(values, xmmd_identity_r3_ps, _MM_SHUFFLE(3, 2, 3, 2));
 
 		return matrix4f(
@@ -548,7 +548,7 @@ namespace atma { namespace math {
 			_mm_and_ps(values, xmmd_mask_0100_ps),
 			// 0, 0, range, 1.f
 			_mm_shuffle_ps(xmmd_zero_ps, values2, _MM_SHUFFLE(3, 0, 0, 0)),
-			// 0, 0, -range*near, 0
+			// 0, 0, -range*near_plane, 0
 			_mm_shuffle_ps(xmmd_zero_ps, values2, _MM_SHUFFLE(2, 1, 0, 0))
 			);
 	}
