@@ -3,7 +3,7 @@
 #include <atma/types.hpp>
 
 #pragma warning(push,3)
-#include <xmmintrin.h>
+#include <smmintrin.h>
 #pragma warning(pop)
 
 #include <cstdint>
@@ -154,6 +154,16 @@ namespace atma { namespace math {
 	//=====================================================================
 	// functions
 	//=====================================================================
+	inline auto point4f() -> vector4f
+	{
+		return vector4f{0.f, 0.f, 0.f, 1.f};
+	}
+
+	inline auto point4f(float x, float y, float z) -> vector4f
+	{
+		return vector4f{x, y, z, 1.f};
+	}
+
 	inline auto normalize(vector4f const& x) -> vector4f
 	{
 		return vector4f{_mm_mul_ps(x.xmmdata, _mm_rsqrt_ps(_mm_dp_ps(x.xmmdata, x.xmmdata, 0x7f)))};
@@ -177,3 +187,5 @@ namespace atma { namespace math {
 	}
 
 } }
+
+namespace aml = atma::math;
