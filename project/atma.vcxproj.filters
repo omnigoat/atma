@@ -11,14 +11,8 @@
     <Filter Include="include\math">
       <UniqueIdentifier>{6a21c52c-1458-45d2-ac50-fb769cd6ca66}</UniqueIdentifier>
     </Filter>
-    <Filter Include="include\math\impl">
-      <UniqueIdentifier>{4378cc9b-a9ac-412f-a43a-643675efc68a}</UniqueIdentifier>
-    </Filter>
     <Filter Include="include\lockfree">
       <UniqueIdentifier>{145f0927-0d27-44fe-92f1-ab9ad4710a05}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="include\math\impl\vector4i">
-      <UniqueIdentifier>{56f835d3-d1fa-4921-bd46-c3f329861c55}</UniqueIdentifier>
     </Filter>
     <Filter Include="include\utf">
       <UniqueIdentifier>{56575bb8-07a7-4c79-9adb-214074d8fee8}</UniqueIdentifier>
@@ -70,20 +64,8 @@
     <ClInclude Include="..\include\atma\assert\handling.hpp">
       <Filter>include\assert</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\atma\math\impl\expr.hpp">
-      <Filter>include\math\impl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\math\impl\storage_policy.hpp">
-      <Filter>include\math\impl</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\atma\math\vector4f.hpp">
       <Filter>include\math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\math\impl\binary_expr.hpp">
-      <Filter>include\math\impl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\math\impl\element_type_of.hpp">
-      <Filter>include\math\impl</Filter>
     </ClInclude>
     <ClInclude Include="..\include\atma\math\matrix4f.hpp">
       <Filter>include\math</Filter>
@@ -96,12 +78,6 @@
     </ClInclude>
     <ClInclude Include="..\include\atma\math\vector4i.hpp">
       <Filter>include\math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\math\impl\vector4i_declaration.hpp">
-      <Filter>include\math\impl\vector4i</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\atma\math\impl\vector4i_definition.hpp">
-      <Filter>include\math\impl\vector4i</Filter>
     </ClInclude>
     <ClInclude Include="..\include\atma\utf\algorithm.hpp">
       <Filter>include\utf</Filter>
