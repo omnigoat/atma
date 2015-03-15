@@ -15,31 +15,24 @@ namespace atma { namespace math {
 		explicit vector4i(__m128i);
 		
 
-		auto operator [] (int) const -> int32;
 		auto operator *= (int32) -> vector4i&;
 		auto operator /= (int32) -> vector4i&;
 
-		template <typename OP> auto operator  = (impl::expr<vector4i, OP> const&) -> vector4i&;
-		template <typename OP> auto operator += (impl::expr<vector4i, OP> const&) -> vector4i&;
-		template <typename OP> auto operator -= (impl::expr<vector4i, OP> const&) -> vector4i&;
+		auto operator  = (vector4i const&) -> vector4i&;
+		//template <typename OP> auto operator += (impl::expr<vector4i, OP> const&) -> vector4i&;
+		//template <typename OP> auto operator -= (impl::expr<vector4i, OP> const&) -> vector4i&;
 
-#ifdef ATMA_MATH_USE_SSE
-		auto xmmd() const -> __m128i { return xmmdata; }
-#endif
 
 		auto is_zero() const -> bool;
 
 #pragma warning(push)
 #pragma warning(disable: 4201)
 		union {
-			struct
-			{
+			struct {
 				int32 x, y, z, w;
 			};
 
-#if defined(ATMA_MATH_USE_SSE)
 			__m128i xmmdata;
-#endif
 
 			int32 components[4];
 		};
