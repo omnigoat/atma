@@ -6,8 +6,6 @@
 #include <smmintrin.h>
 #pragma warning(pop)
 
-#include <cstdint>
-
 
 namespace atma { namespace math {
 
