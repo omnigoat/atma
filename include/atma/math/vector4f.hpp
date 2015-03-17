@@ -58,8 +58,7 @@ namespace atma { namespace math {
 
 	inline vector4f::vector4f(float x, float y, float z, float w)
 	{
-		__declspec(align(16)) float fs[] ={x, y, z, w};
-		xmmdata = _mm_load_ps(fs);
+		xmmdata = _mm_set_ps(x, y, z, w);
 	}
 
 	inline vector4f::vector4f(__m128 xm)
@@ -97,13 +96,13 @@ namespace atma { namespace math {
 
 	inline auto vector4f::operator *= (float rhs) -> vector4f&
 	{
-		xmmdata = _mm_mul_ps(xmmdata, _mm_load_ps1(&rhs));
+		xmmdata = _mm_mul_ps(xmmdata, _mm_set_ps(rhs, rhs, rhs, rhs));
 		return *this;
 	}
 
 	inline auto vector4f::operator /= (float rhs) -> vector4f&
 	{
-		xmmdata = _mm_div_ps(xmmdata, _mm_load_ps1(&rhs));
+		xmmdata = _mm_div_ps(xmmdata, _mm_set_ps(rhs, rhs, rhs, rhs));
 		return *this;
 	}
 
@@ -127,23 +126,23 @@ namespace atma { namespace math {
 
 	inline auto operator * (vector4f const& lhs, float rhs) -> vector4f
 	{
-		return vector4f{_mm_mul_ps(lhs.xmmdata, _mm_load_ps1(&rhs))};
+		return vector4f{_mm_mul_ps(lhs.xmmdata, _mm_set_ps(rhs, rhs, rhs, rhs))};
 	}
 
 	inline auto operator * (float lhs, vector4f const& rhs) -> vector4f
 	{
-		return vector4f{_mm_mul_ps(_mm_load_ps1(&lhs), rhs.xmmdata)};
+		return vector4f{_mm_mul_ps(_mm_set_ps(lhs, lhs, lhs, lhs), rhs.xmmdata)};
 	}
 
 
 	inline auto operator / (vector4f const& lhs, float rhs) -> vector4f
 	{
-		return vector4f{_mm_div_ps(lhs.xmmdata, _mm_load_ps1(&rhs))};
+		return vector4f{_mm_div_ps(lhs.xmmdata, _mm_set_ps(rhs, rhs, rhs, rhs))};
 	}
 
 	inline auto operator / (float lhs, vector4f const& rhs) -> vector4f
 	{
-		return vector4f{_mm_div_ps(_mm_load_ps1(&lhs), rhs.xmmdata)};
+		return vector4f{_mm_div_ps(_mm_set_ps(lhs, lhs, lhs, lhs), rhs.xmmdata)};
 	}
 
 
