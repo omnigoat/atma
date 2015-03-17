@@ -3,11 +3,7 @@
 #include <atma/math/constants.hpp>
 #include <atma/math/scalar.hpp>
 #include <atma/math/vector4f.hpp>
-
-#include <atma/assert.hpp>
-
-#include <cstdint>
-
+#include <atma/types.hpp>
 
 namespace atma { namespace math {
 
@@ -155,20 +151,11 @@ namespace atma { namespace math {
 
 	inline auto matrix4f::scale(float x, float y, float z) -> matrix4f
 	{
-		//[[align(16)]]
-		__declspec(align(16))
-		float values[16] = {
-			x, 0.f, 0.f, 0.f,
-			0.f, y, 0.f, 0.f,
-			0.f, 0.f, z, 0.f,
-			0.f, 0.f, 0.f, 1.f};
-
-		auto r0 = _mm_load_ps(values);
-		auto r1 = _mm_load_ps(values + 4);
-		auto r2 = _mm_load_ps(values + 8);
-		auto r3 = _mm_load_ps(values + 12);
-
-		return matrix4f{r0, r1, r2, r3};
+		return matrix4f{
+			_mm_set_ps(x, 0.f, 0.f, 0.f),
+			_mm_set_ps(0.f, y, 0.f, 0.f),
+			_mm_set_ps(0.f, 0.f, z, 0.f),
+			_mm_set_ps(0.f, 0.f, 0.f, 1.f)};
 	}
 
 	inline auto matrix4f::translate(vector4f const& v) -> matrix4f
