@@ -152,10 +152,10 @@ namespace atma { namespace math {
 	inline auto matrix4f::scale(float x, float y, float z) -> matrix4f
 	{
 		return matrix4f{
-			_mm_set_ps(x, 0.f, 0.f, 0.f),
-			_mm_set_ps(0.f, y, 0.f, 0.f),
-			_mm_set_ps(0.f, 0.f, z, 0.f),
-			_mm_set_ps(0.f, 0.f, 0.f, 1.f)};
+			_mm_set_ps(0.f, 0.f, 0.f, x),
+			_mm_set_ps(0.f, 0.f, y, 0.f),
+			_mm_set_ps(0.f, z, 0.f, 0.f),
+			_mm_set_ps(1.f, 0.f, 0.f, 0.f)};
 	}
 
 	inline auto matrix4f::translate(vector4f const& v) -> matrix4f
