@@ -58,7 +58,7 @@ namespace atma { namespace math {
 
 	inline vector4f::vector4f(float x, float y, float z, float w)
 	{
-		xmmdata = _mm_set_ps(x, y, z, w);
+		xmmdata = _mm_set_ps(w, z, y, x);
 	}
 
 	inline vector4f::vector4f(__m128 xm)
