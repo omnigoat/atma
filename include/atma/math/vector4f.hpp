@@ -61,6 +61,11 @@ namespace atma { namespace math {
 		xmmdata = _mm_set_ps(w, z, y, x);
 	}
 
+	inline vector4f::vector4f(float x, float y, float z)
+	{
+		xmmdata = _mm_set_ps(0.f, z, y, x);
+	}
+
 	inline vector4f::vector4f(__m128 xm)
 		: xmmdata(xm)
 	{
