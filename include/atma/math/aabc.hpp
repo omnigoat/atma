@@ -42,7 +42,7 @@ namespace atma { namespace math {
 
 
 
-	auto aabc_t::octant_idx_of(math::vector4f const& p) const -> int
+	inline auto aabc_t::octant_idx_of(math::vector4f const& p) const -> int
 	{
 		return (int)(data_.x < p.x) + 2*(int)(data_.y < p.y) + 4*(int)(data_.z < p.z);
 	}
@@ -67,7 +67,7 @@ namespace atma { namespace math {
 			p.z < data_.z - data_.w * 0.5f || data_.z + data_.w < p.z);
 	}
 
-	auto aabc_t::compute_corners() const -> std::array<vector4f, 8>
+	inline auto aabc_t::compute_corners() const -> std::array<vector4f, 8>
 	{
 		auto center = vector4f {data_.x, data_.y, data_.z, 1.f};
 

@@ -58,7 +58,7 @@ namespace atma { namespace math {
 		xmmdata = _mm_load_si128((__m128i*)v);
 	}
 
-	vector4i::vector4i(__m128i xm)
+	inline vector4i::vector4i(__m128i xm)
 		: xmmdata(xm)
 	{
 	}
