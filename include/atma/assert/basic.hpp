@@ -12,10 +12,10 @@
 	
 
 	#define ATMA_HALT(msg) \
-		for (;;) { \
+		do { \
 			ATMA_DEBUGBREAK(); \
 			break; \
-		}
+		} while(0)
 
 
 	//=====================================================================
@@ -25,11 +25,11 @@
 	//   string @msg and generates an assertion if !x, displaying the message.
 	//=====================================================================
 	#define ATMA_ASSERT_MSG(x, msg) \
-		for (;;) { \
+		do { \
 			if ( !(x) && ::atma::assert::detail::handle(msg, __FILE__, __LINE__) ) \
 				{ ATMA_DEBUGBREAK(); } \
 			break; \
-		}
+		} while(0)
 
 
 	//=====================================================================
@@ -125,6 +125,7 @@
 //=====================================================================
 #else // ATMA_ENABLE_ASSERTS
 //=====================================================================
+	#define ATMA_HALT(...)
 	#define ATMA_ASSERT(...)
 	#define ATMA_ASSERT_MSG(...)
 	#define ATMA_ASSERT_ONE_OF(...)

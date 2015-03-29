@@ -150,13 +150,16 @@ namespace atma {
 			return intrusive_ptr<Y>(dynamic_cast<Y*>(px));
 		}
 
+		static intrusive_ptr null;
+
 	private:
 		T* px;
 
 		template <typename> friend struct intrusive_ptr;
 	};
 
-
+	template <typename T>
+	intrusive_ptr<T> intrusive_ptr<T>::null = intrusive_ptr<T>();
 
 
 	template <typename T>

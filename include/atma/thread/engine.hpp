@@ -16,9 +16,10 @@ namespace atma { namespace thread {
 		~engine_t();
 
 		auto signal(signal_t const&) -> void;
+		auto signal_batch(queue_t::batch_t&) -> void;
 		auto signal_evergreen(signal_t const&) -> void;
 		auto signal_block() -> void;
-		
+
 	private:
 		auto reenter(std::atomic<bool> const& blocked) -> void;
 
@@ -59,6 +60,13 @@ namespace atma { namespace thread {
 		if (!running_)
 			return;
 		queue_.push(fn);
+	}
+
+	inline auto engine_t::signal_batch(queue_t::batch_t& batch) -> void
+	{
+		if (!running_)
+			return;
+		queue_.push(batch);
 	}
 
 	inline auto engine_t::signal_evergreen(signal_t const& fn) -> void
