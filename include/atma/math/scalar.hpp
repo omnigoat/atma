@@ -53,4 +53,13 @@ namespace atma { namespace math {
 		return atan(x);
 	}
 
+	inline auto log2(uint64 x) -> uint64
+	{
+		DWORD r;
+		_BitScanReverse64(&r, x);
+		return r;
+	}
+
+
+
 } }
