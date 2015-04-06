@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atma/math/constants.hpp>
+#include <atma/types.hpp>
 
 #include <cmath>
 
@@ -55,8 +56,9 @@ namespace atma { namespace math {
 
 	inline auto log2(uint64 x) -> uint64
 	{
-		DWORD r;
-		_BitScanReverse64(&r, x);
+		uint64 r = 0;
+		if (x == 1) return r;
+		while (x /= 2) ++r;
 		return r;
 	}
 
