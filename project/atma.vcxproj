@@ -30,6 +30,7 @@
     <ClInclude Include="..\include\atma\assert\ensure.hpp" />
     <ClInclude Include="..\include\atma\assert\handling.hpp" />
     <ClInclude Include="..\include\atma\bind.hpp" />
+    <ClInclude Include="..\include\atma\bitmask.hpp" />
     <ClInclude Include="..\include\atma\com_ptr.hpp" />
     <ClInclude Include="..\include\atma\config\platform.hpp" />
     <ClInclude Include="..\include\atma\console.hpp" />
