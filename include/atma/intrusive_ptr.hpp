@@ -177,5 +177,14 @@ namespace atma {
 		return lhs.get() < rhs.get();
 	}
 
+
+
+
+	template <typename T, typename... Args>
+	inline auto make_intrusive_ptr(Args&&... args) -> intrusive_ptr<T>
+	{
+		return intrusive_ptr<T>(new T{std::forward<Args>(args)...});
+	}
+
 }
 
