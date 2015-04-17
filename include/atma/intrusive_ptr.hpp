@@ -183,7 +183,7 @@ namespace atma {
 	template <typename T, typename... Args>
 	inline auto make_intrusive_ptr(Args&&... args) -> intrusive_ptr<T>
 	{
-		return intrusive_ptr<T>(new T{std::forward<Args>(args)...});
+		return intrusive_ptr<T>(new T(std::forward<Args>(args)...));
 	}
 
 }
