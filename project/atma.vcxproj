@@ -73,6 +73,7 @@
     <ClInclude Include="..\include\atma\utf\utf8_string.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string_range_header.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_string_range.hpp" />
+    <ClInclude Include="..\include\atma\vector.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{3301E1FA-9F23-43C6-A5E1-183204867D44}</ProjectGuid>
