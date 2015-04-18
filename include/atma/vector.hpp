@@ -1,26 +1,41 @@
 #pragma once
 
+#include <atma/unique_memory.hpp>
+
 #include <initializer_list>
 #include <allocators>
+
 
 namespace atma
 {
 	namespace detail
 	{
-		inline auto quantize_memory(size_t size) -> size_t
+		inline auto quantize_memory_size(size_t size) -> size_t
 		{
 			auto c = size_t{8};
-			while (c < minsize)
+			while (c < size)
 				c *= 2;
 
 			return c;
 		}
 
 
+		template <typename A, typename T, bool E>
+		struct base_internal_memory_t
+		{
+			auto allocate_mem(size_t capacity) -> T*;
+			auto deallocate() -> void;
+			auto construct_default(size_t offset, size_t count) -> void;
+			auto construct_move(size_t offset, T&&) -> void;
+			auto construct_copy(size_t offset, T const&) -> void;
+			auto construct_copy_range(size_t offset, T const*, size_t size) -> void;
+			auto destruct(size_t offset, size_t count) -> void;
+			auto detach() -> T*;
+			auto move(size_t dest, size_t src, size_t count) -> void;
+		};
 
-
-		template <typename A, typename T, bool = std::is_empty<A>::value>
-		struct internal_memory_t
+		template <typename A, typename T, bool E = std::is_empty<A>::value>
+		struct internal_memory_t : base_internal_memory_t<A,T,E>
 		{
 			internal_memory_t()
 				: allocator_{}
@@ -42,11 +57,7 @@ namespace atma
 
 			auto allocator() -> A& { return allocator_; }
 
-			auto allocate(size_t capacity) -> T*;
-			auto deallocate() -> void;
-			auto construct_default(size_t offset, size_t count) -> void;
-			auto construct_copy(size_t offset, T const*, size_t size) -> void;
-			auto destruct(size_t offset, size_t count) -> void;
+			
 
 			T* memory;
 
@@ -57,7 +68,8 @@ namespace atma
 
 		template <typename A, typename T>
 		struct internal_memory_t<A, T, true>
-			: A
+			: base_internal_memory_t<A,T,true>
+			, protected A
 		{
 			internal_memory_t()
 				: A{}
@@ -78,12 +90,6 @@ namespace atma
 
 			auto allocator() -> A& { return *this; }
 
-			auto allocate(size_t capacity) -> T*;
-			auto deallocate() -> void;
-			auto construct_default(size_t offset, size_t count) -> void;
-			auto construct_copy(size_t offset, T const*, size_t size) -> void;
-			auto destruct(size_t, size_t) -> void;
-
 			T* memory;
 		};
 
@@ -91,37 +97,72 @@ namespace atma
 
 
 		template <typename A, typename T, bool E>
-		inline auto internal_memory_t<A,T,E>::allocate(size_t capacity) -> T*
+		inline auto base_internal_memory_t<A,T,E>::allocate_mem(size_t capacity) -> T*
 		{
-			memory = (T*)allocator().allocate(sizeof(T) * capacity);
-			return memory;
+			auto* self = static_cast<internal_memory_t<A,T,E>*>(this);
+			self->memory = (T*)self->allocator().allocate(sizeof(T) * capacity);
+			return self->memory;
 		}
 
 		template <typename A, typename T, bool E>
-		inline auto internal_memory_t<A, T, E>::deallocate() -> void
+		inline auto base_internal_memory_t<A, T, E>::deallocate() -> void
 		{
-			allocator().deallocate(memory, allocator().size_type{});
+			auto* self = static_cast<internal_memory_t<A, T, E>*>(this);
+			self->allocator().deallocate(self->memory, self->allocator().size_type{});
 		}
 
 		template <typename A, typename T, bool E>
-		inline auto internal_memory_t<A, T, E>::construct_default(size_t offset, size_t count) -> void
+		inline auto base_internal_memory_t<A, T, E>::construct_default(size_t offset, size_t count) -> void
 		{
+			auto* self = static_cast<internal_memory_t<A, T, E>*>(this);
 			for (auto i = offset; i != offset + count; ++i)
-				new (memory + i) T{};
+				new (self->memory + i) T{};
 		}
 
 		template <typename A, typename T, bool E>
-		inline auto internal_memory_t<A, T, E>::construct_copy(size_t offset, T const* src, size_t size) -> void
+		inline auto base_internal_memory_t<A, T, E>::construct_move(size_t offset, T&& x) -> void
 		{
+			auto* self = static_cast<internal_memory_t<A, T, E>*>(this);
+			new (self->memory + offset) T{std::move(x)};
+		}
+
+		template <typename A, typename T, bool E>
+		inline auto base_internal_memory_t<A, T, E>::construct_copy(size_t offset, T const& x) -> void
+		{
+			auto* self = static_cast<internal_memory_t<A, T, E>*>(this);
+			new (self->memory + offset) T{x};
+		}
+
+		template <typename A, typename T, bool E>
+		inline auto base_internal_memory_t<A, T, E>::construct_copy_range(size_t offset, T const* src, size_t count) -> void
+		{	
+			auto* self = static_cast<internal_memory_t<A, T, E>*>(this);
 			for (auto i = 0; i != count; ++i)
-				new (memory + offset + i) T{src + i};
+				new (self->memory + offset + i) T{src[i]};
 		}
 
 		template <typename A, typename T, bool E>
-		inline auto internal_memory_t<A, T, E>::destruct(size_t offset, size_t count) -> void
+		inline auto base_internal_memory_t<A, T, E>::destruct(size_t offset, size_t count) -> void
 		{
+			auto* self = static_cast<internal_memory_t<A, T, E>*>(this);
 			for (auto i = offset; i != offset + count; ++i)
-				memory[i].~T();
+				self->memory[i].~T();
+		}
+
+		template <typename A, typename T, bool E>
+		inline auto base_internal_memory_t<A, T, E>::move(size_t dest, size_t src, size_t size) -> void
+		{
+			auto* self = static_cast<internal_memory_t<A, T, E>*>(this);
+			std::memmove(self->memory + dest, self->memory + src, size * sizeof(T));
+		}
+
+		template <typename A, typename T, bool E>
+		inline auto base_internal_memory_t<A, T, E>::detach() -> T*
+		{
+			auto* self = static_cast<internal_memory_t<A, T, E>*>(this);
+			auto tmp = self->memory;
+			self->memory = nullptr;
+			return tmp;
 		}
 	}
 
@@ -153,6 +194,10 @@ namespace atma
 		auto end() const -> T const*;
 		auto begin() -> T*;
 		auto end() -> T*;
+		auto data() -> T*;
+		auto data() const -> T const*;
+
+		auto detach_buffer() -> unique_memory_t;
 
 		auto reserve(size_t) -> void;
 		auto recapacitize(size_t) -> void;
@@ -160,18 +205,16 @@ namespace atma
 		auto resize(size_t) -> void;
 
 		auto push_back(T&&) -> void;
+
+		auto insert(const_iterator, T const&) -> void;
 		auto insert(const_iterator, T&&) -> void;
+		auto insert(const_iterator, std::initializer_list<T>) -> void;
 		template <typename H> auto insert(const_iterator, H begin, H end) -> void;
+
 		auto erase(const_iterator) -> void;
 
 	private:
-		auto imem_allocate(size_t) -> T*;
-		auto imem_deallocate(T*) -> void;
-		auto elements_initialize_default(T*, size_t where, size_t len) -> void;
-		auto elements_initialize_value(T*, size_t where, size_t len, T const&) -> void;
-		auto elements_deinitialize(T*, size_t where, size_t len) -> void;
-
-		auto elements_grow(size_t minsize) -> void;
+		auto imem_grow(size_t minsize) -> void;
 
 	private:
 		detail::internal_memory_t<Allocator, T> imem_;
@@ -193,8 +236,8 @@ namespace atma
 	inline vector<T,A>::vector(size_t capacity, size_t size)
 		: capacity_(capacity), size_(size)
 	{
-		imem_.allocate(capacity_);
-		imem_.initialize_default(0, size_);
+		imem_.allocate_mem(capacity_);
+		imem_.construct_default(0, size_);
 	}
 
 	template <typename T, typename A>
@@ -208,8 +251,8 @@ namespace atma
 	inline vector<T,A>::vector(vector const& rhs)
 		: capacity_(rhs.capacity_), size_(rhs.size_)
 	{
-		imem_.allocate(capacity_);
-		imem_.construct_copy(0, rhs.imem_.memory, size_);
+		imem_.allocate_mem(capacity_);
+		imem_.construct_copy_range(0, rhs.imem_.memory, size_);
 	}
 
 	template <typename T, typename A>
@@ -293,12 +336,30 @@ namespace atma
 	}
 
 	template <typename T, typename A>
+	inline auto vector<T, A>::data() -> T*
+	{
+		return imem_.memory;
+	}
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::data() const -> T const*
+	{
+		return imem_.memory;
+	}
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::detach_buffer() -> unique_memory_t
+	{
+		auto c = capacity_;
+		size_ = 0;
+		capacity_ = 0;
+		return unique_memory_t{unique_memory_take_ownership_tag{}, imem_.detach(), c};
+	}
+
+	template <typename T, typename A>
 	inline auto vector<T,A>::reserve(size_t capacity) -> void
 	{
-		auto newcap = std::max(capacity, 8);
-		while (newcap < capacity_)
-			newcap *= 2;
-
+		auto newcap = detail::quantize_memory_size(capacity);
 		recapacitize(newcap);
 	}
 	
@@ -313,13 +374,11 @@ namespace atma
 			size_ = capacity;
 		}
 
-		//auto tmp = std::move(imem_);
-		imem_.allocate(capacity);
-		memcpy(imem_.memory(), tmp.memory(), size_);
-		tmp.
-		elements_ = imem_allocate(capacity);
-		memcpy(elements_, tmp, size_);
-		imem_deallocate(tmp);
+		auto tmp = detail::internal_memory_t<A, T>{std::move(imem_)};
+		imem_.allocate_mem(capacity);
+		memcpy(imem_.memory, tmp.memory, size_ * sizeof(T));
+
+		capacity_ = capacity;
 	}
 
 	template <typename T, typename A>
@@ -331,15 +390,12 @@ namespace atma
 	template <typename T, typename A>
 	inline auto vector<T,A>::resize(size_t size) -> void
 	{
+		imem_grow(size);
+		
 		if (size < size_) {
 			imem_.destruct(size, size_ - size);
 		}
-		
-		if (capacity_ < size) {
-			imem_grow(size);
-		}
-
-		if (size_ < size) {
+		else if (size_ < size) {
 			imem_.construct_default(size_, size - size_);
 		}
 
@@ -350,9 +406,23 @@ namespace atma
 	inline auto vector<T,A>::push_back(T&& x) -> void
 	{
 		if (size_ == capacity_)
-			elements_grow(size_ + 1);
+			imem_grow(size_ + 1);
 
 		new (elements_ + size_++) T(std::forward<T>(x));
+	}
+
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::insert(const_iterator where, T const& x) -> void
+	{
+		auto offset = where - elements_;
+
+		if (size_ == capacity_)
+			imem_grow(size_ + 1);
+
+		imem_.move(offset + 2, offset + 1, 1);
+		imem_.construct_copy(offset + 1, x, 1);
+		++size_;
 	}
 
 	template <typename T, typename A>
@@ -361,11 +431,17 @@ namespace atma
 		auto offset = where - elements_;
 
 		if (size_ == capacity_)
-			elements_grow(size_ + 1);
+			imem_grow(size_ + 1);
 
-		memmove(elements_ + offset + 2, elements_ + offset + 1, size_ - offset);
-		new (elements_ + offset + 1) T(x);
+		imem_.move(offset + 2, offset + 1, 1);
+		imem_.construct_move(offset + 1, x, 1);
 		++size_;
+	}
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::insert(const_iterator where, std::initializer_list<T> list) -> void
+	{
+		insert(where, list.begin(), list.end());
 	}
 
 	template <typename T, typename A>
@@ -375,12 +451,11 @@ namespace atma
 		auto const offset = where - this->begin();
 		auto const rangesize = end - begin;
 
-		if (size_ == capacity_)
-			elements_grow(size_ + rangesize);
+		if (size_ + rangesize > capacity_)
+			imem_grow(size_ + rangesize);
 
-		memmove(imem_.memory + offset + 1 + rangesize, imem_.memory + offset + 1, size_ - offset);
-		for (auto i = begin; i != end; ++i)
-			new (imem_.memory + offset + (i - begin)) T(*i);
+		imem_.move(offset + 1 + rangesize, offset + 1, size_ - offset);
+		imem_.construct_copy_range(offset, begin, rangesize);
 		size_ += rangesize;
 	}
 
@@ -388,61 +463,16 @@ namespace atma
 	inline auto vector<T,A>::erase(const_iterator where) -> void
 	{
 		ATMA_ASSERT("things");
-		auto offset = where - elements_;
+		auto offset = where - begin();
 
-		if (size_ - 1 < capacity_ / 2) {
-			recapacitize(capacity_ / 2);
-		}
-
-		elements_deinitialize(elements_, offset, 1);
-	}
-
-
-	template <typename T, typename A>
-	inline auto vector<T,A>::imem_allocate(size_t capacity) -> T*
-	{
-		return (T*)imem_.allocator().allocate(sizeof(T) * capacity);  // (T*)new char [sizeof(T) * capacity];
+		imem_grow(size_ - 1);
+		imem_.destruct(offset, 1);
 	}
 
 	template <typename T, typename A>
-	inline auto vector<T,A>::imem_deallocate(T* elements) -> void
+	inline auto vector<T,A>::imem_grow(size_t minsize) -> void
 	{
-		delete[] reinterpret_cast<char*>(elements);
-	}
-
-	template <typename T, typename A>
-	inline auto vector<T,A>::elements_initialize_default(T* elements, size_t where, size_t len) -> void
-	{
-		for (auto i = where; i != where + len; ++i)
-			new (elements + i) T();
-	}
-
-	template <typename T, typename A>
-	inline auto vector<T,A>::elements_initialize_value(T* elements, size_t where, size_t len, T const& x) -> void
-	{
-		for (auto i = where; i != where + len; ++i)
-			new (elements + i) T(x);
-	}
-
-	template <typename T, typename A>
-	inline auto vector<T,A>::elements_deinitialize(T* elements, size_t where, size_t len) -> void
-	{
-		for (auto i = where; i != where + len; ++i)
-			elements[i].~T();
-	}
-
-	template <typename T, typename A>
-	inline auto vector<T,A>::elements_grow(size_t minsize) -> void
-	{
-		auto c = std::max(minsize, size_t{8});
-		auto c = size_t{8};
-		while (c < minsize)
-			c *= 2;
-		
-		auto newcap = std::max(capacity_, size_t(8));
-		while (newcap < minsize)
-			newcap *= 2;
-
+		auto newcap = detail::quantize_memory_size(minsize);
 		recapacitize(newcap);
 	}
 }
