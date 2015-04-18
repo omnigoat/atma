@@ -49,6 +49,11 @@ namespace atma
 				rhs.memory = nullptr;
 			}
 
+			~internal_memory_t()
+			{
+				allocator().deallocate(memory);
+			}
+
 			template <typename AA, typename TT>
 			internal_memory_t(AA&& a, TT&& t)
 				: allocator_(std::forward<AA>(a))
@@ -81,6 +86,11 @@ namespace atma
 				, memory{rhs.memory}
 			{
 				rhs.memory = nullptr;
+			}
+
+			~internal_memory_t()
+			{
+				allocator().deallocate(memory, typename A::size_type{});
 			}
 
 			template <typename AA, typename TT>
@@ -123,7 +133,7 @@ namespace atma
 		inline auto base_internal_memory_t<A, T, E>::construct_move(size_t offset, T&& x) -> void
 		{
 			auto* self = static_cast<internal_memory_t<A, T, E>*>(this);
-			new (self->memory + offset) T{std::move(x)};
+			new (self->memory + offset) T(std::move(x));
 		}
 
 		template <typename A, typename T, bool E>
@@ -138,7 +148,7 @@ namespace atma
 		{	
 			auto* self = static_cast<internal_memory_t<A, T, E>*>(this);
 			for (auto i = 0; i != count; ++i)
-				new (self->memory + offset + i) T{src[i]};
+				new (self->memory + offset + i) T(src[i]);
 		}
 
 		template <typename A, typename T, bool E>
@@ -196,6 +206,7 @@ namespace atma
 		auto end() -> T*;
 		auto data() -> T*;
 		auto data() const -> T const*;
+		auto empty() const -> bool;
 
 		auto detach_buffer() -> unique_memory_t;
 
@@ -212,12 +223,15 @@ namespace atma
 		template <typename H> auto insert(const_iterator, H begin, H end) -> void;
 
 		auto erase(const_iterator) -> void;
+		auto erase(const_iterator, const_iterator) -> void;
 
 	private:
 		auto imem_grow(size_t minsize) -> void;
 
 	private:
-		detail::internal_memory_t<Allocator, T> imem_;
+		using internal_memory_t = detail::internal_memory_t<Allocator, T>;
+
+		internal_memory_t imem_;
 		size_t capacity_;
 		size_t size_;
 	};
@@ -348,6 +362,12 @@ namespace atma
 	}
 
 	template <typename T, typename A>
+	inline auto vector<T, A>::empty() const -> bool
+	{
+		return size_ == 0;
+	}
+
+	template <typename T, typename A>
 	inline auto vector<T, A>::detach_buffer() -> unique_memory_t
 	{
 		auto c = capacity_;
@@ -374,7 +394,7 @@ namespace atma
 			size_ = capacity;
 		}
 
-		auto tmp = detail::internal_memory_t<A, T>{std::move(imem_)};
+		auto tmp = internal_memory_t{std::move(imem_)};
 		imem_.allocate_mem(capacity);
 		memcpy(imem_.memory, tmp.memory, size_ * sizeof(T));
 
@@ -408,7 +428,8 @@ namespace atma
 		if (size_ == capacity_)
 			imem_grow(size_ + 1);
 
-		new (elements_ + size_++) T(std::forward<T>(x));
+		//new (elements_ + size_++) T(std::forward<T>(x));
+		imem_.construct_move(size_++, std::move(x));
 	}
 
 
@@ -465,9 +486,37 @@ namespace atma
 		ATMA_ASSERT("things");
 		auto offset = where - begin();
 
-		imem_grow(size_ - 1);
 		imem_.destruct(offset, 1);
+		imem_grow(size_ - 1);
 	}
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::erase(const_iterator begin, const_iterator end) -> void
+	{
+		auto const offset = begin - this->begin();
+		auto const offset_end = end - this->begin();
+		auto const rangesize = end - begin;
+
+		imem_.destruct(offset, rangesize);
+
+		auto newcap = detail::quantize_memory_size(size_ - rangesize);
+		if (newcap != capacity_)
+		{
+			auto tmp = internal_memory_t{std::move(imem_)};
+			imem_.allocate_mem(newcap);
+			memcpy(imem_.memory, tmp.memory, offset * sizeof(T));
+			memcpy(imem_.memory + offset, tmp.memory + offset_end, (size_ - offset_end) * sizeof(T));
+		}
+		else
+		{
+			imem_.move(offset, offset_end, size_ - offset_end);
+		}
+
+		size_ -= rangesize;
+	}
+
+
+
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::imem_grow(size_t minsize) -> void
