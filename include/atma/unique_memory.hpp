@@ -3,15 +3,19 @@
 #include <atma/types.hpp>
 #include <atma/platform/allocation.hpp>
 
+
 namespace atma
 {
+	struct unique_memory_take_ownership_tag {};
+
 	struct unique_memory_t
 	{
-		explicit unique_memory_t();
+		unique_memory_t();
 		explicit unique_memory_t(size_t size);
 		unique_memory_t(size_t size, void const* data);
 		unique_memory_t(uint alignment, size_t size);
 		unique_memory_t(uint alignment, size_t size, void const* data);
+		unique_memory_t(unique_memory_take_ownership_tag, void* data, size_t size);
 		unique_memory_t(unique_memory_t&&);
 		~unique_memory_t();
 		unique_memory_t(unique_memory_t const&) = delete;
@@ -73,6 +77,12 @@ namespace atma
 		, end_(begin_ + size)
 	{
 		memcpy(begin_, data, size);
+	}
+
+	inline unique_memory_t::unique_memory_t(unique_memory_take_ownership_tag, void* data, size_t size)
+		: begin_(reinterpret_cast<byte*>(data))
+		, end_(begin_ + size)
+	{
 	}
 
 	inline unique_memory_t::unique_memory_t(unique_memory_t&& rhs)
