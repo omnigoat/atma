@@ -30,7 +30,7 @@ namespace atma {
 		typedef T const* const_pointer;
 		typedef T& reference;
 		typedef T const& const_reference;
-		typedef uint32 size_type;
+		typedef size_t size_type;
 		typedef ptrdiff_t difference_type;
 
 		typedef std::true_type propagate_on_container_move_assignment_t;
