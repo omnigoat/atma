@@ -202,5 +202,8 @@
     <ClInclude Include="..\include\atma\vector.hpp">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\allocdata_t.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

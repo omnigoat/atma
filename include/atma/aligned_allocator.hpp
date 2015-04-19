@@ -44,7 +44,7 @@ namespace atma {
 		auto max_size() const -> size_type;
 		auto address(reference x) const -> pointer;
 		auto address(const_reference x) const -> const_pointer;
-		auto allocate(size_type n, typename aligned_allocator_t<void, A>::const_pointer = 0) -> pointer;
+		auto allocate(size_type n, typename aligned_allocator_t<void, A>::const_pointer = nullptr) -> pointer;
 
 		auto deallocate(pointer p, size_type) -> void;
 
@@ -77,7 +77,7 @@ namespace atma {
 	}
 
 	template <typename T, uint32 A>
-	inline auto aligned_allocator_t<T, A>::allocate(size_type n, typename aligned_allocator_t<void, A>::const_pointer = 0) -> pointer
+	inline auto aligned_allocator_t<T, A>::allocate(size_type n, typename aligned_allocator_t<void, A>::const_pointer) -> pointer
 	{
 		size_type const alignment = static_cast<size_type>(A);
 		void* ptr = platform::allocate_aligned_memory(alignment, n * sizeof(T));
