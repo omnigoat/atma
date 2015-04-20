@@ -20,6 +20,10 @@ namespace atma
 				: allocator_(allocator)
 			{}
 
+			base_allocdata_t(base_allocdata_t&& rhs)
+				: allocator_(std::move(rhs.allocator_))
+			{}
+
 			auto allocator() -> Alloc& { return allocator_; }
 
 		private:
@@ -38,6 +42,10 @@ namespace atma
 				: Alloc(allocator)
 			{
 			}
+
+			base_allocdata_t(base_allocdata_t&& rhs)
+				: Alloc(std::move(rhs))
+			{}
 
 			auto allocator() -> Alloc& { return static_cast<Alloc&>(*this); }
 		};
@@ -59,10 +67,16 @@ namespace atma
 			: detail::base_allocdata_t(allocator)
 		{}
 
+		allocdata_t(allocdata_t&& rhs)
+			: detail::base_allocdata_t<Alloc>(std::move(rhs))
+			, data_(rhs.detach_data())
+		{
+		}
+
 		auto data() -> value_type* { return data_; }
 		auto data() const -> value_type const* { return data_; }
 
-		auto allocate_n(size_t capacity) -> void;
+		auto alloc(size_t capacity) -> void;
 		auto deallocate() -> void;
 		auto construct_default(size_t offset, size_t count) -> void;
 		auto construct_copy(size_t offset, value_type const&) -> void;
@@ -83,7 +97,7 @@ namespace atma
 
 
 	template <typename A>
-	auto allocdata_t<A>::allocate_n(size_t capacity) -> void
+	auto allocdata_t<A>::alloc(size_t capacity) -> void
 	{
 		data_ = allocator().allocate(capacity);
 	}

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atma/unique_memory.hpp>
+#include <atma/allocdata_t.hpp>
 
 #include <initializer_list>
 #include <allocators>
@@ -8,6 +9,17 @@
 
 namespace atma
 {
+	namespace detail
+	{
+		inline auto quantize_memory_size(size_t s) -> size_t
+		{
+			size_t r = 8;
+			while (r < s)
+				r *= 2;
+			return r;
+		}
+	}
+
 	template <typename T, typename Allocator = std::allocator<T>>
 	struct vector
 	{
@@ -58,7 +70,7 @@ namespace atma
 		auto imem_grow(size_t minsize) -> void;
 
 	private:
-		using internal_memory_t = detail::internal_memory_t<Allocator, T>;
+		using internal_memory_t = atma::allocdata_t<Allocator>;
 
 		internal_memory_t imem_;
 		size_t capacity_;
@@ -79,7 +91,7 @@ namespace atma
 	inline vector<T,A>::vector(size_t capacity, size_t size)
 		: capacity_(capacity), size_(size)
 	{
-		imem_.allocate_mem(capacity_);
+		imem_.alloc(capacity_);
 		imem_.construct_default(0, size_);
 	}
 
@@ -94,7 +106,7 @@ namespace atma
 	inline vector<T,A>::vector(vector const& rhs)
 		: capacity_(rhs.capacity_), size_(rhs.size_)
 	{
-		imem_.allocate_mem(capacity_);
+		imem_.alloc(capacity_);
 		imem_.construct_copy_range(0, rhs.imem_.memory, size_);
 	}
 
@@ -112,6 +124,7 @@ namespace atma
 	inline vector<T,A>::~vector()
 	{
 		imem_.destruct(0, size_);
+		imem_.deallocate();
 	}
 
 	template <typename T, typename A>
@@ -133,13 +146,13 @@ namespace atma
 	template <typename T, typename A>
 	inline auto vector<T,A>::operator [] (int index) const -> T const&
 	{
-		return imem_.memory[index];
+		return imem_.data()[index];
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::operator [] (int index) -> T&
 	{
-		return imem_.memory[index];
+		return imem_.data()[index];
 	}
 
 	template <typename T, typename A>
@@ -157,37 +170,37 @@ namespace atma
 	template <typename T, typename A>
 	inline auto vector<T,A>::begin() const -> T const*
 	{
-		return imem_.memory;
+		return imem_.data();
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::end() const -> T const*
 	{
-		return imem_.memory + size_;
+		return imem_.data() + size_;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::begin() -> T*
 	{
-		return imem_.memory;
+		return imem_.data();
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::end() -> T*
 	{
-		return imem_.memory + size_;
+		return imem_.data() + size_;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T, A>::data() -> T*
 	{
-		return imem_.memory;
+		return imem_.data();
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T, A>::data() const -> T const*
 	{
-		return imem_.memory;
+		return imem_.data();
 	}
 
 	template <typename T, typename A>
@@ -202,7 +215,7 @@ namespace atma
 		auto c = capacity_;
 		size_ = 0;
 		capacity_ = 0;
-		return unique_memory_t{unique_memory_take_ownership_tag{}, imem_.detach(), c};
+		return unique_memory_t{unique_memory_take_ownership_tag{}, imem_.detach_data(), c};
 	}
 
 	template <typename T, typename A>
@@ -224,8 +237,9 @@ namespace atma
 		}
 
 		auto tmp = internal_memory_t{std::move(imem_)};
-		imem_.allocate_mem(capacity);
-		memcpy(imem_.memory, tmp.memory, size_ * sizeof(T));
+		imem_.alloc(capacity);
+		imem_.memcpy(0, tmp, 0, size_);
+		tmp.deallocate();
 
 		capacity_ = capacity;
 	}
@@ -332,13 +346,14 @@ namespace atma
 		if (newcap != capacity_)
 		{
 			auto tmp = internal_memory_t{std::move(imem_)};
-			imem_.allocate_mem(newcap);
-			memcpy(imem_.memory, tmp.memory, offset * sizeof(T));
-			memcpy(imem_.memory + offset, tmp.memory + offset_end, (size_ - offset_end) * sizeof(T));
+			imem_.alloc(newcap);
+			imem_.memcpy(0, tmp, 0, offset);
+			imem_.memcpy(offset, tmp, offset_end, size_ - offset_end);
+			tmp.deallocate();
 		}
 		else
 		{
-			imem_.move(offset, offset_end, size_ - offset_end);
+			imem_.memmove(offset, offset_end, size_ - offset_end);
 		}
 
 		size_ -= rangesize;
