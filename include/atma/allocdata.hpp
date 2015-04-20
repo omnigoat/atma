@@ -73,6 +73,10 @@ namespace atma
 		{
 		}
 
+		explicit allocdata_t(void* data)
+			: data_(data)
+		{}
+
 		auto data() -> value_type* { return data_; }
 		auto data() const -> value_type const* { return data_; }
 
