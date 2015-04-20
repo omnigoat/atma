@@ -2,26 +2,25 @@
 
 #include <atma/types.hpp>
 #include <atma/platform/allocation.hpp>
-
+#include <atma/allocdata.hpp>
 
 namespace atma
 {
 	struct unique_memory_take_ownership_tag {};
 
-	struct unique_memory_t
+	template <typename Alloc>
+	struct basic_unique_memory_t
 	{
-		unique_memory_t();
-		explicit unique_memory_t(size_t size);
-		unique_memory_t(size_t size, void const* data);
-		unique_memory_t(uint alignment, size_t size);
-		unique_memory_t(uint alignment, size_t size, void const* data);
-		unique_memory_t(unique_memory_take_ownership_tag, void* data, size_t size);
-		unique_memory_t(unique_memory_t&&);
-		~unique_memory_t();
-		unique_memory_t(unique_memory_t const&) = delete;
+		basic_unique_memory_t();
+		explicit basic_unique_memory_t(size_t size);
+		basic_unique_memory_t(size_t size, void const* data);
+		basic_unique_memory_t(unique_memory_take_ownership_tag, void* data, size_t size);
+		basic_unique_memory_t(basic_unique_memory_t const&) = delete;
+		basic_unique_memory_t(basic_unique_memory_t&&);
+		~basic_unique_memory_t();
 
-		auto operator = (unique_memory_t&&) -> unique_memory_t&;
-		auto operator = (unique_memory_t const&) -> unique_memory_t& = delete;
+		auto operator = (basic_unique_memory_t const&) -> basic_unique_memory_t& = delete;
+		auto operator = (basic_unique_memory_t&&) -> basic_unique_memory_t&;
 
 		operator bool() const;
 
@@ -29,78 +28,67 @@ namespace atma
 		auto size() const -> size_t;
 		auto begin() const -> byte const*;
 		auto end() const -> byte const*;
-		template <typename T> auto begin() const -> T const*;
-		template <typename T> auto end() const -> T const*;
-		template <typename T> auto at(size_t) const -> T const&;
-
 		auto begin() -> byte*;
 		auto end() -> byte*;
-		template <typename T> auto begin() -> T*;
-		template <typename T> auto end() -> T*;
-		template <typename T> auto at(size_t) -> T&;
 
-		auto swap(unique_memory_t&) -> void;
+		auto swap(basic_unique_memory_t&) -> void;
 
 	private:
-		byte* begin_;
-		byte* end_;
+		atma::allocdata_t<Alloc> memory_;
+		size_t size_;
 	};
 
 
 
-
-	inline unique_memory_t::unique_memory_t()
+	template <typename A>
+	inline basic_unique_memory_t<A>::basic_unique_memory_t()
 		: begin_()
 		, end_()
 	{
 		
 	}
 
-	inline unique_memory_t::unique_memory_t(size_t size)
-		: unique_memory_t(4, size)
+
+	template <typename A>
+	inline basic_unique_memory_t<A>::basic_unique_memory_t(size_t size)
+		: size_(size)
+	{
+		memory_.alloc(size);
+	}
+
+	template <typename A>
+	inline basic_unique_memory_t<A>::basic_unique_memory_t(size_t size, void const* data)
+		: size_(size)
+	{
+		memory_.alloc(size);
+		memcpy(memory_.data(), data, size);
+	}
+
+	template <typename A>
+	inline basic_unique_memory_t<A>::basic_unique_memory_t(unique_memory_take_ownership_tag, void* data, size_t size)
+		: memory_{data}
+		, size_(size)
 	{
 	}
 
-	inline unique_memory_t::unique_memory_t(size_t size, void const* data)
-		: unique_memory_t(4, size, data)
+	template <typename A>
+	inline basic_unique_memory_t<A>::basic_unique_memory_t(basic_unique_memory_t&& rhs)
+		: memory_(std::move(rhs.memory_))
+		, size_(rhs.size_)
 	{
+		rhs.size_ = 0;
 	}
 
-	inline unique_memory_t::unique_memory_t(uint alignment, size_t size)
-		: begin_(reinterpret_cast<byte*>(platform::allocate_aligned_memory(alignment, size)))
-		, end_(begin_ + size)
+	template <typename A>
+	inline basic_unique_memory_t<A>::~basic_unique_memory_t()
 	{
+		memory_.deallocate();
 	}
 
-	inline unique_memory_t::unique_memory_t(uint alignment, size_t size, void const* data)
-		: begin_(reinterpret_cast<byte*>(platform::allocate_aligned_memory(alignment, size)))
-		, end_(begin_ + size)
+	template <typename A>
+	inline auto basic_unique_memory_t<A>::operator = (basic_unique_memory_t&& rhs) -> basic_unique_memory_t&
 	{
-		memcpy(begin_, data, size);
-	}
-
-	inline unique_memory_t::unique_memory_t(unique_memory_take_ownership_tag, void* data, size_t size)
-		: begin_(reinterpret_cast<byte*>(data))
-		, end_(begin_ + size)
-	{
-	}
-
-	inline unique_memory_t::unique_memory_t(unique_memory_t&& rhs)
-		: begin_(rhs.begin_)
-		, end_(rhs.end_)
-	{
-		rhs.begin_ = nullptr;
-		rhs.end_ = nullptr;
-	}
-
-	inline unique_memory_t::~unique_memory_t()
-	{
-		platform::deallocate_aligned_memory(begin_);
-	}
-
-	inline auto unique_memory_t::operator = (unique_memory_t&& rhs) -> unique_memory_t&
-	{
-		this->~unique_memory_t();
+		this->~basic_unique_memory_t();
 		begin_ = rhs.begin_;
 		end_ = rhs.end_;
 		rhs.begin_ = nullptr;
@@ -108,84 +96,58 @@ namespace atma
 		return *this;
 	}
 
-	inline unique_memory_t::operator bool() const
+	template <typename A>
+	inline basic_unique_memory_t<A>::operator bool() const
 	{
 		return begin_ != nullptr;
 	}
 
-	inline auto unique_memory_t::empty() const -> bool
+	template <typename A>
+	inline auto basic_unique_memory_t<A>::empty() const -> bool
 	{
 		return size() == 0;
 	}
 
-	inline auto unique_memory_t::size() const -> size_t
+	template <typename A>
+	inline auto basic_unique_memory_t<A>::size() const -> size_t
 	{
-		return end_ - begin_;
+		return size_;
 	}
 
-	inline auto unique_memory_t::begin() const -> byte const*
+	template <typename A>
+	inline auto basic_unique_memory_t<A>::begin() const -> byte const*
 	{
-		return begin_;
+		return memory_.data();
 	}
 
-	inline auto unique_memory_t::end() const -> byte const*
+	template <typename A>
+	inline auto basic_unique_memory_t<A>::end() const -> byte const*
 	{
-		return end_;
+		return memory_.data() + size_;
 	}
 
-	template <typename T>
-	inline auto unique_memory_t::begin() const -> T const*
+	template <typename A>
+	inline auto basic_unique_memory_t<A>::begin() -> byte*
 	{
-		return reinterpret_cast<T const*>(begin_);
+		return memory_.data();
 	}
 
-	template <typename T>
-	inline auto unique_memory_t::end() const -> T const*
+	template <typename A>
+	inline auto basic_unique_memory_t<A>::end() -> byte*
 	{
-		return reinterpret_cast<T const*>(end_);
+		return memory_.data() + size_;
 	}
 
-	template <typename T>
-	inline auto unique_memory_t::at(size_t i) const -> T const&
-	{
-		return reinterpret_cast<T*>(begin_)[i];
-	}
-
-	inline auto unique_memory_t::begin() -> byte*
-	{
-		return begin_;
-	}
-
-	inline auto unique_memory_t::end() -> byte*
-	{
-		return end_;
-	}
-
-	template <typename T>
-	inline auto unique_memory_t::begin() -> T*
-	{
-		return reinterpret_cast<T*>(begin_);
-	}
-
-	template <typename T>
-	inline auto unique_memory_t::end() -> T*
-	{
-		return reinterpret_cast<T*>(end_);
-	}
-
-	template <typename T>
-	inline auto unique_memory_t::at(size_t i) -> T&
-	{
-		return reinterpret_cast<T*>(begin_)[i];
-	}
-
-	inline auto unique_memory_t::swap(unique_memory_t& rhs) -> void
+	template <typename A>
+	inline auto basic_unique_memory_t<A>::swap(basic_unique_memory_t& rhs) -> void
 	{
 		auto tmp = std::move(*this);
 		*this = std::move(rhs);
 		rhs = std::move(tmp);
 	}
 
+
+	using unique_memory_t = basic_unique_memory_t<atma::aligned_allocator_t<byte, 4>>;
 
 
 
