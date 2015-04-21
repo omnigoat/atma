@@ -1,7 +1,7 @@
 #pragma once
 
+#include <atma/memory.hpp>
 #include <atma/unique_memory.hpp>
-#include <atma/allocdata.hpp>
 
 #include <initializer_list>
 #include <allocators>
@@ -70,7 +70,7 @@ namespace atma
 		auto imem_grow(size_t minsize) -> void;
 
 	private:
-		using internal_memory_t = atma::allocdata_t<Allocator>;
+		using internal_memory_t = atma::memory_t<Allocator>;
 
 		internal_memory_t imem_;
 		size_t capacity_;
@@ -146,13 +146,13 @@ namespace atma
 	template <typename T, typename A>
 	inline auto vector<T,A>::operator [] (int index) const -> T const&
 	{
-		return imem_.data()[index];
+		return imem_.ptr[index];
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::operator [] (int index) -> T&
 	{
-		return imem_.data()[index];
+		return imem_.ptr[index];
 	}
 
 	template <typename T, typename A>
@@ -170,37 +170,37 @@ namespace atma
 	template <typename T, typename A>
 	inline auto vector<T,A>::begin() const -> T const*
 	{
-		return imem_.data();
+		return imem_.ptr;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::end() const -> T const*
 	{
-		return imem_.data() + size_;
+		return imem_.ptr + size_;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::begin() -> T*
 	{
-		return imem_.data();
+		return imem_.ptr;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::end() -> T*
 	{
-		return imem_.data() + size_;
+		return imem_.ptr + size_;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T, A>::data() -> T*
 	{
-		return imem_.data();
+		return imem_.ptr;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T, A>::data() const -> T const*
 	{
-		return imem_.data();
+		return imem_.ptr;
 	}
 
 	template <typename T, typename A>
@@ -215,7 +215,7 @@ namespace atma
 		auto c = capacity_;
 		size_ = 0;
 		capacity_ = 0;
-		return unique_memory_t{unique_memory_take_ownership_tag{}, imem_.detach_data(), c};
+		return unique_memory_t{unique_memory_take_ownership_tag{}, imem_.detach_ptr(), c};
 	}
 
 	template <typename T, typename A>

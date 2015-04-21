@@ -24,7 +24,7 @@
     <ClInclude Include="..\include\atma\algorithm\map.hpp" />
     <ClInclude Include="..\include\atma\algorithm\zip.hpp" />
     <ClInclude Include="..\include\atma\aligned_allocator.hpp" />
-    <ClInclude Include="..\include\atma\allocdata.hpp" />
+    <ClInclude Include="..\include\atma\memory.hpp" />
     <ClInclude Include="..\include\atma\assert.hpp" />
     <ClInclude Include="..\include\atma\assert\basic.hpp" />
     <ClInclude Include="..\include\atma\assert\config.hpp" />
@@ -129,10 +129,10 @@
     <OutDir>$(SolutionDir)$(ProjectName)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>..\vendor;..\include;$(IncludePath)</IncludePath>
+    <IncludePath>../vendor;../include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(ProjectDir)../vendor;$(ProjectDir)../include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)../vendor;$(ProjectDir)../../include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
