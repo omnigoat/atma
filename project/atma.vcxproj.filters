@@ -202,7 +202,7 @@
     <ClInclude Include="..\include\atma\vector.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\atma\allocdata.hpp">
+    <ClInclude Include="..\include\atma\memory.hpp">
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>

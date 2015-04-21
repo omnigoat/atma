@@ -2,7 +2,9 @@
 
 #include <atma/types.hpp>
 #include <atma/platform/allocation.hpp>
-#include <atma/allocdata.hpp>
+#include <atma/memory.hpp>
+#include <atma/aligned_allocator.hpp>
+
 
 namespace atma
 {
@@ -33,8 +35,10 @@ namespace atma
 
 		auto swap(basic_unique_memory_t&) -> void;
 
+		auto detach_memory() -> atma::memory_t<Alloc>;
+
 	private:
-		atma::allocdata_t<Alloc> memory_;
+		atma::memory_t<Alloc> memory_;
 		size_t size_;
 	};
 
@@ -42,12 +46,9 @@ namespace atma
 
 	template <typename A>
 	inline basic_unique_memory_t<A>::basic_unique_memory_t()
-		: begin_()
-		, end_()
+		: size_()
 	{
-		
 	}
-
 
 	template <typename A>
 	inline basic_unique_memory_t<A>::basic_unique_memory_t(size_t size)
@@ -61,20 +62,20 @@ namespace atma
 		: size_(size)
 	{
 		memory_.alloc(size);
-		memcpy(memory_.data(), data, size);
+		memcpy(memory_.ptr, data, size);
 	}
 
 	template <typename A>
 	inline basic_unique_memory_t<A>::basic_unique_memory_t(unique_memory_take_ownership_tag, void* data, size_t size)
-		: memory_{data}
+		: memory_{reinterpret_cast<byte*>(data)}
 		, size_(size)
 	{
 	}
 
 	template <typename A>
 	inline basic_unique_memory_t<A>::basic_unique_memory_t(basic_unique_memory_t&& rhs)
-		: memory_(std::move(rhs.memory_))
-		, size_(rhs.size_)
+		: memory_{rhs.memory_.detach_ptr()}
+		, size_{rhs.size_}
 	{
 		rhs.size_ = 0;
 	}
@@ -89,10 +90,9 @@ namespace atma
 	inline auto basic_unique_memory_t<A>::operator = (basic_unique_memory_t&& rhs) -> basic_unique_memory_t&
 	{
 		this->~basic_unique_memory_t();
-		begin_ = rhs.begin_;
-		end_ = rhs.end_;
-		rhs.begin_ = nullptr;
-		rhs.end_ = nullptr;
+		memory_ = rhs.memory_;
+		size_ = rhs.size_;
+		rhs.memory_.ptr = nullptr;
 		return *this;
 	}
 
@@ -117,25 +117,25 @@ namespace atma
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::begin() const -> byte const*
 	{
-		return memory_.data();
+		return memory_.ptr;
 	}
 
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::end() const -> byte const*
 	{
-		return memory_.data() + size_;
+		return memory_.ptr + size_;
 	}
 
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::begin() -> byte*
 	{
-		return memory_.data();
+		return memory_.ptr;
 	}
 
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::end() -> byte*
 	{
-		return memory_.data() + size_;
+		return memory_.ptr + size_;
 	}
 
 	template <typename A>
@@ -146,6 +146,13 @@ namespace atma
 		rhs = std::move(tmp);
 	}
 
+	template <typename A>
+	inline auto basic_unique_memory_t<A>::detach_memory() -> memory_t<A>
+	{
+		auto tmp = memory_;
+		memory_.detach_ptr();
+		return tmp;
+	}
 
 	using unique_memory_t = basic_unique_memory_t<atma::aligned_allocator_t<byte, 4>>;
 
