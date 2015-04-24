@@ -30,12 +30,13 @@ namespace atma
 			base_memory_t()
 			{}
 
-			base_memory_t(Alloc& allocator)
-				: allocator_(allocator)
+			template <typename U>
+			base_memory_t(base_memory_t<U> const& rhs)
+				: allocator_(rhs.allocator())
 			{}
 
-			base_memory_t(base_memory_t&& rhs)
-				: allocator_(std::move(rhs.allocator_))
+			base_memory_t(Alloc& allocator)
+				: allocator_(allocator)
 			{}
 
 			auto allocator() -> Alloc& { return allocator_; }
@@ -50,16 +51,15 @@ namespace atma
 			: protected Alloc
 		{
 			base_memory_t()
-			{
-			}
+			{}
+
+			template <typename U>
+			base_memory_t(base_memory_t<U> const& rhs)
+				: Alloc(rhs.allocator())
+			{}
 
 			base_memory_t(Alloc& allocator)
 				: Alloc(allocator)
-			{
-			}
-
-			base_memory_t(base_memory_t&& rhs)
-				: Alloc(std::move(rhs))
 			{}
 
 			auto allocator() -> Alloc& { return static_cast<Alloc&>(*this); }
@@ -76,11 +76,11 @@ namespace atma
 		using value_type = typename Alloc::value_type;
 
 		memory_t();
-		memory_t(memory_t const& rhs);
+		template <typename U> memory_t(memory_t<U> const& rhs);
 		explicit memory_t(Alloc& allocator);
 		explicit memory_t(value_type* data);
 
-		auto operator = (memory_t const& rhs) -> memory_t&;
+		template <typename U> auto operator = (memory_t<U> const& rhs) -> memory_t&;
 
 		auto alloc(size_t capacity) -> void;
 		auto deallocate() -> void;
@@ -113,9 +113,10 @@ namespace atma
 	{}
 
 	template <typename A>
-	inline memory_t<A>::memory_t(memory_t const& rhs)
-		: detail::base_memory_t<A>(rhs)
-		, ptr(rhs.ptr)
+	template <typename U>
+	inline memory_t<A>::memory_t(memory_t<U> const& rhs)
+		: detail::base_memory_t<A>(static_cast<detail::base_memory_t<U> const&>(rhs))
+		, ptr(reinterpret_cast<value_type*>(rhs.ptr))
 	{
 	}
 
@@ -125,9 +126,10 @@ namespace atma
 	{}
 
 	template <typename A>
-	inline auto memory_t<A>::operator = (memory_t const& rhs) -> memory_t&
+	template <typename A2>
+	inline auto memory_t<A>::operator = (memory_t<A2> const& rhs) -> memory_t&
 	{
-		allocator() = rhs.allocator();
+		allocator() = A(rhs.allocator());
 		ptr = rhs.ptr;
 		return *this;
 	}
@@ -160,7 +162,7 @@ namespace atma
 	template <typename A>
 	inline auto memory_t<A>::construct_copy_range(size_t offset, value_type const* rhs, size_t size) -> void
 	{
-		for (auto i = 0, j = offset; i != size; ++i, ++j)
+		for (auto i = size_t{}, j = offset; i != size; ++i, ++j)
 			allocator().construct(ptr + j, rhs[i]);
 	}
 

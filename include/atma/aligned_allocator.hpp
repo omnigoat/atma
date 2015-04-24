@@ -1,13 +1,13 @@
 #pragma once
-//======================================================================
+
 #include <atma/types.hpp>
 #include <atma/platform/allocation.hpp>
 
 #include <cstdint>
-//======================================================================
-namespace atma {
-//======================================================================
-	
+
+
+namespace atma
+{
 	template <typename T, uint32 A>
 	struct aligned_allocator_t;
 
@@ -33,8 +33,6 @@ namespace atma {
 		typedef size_t size_type;
 		typedef ptrdiff_t difference_type;
 
-		typedef std::true_type propagate_on_container_move_assignment_t;
-
 		template <typename U>
 		struct rebind { typedef aligned_allocator_t<U, A> other; };
 
@@ -58,9 +56,8 @@ namespace atma {
 	};
 
 
-	//======================================================================
-	// IMPLEMENTATION
-	//======================================================================
+
+
 	template <typename T, uint32 A>
 	inline auto aligned_allocator_t<T, A>::max_size() const -> size_type {
 		return (size_type(~0) - size_type(A)) / sizeof(T);
@@ -94,9 +91,8 @@ namespace atma {
 	}
 
 
-	//======================================================================
-	// operators
-	//======================================================================
+
+
 	template <typename T, uint32 TA, typename U, uint32 UA>
 	inline bool operator == (aligned_allocator_t<T, TA> const&, aligned_allocator_t<U, UA> const&)
 	{
@@ -108,10 +104,4 @@ namespace atma {
 	{
 		return TA != UA;
 	}
-
-
-
-
-//======================================================================
-} // namespace atma
-//======================================================================
+}

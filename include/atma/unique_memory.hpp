@@ -15,14 +15,14 @@ namespace atma
 	{
 		basic_unique_memory_t();
 		explicit basic_unique_memory_t(size_t size);
-		basic_unique_memory_t(size_t size, void const* data);
+		basic_unique_memory_t(void const* data, size_t size);
 		basic_unique_memory_t(unique_memory_take_ownership_tag, void* data, size_t size);
 		basic_unique_memory_t(basic_unique_memory_t const&) = delete;
-		basic_unique_memory_t(basic_unique_memory_t&&);
+		template <typename U> basic_unique_memory_t(basic_unique_memory_t<U>&&);
 		~basic_unique_memory_t();
 
 		auto operator = (basic_unique_memory_t const&) -> basic_unique_memory_t& = delete;
-		auto operator = (basic_unique_memory_t&&) -> basic_unique_memory_t&;
+		template <typename U> auto operator = (basic_unique_memory_t<U>&&) -> basic_unique_memory_t&;
 
 		operator bool() const;
 
@@ -38,8 +38,10 @@ namespace atma
 		auto detach_memory() -> atma::memory_t<Alloc>;
 
 	private:
-		atma::memory_t<Alloc> memory_;
+		atma::memory_t<typename Alloc::template rebind<byte>::other> memory_;
 		size_t size_;
+
+		template <typename U> friend struct basic_unique_memory_t;
 	};
 
 
@@ -58,7 +60,7 @@ namespace atma
 	}
 
 	template <typename A>
-	inline basic_unique_memory_t<A>::basic_unique_memory_t(size_t size, void const* data)
+	inline basic_unique_memory_t<A>::basic_unique_memory_t(void const* data, size_t size)
 		: size_(size)
 	{
 		memory_.alloc(size);
@@ -67,13 +69,15 @@ namespace atma
 
 	template <typename A>
 	inline basic_unique_memory_t<A>::basic_unique_memory_t(unique_memory_take_ownership_tag, void* data, size_t size)
-		: memory_{reinterpret_cast<byte*>(data)}
+		: memory_{}
 		, size_(size)
 	{
+		memory_.ptr = reinterpret_cast<byte*>(data);
 	}
 
 	template <typename A>
-	inline basic_unique_memory_t<A>::basic_unique_memory_t(basic_unique_memory_t&& rhs)
+	template <typename U>
+	inline basic_unique_memory_t<A>::basic_unique_memory_t(basic_unique_memory_t<U>&& rhs)
 		: memory_{rhs.memory_.detach_ptr()}
 		, size_{rhs.size_}
 	{
@@ -87,7 +91,8 @@ namespace atma
 	}
 
 	template <typename A>
-	inline auto basic_unique_memory_t<A>::operator = (basic_unique_memory_t&& rhs) -> basic_unique_memory_t&
+	template <typename U>
+	inline auto basic_unique_memory_t<A>::operator = (basic_unique_memory_t<U>&& rhs) -> basic_unique_memory_t&
 	{
 		this->~basic_unique_memory_t();
 		memory_ = rhs.memory_;
