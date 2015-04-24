@@ -20,7 +20,7 @@ namespace atma
 		}
 	}
 
-	template <typename T, typename Allocator = std::allocator<T>>
+	template <typename T, typename Allocator = atma::aligned_allocator_t<T, 4>>
 	struct vector
 	{
 		typedef T const* const_iterator;
@@ -49,7 +49,8 @@ namespace atma
 		auto data() const -> T const*;
 		auto empty() const -> bool;
 
-		auto detach_buffer() -> unique_memory_t;
+		auto detach_buffer() -> basic_unique_memory_t<Allocator>;
+		auto attach_buffer(basic_unique_memory_t<Allocator>&&) -> void;
 
 		auto reserve(size_t) -> void;
 		auto recapacitize(size_t) -> void;
@@ -57,7 +58,9 @@ namespace atma
 		auto resize(size_t) -> void;
 
 		auto push_back(T&&) -> void;
+		auto push_back(T const&) -> void;
 
+		template <typename H> auto assign(H begin, H end) -> void;
 		auto insert(const_iterator, T const&) -> void;
 		auto insert(const_iterator, T&&) -> void;
 		auto insert(const_iterator, std::initializer_list<T>) -> void;
@@ -107,7 +110,7 @@ namespace atma
 		: capacity_(rhs.capacity_), size_(rhs.size_)
 	{
 		imem_.alloc(capacity_);
-		imem_.construct_copy_range(0, rhs.imem_.memory, size_);
+		imem_.construct_copy_range(0, rhs.imem_.ptr, size_);
 	}
 
 	template <typename T, typename A>
@@ -210,12 +213,19 @@ namespace atma
 	}
 
 	template <typename T, typename A>
-	inline auto vector<T, A>::detach_buffer() -> unique_memory_t
+	inline auto vector<T, A>::attach_buffer(basic_unique_memory_t<A>&& buf) -> void
+	{
+		detach_buffer();
+		imem_ = buf.detach_memory();
+	}
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::detach_buffer() -> basic_unique_memory_t<A>
 	{
 		auto c = capacity_;
 		size_ = 0;
 		capacity_ = 0;
-		return unique_memory_t{unique_memory_take_ownership_tag{}, imem_.detach_ptr(), c};
+		return basic_unique_memory_t<A>{unique_memory_take_ownership_tag{}, imem_.detach_ptr(), c};
 	}
 
 	template <typename T, typename A>
@@ -266,15 +276,36 @@ namespace atma
 	}
 
 	template <typename T, typename A>
+	inline auto vector<T, A>::push_back(T const& x) -> void
+	{
+		if (size_ == capacity_)
+			imem_grow(size_ + 1);
+
+		imem_.construct_copy(size_++, x);
+	}
+
+	template <typename T, typename A>
 	inline auto vector<T,A>::push_back(T&& x) -> void
 	{
 		if (size_ == capacity_)
 			imem_grow(size_ + 1);
 
-		//new (elements_ + size_++) T(std::forward<T>(x));
 		imem_.construct_move(size_++, std::move(x));
 	}
 
+	template <typename T, typename A>
+	template <typename H>
+	inline auto vector<T, A>::assign(H begin, H end) -> void
+	{
+		imem_.deallocate();
+
+		auto size = std::distance(begin, end);
+		imem_.alloc(size);
+
+		int idx = 0;
+		for (auto i = begin; i != end; ++i)
+			new (imem_.ptr + idx++) T(*i);
+	}
 
 	template <typename T, typename A>
 	inline auto vector<T, A>::insert(const_iterator where, T const& x) -> void
@@ -297,7 +328,7 @@ namespace atma
 		if (size_ == capacity_)
 			imem_grow(size_ + 1);
 
-		imem_.move(offset + 2, offset + 1, 1);
+		imem_.memmove(offset + 2, offset + 1, 1);
 		imem_.construct_move(offset + 1, x, 1);
 		++size_;
 	}
@@ -318,7 +349,7 @@ namespace atma
 		if (size_ + rangesize > capacity_)
 			imem_grow(size_ + rangesize);
 
-		imem_.move(offset + 1 + rangesize, offset + 1, size_ - offset);
+		imem_.memmove(offset + 1 + rangesize, offset + 1, size_ - offset);
 		imem_.construct_copy_range(offset, begin, rangesize);
 		size_ += rangesize;
 	}
