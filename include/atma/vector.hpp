@@ -23,10 +23,11 @@ namespace atma
 	template <typename T, typename Allocator = atma::aligned_allocator_t<T, 4>>
 	struct vector
 	{
-		typedef T const* const_iterator;
-		typedef T* iterator;
-		typedef T& reference_type;
-
+		using const_iterator = T const*;
+		using iterator       = T*;
+		using reference_type = T&;
+		using buffer_type    = atma::basic_unique_memory_t<Allocator>;
+		
 		vector();
 		vector(size_t capacity, size_t size);
 		vector(std::initializer_list<T>);
@@ -49,8 +50,8 @@ namespace atma
 		auto data() const -> T const*;
 		auto empty() const -> bool;
 
-		auto detach_buffer() -> basic_unique_memory_t<Allocator>;
-		auto attach_buffer(basic_unique_memory_t<Allocator>&&) -> void;
+		auto detach_buffer() -> buffer_type;
+		auto attach_buffer(buffer_type&&) -> void;
 
 		auto reserve(size_t) -> void;
 		auto recapacitize(size_t) -> void;
@@ -213,14 +214,14 @@ namespace atma
 	}
 
 	template <typename T, typename A>
-	inline auto vector<T, A>::attach_buffer(basic_unique_memory_t<A>&& buf) -> void
+	inline auto vector<T, A>::attach_buffer(buffer_type&& buf) -> void
 	{
 		detach_buffer();
 		imem_ = buf.detach_memory();
 	}
 
 	template <typename T, typename A>
-	inline auto vector<T, A>::detach_buffer() -> basic_unique_memory_t<A>
+	inline auto vector<T, A>::detach_buffer() -> buffer_type
 	{
 		auto c = capacity_;
 		size_ = 0;
