@@ -76,7 +76,7 @@ namespace atma
 		using value_type = typename Alloc::value_type;
 
 		memory_t();
-		template <typename U> memory_t(memory_t<U> const& rhs);
+		template <typename U> explicit memory_t(memory_t<U> const& rhs);
 		explicit memory_t(Alloc& allocator);
 		explicit memory_t(value_type* data);
 
@@ -91,7 +91,7 @@ namespace atma
 		auto destruct(size_t offset, size_t count) -> void;
 
 		auto memmove(size_t dest, size_t src, size_t count) -> void;
-		auto memcpy(size_t dest, memory_t const&, size_t src, size_t count) -> void;
+		template <typename B> auto memcpy(size_t dest, memory_t<B> const&, size_t src, size_t count) -> void;
 
 		auto detach_ptr() -> value_type*;
 
@@ -186,9 +186,10 @@ namespace atma
 	}
 
 	template <typename A>
-	inline auto memory_t<A>::memcpy(size_t dest, memory_t const& rhs, size_t src, size_t count) -> void
+	template <typename B>
+	inline auto memory_t<A>::memcpy(size_t dest, memory_t<B> const& rhs, size_t src, size_t count) -> void
 	{
-		std::memcpy(ptr + dest, rhs.ptr + src, sizeof(value_type) * count);
+		std::memcpy(ptr + dest, rhs.ptr + src, sizeof(typename B::value_type) * count);
 	}
 
 	template <typename A>
