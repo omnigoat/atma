@@ -52,7 +52,9 @@ namespace atma
 
 		auto detach_buffer() -> buffer_type;
 		auto attach_buffer(buffer_type&&) -> void;
+		template <typename Y, typename B> auto copy_buffer(vector<Y, B> const&) -> void;
 
+		auto clear() -> void;
 		auto reserve(size_t) -> void;
 		auto recapacitize(size_t) -> void;
 		auto shrink_to_fit() -> void;
@@ -79,6 +81,8 @@ namespace atma
 		internal_memory_t imem_;
 		size_t capacity_;
 		size_t size_;
+
+		template <typename Y, typename B> friend struct vector;
 	};
 
 
@@ -214,6 +218,21 @@ namespace atma
 	}
 
 	template <typename T, typename A>
+	template <typename Y, typename B>
+	inline auto vector<T, A>::copy_buffer(vector<Y, B> const& rhs) -> void
+	{
+		clear();
+
+		// reinterpret the data from rhs
+		auto oursize = rhs.size() * sizeof(Y);
+		ATMA_ASSERT(oursize % sizeof(T) == 0);
+		oursize /= sizeof(T);
+
+		imem_.alloc(oursize);
+		imem_.memcpy(0, rhs.imem_, 0, rhs.size_);
+	}
+
+	template <typename T, typename A>
 	inline auto vector<T, A>::attach_buffer(buffer_type&& buf) -> void
 	{
 		detach_buffer();
@@ -227,6 +246,15 @@ namespace atma
 		size_ = 0;
 		capacity_ = 0;
 		return basic_unique_memory_t<A>{unique_memory_take_ownership_tag{}, imem_.detach_ptr(), c};
+	}
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::clear() -> void
+	{
+		imem_.destruct(0, size_);
+		imem_.deallocate();
+		size_ = 0;
+		capacity_ = 0;
 	}
 
 	template <typename T, typename A>
