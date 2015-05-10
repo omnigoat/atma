@@ -154,7 +154,7 @@ namespace atma
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::detach_memory() -> memory_t<A>
 	{
-		auto tmp = memory_;
+		auto tmp = memory_t<A>{memory_};
 		memory_.detach_ptr();
 		return tmp;
 	}
