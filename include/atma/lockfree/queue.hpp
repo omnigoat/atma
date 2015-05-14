@@ -201,7 +201,8 @@ namespace atma { namespace lockfree {
 	}
 
 	template <typename T>
-	auto queue_t<T>::push(batch_t& b) -> void {
+	auto queue_t<T>::push(batch_t& b) -> void
+	{
 		while (producer_lock_.exchange(true))
 			;
 		tail_->next = b.head_->next.load();
