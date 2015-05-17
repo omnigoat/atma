@@ -253,6 +253,7 @@ namespace atma
 	{
 		imem_.destruct(0, size_);
 		imem_.deallocate();
+		imem_.ptr = nullptr;
 		size_ = 0;
 		capacity_ = 0;
 	}
