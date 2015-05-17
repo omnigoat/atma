@@ -186,5 +186,10 @@ namespace atma {
 		return intrusive_ptr<T>(new T(std::forward<Args>(args)...));
 	}
 
+	template <typename Y, typename T>
+	inline auto ptr_cast_static(atma::intrusive_ptr<T> const& ptr) -> atma::intrusive_ptr<Y>
+	{
+		return intrusive_ptr<Y>(static_cast<Y*>(ptr.get()));
+	}
 }
 
