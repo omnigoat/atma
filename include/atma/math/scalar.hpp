@@ -62,6 +62,11 @@ namespace atma { namespace math {
 		return r;
 	}
 
-
+	inline auto pow(uint x, uint y) -> uint
+	{
+		uint r = 1;
+		while (y--) r *= x;
+		return r;
+	}
 
 } }
