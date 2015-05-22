@@ -167,15 +167,27 @@ namespace atma
 	template <typename T, typename E>
 	struct memory_view_t
 	{
-		memory_view_t(T& c)
-			: c_(c)
+		memory_view_t(T& c, size_t offset, size_t size)
+			: begin_{c.begin() + offset}, end_{c.begin() + offset + size}
 		{}
 
-		auto begin() const -> E* { return reinterpret_cast<E*>(c_.begin()); }
-		auto end() const -> E* { return reinterpret_cast<E*>(c_.end()); }
+		memory_view_t(T& c)
+			: memory_view_t(c, 0, c.size())
+		{}
+
+		auto begin() const -> E* { return reinterpret_cast<E*>(begin_); }
+		auto end() const -> E* { return reinterpret_cast<E*>(end_); }
+		auto size() const -> size_t { return end() - begin(); }
+
+		auto operator [](size_t idx) const -> E&
+		{
+			return begin()[idx];
+		}
 
 	private:
-		T& c_;
+		using storage_ptr = std::conditional_t<std::is_const<T>::value, void const*, void*>;
+
+		storage_ptr begin_, end_;
 	};
 }
 
