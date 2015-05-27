@@ -108,4 +108,13 @@ namespace atma
 			return hasher_t()(&x, sizeof(T)).result();
 		}
 	};
+
+	template <typename T>
+	struct hash_t
+	{
+		auto operator()(T const& x) const -> size_t
+		{
+			return hasher_t()(&x, sizeof(T)).result();
+		}
+	};
 }
