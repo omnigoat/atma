@@ -120,7 +120,7 @@ namespace atma {
 			return *this;
 		}
 
-		operator bool () {
+		operator bool () const {
 			return px != nullptr;
 		}
 
