@@ -42,9 +42,8 @@ namespace atma { namespace filesystem {
 
 		auto read_into_memory() -> atma::unique_memory_t
 		{
-			auto m = atma::unique_memory_t(size() + 1);
+			auto m = atma::unique_memory_t(size());
 			read(m.begin(), size());
-			*(m.begin() + size()) = '\0';
 			return m;
 		}
 
