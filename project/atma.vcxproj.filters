@@ -205,5 +205,8 @@
     <ClInclude Include="..\include\atma\memory.hpp">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\hash_map.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
