@@ -15,7 +15,7 @@
 //
 //      - this class doesn't manage the lifetime of the memory allocated within it.
 //        it will NOT deallocate on destruction, will not deallocate if assigned 
-//        another instance
+//        another instance, and shoot you in your face if you mismanage your memory.
 // 
 namespace atma
 {
@@ -84,7 +84,7 @@ namespace atma
 
 		auto alloc(size_t capacity) -> void;
 		auto deallocate() -> void;
-		auto construct_default(size_t offset, size_t count) -> void;
+		auto construct_default(size_t offset, size_t count, value_type const& = value_type()) -> void;
 		auto construct_copy(size_t offset, value_type const&) -> void;
 		auto construct_copy_range(size_t offset, value_type const*, size_t size) -> void;
 		auto construct_move(size_t offset, value_type&&) -> void;
@@ -147,10 +147,10 @@ namespace atma
 	}
 
 	template <typename A>
-	inline auto memory_t<A>::construct_default(size_t offset, size_t count) -> void
+	inline auto memory_t<A>::construct_default(size_t offset, size_t count, value_type const& x) -> void
 	{
 		for (auto i = offset; i != offset + count; ++i)
-			allocator().construct(ptr + i);
+			allocator().construct(ptr + i, x);
 	}
 
 	template <typename A>
