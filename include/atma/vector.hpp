@@ -29,7 +29,7 @@ namespace atma
 		using buffer_type    = atma::basic_unique_memory_t<Allocator>;
 		
 		vector();
-		vector(size_t capacity, size_t size);
+		explicit vector(size_t size, T const& = T());
 		vector(std::initializer_list<T>);
 		vector(vector const&);
 		vector(vector&&);
@@ -96,11 +96,11 @@ namespace atma
 	}
 
 	template <typename T, typename A>
-	inline vector<T,A>::vector(size_t capacity, size_t size)
-		: capacity_(capacity), size_(size)
+	inline vector<T,A>::vector(size_t size, T const& d)
+		: capacity_(size), size_(size)
 	{
 		imem_.alloc(capacity_);
-		imem_.construct_default(0, size_);
+		imem_.construct_default(0, size_, d);
 	}
 
 	template <typename T, typename A>
