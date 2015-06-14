@@ -318,7 +318,7 @@ namespace atma {
 	{
 		// bind doesn't take anything by reference, so we just straight-up store
 		// by value. this will still perform construct-by-reference (rvalue/lvalue)
-		using Bindings = tuple_map_t<std::remove_reference, BindingsRef>;
+		using Bindings = tuple_map_t<std::decay, BindingsRef>;
 
 		template <typename FF, typename BB>
 		bind_t(FF&& fn, BB&& bindings)
@@ -337,14 +337,14 @@ namespace atma {
 		auto bindings() const -> Bindings const& { return bindings_; }
 
 	private:
-		F fn_;
+		std::decay_t<F> fn_;
 		Bindings bindings_;
 	};
 
 	template <typename PreF, typename PreBindings, typename NewBindings>
 	struct bind_t<bind_t<PreF, PreBindings>, NewBindings>
 	{
-		using Bindings = tuple_map_t<std::remove_reference, bound_arguments_t<PreBindings, NewBindings>>;
+		using Bindings = tuple_map_t<std::decay, bound_arguments_t<PreBindings, NewBindings>>;
 
 		template <typename FF, typename BB>
 		bind_t(FF&& fn, BB&& bindings)
@@ -353,8 +353,8 @@ namespace atma {
 				std::forward<decltype(bind_arguments(fn.bindings(), std::forward<BB>(bindings)))>(
 					bind_arguments(fn.bindings(), std::forward<BB>(bindings))))
 		{
-			auto&& blam = bind_arguments(fn.bindings(), std::forward<BB>(bindings));
-			bindings_ = blam;
+			//auto&& blam = bind_arguments(fn.bindings(), std::forward<BB>(bindings));
+			//bindings_ = blam;
 		}
 
 		template <typename... Args>
@@ -368,7 +368,7 @@ namespace atma {
 		auto bindings() const -> Bindings const& { return bindings_; }
 
 	private:
-		PreF fn_;
+		std::decay_t<PreF> fn_;
 		Bindings bindings_;
 	};
 
