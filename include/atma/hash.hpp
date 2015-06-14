@@ -2,13 +2,12 @@
 
 namespace atma
 {
+	struct hasher_t;
+
 	template <typename T>
 	struct hash_t
 	{
-		auto operator()(hasher_t& hsh, T const& x) const -> void
-		{
-			return hsh(&x, sizeof(T));
-		}
+		auto operator()(hasher_t& hsh, T const& x) const -> void;
 	};
 
 	struct hasher_t
@@ -79,8 +78,11 @@ namespace atma
 	};
 
 
-
-
+	template <typename T>
+	inline auto hash_t<T>::operator()(hasher_t& hsh, T const& x) const -> void
+	{
+		hsh(&x, sizeof(T));
+	}
 
 	inline hasher_t::hasher_t(uint64 seed)
 		: hash_(seed)
