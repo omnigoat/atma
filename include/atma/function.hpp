@@ -2,6 +2,11 @@
 
 namespace atma
 {
+	template <typename R, typename... Params> struct function;
+
+
+
+
 	// functor-buf
 	namespace detail
 	{
@@ -23,7 +28,13 @@ namespace atma
 	namespace detail
 	{
 		template <typename FN>
-		struct vtable_impl_t<FN, bool small_functor_optimization = sizeof(FN) <= bufsize_bytes>
+		struct small_functor_optimization_t
+		{
+			static bool const value = sizeof(FN) <= bufsize_bytes;
+		};
+
+		template <typename FN, bool = small_functor_optimization_t<FN>::value>
+		struct vtable_impl_t
 		{
 			static auto store(functor_buf_t& buf, FN const& fn) -> void
 			{
@@ -226,7 +237,7 @@ namespace atma
 		// terminate
 		template <size_t PS, typename R, typename... Params>
 		struct dispatcher_t<PS, 0, R, std::tuple<Params...>>
-#if 0
+#if 1
 			: dispatcher_partial_t<R,
 			std::tuple<>,
 			atma::tuple_select_t<atma::idxs_range_t<0, PS>, std::tuple<Params...>>
@@ -336,4 +347,23 @@ namespace atma
 		detail::dispatch_fnptr_t<R, Params...> dispatch_;
 		detail::functor_wrapper_t<R, Params...> wrapper_;
 	};
+
+
+	namespace detail
+	{
+		template <typename R, typename... Params, typename... RParams>
+		inline auto dispatcher_partial_t<R, std::tuple<Params...>, std::tuple<RParams...>>
+			::call(dispatch_fnptr_t<R, Params..., RParams...> dispatch, functor_buf_t const& buf, Params... args)
+			-> function<R(RParams...)>
+		{
+			return function<R(RParams...)>{atma::curry(dispatch, buf, args...)};
+		}
+
+		template <size_t S, typename R, typename... Params>
+		inline auto dispatcher_t<S, S, R, std::tuple<Params...>>::call(dispatch_fnptr_t<R, Params...> dispatch, functor_buf_t const& buf, Params... args)
+			-> R
+		{
+			return dispatch(buf, args...);
+		}
+	}
 }
