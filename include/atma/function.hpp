@@ -277,6 +277,11 @@ namespace atma
 	template <typename R, typename... Params>
 	struct function<R(Params...)>
 	{
+		function()
+		{
+			init_empty();
+		}
+
 		template <typename FN>
 		explicit function(FN&& fn)
 		{
@@ -293,6 +298,11 @@ namespace atma
 			: dispatch_{rhs.dispatch_}
 			, wrapper_(rhs.wrapper_)
 		{}
+
+		auto operator = (function const& rhs) -> function&
+		{
+			
+		}
 
 		auto operator()(Params... args) const -> R
 		{
