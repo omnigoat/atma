@@ -382,20 +382,89 @@ namespace atma {
 
 
 
+#if 0
+	template <typename, typename> struct bind_args_tx;
+	template <typename, typename, typename> struct bind_args_ii_tx;
+	template <typename, typename, uint> struct bind_args_iii_tx;
 
+
+	template <typename Args, int E, typename... Rest>
+	struct bind_args_ii_tx<Args, std::tuple<placeholder_t<E>, Rest...>, E>
+	{
+		using type = std::tuple< tuple_get_t<E, Args> >;
+	};
+
+	template <typename Args, int E, typename... Rest>
+	struct bind_args_ii_tx<Args, std::tuple<Rest...>, E>
+	{
+		using type = std::tuple< tuple_get_t<E, Args> >;
+	};
+
+	template <typename Args, int E>
+	struct bind_args_ii_tx<Args, std::tuple<>, E>
+	{
+		using type = std::tuple<>;
+	};
+
+	template <typename Args, typename Bindings, uint... idxs>
+	struct bind_args_tx<Args, Bindings, idxs_t<idxs...>>
+	{
+		using type = tuple_cat_t< typename bind_args_iii_tx<Args, Bindings, idxs>::type... >;
+	};
+
+	
+	template <typename Args, typename Bindings>
+	struct bind_args_tx
+		: bind_args_ii_tx<Args, Bindings, idxs_list_t<std::tuple_size<Bindings>::value>>
+	{
+	};
+
+
+
+	template <typename, size_t, typename> struct comb;
+
+	template <typename A, size_t N>
+	struct comb<A, N, std::tuple<>>
+	{
+		using type = std::tuple<>;
+	};
+
+	// 
+	template <typename ArgsTuple, size_t N, int E, typename... Rest>
+	struct comb<ArgsTuple, N, std::tuple<placeholder_t<E>, Rest...>>
+	{
+		// find placeholder<N> and 
+		using type =
+			tuple_push_front_t<
+				typename comb<ArgsTuple, N + 1, std::tuple<Rest...>>::type,
+				tuple_get_t<N, ArgsTuple>
+			>;
+	};
+
+	// non-placeholder, doesn't contribute to arguments
+	template <typename ArgsTuple, size_t N, typename L, typename... Rest>
+	struct comb<ArgsTuple, N, std::tuple<L, Rest...>>
+	{
+		using type =
+			typename comb<ArgsTuple, N, std::tuple<Rest...>>::type;
+	};
+
+	
 	template <typename F, typename Bindings>
 	struct function_traits<bind_t<F, Bindings>>
 	{
 		using result_type = typename function_traits<F>::result_type;
-
+		using tupled_args_type = typename comb<typename function_traits<F>::tupled_args_type, 0, Bindings>::type;
+			
+		//using tupled_args_type = tuple_select_t<idxs_list_t< typename function_traits<F>::tupled_args_type;
+		
 		enum { arity = function_traits<F>::arity - tuple_nonplaceholder_size_t<Bindings>::value };
 
+
 		template <size_t i>
-		struct arg
-		{
-			typedef typename function_traits<F>::template arg<i + tuple_nonplaceholder_size_t<Bindings>::value>::type type;
-		};
+		using arg_type = typename function_traits<F>::template arg_type<i + tuple_nonplaceholder_size_t<Bindings>::value>;
 	};
+#endif
 
 
 	//
