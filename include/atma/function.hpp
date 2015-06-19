@@ -213,127 +213,49 @@ namespace atma
 	// dispatch
 	namespace detail
 	{
-		template <bool, size_t, size_t, typename, typename>  struct dispatcher_t;
-		template <typename, typename, typename>        struct dispatcher_partial_t;
-
 		template <typename R, typename... Params>
 		using dispatch_fnptr_t = auto(*)(functor_buf_t const&, Params...) -> R;
 
-		template <typename R, typename... Params, typename... RParams>
-		struct dispatcher_partial_t<R, std::tuple<Params...>, std::tuple<RParams...>>
+
+		template <typename R, typename Params, typename Args, size_t I>                   struct dispatcher_t;
+		template <typename R, typename Params, typename Args, size_t I, bool LT, bool GT> struct dispatcher_ii_t;
+		template <typename R, typename Params, typename UParams, typename RParams>        struct dispatcher_iii_t;
+
+		template <typename R, typename... Params, typename... UParams, typename... RParams>
+		struct dispatcher_iii_t<R, std::tuple<Params...>, std::tuple<UParams...>, std::tuple<RParams...>>
 		{
-			static auto call(dispatch_fnptr_t<R, Params..., RParams...>, functor_buf_t const&, Params...) -> function<R(RParams...)>;
+			static auto call(dispatch_fnptr_t<R, Params...>, functor_buf_t const&, UParams...) -> function<R(RParams...)>;
 		};
 
-		// too many args
-#if 0
-		template <size_t ParamCount, size_t ArgCount, typename R, typename... Params>
-		struct dispatcher_t<false, ParamCount, ArgCount, R, std::tuple<Params...>>
-			: dispatcher_t<ArgCount - 1 <= ParamCount, ParamCount, ArgCount - 1, R, std::tuple<Params...>>
+		// superfluous arguments
+		template <typename R, typename... Params, typename Args, size_t I>
+		struct dispatcher_ii_t<R, std::tuple<Params...>, Args, I, false, true>
 		{
-			using dispatcher_t<true, ParamCount, ArgCount - 1, R, std::tuple<Params...>>::call;
-
-			static auto call(dispatch_fnptr_t<R, Params...>, functor_buf_t const&, Args...) -> R;
+			template <typename... More>
+			static auto call(dispatch_fnptr_t<R, Params...>, functor_buf_t const&, Params..., More&&...) -> R;
 		};
-#endif
 
-		// completed call
-		template <size_t ParamArgCount, typename R, typename... Params>
-		struct dispatcher_t<true, ParamArgCount, ParamArgCount, R, std::tuple<Params...>>
-			: dispatcher_t<true, ParamArgCount, ParamArgCount - 1, R, std::tuple<Params...>>
+		// partial-function
+		template <typename R, typename... Params, typename Args, size_t I>
+		struct dispatcher_ii_t<R, std::tuple<Params...>, Args, I, true, false>
+			: dispatcher_iii_t<R, std::tuple<Params...>,
+				tuple_select_t<idxs_list_t<I>, std::tuple<Params...>>,
+				tuple_select_t<idxs_range_t<I, sizeof...(Params)>, std::tuple<Params...>>>
 		{
-			using dispatcher_t<true, ParamArgCount, ParamArgCount - 1, R, std::tuple<Params...>>::call;
+		};
 
+		// correct arguments
+		template <typename R, typename... Params, typename Args, size_t I>
+		struct dispatcher_ii_t<R, std::tuple<Params...>, Args, I, false, false>
+		{
 			static auto call(dispatch_fnptr_t<R, Params...>, functor_buf_t const&, Params...) -> R;
 		};
 
-		// partial call
-		template <size_t ParamCount, size_t ArgCount, typename R, typename... Params>
-		struct dispatcher_t<true, ParamCount, ArgCount, R, std::tuple<Params...>>
-			: dispatcher_t<true, ParamCount, ArgCount - 1, R, std::tuple<Params...>>
-			, dispatcher_partial_t<R,
-				atma::tuple_select_t<atma::idxs_list_t<ArgCount>, std::tuple<Params...>>,
-				atma::tuple_select_t<atma::idxs_range_t<ArgCount, ParamCount>, std::tuple<Params...>>
-			>
+		template <typename R, typename... Params, typename Args, size_t I>
+		struct dispatcher_t<R, std::tuple<Params...>, Args, I>
+			: dispatcher_ii_t<R, std::tuple<Params...>, Args, I, (I < sizeof...(Params)), (sizeof...(Params) < I)>
 		{
-			using dispatcher_partial_t<R,
-				atma::tuple_select_t<atma::idxs_list_t<ArgCount>, std::tuple<Params...>>,
-				atma::tuple_select_t<atma::idxs_range_t<ArgCount, ParamCount>, std::tuple<Params...>>
-			>::call;
 		};
-
-		// terminate
-		template <size_t ParamCount, typename R, typename... Params>
-		struct dispatcher_t<true, ParamCount, 0, R, std::tuple<Params...>>
-#if 0
-			: dispatcher_partial_t<R,
-			std::tuple<>,
-			atma::tuple_select_t<atma::idxs_range_t<0, ParamCount>, std::tuple<Params...>>
-			>
-#endif
-		{};
-
-		namespace d2
-		{
-			template <typename R, typename Params, typename Args> struct dispatcher_t;
-
-			template <typename R, typename Params, typename Args, typename Idxs>
-			struct dispatcher_ii_t;
-
-			template <typename R, typename Params, typename Args, size_t I, bool LT, bool GT> struct dispatcher_iv_t;
-
-			template <typename R, typename... Params, typename Args, size_t I>
-			struct dispatcher_iv_t<R, std::tuple<Params...>, Args, I, false, true>
-			{
-				template <typename... More>
-				static auto call(dispatch_fnptr_t<R, Params...>, functor_buf_t const&, Params..., More&&...) -> R;
-			};
-
-			template <typename R, typename... Params, typename Args, size_t I>
-			struct dispatcher_iv_t<R, std::tuple<Params...>, Args, I, false, false>
-			{
-				static auto call(dispatch_fnptr_t<R, Params...>, functor_buf_t const&, Params...) -> R;
-			};
-
-			template <typename R, typename Params, typename UParams, typename RParams> struct dispatcher_v_t;
-
-			template <typename R, typename... Params, typename... UParams, typename... RParams>
-			struct dispatcher_v_t<R, std::tuple<Params...>, std::tuple<UParams...>, std::tuple<RParams...>>
-			{
-				static auto call(dispatch_fnptr_t<R, Params...>, functor_buf_t const&, UParams...) -> function<R(RParams...)>;
-			};
-
-			template <typename R, typename... Params, typename Args, size_t I>
-			struct dispatcher_iv_t<R, std::tuple<Params...>, Args, I, true, false>
-				: dispatcher_v_t<R, std::tuple<Params...>,
-					tuple_select_t<idxs_list_t<I>, std::tuple<Params...>>,
-					tuple_select_t<idxs_range_t<I, sizeof...(Params)>, std::tuple<Params...>>>
-			{
-			};
-
-
-			template <typename R, typename Params, typename Args, size_t I>
-			struct dispatcher_iii_t;
-
-			template <typename R, typename... Params, typename Args, size_t I>
-			struct dispatcher_iii_t<R, std::tuple<Params...>, Args, I>
-				: dispatcher_iv_t<R, std::tuple<Params...>, Args, I, (I < sizeof...(Params)), (sizeof...(Params) < I)>
-			{
-			};
-
-			template <typename R, typename... Params, typename... Args, size_t... idxs>
-			struct dispatcher_ii_t<R, std::tuple<Params...>, std::tuple<Args...>, idxs_t<idxs...>>
-				: dispatcher_iii_t<R, std::tuple<Params...>, std::tuple<Args...>, idxs>...
-			{
-			};
-
-
-			template <typename R, typename... Params, typename... Args>
-			struct dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>>
-				: dispatcher_ii_t<R, std::tuple<Params...>, std::tuple<Args...>, idxs_list_t<sizeof...(Args) + 1>>
-			{
-			};
-		}
 	}
 
 
@@ -428,14 +350,9 @@ namespace atma
 
 		template <typename... Args>
 		auto operator ()(Args&&... args) const
-			-> decltype(
-				//detail::dispatcher_t<sizeof...(Args) <= sizeof...(Params), sizeof...(Params), sizeof...(Args), R, std::tuple<Params...>>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...)
-				detail::d2::dispatcher_iii_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...)
-			)
+			-> decltype(detail::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...))
 		{
-			//return detail::dispatcher_t<sizeof...(Args) <= sizeof...(Params), sizeof...(Params), sizeof...(Args), R, std::tuple<Params...>>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...);
-			//return detail::d2::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...);
-			return detail::d2::dispatcher_iii_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...);
+			return detail::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...);
 		}
 
 		auto swap(function& rhs) -> void
@@ -474,41 +391,23 @@ namespace atma
 
 	namespace detail
 	{
-		namespace d2
+		template <typename R, typename... Params, typename Args, size_t I>
+		template <typename... More>
+		auto dispatcher_ii_t<R, std::tuple<Params...>, Args, I, false, true>::call(dispatch_fnptr_t<R, Params...> fn, functor_buf_t const& buf, Params... params, More&&...) -> R
 		{
-			template <typename R, typename... Params, typename Args, size_t I>
-			template <typename... More>
-			auto dispatcher_iv_t<R, std::tuple<Params...>, Args, I, false, true>::call(dispatch_fnptr_t<R, Params...> fn, functor_buf_t const& buf, Params... params, More&&...) -> R
-			{
-				return fn(buf, params...);
-			};
+			return fn(buf, params...);
+		};
 
-			template <typename R, typename... Params, typename Args, size_t I>
-			inline auto dispatcher_iv_t<R, std::tuple<Params...>, Args, I, false, false>::call(dispatch_fnptr_t<R, Params...> fn, functor_buf_t const& buf, Params... params) -> R
-			{
-				return fn(buf, params...);
-			}
-
-			template <typename R, typename... Params, typename... UParams, typename... RParams>
-			auto dispatcher_v_t<R, std::tuple<Params...>, std::tuple<UParams...>, std::tuple<RParams...>>::call(dispatch_fnptr_t<R, Params...> fn, functor_buf_t const& buf, UParams... params) -> function<R(RParams...)>
-			{
-				return function<R(RParams...)>{curry(fn, buf, params...)};
-			}
+		template <typename R, typename... Params, typename Args, size_t I>
+		inline auto dispatcher_ii_t<R, std::tuple<Params...>, Args, I, false, false>::call(dispatch_fnptr_t<R, Params...> fn, functor_buf_t const& buf, Params... params) -> R
+		{
+			return fn(buf, params...);
 		}
 
-		template <typename R, typename... Params, typename... RParams>
-		inline auto dispatcher_partial_t<R, std::tuple<Params...>, std::tuple<RParams...>>
-			::call(dispatch_fnptr_t<R, Params..., RParams...> dispatch, functor_buf_t const& buf, Params... args)
-			-> function<R(RParams...)>
+		template <typename R, typename... Params, typename... UParams, typename... RParams>
+		auto dispatcher_iii_t<R, std::tuple<Params...>, std::tuple<UParams...>, std::tuple<RParams...>>::call(dispatch_fnptr_t<R, Params...> fn, functor_buf_t const& buf, UParams... params) -> function<R(RParams...)>
 		{
-			return function<R(RParams...)>{atma::curry(dispatch, buf, args...)};
-		}
-
-		template <size_t S, typename R, typename... Params>
-		inline auto dispatcher_t<true, S, S, R, std::tuple<Params...>>::call(dispatch_fnptr_t<R, Params...> dispatch, functor_buf_t const& buf, Params... args)
-			-> R
-		{
-			return dispatch(buf, args...);
+			return function<R(RParams...)>{curry(fn, buf, params...)};
 		}
 	}
 }
