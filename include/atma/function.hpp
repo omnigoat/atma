@@ -67,6 +67,12 @@ namespace atma
 				auto& fn = reinterpret_cast<FN&>(const_cast<functor_buf_t&>(buf));
 				return fn(std::forward<Args>(args)...);
 			}
+
+			static auto target(functor_buf_t& buf) -> void*
+			{
+				auto&& fn = reinterpret_cast<FN&>(buf);
+				return &fn;
+			}
 		};
 
 		template <typename FN>
@@ -102,6 +108,12 @@ namespace atma
 			{
 				return (*reinterpret_cast<FN* const&>(buf))(std::forward<Args>(args)...);
 			}
+
+			static auto target(functor_buf_t& buf) -> void*
+			{
+				auto&& ptr = reinterpret_cast<FN*&>(buf);
+				return ptr;
+			}
 		};
 	}
 
@@ -117,10 +129,12 @@ namespace atma
 			using destruct_fntype = auto(*)(detail::functor_buf_t&) -> void;
 			using copy_fntype     = auto(*)(detail::functor_buf_t&, detail::functor_buf_t const&) -> void;
 			using move_fntype     = auto(*)(detail::functor_buf_t&, detail::functor_buf_t&&) -> void;
+			using target_fntype   = auto(*)(detail::functor_buf_t&) -> void*;
 
 			destruct_fntype destruct;
 			copy_fntype     copy;
 			move_fntype     move;
+			target_fntype   target;
 		};
 
 		template <typename FN, typename R, typename... Params>
@@ -129,8 +143,9 @@ namespace atma
 			static auto _ = functor_vtable_t<R, Params...>
 			{
 				&vtable_impl_t<FN>::destruct,
-					&vtable_impl_t<FN>::copy,
-					&vtable_impl_t<FN>::move,
+				&vtable_impl_t<FN>::copy,
+				&vtable_impl_t<FN>::move,
+				&vtable_impl_t<FN>::target,
 			};
 
 			return &_;
@@ -192,6 +207,12 @@ namespace atma
 				vtable = rhs.vtable;
 				vtable->move(buf, std::move(rhs.buf));
 				return *this;
+			}
+
+			template <typename T>
+			auto target() const -> T const*
+			{
+				return reinterpret_cast<T const*>(vtable->target(const_cast<detail::functor_buf_t&>(buf)));
 			}
 
 			auto move_into(functor_wrapper_t& rhs) -> void
@@ -353,6 +374,12 @@ namespace atma
 			-> decltype(detail::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...))
 		{
 			return detail::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...);
+		}
+
+		template <typename T>
+		auto target() const -> T const*
+		{
+			return wrapper_.target<T>();
 		}
 
 		auto swap(function& rhs) -> void
