@@ -364,6 +364,18 @@ namespace atma
 			return *this;
 		}
 
+		auto operator = (std::nullptr_t) -> function&
+		{
+			wrapper_.~functor_wrapper_t();
+			init_empty();
+			return *this;
+		}
+
+		operator bool() const
+		{
+			return *target<R(*)(Params...)>() != empty_fn;
+		}
+
 		auto operator()(Params... args) const -> R
 		{
 			return dispatch_(wrapper_.buf, args...);
@@ -399,8 +411,7 @@ namespace atma
 
 		auto init_empty() -> void
 		{
-			using empty_fn = auto(*)(Params...) -> R;
-			init_fn(empty_fn());
+			init_fn(&empty_fn);
 		}
 
 		template <typename FN>
@@ -410,9 +421,11 @@ namespace atma
 			new (&wrapper_) detail::functor_wrapper_t<R, Params...>{std::forward<FN>(fn)};
 		}
 
-	public:
+	private:
 		detail::dispatch_fnptr_t<R, Params...>  dispatch_;
 		detail::functor_wrapper_t<R, Params...> wrapper_;
+
+		static auto empty_fn(Params...) -> R { return *reinterpret_cast<R*>(nullptr); }
 	};
 
 
