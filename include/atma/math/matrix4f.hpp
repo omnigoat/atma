@@ -540,6 +540,18 @@ namespace atma { namespace math {
 			);
 	}
 
+	inline auto orthographic(float left, float right, float top, float bottom, float near, float far) -> matrix4f
+	{
+		// todo: SIMD this
+		return matrix4f
+		{
+			vector4f{2.f / (right - 1.f), 0.f, 0.f, 0.f},
+			vector4f{0.f, 2.f / (top - bottom), 0.f, 0.f},
+			vector4f{0.f, 0.f, 1.f / (far - near), 0.f},
+			vector4f{(1.f + right) / (1.f - right), (top+bottom) / (bottom-top), near/(near - far), 1.f}
+		};
+	}
+
 	inline auto rotation_y(float angle) -> matrix4f
 	{
 		float sin_angle;
