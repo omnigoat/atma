@@ -545,10 +545,10 @@ namespace atma { namespace math {
 		// todo: SIMD this
 		return matrix4f
 		{
-			vector4f{2.f / (right - 1.f), 0.f, 0.f, 0.f},
+			vector4f{2.f / (right - left), 0.f, 0.f, 0.f},
 			vector4f{0.f, 2.f / (top - bottom), 0.f, 0.f},
 			vector4f{0.f, 0.f, 1.f / (far - near), 0.f},
-			vector4f{(1.f + right) / (1.f - right), (top+bottom) / (bottom-top), near/(near - far), 1.f}
+			vector4f{(left + right) / (left - right), (top + bottom) / (bottom - top), near / (near - far), 1.f}
 		};
 	}
 
