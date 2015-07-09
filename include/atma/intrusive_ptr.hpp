@@ -140,6 +140,10 @@ namespace atma {
 			return px;
 		}
 
+		auto reset() -> void {
+			*this = intrusive_ptr{};
+		}
+
 		template <typename Y>
 		auto cast_static() const -> intrusive_ptr<Y> {
 			return intrusive_ptr<Y>(static_cast<Y*>(px));
