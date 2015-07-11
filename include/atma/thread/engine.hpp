@@ -11,12 +11,13 @@ namespace atma { namespace thread {
 	{
 		using signal_t = std::function<void()>;
 		using queue_t  = atma::lockfree::queue_t<signal_t>;
+		using batch_t  = queue_t::batch_t;
 
 		engine_t();
 		~engine_t();
 
 		auto signal(signal_t const&) -> void;
-		auto signal_batch(queue_t::batch_t&) -> void;
+		auto signal_batch(batch_t&) -> void;
 		auto signal_evergreen(signal_t const&) -> void;
 		auto signal_block() -> void;
 
@@ -42,7 +43,10 @@ namespace atma { namespace thread {
 
 	inline engine_t::~engine_t()
 	{
-		signal([&] { running_ = false; });
+		signal([&] {
+			running_ = false;
+		});
+
 		handle_.join();
 	}
 
@@ -59,19 +63,25 @@ namespace atma { namespace thread {
 	{
 		if (!running_)
 			return;
+
 		queue_.push(fn);
 	}
 
-	inline auto engine_t::signal_batch(queue_t::batch_t& batch) -> void
+	inline auto engine_t::signal_batch(batch_t& batch) -> void
 	{
 		if (!running_)
 			return;
+
 		queue_.push(batch);
 	}
 
 	inline auto engine_t::signal_evergreen(signal_t const& fn) -> void
 	{
-		auto sg = [&, fn]() { fn(); signal_evergreen(fn); };
+		auto sg = [&, fn]() {
+			fn();
+			signal_evergreen(fn);
+		};
+
 		signal(sg);
 	}
 
@@ -81,13 +91,14 @@ namespace atma { namespace thread {
 			return;
 
 		auto blocked = std::atomic<bool>{true};
-		queue_.push([&blocked]{ blocked = false; });
+		queue_.push([&blocked]{
+			blocked = false;
+		});
 
 		// the engine thread can't block itself!
 		if (std::this_thread::get_id() == handle_.get_id())
 		{
 			reenter(blocked);
-			return;
 		}
 		else
 		{
