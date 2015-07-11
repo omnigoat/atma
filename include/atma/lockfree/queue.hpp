@@ -148,14 +148,17 @@ namespace atma { namespace lockfree {
 		batch_t();
 		~batch_t();
 
-		auto push(T const&) -> batch_t&;
 		auto begin() const -> node_t const*;
 		auto end() const -> node_t const*;
+		auto empty() const -> bool;
 
-	public:
+		auto push(T const&) -> batch_t&;
+
+	private:
 		typedef detail::node_t<T> node_t;
 
-		node_t* head_, *tail_;
+		node_t* head_;
+		node_t* tail_;
 
 		friend struct queue_t<T>;
 	};
@@ -203,8 +206,12 @@ namespace atma { namespace lockfree {
 	template <typename T>
 	auto queue_t<T>::push(batch_t& b) -> void
 	{
+		if (b.empty())
+			return;
+
 		while (producer_lock_.exchange(true))
 			;
+
 		tail_->next = b.head_->next.load();
 		tail_ = b.tail_;
 		producer_lock_ = false;
@@ -221,17 +228,18 @@ namespace atma { namespace lockfree {
 			;
 
 		node_t* head = head_;
-		node_t* head_next = head_->next;
+		node_t* head_next = head->next;
 		if (head_next)
 		{
 			T const* value = head_next->value_ptr();
 			head_ = head_next;
-			consumer_lock_ = false;
 
 			result = *value;
 			head_next->clear_value_ptr();
 
 			delete head;
+
+			consumer_lock_ = false;
 			return true;
 		}
 
@@ -328,11 +336,18 @@ namespace atma { namespace lockfree {
 	template <typename T>
 	queue_t<T>::batch_t::~batch_t()
 	{
-		while (head_) {
+		while (head_)
+		{
 			auto tmp = head_->next.load();
 			delete head_;
 			head_ = tmp;
 		}
+	}
+
+	template <typename T>
+	auto queue_t<T>::batch_t::empty() const -> bool
+	{
+		return head_ == tail_;
 	}
 
 	template <typename T>
