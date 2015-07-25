@@ -90,7 +90,7 @@ namespace atma { namespace thread {
 		if (!running_)
 			return;
 
-		auto blocked = std::atomic<bool>{true};
+		std::atomic<bool> blocked{true};
 		queue_.push([&blocked]{
 			blocked = false;
 		});
