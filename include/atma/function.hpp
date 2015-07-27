@@ -5,7 +5,7 @@
 
 namespace atma
 {
-	template <typename R, typename... Params> struct function;
+	template <typename> struct function;
 
 
 
@@ -304,12 +304,63 @@ namespace atma
 		}
 	}
 
-
-
-
 	template <typename R, typename... Params>
-	struct function<R(Params...)>
+	struct function_base
 	{
+#if 0
+		auto operator()(Params... args) const -> R
+		{
+			return dispatch_(wrapper_.buf, args...);
+		}
+
+		template <typename... Args>
+		auto operator ()(Args&&... args) const
+			-> decltype(detail::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...))
+		{
+			return detail::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...);
+		}
+#endif
+
+	protected:
+#if 0
+		detail::dispatch_fnptr_t<R, Params...>  dispatch_;
+		detail::functor_wrapper_t<R, Params...> wrapper_;
+
+		static auto empty_fn(Params...) -> R { return *reinterpret_cast<R*>(nullptr); }
+#endif
+
+	protected:
+#if 0
+		auto reset() -> void
+		{
+			dispatch_ = nullptr;
+			wrapper_.~functor_wrapper_t();
+		}
+
+		auto init_empty() -> void
+		{
+			init_fn(&empty_fn);
+		}
+
+		template <typename FN>
+		auto init_fn(FN&& fn) -> void
+		{
+			dispatch_ = &detail::vtable_impl_t<FN>::template call<R, Params...>;
+			new (&wrapper_) detail::functor_wrapper_t<R, Params...>{std::forward<FN>(fn)};
+		}
+#endif
+	};
+
+	template <class T> struct function_base_getter;
+	template <typename R, typename... Params> struct function_base_getter<R(Params...)>
+	{
+		typedef function_base<R, Params...> type;
+	};
+
+	template <class F>
+	struct function : function_base_getter<F>::type
+	{
+#if 0
 		function()
 		{
 			init_empty();
@@ -376,17 +427,7 @@ namespace atma
 			return *target<R(*)(Params...)>() != empty_fn;
 		}
 
-		auto operator()(Params... args) const -> R
-		{
-			return dispatch_(wrapper_.buf, args...);
-		}
 
-		template <typename... Args>
-		auto operator ()(Args&&... args) const
-			-> decltype(detail::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...))
-		{
-			return detail::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...);
-		}
 
 		template <typename T>
 		auto target() const -> T const*
@@ -401,31 +442,7 @@ namespace atma
 			wrapper_.move_into(rhs.wrapper_);
 			tmp.move_into(wrapper_);
 		}
-
-	private:
-		auto reset() -> void
-		{
-			dispatch_ = nullptr;
-			wrapper_.~functor_wrapper_t();
-		}
-
-		auto init_empty() -> void
-		{
-			init_fn(&empty_fn);
-		}
-
-		template <typename FN>
-		auto init_fn(FN&& fn) -> void
-		{
-			dispatch_ = &detail::vtable_impl_t<FN>::template call<R, Params...>;
-			new (&wrapper_) detail::functor_wrapper_t<R, Params...>{std::forward<FN>(fn)};
-		}
-
-	private:
-		detail::dispatch_fnptr_t<R, Params...>  dispatch_;
-		detail::functor_wrapper_t<R, Params...> wrapper_;
-
-		static auto empty_fn(Params...) -> R { return *reinterpret_cast<R*>(nullptr); }
+#endif
 	};
 
 

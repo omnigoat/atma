@@ -68,6 +68,14 @@ namespace atma
 		return hasher_t(seed)(key, size).result();
 	}
 
+	template <typename T>
+	inline auto hash(T const& t) -> uint64
+	{
+		auto hasher = hasher_t{};
+		hash_t<T>{}(hasher, t);
+		return hasher.result();
+	}
+
 	struct std_hash_functor_adaptor_t
 	{
 		template <typename T>
