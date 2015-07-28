@@ -168,10 +168,10 @@ namespace atma
 
 			template <typename FN>
 			explicit functor_wrapper_t(FN&& fn)
-				: vtable{generate_vtable<FN, R, Params...>()}
+				: vtable{generate_vtable<std::decay_t<FN>, R, Params...>()}
 				, buf{}
 			{
-				vtable_impl_t<FN>::store(buf, std::forward<FN>(fn));
+				vtable_impl_t<std::decay_t<FN>>::store(buf, fn);
 			}
 
 			functor_wrapper_t(functor_wrapper_t const& rhs)
@@ -304,63 +304,12 @@ namespace atma
 		}
 	}
 
+
+
+
 	template <typename R, typename... Params>
-	struct function_base
+	struct function<R(Params...)>
 	{
-#if 0
-		auto operator()(Params... args) const -> R
-		{
-			return dispatch_(wrapper_.buf, args...);
-		}
-
-		template <typename... Args>
-		auto operator ()(Args&&... args) const
-			-> decltype(detail::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...))
-		{
-			return detail::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...);
-		}
-#endif
-
-	protected:
-#if 0
-		detail::dispatch_fnptr_t<R, Params...>  dispatch_;
-		detail::functor_wrapper_t<R, Params...> wrapper_;
-
-		static auto empty_fn(Params...) -> R { return *reinterpret_cast<R*>(nullptr); }
-#endif
-
-	protected:
-#if 0
-		auto reset() -> void
-		{
-			dispatch_ = nullptr;
-			wrapper_.~functor_wrapper_t();
-		}
-
-		auto init_empty() -> void
-		{
-			init_fn(&empty_fn);
-		}
-
-		template <typename FN>
-		auto init_fn(FN&& fn) -> void
-		{
-			dispatch_ = &detail::vtable_impl_t<FN>::template call<R, Params...>;
-			new (&wrapper_) detail::functor_wrapper_t<R, Params...>{std::forward<FN>(fn)};
-		}
-#endif
-	};
-
-	template <class T> struct function_base_getter;
-	template <typename R, typename... Params> struct function_base_getter<R(Params...)>
-	{
-		typedef function_base<R, Params...> type;
-	};
-
-	template <class F>
-	struct function : function_base_getter<F>::type
-	{
-#if 0
 		function()
 		{
 			init_empty();
@@ -427,7 +376,17 @@ namespace atma
 			return *target<R(*)(Params...)>() != empty_fn;
 		}
 
+		auto operator()(Params... args) const -> R
+		{
+			return dispatch_(wrapper_.buf, args...);
+		}
 
+		template <typename... Args>
+		auto operator ()(Args&&... args) const
+			-> decltype(detail::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...))
+		{
+			return detail::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...);
+		}
 
 		template <typename T>
 		auto target() const -> T const*
@@ -442,8 +401,108 @@ namespace atma
 			wrapper_.move_into(rhs.wrapper_);
 			tmp.move_into(wrapper_);
 		}
-#endif
+
+	private:
+		auto reset() -> void
+		{
+			dispatch_ = nullptr;
+			wrapper_.~functor_wrapper_t();
+		}
+
+		auto init_empty() -> void
+		{
+			init_fn(&empty_fn);
+		}
+
+		template <typename FN>
+		auto init_fn(FN&& fn) -> void
+		{
+			dispatch_ = &detail::vtable_impl_t<std::decay_t<FN>>::template call<R, Params...>;
+			new (&wrapper_) detail::functor_wrapper_t<R, Params...>{std::forward<FN>(fn)};
+		}
+
+	private:
+		detail::dispatch_fnptr_t<R, Params...>  dispatch_;
+		detail::functor_wrapper_t<R, Params...> wrapper_;
+
+		static auto empty_fn(Params...) -> R { return *reinterpret_cast<R*>(nullptr); }
 	};
+
+
+
+
+	//
+	//  function_traits
+	//  -----------------
+	//    specialization for function_traits
+	//
+	template <typename R, typename... Params>
+	struct function_traits<function<R(Params...)>>
+		: function_traits<R(Params...)>
+	{
+	};
+
+
+	//
+	//  adapted_function_t
+	//  --------------------
+	//    given a callable, returns the function type that would be
+	//    used to call it
+	//
+	namespace detail
+	{
+		template <typename R, typename Args> struct adapted_function_tx;
+
+		template <typename R, typename... Args>
+		struct adapted_function_tx<R, std::tuple<Args...>>
+		{
+			using type = function<R(Args...)>;
+		};
+	}
+
+	template <typename FN>
+	using adapted_function_t = typename detail::adapted_function_tx<
+		typename function_traits<std::decay_t<FN>>::result_type,
+		typename function_traits<std::decay_t<FN>>::tupled_args_type>::type;
+
+
+
+
+	//
+	//  functionize
+	//  -------------
+	//    wraps a callable in an function
+	//
+	template <typename FN>
+	auto functionize(FN&& fn) -> adapted_function_t<FN>
+	{
+		return adapted_function_t<FN>{&std::forward<FN>(fn)};
+	}
+
+
+
+	//
+	//  function composiition
+	//  -----------------------
+	//    operator * composes two function together:
+	//
+	//    f(b)->c  *  g(a)->b  === h(a)->c === f(g(a))->c
+	//
+	namespace detail
+	{
+		template <typename F, typename G, typename R, typename... Args>
+		inline auto composited(F&& f, G&& g, Args... args) -> R
+		{
+			return std::forward<F>(f)(std::forward<G>(g)(args...));
+		}
+	}
+
+	template <typename FR, typename GR, typename... GArgs>
+	inline auto operator * (function<FR(GR)> const& f, function<GR(GArgs...)> const& g) -> function<FR(GArgs...)>
+	{
+		return function<FR(GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GArgs...>, f, g)};
+	}
+
 
 
 	namespace detail
