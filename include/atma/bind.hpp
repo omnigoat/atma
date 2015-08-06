@@ -118,8 +118,10 @@ namespace atma {
 	template <typename R, typename from, typename to>
 	struct type_if_castible :
 		std::enable_if<std::is_convertible<std::remove_reference_t<from>&, std::remove_reference_t<to>&>::value, R>
-	{
-	};
+	{};
+
+	template <typename R, typename From, typename To>
+	using type_if_castible_t = typename type_if_castible<R, From, To>::type;
 
 
 
@@ -134,7 +136,7 @@ namespace atma {
 	//    object, like a std::function<>, or even a lambda.
 	//
 	template <typename F, typename... Args>
-	auto call_fn(F&& f, Args&&... args) -> typename function_traits<F>::result_type
+	auto call_fn(F&& f, Args&&... args) -> result_of_t<F(Args...)>
 	{
 		return f(std::forward<Args>(args)...);
 	}
@@ -189,31 +191,25 @@ namespace atma {
 	{
 		template <typename F, typename Tuple, size_t... Idxs>
 		inline auto call_fn_tuple_impl(F&& f, Tuple&& xs, idxs_t<Idxs...>)
-			-> typename function_traits<typename std::decay<F>::type>::result_type
+			-> decltype(call_fn(std::forward<F>(f), std::get<Idxs>(std::forward<Tuple>(xs))...))
 		{
-			return call_fn(
-				std::forward<F>(f),
-				std::get<Idxs>(std::forward<Tuple>(xs))...);
+			return call_fn(std::forward<F>(f), std::get<Idxs>(std::forward<Tuple>(xs))...);
 		}
 	}
 
 	// catch-all
 	template <typename F, typename Tuple>
 	inline auto call_fn_tuple(F&& f, Tuple&& xs)
-		-> typename function_traits<typename std::decay<F>::type>::result_type
+		-> decltype(detail::call_fn_tuple_impl(std::forward<F>(f), std::forward<Tuple>(xs), idxs_list_t<tuple_size>()))
 	{
 		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
 
-		return detail::call_fn_tuple_impl(
-			std::forward<F>(f),
-			std::forward<Tuple>(xs),
-			idxs_list_t<tuple_size>());
+		return detail::call_fn_tuple_impl(std::forward<F>(f), std::forward<Tuple>(xs), idxs_list_t<tuple_size>());
 	}
 
 	// memfnptr helpers
 	template <typename R, typename C, typename... Params, typename CC, typename Tuple>
-	inline auto call_fn_tuple(R(C::*f)(Params...), CC* c, Tuple&& xs)
-		-> typename type_if_castible<R, CC, C>::type
+	inline auto call_fn_tuple(R(C::*f)(Params...), CC* c, Tuple&& xs) -> type_if_castible_t<R, CC, C>
 	{
 		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
 		static_assert(tuple_size == sizeof...(Params), "incorrect number of arguments");
@@ -225,8 +221,7 @@ namespace atma {
 	}
 
 	template <typename R, typename C, typename... Params, typename CC, typename Tuple>
-	inline auto call_fn_tuple(R(C::*f)(Params...) const, CC* c, Tuple&& xs)
-		-> typename type_if_castible<R, CC, C const>::type
+	inline auto call_fn_tuple(R(C::*f)(Params...) const, CC* c, Tuple&& xs) -> type_if_castible_t<R, CC, C const>
 	{
 		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
 		static_assert(tuple_size == sizeof...(Params), "incorrect number of arguments");
@@ -238,8 +233,7 @@ namespace atma {
 	}
 
 	template <typename R, typename C, typename... Params, typename CC, typename Tuple>
-	inline auto call_fn_tuple(R(C::*f)(Params...), CC&& c, Tuple&& xs)
-		-> typename type_if_castible<R, CC, C>::type
+	inline auto call_fn_tuple(R(C::*f)(Params...), CC&& c, Tuple&& xs) -> type_if_castible_t<R, CC, C>
 	{
 		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
 		static_assert(tuple_size == sizeof...(Params), "incorrect number of arguments");
@@ -251,8 +245,7 @@ namespace atma {
 	}
 
 	template <typename R, typename C, typename... Params, typename CC, typename Tuple>
-	inline auto call_fn_tuple(R(C::*f)(Params...) const, CC&& c, Tuple&& xs)
-		-> typename type_if_castible<R, CC, C const>::type
+	inline auto call_fn_tuple(R(C::*f)(Params...) const, CC&& c, Tuple&& xs) -> type_if_castible_t<R, CC, C const>
 	{
 		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
 		static_assert(tuple_size == sizeof...(Params), "incorrect number of arguments");
@@ -280,18 +273,19 @@ namespace atma {
 	{
 		template <typename F, typename Bindings, typename Args, size_t... Idxs>
 		inline auto call_fn_bound_tuple_impl(F&& f, Bindings&& bindings, Args&& args, idxs_t<Idxs...>)
-			-> typename function_traits<typename std::decay<F>::type>::result_type
+			-> decltype(call_fn(std::forward<F>(f), select_bound_arg(std::get<Idxs>(std::forward<Bindings>(bindings)), std::forward<Args>(args))...))
 		{
-			return call_fn(
-				std::forward<F>(f),
-				select_bound_arg(std::get<Idxs>(std::forward<Bindings>(bindings)), std::forward<Args>(args))...);
+			return call_fn(std::forward<F>(f), select_bound_arg(std::get<Idxs>(std::forward<Bindings>(bindings)), std::forward<Args>(args))...);
 		}
 	}
 
 	template <typename F, typename Bindings, typename Args>
 	inline auto call_fn_bound_tuple(F&& f, Bindings&& b, Args&& a)
-		-> typename function_traits<std::decay_t<F>>::result_type
+		-> decltype(detail::call_fn_bound_tuple_impl(std::forward<F>(f), std::forward<Bindings>(b), std::forward<Args>(a), idxs_list_t<std::tuple_size<std::decay_t<Bindings>>::value>()))
 	{
+		// this following code won't work for a functor that has overloaded operator (),
+		// beacuse function_traits won't be able to auto-magically guess the traits. if this
+		// becomes a problem, comment out everything save the return-statement.
 		auto const param_size = function_traits<F>::arity + (size_t)function_traits<F>::is_memfnptr;
 		auto const binding_size = std::tuple_size<std::decay_t<Bindings>>::value;
 
@@ -318,33 +312,35 @@ namespace atma {
 	{
 		// bind doesn't take anything by reference, so we just straight-up store
 		// by value. this will still perform construct-by-reference (rvalue/lvalue)
-		using Bindings = tuple_map_t<std::decay, BindingsRef>;
+		using function_t = std::decay_t<F>;
+		using bindings_t = tuple_map_t<std::decay, BindingsRef>;
 
 		template <typename FF, typename BB>
 		bind_t(FF&& fn, BB&& bindings)
-			: fn_(std::forward<FF>(fn)), bindings_(std::forward<BB>(bindings))
+			: fn_(std::forward<FF>(fn))
+			, bindings_(std::forward<BB>(bindings))
 		{
 		}
 
 		template <typename... Args>
-		auto operator ()(Args&&... args)
-			-> typename function_traits<F>::result_type
+		auto operator ()(Args&&... args) -> decltype(call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...)))
 		{
 			return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
 		}
 
-		auto fn() const -> F const& { return fn_; }
-		auto bindings() const -> Bindings const& { return bindings_; }
+		auto fn() const -> function_t const& { return fn_; }
+		auto bindings() const -> bindings_t const& { return bindings_; }
 
 	private:
-		std::decay_t<F> fn_;
-		Bindings bindings_;
+		function_t fn_;
+		bindings_t bindings_;
 	};
 
 	template <typename PreF, typename PreBindings, typename NewBindings>
 	struct bind_t<bind_t<PreF, PreBindings>, NewBindings>
 	{
-		using Bindings = tuple_map_t<std::decay, bound_arguments_t<PreBindings, NewBindings>>;
+		using function_t = std::decay_t<PreF>;
+		using bindings_t = tuple_map_t<std::decay, bound_arguments_t<PreBindings, NewBindings>>;
 
 		template <typename FF, typename BB>
 		bind_t(FF&& fn, BB&& bindings)
@@ -353,23 +349,20 @@ namespace atma {
 				std::forward<decltype(bind_arguments(fn.bindings(), std::forward<BB>(bindings)))>(
 					bind_arguments(fn.bindings(), std::forward<BB>(bindings))))
 		{
-			//auto&& blam = bind_arguments(fn.bindings(), std::forward<BB>(bindings));
-			//bindings_ = blam;
 		}
 
 		template <typename... Args>
-		auto operator ()(Args&&... args)
-			-> typename function_traits<PreF>::result_type
+		auto operator ()(Args&&... args) -> decltype(call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...)))
 		{
 			return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
 		}
 
 		auto fn() const -> PreF const& { return fn_; }
-		auto bindings() const -> Bindings const& { return bindings_; }
+		auto bindings() const -> bindings_t const& { return bindings_; }
 
 	private:
-		std::decay_t<PreF> fn_;
-		Bindings bindings_;
+		function_t fn_;
+		bindings_t bindings_;
 	};
 
 	// regular bind
@@ -380,7 +373,11 @@ namespace atma {
 		return {std::forward<F>(f), std::forward_as_tuple(bindings...)};
 	}
 
-
+	template <typename F, typename Params>
+	struct result_of<atma::bind_t<F, Params>>
+	{
+		using type = result_of_t<F>;
+	};
 
 #if 0
 	template <typename, typename> struct bind_args_tx;
@@ -503,3 +500,5 @@ namespace atma {
 	}
 
 }
+
+
