@@ -182,12 +182,19 @@ namespace atma {
 	}
 
 
-
+	struct intrusive_ptr_expose_constructor
+	{
+		template <typename T, typename... Args>
+		static auto make(Args&&... args) -> intrusive_ptr<T>
+		{
+			return intrusive_ptr<T>(new T(std::forward<Args>(args)...));
+		}
+	};
 
 	template <typename T, typename... Args>
-	inline auto make_intrusive_ptr(Args&&... args) -> intrusive_ptr<T>
+	inline auto make_intrusive(Args&&... args) -> intrusive_ptr<T>
 	{
-		return intrusive_ptr<T>(new T(std::forward<Args>(args)...));
+		return intrusive_ptr_expose_constructor::make<T>(std::forward<Args>(args)...);
 	}
 
 	template <typename Y, typename T>

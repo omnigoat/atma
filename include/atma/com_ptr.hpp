@@ -24,7 +24,7 @@ namespace atma
 		com_ptr(com_ptr<Y> const& rhs)
 		: x_(static_cast<Y*>(rhs.get()))
 		{
-			x_->AddRef();
+			if (x_) x_->AddRef();
 		}
 
 		com_ptr(com_ptr&& rhs)
