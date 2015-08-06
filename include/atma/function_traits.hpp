@@ -53,8 +53,6 @@ namespace atma
 	};
 
 
-
-
 	template <typename R, typename... Args>
 	struct function_traits<R(Args...)>
 	{
@@ -68,4 +66,16 @@ namespace atma
 		static bool   const is_memfnptr = false;
 	};
 
+
+
+
+	// reimplement std::result_of
+	template <typename F>
+	struct result_of
+	{
+		using type = std::result_of_t<F>;
+	};
+
+	template <typename F>
+	using result_of_t = typename result_of<F>::type;
 }
