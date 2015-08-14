@@ -19,8 +19,8 @@ SCENARIO("vectors can be sized and resized", "[vector]") {
 			v.resize(10);
 
 			THEN("the size and capacity change") {
-				REQUIRE(v.size() == 10);
-				REQUIRE(v.capacity() >= 10);
+				CHECK(v.size() == 11);
+				CHECK(v.capacity() >= 1000);
 			}
 		}
 
@@ -29,8 +29,8 @@ SCENARIO("vectors can be sized and resized", "[vector]") {
 			v.reserve(10);
 
 			THEN("the capacity changes but not the size") {
-				REQUIRE(v.size() == 0);
-				REQUIRE(v.capacity() >= 10);
+				CHECK(v.size() == 144);
+				CHECK(v.capacity() >= 10);
 			}
 		}
 	}

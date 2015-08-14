@@ -8520,6 +8520,7 @@ namespace Catch {
 				if (m_config->showDurations() == ShowDurations::Always)
 					stream << "Completed in " << _sectionStats.durationInSeconds << "s" << std::endl;
 				m_headerPrinted = false;
+				std::cout << std::endl;
 			}
 			else {
 				if (m_config->showDurations() == ShowDurations::Always)
@@ -8644,22 +8645,22 @@ namespace Catch {
 			void printResultType() const {
 				if (!passOrFail.empty()) {
 					Colour colourGuard(colour);
-					stream << passOrFail << ":\n";
+					stream << passOrFail;
 				}
 			}
 			void printOriginalExpression() const {
 				if (result.hasExpression()) {
 					Colour colourGuard(Colour::OriginalExpression);
-					stream  << "  ";
+					stream  << " ";
 					stream << result.getExpressionInMacro();
-					stream << "\n";
+					//stream << "\n";
 				}
 			}
 			void printReconstructedExpression() const {
 				if (result.hasExpandedExpression()) {
-					stream << "with expansion:\n";
+					stream << " as ";
 					Colour colourGuard(Colour::ReconstructedExpression);
-					stream << Text(result.getExpandedExpression(), TextAttributes().setIndent(2)) << "\n";
+					stream << Text(result.getExpandedExpression(), TextAttributes().setIndent(2));
 				}
 			}
 			void printMessage() const {
@@ -8675,7 +8676,7 @@ namespace Catch {
 			}
 			void printSourceInfo() const {
 				Colour colourGuard(Colour::FileName);
-				stream << result.getSourceInfo() << ": ";
+				stream << "\t\t" <<  result.getSourceInfo() << ": ";
 			}
 
 			std::ostream& stream;
@@ -8702,11 +8703,12 @@ namespace Catch {
 			}
 		}
 		void lazyPrintRunInfo() {
-			stream  << "\n" << getLineOfChars<'~'>() << "\n";
+			stream  << "\n" << getLineOfChars<'='>() << "\n";
 			Colour colour(Colour::SecondaryText);
-			stream  << currentTestRunInfo->name
-				<< " is a Catch v"  << libraryVersion << " host application.\n"
-				<< "Run with -? for options\n\n";
+			//stream  << currentTestRunInfo->name
+				//<< " is a Catch v"  << libraryVersion << " host application.\n"
+				//<< "Run with -? for options\n\n";
+			stream << "Running Tests...\n" << getLineOfChars<'='>() << std::endl;
 
 			if (m_config->rngSeed() != 0)
 				stream << "Randomness seeded to: " << m_config->rngSeed() << "\n\n";
@@ -8721,7 +8723,17 @@ namespace Catch {
 		}
 		void printTestCaseAndSectionHeader() {
 			assert(!m_sectionStack.empty());
-			printOpenHeader(currentTestCaseInfo->name);
+
+			SourceLineInfo lineInfo = m_sectionStack.front().lineInfo;
+
+
+			if (!lineInfo.empty()){
+				//stream << getLineOfChars<'-'>() << "\n";
+				Colour colourGuard(Colour::FileName);
+				stream << lineInfo << "\n";
+			}
+
+			//printOpenHeader(currentTestCaseInfo->name);
 
 			if (m_sectionStack.size() > 1) {
 				Colour colourGuard(Colour::Headers);
@@ -8733,14 +8745,8 @@ namespace Catch {
 					printHeaderString(it->name, 2);
 			}
 
-			SourceLineInfo lineInfo = m_sectionStack.front().lineInfo;
-
-			if (!lineInfo.empty()){
-				stream << getLineOfChars<'-'>() << "\n";
-				Colour colourGuard(Colour::FileName);
-				stream << lineInfo << "\n";
-			}
-			stream << getLineOfChars<'.'>() << "\n" << std::endl;
+			stream << std::endl;
+			//stream << getLineOfChars<'.'>() << "\n" << std::endl;
 		}
 
 		void printClosedHeader(std::string const& _name) {
