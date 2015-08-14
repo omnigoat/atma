@@ -1,97 +1,58 @@
-#include <atma/unittest/run.hpp>
-#include <atma/utf/utf8_char.hpp>
-#include <atma/function.hpp>
+#define CATCH_CONFIG_MAIN
+#include <atma/unit_test.hpp>
 
-#include <functional>
-#include <stack>
-#include <list>
+#include <atma/vector.hpp>
 
-#if 0
-namespace jester
-{
-	typedef std::function<void()> action_t;
 
-	namespace detail
+SCENARIO("vectors can be sized and resized", "[vector]") {
+
+	GIVEN("an empty vector")
 	{
-		struct test_t
+		atma::vector<int> v;
+
+		REQUIRE(v.empty());
+		REQUIRE(v.size() == 0);
+		REQUIRE(v.capacity() >= 0);
+
+		WHEN("the size is increased")
 		{
-			char const* name;
-			action_t before_each_callback;
+			v.resize(10);
 
-			typedef std::list<test_t> children_t;
-			children_t children;
-		};
-
-		typedef test_t::children_t tests_t;
-
-		auto root_tests() -> tests_t&
-		{
-			static tests_t _;
-			return _;
-		}
-
-		typedef std::stack<tests_t*> test_stack_t;
-
-		auto test_stack() -> test_stack_t&
-		{
-			static bool initialized = false;
-			static test_stack_t _;
-
-			if (!initialized)
-			{
-				_.push(&root_tests());
+			THEN("the size and capacity change") {
+				REQUIRE(v.size() == 10);
+				REQUIRE(v.capacity() >= 10);
 			}
-
-			return _;
 		}
 
-		auto current_position() -> tests_t&
+		WHEN("the size is reduced")
 		{
-			return *test_stack().top();
+			v.resize(0);
+
+			THEN("the size changes but not capacity") {
+				REQUIRE(v.empty());
+				REQUIRE(v.size() == 0);
+				REQUIRE(v.capacity() >= 5);
+			}
 		}
 
-		auto dive(char const* name) -> void
+		WHEN("more capacity is reserved")
 		{
-			auto& children = current_position();
-			auto i = std::find_if(children.begin(), children.end(), [name](test_t const& x) {
-				return !strcmp(x.name, name);
-			});
+			v.reserve(10);
 
-			ATMA_ASSERT(i != children.end());
-			test_stack().push(&i->children);
+			THEN("the capacity changes but not the size") {
+				REQUIRE(v.size() == 5);
+				REQUIRE(v.capacity() >= 10);
+			}
+		}
+
+		WHEN("less capacity is reserved")
+		{
+			v.reserve(0);
+
+			THEN("neither size nor capacity are changed") {
+				REQUIRE(v.size() == 5);
+				REQUIRE(v.capacity() >= 5);
+			}
 		}
 	}
-
-
-	auto test(char const* name, std::function<void()> const& fn) -> void 
-	{
-		detail::current_position().insert(detail::test_t{name, fn});
-		//detail::current_position() = 
-		detail::static_suites().insert(std::make_pair(std::string(name), detail::suite_t{name, fn}));
-	};
-}
-#endif
-
-
-template <template <typename, typename...> class C, typename I, typename FN, typename T, typename... Args>
-auto fold(C<T, Args...> const& xs, I const& initial, FN const& fn) -> decltype(fn(I(), T()))
-{
-	if (xs.empty())
-		return initial;
-
-	auto init = initial;
-	for (auto const& x : xs)
-		init = fn(init, x);
-
-	return init;
-}
-
-template <typename C, typename FN>
-auto filter(C const& xs, FN const& fn) -> void {
-	return lazy_filter_range_t(xs, fn);
-}
-
-
-int main()
-{
 }
