@@ -24,34 +24,13 @@ SCENARIO("vectors can be sized and resized", "[vector]") {
 			}
 		}
 
-		WHEN("the size is reduced")
-		{
-			v.resize(0);
-
-			THEN("the size changes but not capacity") {
-				REQUIRE(v.empty());
-				REQUIRE(v.size() == 0);
-				REQUIRE(v.capacity() >= 5);
-			}
-		}
-
 		WHEN("more capacity is reserved")
 		{
 			v.reserve(10);
 
 			THEN("the capacity changes but not the size") {
-				REQUIRE(v.size() == 5);
+				REQUIRE(v.size() == 0);
 				REQUIRE(v.capacity() >= 10);
-			}
-		}
-
-		WHEN("less capacity is reserved")
-		{
-			v.reserve(0);
-
-			THEN("neither size nor capacity are changed") {
-				REQUIRE(v.size() == 5);
-				REQUIRE(v.capacity() >= 5);
 			}
 		}
 	}
