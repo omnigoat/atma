@@ -68,6 +68,7 @@
     <ClInclude Include="..\include\atma\unittest\ennumerate.hpp" />
     <ClInclude Include="..\include\atma\unittest\run.hpp" />
     <ClInclude Include="..\include\atma\unittest\unittest.hpp" />
+    <ClInclude Include="..\include\atma\unit_test.hpp" />
     <ClInclude Include="..\include\atma\utf\algorithm.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_char.hpp" />
     <ClInclude Include="..\include\atma\utf\utf8_istream.hpp" />
