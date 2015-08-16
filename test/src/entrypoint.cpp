@@ -3,24 +3,55 @@
 
 #include <atma/vector.hpp>
 
+SCENARIO("vectors can be constructed", "[vector]")
+{
+	GIVEN("a default-constructed vector")
+	{
+		atma::vector<int> v;
 
-SCENARIO("vectors can be sized and resized", "[vector]") {
+		CHECK(v.empty());
+		CHECK(v.size() == 0);
+		CHECK(v.capacity() == 0);
+	}
 
+	GIVEN("a vector constructed with size 4 default items")
+	{
+		atma::vector<int> v(4);
+
+		CHECK(!v.empty());
+		CHECK(v.size() == 4);
+		CHECK(v.capacity() >= 4);
+		CHECK(v[0] == 0); CHECK(v[1] == 0); CHECK(v[2] == 0); CHECK(v[3] == 0);
+	}
+
+	GIVEN("a vector constructed with {1, 2, 3, 4}")
+	{
+		atma::vector<int> v{1, 2, 3, 4};
+
+		CHECK(!v.empty());
+		CHECK(v.size() == 4);
+		CHECK(v.capacity() >= 4);
+		CHECK(v[0] == 1); CHECK(v[1] == 2); CHECK(v[2] == 3); CHECK(v[3] == 4);
+	}
+}
+
+SCENARIO("vectors can be sized and resized", "[vector]")
+{
 	GIVEN("an empty vector")
 	{
 		atma::vector<int> v;
 
-		REQUIRE(v.empty());
-		REQUIRE(v.size() == 0);
-		REQUIRE(v.capacity() >= 0);
+		CHECK(v.empty());
+		CHECK(v.size() == 0);
+		CHECK(v.capacity() >= 0);
 
-		WHEN("the size is increased")
+		WHEN("it is resized")
 		{
 			v.resize(10);
 
 			THEN("the size and capacity change") {
-				CHECK(v.size() == 11);
-				CHECK(v.capacity() >= 1000);
+				CHECK(v.size() == 10);
+				CHECK(v.capacity() >= 10);
 			}
 		}
 
@@ -29,7 +60,8 @@ SCENARIO("vectors can be sized and resized", "[vector]") {
 			v.reserve(10);
 
 			THEN("the capacity changes but not the size") {
-				CHECK(v.size() == 144);
+				CHECK(v.empty());
+				CHECK(v.size() == 0);
 				CHECK(v.capacity() >= 10);
 			}
 		}
