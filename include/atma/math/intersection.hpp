@@ -79,9 +79,9 @@ namespace atma { namespace math {
 		auto v1zx = math::vector4f{v1.z, v1.x, 0.f, 0.f};
 		auto v2zx = math::vector4f{v2.z, v2.x, 0.f, 0.f};
 
-		de0zx = -dot_product(ne0zx, v0zx) + std::max(0.f, dp.y * ne0zx.x) + std::max(0.f, dp.z * ne0zx.y);
-		de1zx = -dot_product(ne1zx, v1zx) + std::max(0.f, dp.y * ne1zx.x) + std::max(0.f, dp.z * ne1zx.y);
-		de2zx = -dot_product(ne2zx, v2zx) + std::max(0.f, dp.y * ne2zx.x) + std::max(0.f, dp.z * ne2zx.y);
+		de0zx = -dot_product(ne0zx, v0zx) + std::max(0.f, dp.z * ne0zx.x) + std::max(0.f, dp.x * ne0zx.y);
+		de1zx = -dot_product(ne1zx, v1zx) + std::max(0.f, dp.z * ne1zx.x) + std::max(0.f, dp.x * ne1zx.y);
+		de2zx = -dot_product(ne2zx, v2zx) + std::max(0.f, dp.z * ne2zx.x) + std::max(0.f, dp.x * ne2zx.y);
 	}
 
 	template <typename Box>
