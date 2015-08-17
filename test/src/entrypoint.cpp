@@ -41,7 +41,7 @@ SCENARIO("vectors can be constructed", "[vector]")
 		CHECK(!v.empty());
 		CHECK(v.size() == 4);
 		CHECK(v.capacity() >= 4);
-		CHECK(v[0] == 1); CHECK(v[1] == 245); CHECK(v[2] == 345); CHECK(v[3] == 4);
+		CHECK(v[0] == 1); CHECK(v[1] == 2); CHECK(v[2] == 3); CHECK(v[3] == 4);
 	}
 }
 
@@ -59,7 +59,8 @@ SCENARIO("vectors can be sized and resized", "[vector]")
 		{
 			v.resize(10);
 
-			THEN("the size and capacity change") {
+			THEN("the size and capacity change")
+			{
 				CHECK(v.size() == 10);
 				CHECK(v.capacity() >= 10);
 			}
@@ -69,10 +70,24 @@ SCENARIO("vectors can be sized and resized", "[vector]")
 		{
 			v.reserve(10);
 
-			THEN("the capacity changes but not the size") {
-				CHECK(!v.empty());
+			THEN("the capacity changes but not the size")
+			{
+				CHECK(v.empty());
 				CHECK(v.size() == 0);
 				CHECK(v.capacity() >= 10);
+			}
+		}
+
+		WHEN("more capacity is reserved, then shrink_to_fit")
+		{
+			v.reserve(10);
+			v.shrink_to_fit();
+
+			THEN("the capacity is zero")
+			{
+				CHECK(v.empty());
+				CHECK(v.size() == 0);
+				CHECK(v.capacity() == 0);
 			}
 		}
 	}
