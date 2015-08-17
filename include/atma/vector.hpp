@@ -283,10 +283,13 @@ namespace atma
 			size_ = capacity;
 		}
 
-		auto tmp = internal_memory_t{std::move(imem_)};
-		imem_.alloc(capacity);
-		imem_.memcpy(0, tmp, 0, size_);
-		tmp.deallocate();
+		if (capacity > 0)
+		{
+			auto tmp = internal_memory_t{std::move(imem_)};
+			imem_.alloc(capacity);
+			imem_.memcpy(0, tmp, 0, size_);
+			tmp.deallocate();
+		}
 
 		capacity_ = capacity;
 	}
