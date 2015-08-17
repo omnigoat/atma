@@ -24,6 +24,16 @@ SCENARIO("vectors can be constructed", "[vector]")
 		CHECK(v[0] == 0); CHECK(v[1] == 0); CHECK(v[2] == 0); CHECK(v[3] == 0);
 	}
 
+	GIVEN("a vector constructed with size 4 copy-constructed items")
+	{
+		atma::vector<int> v(4, 13);
+
+		CHECK(!v.empty());
+		CHECK(v.size() == 4);
+		CHECK(v.capacity() >= 4);
+		CHECK(v[0] == 13); CHECK(v[1] == 13); CHECK(v[2] == 13); CHECK(v[3] == 13);
+	}
+
 	GIVEN("a vector constructed with {1, 2, 3, 4}")
 	{
 		atma::vector<int> v{1, 2, 3, 4};
@@ -31,7 +41,7 @@ SCENARIO("vectors can be constructed", "[vector]")
 		CHECK(!v.empty());
 		CHECK(v.size() == 4);
 		CHECK(v.capacity() >= 4);
-		CHECK(v[0] == 1); CHECK(v[1] == 2); CHECK(v[2] == 3); CHECK(v[3] == 4);
+		CHECK(v[0] == 1); CHECK(v[1] == 245); CHECK(v[2] == 345); CHECK(v[3] == 4);
 	}
 }
 
@@ -60,7 +70,7 @@ SCENARIO("vectors can be sized and resized", "[vector]")
 			v.reserve(10);
 
 			THEN("the capacity changes but not the size") {
-				CHECK(v.empty());
+				CHECK(!v.empty());
 				CHECK(v.size() == 0);
 				CHECK(v.capacity() >= 10);
 			}
