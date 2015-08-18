@@ -43,6 +43,33 @@ SCENARIO("vectors can be constructed", "[vector]")
 		CHECK(v.capacity() >= 4);
 		CHECK(v[0] == 1); CHECK(v[1] == 2); CHECK(v[2] == 3); CHECK(v[3] == 4);
 	}
+
+	GIVEN("a copy-constructed vector")
+	{
+		atma::vector<int> g{1, 2, 3, 4};
+		atma::vector<int> v{g};
+
+		CHECK(!v.empty());
+		CHECK(v.size() == 4);
+		CHECK(v.capacity() >= 4);
+		CHECK(v[0] == 1); CHECK(v[1] == 2); CHECK(v[2] == 3); CHECK(v[3] == 4);
+		CHECK(v == g);
+	}
+
+	GIVEN("a move-constructed vector")
+	{
+		atma::vector<int> g{1, 2, 3, 4};
+		atma::vector<int> v{std::move(g)};
+
+		CHECK(g.empty());
+		CHECK(g.size() == 0);
+		CHECK(g.capacity() == 0);
+
+		CHECK(!v.empty());
+		CHECK(v.size() == 4);
+		CHECK(v.capacity() >= 4);
+		CHECK(v[0] == 1); CHECK(v[1] == 2); CHECK(v[2] == 3); CHECK(v[3] == 4);
+	}
 }
 
 SCENARIO("vectors can be sized and resized", "[vector]")
