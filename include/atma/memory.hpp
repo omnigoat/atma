@@ -21,8 +21,12 @@ namespace atma
 {
 	namespace detail
 	{
-		template <typename Alloc, bool Empty = std::is_empty<Alloc>::value>
+		template <
+			typename Alloc,
+			bool Empty = std::is_empty<Alloc>::value
+		>
 		struct base_memory_t;
+
 
 		template <typename Alloc>
 		struct base_memory_t<Alloc, false>
@@ -35,7 +39,7 @@ namespace atma
 				: allocator_(rhs.allocator())
 			{}
 
-			base_memory_t(Alloc& allocator)
+			base_memory_t(Alloc const& allocator)
 				: allocator_(allocator)
 			{}
 
@@ -45,6 +49,7 @@ namespace atma
 		private:
 			Alloc allocator_;
 		};
+
 
 		template <typename Alloc>
 		struct base_memory_t<Alloc, true>
@@ -58,7 +63,7 @@ namespace atma
 				: Alloc(rhs.allocator())
 			{}
 
-			base_memory_t(Alloc& allocator)
+			base_memory_t(Alloc const& allocator)
 				: Alloc(allocator)
 			{}
 
@@ -70,18 +75,19 @@ namespace atma
 
 
 
-	template <typename Alloc>
-	struct memory_t : detail::base_memory_t<Alloc>
+	template <typename T, typename Allocator>
+	struct memory_t : detail::base_memory_t<typename Allocator::template rebind<T>::other>
 	{
-		using value_type = typename Alloc::value_type;
+		using value_type = T;
 
 		memory_t();
-		template <typename U> explicit memory_t(memory_t<U> const& rhs);
 		memory_t(memory_t&&);
-		explicit memory_t(Alloc& allocator);
-		explicit memory_t(value_type* data);
+		template <typename U> explicit memory_t(memory_t<T, U> const&);
+		explicit memory_t(Allocator const& allocator);
+		explicit memory_t(value_type* data, Allocator const& = Allocator());
+		memory_t(memory_t const&) = delete;
 
-		template <typename U> auto operator = (memory_t<U> const& rhs) -> memory_t&;
+		auto operator = (memory_t const&) -> memory_t& = delete;
 
 		auto alloc(size_t capacity) -> void;
 		auto deallocate() -> void;
@@ -92,7 +98,7 @@ namespace atma
 		auto destruct(size_t offset, size_t count) -> void;
 
 		auto memmove(size_t dest, size_t src, size_t count) -> void;
-		template <typename B> auto memcpy(size_t dest, memory_t<B> const&, size_t src, size_t count) -> void;
+		template <typename U> auto memcpy(size_t dest, memory_t<T,U> const&, size_t src, size_t count) -> void;
 
 		auto detach_ptr() -> value_type*;
 
@@ -102,107 +108,91 @@ namespace atma
 
 
 
-	template <typename A>
-	inline memory_t<A>::memory_t()
+	template <typename T, typename A>
+	inline memory_t<T,A>::memory_t()
 		: ptr()
 	{}
 
-	template <typename A>
-	inline memory_t<A>::memory_t(A& allocator)
+	template <typename T, typename A>
+	inline memory_t<T,A>::memory_t(A const& allocator)
 		: detail::base_memory_t(allocator)
 		, ptr()
 	{}
 
-	template <typename A>
-	template <typename U>
-	inline memory_t<A>::memory_t(memory_t<U> const& rhs)
-		: detail::base_memory_t<A>(static_cast<detail::base_memory_t<U> const&>(rhs))
-		, ptr(reinterpret_cast<value_type*>(rhs.ptr))
-	{
-	}
-
-	template <typename A>
-	inline memory_t<A>::memory_t(memory_t&& rhs)
+	template <typename T, typename A>
+	inline memory_t<T,A>::memory_t(memory_t&& rhs)
 		: detail::base_memory_t<A>(rhs)
 		, ptr(rhs.ptr)
 	{
 		rhs.ptr = nullptr;
 	}
 
-	template <typename A>
-	inline memory_t<A>::memory_t(value_type* data)
-		: ptr(data)
+	template <typename T, typename A>
+	inline memory_t<T,A>::memory_t(value_type* data, A const& alloc)
+		: detail::base_memory_t<A>(alloc)
+		, ptr(data)
 	{}
 
-	template <typename A>
-	template <typename A2>
-	inline auto memory_t<A>::operator = (memory_t<A2> const& rhs) -> memory_t&
-	{
-		allocator() = A(rhs.allocator());
-		ptr = rhs.ptr;
-		return *this;
-	}
-
-	template <typename A>
-	inline auto memory_t<A>::alloc(size_t capacity) -> void
+	template <typename T, typename A>
+	inline auto memory_t<T,A>::alloc(size_t capacity) -> void
 	{
 		ptr = allocator().allocate(capacity);
 	}
 
-	template <typename A>
-	inline auto memory_t<A>::deallocate() -> void
+	template <typename T, typename A>
+	inline auto memory_t<T,A>::deallocate() -> void
 	{
 		return allocator().deallocate(ptr, 0);
 	}
 
-	template <typename A>
-	inline auto memory_t<A>::construct_default(size_t offset, size_t count, value_type const& x) -> void
+	template <typename T, typename A>
+	inline auto memory_t<T,A>::construct_default(size_t offset, size_t count, value_type const& x) -> void
 	{
 		for (auto i = offset; i != offset + count; ++i)
 			allocator().construct(ptr + i, x);
 	}
 
-	template <typename A>
-	inline auto memory_t<A>::construct_copy(size_t offset, value_type const& x) -> void
+	template <typename T, typename A>
+	inline auto memory_t<T,A>::construct_copy(size_t offset, value_type const& x) -> void
 	{
 		allocator().construct(ptr + offset, x);
 	}
 
-	template <typename A>
-	inline auto memory_t<A>::construct_copy_range(size_t offset, value_type const* rhs, size_t size) -> void
+	template <typename T, typename A>
+	inline auto memory_t<T,A>::construct_copy_range(size_t offset, value_type const* rhs, size_t size) -> void
 	{
 		for (auto i = size_t{}, j = offset; i != size; ++i, ++j)
 			allocator().construct(ptr + j, rhs[i]);
 	}
 
-	template <typename A>
-	inline auto memory_t<A>::construct_move(size_t offset, value_type&& rhs) -> void
+	template <typename T, typename A>
+	inline auto memory_t<T,A>::construct_move(size_t offset, value_type&& rhs) -> void
 	{
 		allocator().construct(ptr + offset, std::move(rhs));
 	}
 
-	template <typename A>
-	inline auto memory_t<A>::destruct(size_t offset, size_t count) -> void
+	template <typename T, typename A>
+	inline auto memory_t<T,A>::destruct(size_t offset, size_t count) -> void
 	{
 		for (auto i = offset; i != offset + count; ++i)
 			allocator().destroy(ptr + i);
 	}
 
-	template <typename A>
-	inline auto memory_t<A>::memmove(size_t dest, size_t src, size_t count) -> void
+	template <typename T, typename A>
+	inline auto memory_t<T,A>::memmove(size_t dest, size_t src, size_t count) -> void
 	{
 		std::memmove(ptr + dest, ptr + src, sizeof(value_type) * count);
 	}
 
-	template <typename A>
-	template <typename B>
-	inline auto memory_t<A>::memcpy(size_t dest, memory_t<B> const& rhs, size_t src, size_t count) -> void
+	template <typename T, typename A>
+	template <typename U>
+	inline auto memory_t<T,A>::memcpy(size_t dest, memory_t<T, U> const& rhs, size_t src, size_t count) -> void
 	{
-		std::memcpy(ptr + dest, rhs.ptr + src, sizeof(typename B::value_type) * count);
+		std::memcpy(ptr + dest, rhs.ptr + src, sizeof(T) * count);
 	}
 
-	template <typename A>
-	inline auto memory_t<A>::detach_ptr() -> value_type*
+	template <typename T, typename A>
+	inline auto memory_t<T,A>::detach_ptr() -> value_type*
 	{
 		auto t = ptr;
 		ptr = nullptr;
