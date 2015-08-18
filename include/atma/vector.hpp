@@ -77,7 +77,7 @@ namespace atma
 		auto imem_grow(size_t minsize) -> void;
 
 	private:
-		using internal_memory_t = atma::memory_t<Allocator>;
+		using internal_memory_t = atma::memory_t<T, Allocator>;
 
 		internal_memory_t imem_;
 		size_t capacity_;

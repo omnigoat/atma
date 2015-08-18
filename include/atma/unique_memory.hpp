@@ -35,10 +35,10 @@ namespace atma
 
 		auto swap(basic_unique_memory_t&) -> void;
 
-		auto detach_memory() -> atma::memory_t<Alloc>;
+		auto detach_memory() -> atma::memory_t<byte, Alloc>;
 
 	private:
-		atma::memory_t<typename Alloc::template rebind<byte>::other> memory_;
+		atma::memory_t<byte, Alloc> memory_;
 		size_t size_;
 
 		template <typename U> friend struct basic_unique_memory_t;
@@ -152,7 +152,7 @@ namespace atma
 	}
 
 	template <typename A>
-	inline auto basic_unique_memory_t<A>::detach_memory() -> memory_t<A>
+	inline auto basic_unique_memory_t<A>::detach_memory() -> memory_t<byte, A>
 	{
 		auto tmp = memory_t<A>{memory_};
 		memory_.detach_ptr();
