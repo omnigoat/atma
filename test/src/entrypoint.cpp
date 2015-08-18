@@ -61,14 +61,20 @@ SCENARIO("vectors can be constructed", "[vector]")
 		atma::vector<int> g{1, 2, 3, 4};
 		atma::vector<int> v{std::move(g)};
 
-		CHECK(g.empty());
-		CHECK(g.size() == 0);
-		CHECK(g.capacity() == 0);
+		THEN("origin vector is empty")
+		{
+			CHECK(g.empty());
+			CHECK(g.size() == 0);
+			CHECK(g.capacity() == 0);
+		}
 
-		CHECK(!v.empty());
-		CHECK(v.size() == 4);
-		CHECK(v.capacity() >= 4);
-		CHECK(v[0] == 1); CHECK(v[1] == 2); CHECK(v[2] == 3); CHECK(v[3] == 4);
+		AND_THEN("constructed vector equal")
+		{
+			CHECK(!v.empty());
+			CHECK(v.size() == 4);
+			CHECK(v.capacity() >= 4);
+			CHECK(v[0] == 1); CHECK(v[1] == 2); CHECK(v[2] == 3); CHECK(v[3] == 4);
+		}
 	}
 }
 
