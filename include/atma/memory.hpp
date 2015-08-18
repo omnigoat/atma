@@ -77,6 +77,7 @@ namespace atma
 
 		memory_t();
 		template <typename U> explicit memory_t(memory_t<U> const& rhs);
+		memory_t(memory_t&&);
 		explicit memory_t(Alloc& allocator);
 		explicit memory_t(value_type* data);
 
@@ -118,6 +119,14 @@ namespace atma
 		: detail::base_memory_t<A>(static_cast<detail::base_memory_t<U> const&>(rhs))
 		, ptr(reinterpret_cast<value_type*>(rhs.ptr))
 	{
+	}
+
+	template <typename A>
+	inline memory_t<A>::memory_t(memory_t&& rhs)
+		: detail::base_memory_t<A>(rhs)
+		, ptr(rhs.ptr)
+	{
+		rhs.ptr = nullptr;
 	}
 
 	template <typename A>

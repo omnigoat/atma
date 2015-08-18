@@ -430,13 +430,22 @@ namespace atma
 		size_ -= rangesize;
 	}
 
-
-
-
 	template <typename T, typename A>
 	inline auto vector<T,A>::imem_grow(size_t minsize) -> void
 	{
 		auto newcap = detail::quantize_memory_size(minsize);
 		recapacitize(newcap);
+	}
+
+	template <typename T, typename A>
+	inline auto operator == (vector<T,A> const& lhs, vector<T, A> const& rhs) -> bool
+	{
+		return lhs.size() == rhs.size() && std::equal(lhs.begin(), lhs.end(), rhs.begin());
+	}
+
+	template <typename T, typename A>
+	inline auto operator != (vector<T, A> const& lhs, vector<T, A> const& rhs) -> bool
+	{
+		return !operator == (lhs, rhs);
 	}
 }
