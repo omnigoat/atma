@@ -125,3 +125,40 @@ SCENARIO("vectors can be sized and resized", "[vector]")
 		}
 	}
 }
+
+SCENARIO("vectors can be assigned", "[vector]")
+{
+	GIVEN("an empty vector and vector of four components")
+	{
+		atma::vector<int> v;
+		atma::vector<int> v2{1, 2, 3, 4};
+
+		WHEN("v is assigned v2")
+		{
+			v = v2;
+
+			THEN("a copy is made")
+			{
+				CHECK(!v.empty());
+				CHECK(v.size() == 4);
+				CHECK(v == v2);
+			}
+		}
+
+		WHEN("v is move-assigned v2")
+		{
+			v = std::move(v2);
+
+			THEN("v2 is reduced to nothing")
+			{
+				CHECK(!v.empty());
+				CHECK(v.size() == 4);
+				CHECK(v2.empty());
+				CHECK(v2.capacity() == 0);
+
+				atma::vector<int> t{1, 2, 3, 4};
+				CHECK(v == t);
+			}
+		}
+	}
+}

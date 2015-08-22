@@ -176,7 +176,7 @@ namespace atma
 	inline auto vector<T,A>::operator = (vector&& rhs) -> vector&
 	{
 		clear();
-		new (this) vector(rhs);
+		new (this) vector(std::move(rhs));
 		return *this;
 	}
 
