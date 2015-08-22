@@ -18,11 +18,15 @@ namespace atma
 				r *= 2;
 			return r;
 		}
+
+		template <typename I>
+		using valid_iterator_t = std::enable_if<std::is_same<typename std::iterator_traits<I>::iterator_category, std::forward_iterator_tag>::value>;
 	}
 
 	template <typename T, typename Allocator = atma::aligned_allocator_t<T, 4>>
 	struct vector
 	{
+		using value_type     = T;
 		using const_iterator = T const*;
 		using iterator       = T*;
 		using reference_type = T&;
@@ -32,6 +36,8 @@ namespace atma
 		explicit vector(size_t size);
 		explicit vector(size_t size, T const&);
 		vector(std::initializer_list<T>);
+		template <typename I, typename = detail::valid_iterator_t<I>>
+		vector(I begin, I end);
 		vector(vector const&);
 		vector(vector&&);
 		~vector();
@@ -59,7 +65,7 @@ namespace atma
 		auto reserve(size_t) -> void;
 		auto recapacitize(size_t) -> void;
 		auto shrink_to_fit() -> void;
-		auto resize(size_t) -> void;
+		auto resize(size_t, value_type const& = value_type()) -> void;
 
 		auto push_back(T&&) -> void;
 		auto push_back(T const&) -> void;
@@ -92,45 +98,61 @@ namespace atma
 
 	template <typename T, typename A>
 	inline vector<T,A>::vector()
-		: capacity_(), size_()
+		: capacity_()
+		, size_()
 	{
 	}
 
 	template <typename T, typename A>
 	inline vector<T, A>::vector(size_t size)
-		: vector(size, T())
+		: capacity_(size)
+		, size_(size)
 	{
+		memory_allocate(imem_, capacity_);
+		memory_construct_default(imem_, 0, size_);
 	}
 
 	template <typename T, typename A>
 	inline vector<T,A>::vector(size_t size, T const& d)
 		: capacity_(size), size_(size)
 	{
-		imem_.alloc(capacity_);
-		imem_.construct_default(0, size_, d);
+		memory_allocate(imem_, capacity_);
+		memory_construct_copy(imem_, 0, size_, d);
 	}
 
 	template <typename T, typename A>
 	inline vector<T,A>::vector(std::initializer_list<T> range)
-		: capacity_(), size_()
+		: capacity_()
+		, size_()
 	{
 		insert(end(), range.begin(), range.end());
 	}
 
 	template <typename T, typename A>
-	inline vector<T,A>::vector(vector const& rhs)
-		: capacity_(rhs.capacity_), size_(rhs.size_)
+	template <typename I, typename>
+	inline vector<T, A>::vector(I begin, I endd)
+		: capacity_()
+		, size_()
 	{
-		imem_.alloc(capacity_);
-		imem_.construct_copy_range(0, rhs.imem_.ptr, size_);
+		insert(end(), begin, endd);
+	}
+
+	template <typename T, typename A>
+	inline vector<T,A>::vector(vector const& rhs)
+		: capacity_(rhs.capacity_)
+		, size_(rhs.size_)
+	{
+		memory_allocate(imem_, capacity_);
+		memory_construct_copy(imem_, 0, size_, rhs.imem_.ptr);
 	}
 
 	template <typename T, typename A>
 	inline vector<T,A>::vector(vector&& rhs)
-		: imem_{std::move(rhs.imem_)}
+		: imem_(rhs.imem_)
 		, capacity_(rhs.capacity_)
 		, size_(rhs.size_)
 	{
+		rhs.imem_.ptr = nullptr;
 		rhs.capacity_ = 0;
 		rhs.size_ = 0;
 	}
@@ -138,14 +160,14 @@ namespace atma
 	template <typename T, typename A>
 	inline vector<T,A>::~vector()
 	{
-		imem_.destruct(0, size_);
-		imem_.deallocate();
+		memory_destruct(imem_, 0, size_);
+		memory_deallocate(imem_);
 	}
 
 	template <typename T, typename A>
 	auto vector<T,A>::operator = (vector const& rhs) -> vector&
 	{
-		this->~vector();
+		clear();
 		new (this) vector(rhs);
 		return *this;
 	}
@@ -153,7 +175,7 @@ namespace atma
 	template <typename T, typename A>
 	inline auto vector<T,A>::operator = (vector&& rhs) -> vector&
 	{
-		this->~vector();
+		clear();
 		new (this) vector(rhs);
 		return *this;
 	}
@@ -235,8 +257,8 @@ namespace atma
 		ATMA_ASSERT(oursize % sizeof(T) == 0);
 		oursize /= sizeof(T);
 
-		imem_.alloc(oursize);
-		imem_.memcpy(0, rhs.imem_, 0, rhs.size_);
+		memory_allocate(imem_, oursize);
+		memory_memcpy(imem_, 0, rhs.imem_, 0, oursize);
 	}
 
 	template <typename T, typename A>
@@ -258,8 +280,8 @@ namespace atma
 	template <typename T, typename A>
 	inline auto vector<T, A>::clear() -> void
 	{
-		imem_.destruct(0, size_);
-		imem_.deallocate();
+		memory_destruct(imem_, 0, size_);
+		memory_deallocate(imem_);
 		imem_.ptr = nullptr;
 		size_ = 0;
 		capacity_ = 0;
@@ -279,16 +301,16 @@ namespace atma
 			return;
 
 		if (capacity < size_) {
-			imem_.destruct(capacity, size_ - capacity);
+			memory_destruct(imem_, capacity, size_ - capacity);
 			size_ = capacity;
 		}
 
 		if (capacity > 0)
 		{
-			auto tmp = internal_memory_t{std::move(imem_)};
-			imem_.alloc(capacity);
-			imem_.memcpy(0, tmp, 0, size_);
-			tmp.deallocate();
+			auto tmp = imem_;
+			memory_allocate(imem_, capacity);
+			memory_memcpy(imem_, 0, tmp, 0, size_);
+			memory_deallocate(tmp);
 		}
 
 		capacity_ = capacity;
@@ -301,15 +323,15 @@ namespace atma
 	}
 
 	template <typename T, typename A>
-	inline auto vector<T,A>::resize(size_t size) -> void
+	inline auto vector<T,A>::resize(size_t size, value_type const& x) -> void
 	{
 		imem_grow(size);
 		
 		if (size < size_) {
-			imem_.destruct(size, size_ - size);
+			memory_destruct(imem_, size, size_ - size);
 		}
 		else if (size_ < size) {
-			imem_.construct_default(size_, size - size_);
+			memory_construct_copy(imem_, size_, size - size_, x);
 		}
 
 		size_ = size;
@@ -321,7 +343,8 @@ namespace atma
 		if (size_ == capacity_)
 			imem_grow(size_ + 1);
 
-		imem_.construct_copy(size_++, x);
+		memory_construct_copy(imem_, size_, 1, x);
+		++size_;
 	}
 
 	template <typename T, typename A>
@@ -330,21 +353,16 @@ namespace atma
 		if (size_ == capacity_)
 			imem_grow(size_ + 1);
 
-		imem_.construct_move(size_++, std::move(x));
+		memory_construct_move(imem_, size_, std::move(x));
+		++size_;
 	}
 
 	template <typename T, typename A>
 	template <typename H>
 	inline auto vector<T, A>::assign(H begin, H end) -> void
 	{
-		imem_.deallocate();
-
-		auto size = std::distance(begin, end);
-		imem_.alloc(size);
-
-		int idx = 0;
-		for (auto i = begin; i != end; ++i)
-			new (imem_.ptr + idx++) T(*i);
+		clear();
+		new (this) vector(begin, end);
 	}
 
 	template <typename T, typename A>
@@ -384,13 +402,15 @@ namespace atma
 	inline auto vector<T,A>::insert(const_iterator where, H begin, H end) -> void
 	{
 		auto const offset = where - this->begin();
-		auto const rangesize = end - begin;
+		auto const rangesize = std::distance(begin, end);
 
 		if (size_ + rangesize > capacity_)
 			imem_grow(size_ + rangesize);
 
-		imem_.memmove(offset + 1 + rangesize, offset + 1, size_ - offset);
-		imem_.construct_copy_range(offset, begin, rangesize);
+		memory_memmove(imem_, offset + 1 + rangesize, offset + 1, size_ - offset);
+		for (auto i = offset; i != rangesize; ++i)
+			new (imem_.ptr + i) T(*begin++);
+		//memory_construct_copy(offset, begin, rangesize);
 		size_ += rangesize;
 	}
 

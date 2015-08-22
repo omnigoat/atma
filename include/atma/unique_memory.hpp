@@ -56,14 +56,14 @@ namespace atma
 	inline basic_unique_memory_t<A>::basic_unique_memory_t(size_t size)
 		: size_(size)
 	{
-		memory_.alloc(size);
+		memory_allocate(memory_, size);
 	}
 
 	template <typename A>
 	inline basic_unique_memory_t<A>::basic_unique_memory_t(void const* data, size_t size)
 		: size_(size)
 	{
-		memory_.alloc(size);
+		memory_allocate(memory_, size);
 		memcpy(memory_.ptr, data, size);
 	}
 
@@ -78,16 +78,17 @@ namespace atma
 	template <typename A>
 	template <typename U>
 	inline basic_unique_memory_t<A>::basic_unique_memory_t(basic_unique_memory_t<U>&& rhs)
-		: memory_{rhs.memory_.detach_ptr()}
+		: memory_{rhs.memory_}
 		, size_{rhs.size_}
 	{
+		rhs.memory_.ptr = nullptr;
 		rhs.size_ = 0;
 	}
 
 	template <typename A>
 	inline basic_unique_memory_t<A>::~basic_unique_memory_t()
 	{
-		memory_.deallocate();
+		memory_deallocate(memory_);
 	}
 
 	template <typename A>
@@ -154,8 +155,8 @@ namespace atma
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::detach_memory() -> memory_t<byte, A>
 	{
-		auto tmp = memory_t<A>{memory_};
-		memory_.detach_ptr();
+		auto tmp = memory_t<byte, A>{memory_};
+		memory_.ptr = nullptr;
 		return tmp;
 	}
 
