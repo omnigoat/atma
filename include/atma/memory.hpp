@@ -77,8 +77,6 @@ namespace atma
 	}
 
 
-
-
 	template <typename T, typename Allocator>
 	struct memory_t : detail::base_memory_t<T, Allocator>
 	{
