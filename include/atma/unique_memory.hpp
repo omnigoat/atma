@@ -13,6 +13,8 @@ namespace atma
 	template <typename Alloc>
 	struct basic_unique_memory_t
 	{
+		using backing_t = atma::memory_t<byte, Alloc>;
+
 		basic_unique_memory_t();
 		explicit basic_unique_memory_t(size_t size);
 		basic_unique_memory_t(void const* data, size_t size);
@@ -24,8 +26,6 @@ namespace atma
 		auto operator = (basic_unique_memory_t const&) -> basic_unique_memory_t& = delete;
 		template <typename U> auto operator = (basic_unique_memory_t<U>&&) -> basic_unique_memory_t&;
 
-		operator bool() const;
-
 		auto empty() const -> bool;
 		auto size() const -> size_t;
 		auto begin() const -> byte const*;
@@ -35,10 +35,10 @@ namespace atma
 
 		auto swap(basic_unique_memory_t&) -> void;
 
-		auto detach_memory() -> atma::memory_t<byte, Alloc>;
+		auto detach_memory() -> backing_t;
 
 	private:
-		atma::memory_t<byte, Alloc> memory_;
+		backing_t memory_;
 		size_t size_;
 
 		template <typename U> friend struct basic_unique_memory_t;
@@ -69,10 +69,9 @@ namespace atma
 
 	template <typename A>
 	inline basic_unique_memory_t<A>::basic_unique_memory_t(unique_memory_take_ownership_tag, void* data, size_t size)
-		: memory_{}
+		: memory_{data}
 		, size_(size)
 	{
-		memory_.ptr = reinterpret_cast<byte*>(data);
 	}
 
 	template <typename A>
@@ -100,12 +99,6 @@ namespace atma
 		size_ = rhs.size_;
 		rhs.memory_.ptr = nullptr;
 		return *this;
-	}
-
-	template <typename A>
-	inline basic_unique_memory_t<A>::operator bool() const
-	{
-		return begin_ != nullptr;
 	}
 
 	template <typename A>
@@ -153,9 +146,9 @@ namespace atma
 	}
 
 	template <typename A>
-	inline auto basic_unique_memory_t<A>::detach_memory() -> memory_t<byte, A>
+	inline auto basic_unique_memory_t<A>::detach_memory() -> backing_t
 	{
-		auto tmp = memory_t<byte, A>{memory_};
+		auto tmp = memory_;
 		memory_.ptr = nullptr;
 		return tmp;
 	}
@@ -165,30 +158,32 @@ namespace atma
 
 
 
-	template <typename T, typename E>
+	template <typename E>
 	struct memory_view_t
 	{
-		memory_view_t(T& c, size_t offset, size_t size)
-			: begin_{c.begin() + offset}, end_{c.begin() + offset + size}
+		template <typename T>
+		memory_view_t(T&& c, size_t offset, size_t size)
+			: begin_{reinterpret_cast<E*>(c.begin() + offset)}
+			, end_{reinterpret_cast<E*>(c.begin() + offset + size)}
 		{}
 
-		memory_view_t(T& c)
+		template <typename T>
+		memory_view_t(T&& c)
 			: memory_view_t(c, 0, c.size())
 		{}
 
-		auto begin() const -> E* { return reinterpret_cast<E*>(begin_); }
-		auto end() const -> E* { return reinterpret_cast<E*>(end_); }
+		auto begin() const -> E* { return begin_; }
+		auto end() const -> E* { return end_; }
 		auto size() const -> size_t { return end() - begin(); }
 
 		auto operator [](size_t idx) const -> E&
 		{
-			return begin()[idx];
+			return begin_[idx];
 		}
 
 	private:
-		using storage_ptr = std::conditional_t<std::is_const<T>::value, void const*, void*>;
-
-		storage_ptr begin_, end_;
+		E* begin_;
+		E* end_;
 	};
 }
 
