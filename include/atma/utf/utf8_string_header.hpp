@@ -25,7 +25,8 @@ namespace atma {
 		using value_t        = char;
 		using iterator       = iterator_t<utf8_char_t>;
 		using const_iterator = iterator_t<utf8_char_t const>;
-
+		//using reverse_iterator = std::reverse_iterator<iterator>;
+		//using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 		utf8_string_t();
 		utf8_string_t(utf8_string_t const&);
@@ -54,6 +55,8 @@ namespace atma {
 		auto end() const -> const_iterator;
 		auto begin() -> iterator;
 		auto end() -> iterator;
+
+		//auto rbegin() const -> const_iterator
 
 		auto raw_begin() const -> char const*;
 		auto raw_end() const -> char const*;
@@ -190,5 +193,29 @@ namespace atma {
 	{
 		return !operator == (lhs, rhs);
 	}
+
+
+	template <typename T>
+	inline auto find_if(utf8_string_t::const_iterator const& begin, utf8_string_t::const_iterator const& end, T&& pred) -> utf8_string_t::const_iterator
+	{
+		for (auto i = begin; i != end; ++i)
+			if (pred(*i))
+				return i;
+
+		return end;
+	}
+
+	template <typename T>
+	inline auto find_if(utf8_string_t const& string, T&& pred) -> utf8_string_t::const_iterator
+	{
+		auto ie = string.end();
+
+		for (auto i = string.begin(); i != ie; ++i)
+			if (pred(*i))
+				return i;
+
+		return ie;
+	}
+
 
 }

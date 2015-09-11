@@ -149,6 +149,33 @@ namespace atma {
 		return *lhs.begin == x;
 	}
 
+
+	inline auto utf8_char_equality(utf8_char_t const& lhs, char const* rhs) -> bool
+	{
+		if (rhs == nullptr)
+			return false;
+
+		ATMA_ASSERT(utf8_byte_is_leading(*rhs));
+
+		for (int i = 0, end = utf8_char_bytecount(lhs.begin); i != end && *rhs; ++i, ++rhs)
+			if (lhs.begin[i] != *rhs)
+				return false;
+		
+		return true;
+	}
+
+	template <typename T>
+	inline auto utf8_charseq_any_of(char const* seq, T&& pred) -> bool
+	{
+		for (auto i = seq; *i; i = utf8_char_advance(i))
+			if (pred(utf8_char_t{i, utf8_char_advance(i)}))
+				return true;
+
+		return false;
+	}
+
+
+
 //=====================================================================
 } // namespace atma
 //=====================================================================

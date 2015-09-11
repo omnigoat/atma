@@ -2,6 +2,7 @@
 
 #include <atma/utf/utf8_string.hpp>
 #include <atma/enable_if.hpp>
+#include <atma/vector.hpp>
 
 #include <algorithm>
 
@@ -31,6 +32,44 @@ namespace atma {
 		std::reverse(s.raw_begin(), s.raw_end());
 
 		return s;
+	}
+
+	inline auto find_first_of(atma::string::const_iterator const& begin, atma::string::const_iterator const& end, char const* delims) -> atma::string::const_iterator
+	{
+		return find_if(begin, end, [&](utf8_char_t const& lhs) {
+			return utf8_charseq_any_of(delims, [&lhs](utf8_char_t const& rhs) {
+				return lhs == rhs; });});
+	}
+
+	inline auto find_first_of(atma::string const& str, char const* delims) -> atma::string::const_iterator
+	{
+		return find_first_of(str.begin(), str.end(), delims);
+	}
+
+
+
+	inline auto split(atma::string const& s, char const* delims) -> atma::vector<atma::string>
+	{
+		auto begin = s.begin();
+		auto end = s.end();
+
+		atma::vector<atma::string> result;
+
+		auto si = begin;
+		for (auto i = begin, pi = begin; i != end; ++i)
+		{
+			for (auto const* d = delims; *d; d = utf8_char_advance(d))
+			{
+				if (utf8_char_equality(*i, d))
+				{
+					result.push_back(atma::string(si, pi));
+					si = i;
+					break;
+				}
+			}
+
+			pi = i;
+		}
 	}
 
 }
