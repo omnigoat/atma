@@ -195,27 +195,47 @@ namespace atma {
 	}
 
 
+
+
+
+
+	// functions
+
+
+
+	//
+	// find_if
+	//
 	template <typename T>
 	inline auto find_if(utf8_string_t::const_iterator const& begin, utf8_string_t::const_iterator const& end, T&& pred) -> utf8_string_t::const_iterator
 	{
-		for (auto i = begin; i != end; ++i)
+		auto i = begin;
+		for (; i != end; ++i)
 			if (pred(*i))
-				return i;
+				break;
 
-		return end;
+		return i;
 	}
 
 	template <typename T>
 	inline auto find_if(utf8_string_t const& string, T&& pred) -> utf8_string_t::const_iterator
 	{
-		auto ie = string.end();
-
-		for (auto i = string.begin(); i != ie; ++i)
-			if (pred(*i))
-				return i;
-
-		return ie;
+		return find_if(string.begin(), string.end(), std::forward<T>(pred));
 	}
 
+	//
+	// find_first_of
+	//
+	inline auto find_first_of(utf8_string_t::const_iterator const& begin, utf8_string_t::const_iterator const& end, char const* delims) -> utf8_string_t::const_iterator
+	{
+		return find_if(begin, end, [&](utf8_char_t const& lhs) {
+			return utf8_charseq_any_of(delims, [&lhs](utf8_char_t const& rhs) {
+				return lhs == rhs; }); });
+	}
+
+	inline auto find_first_of(utf8_string_t const& str, char const* delims) -> utf8_string_t::const_iterator
+	{
+		return find_first_of(str.begin(), str.end(), delims);
+	}
 
 }
