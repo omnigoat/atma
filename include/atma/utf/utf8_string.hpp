@@ -7,9 +7,7 @@
 namespace atma {
 
 	inline utf8_string_t::utf8_string_t()
-		: capacity_()
-		, size_()
-		, data_()
+		: utf8_string_t{"", size_t{}}
 	{
 	}
 
