@@ -12,14 +12,15 @@
 #define CATCH_CONFIG_CPP11_TUPLE
 #define CATCH_CONFIG_VARIADIC_MACROS
 
-#include "../vendor/catch/catch.hpp"
+#include "../../vendor/catch/catch.hpp"
 
+#if defined(CATCH_CONFIG_MAIN)
 
 namespace atma { namespace unit_test {
 
 	using namespace Catch;
 
-	struct atma_reporter_t : StreamingReporterBase
+	struct atma_reporter_t : Catch::StreamingReporterBase
 	{
 		atma_reporter_t(ReporterConfig const& config)
 			: StreamingReporterBase(config)
@@ -333,4 +334,6 @@ namespace atma { namespace unit_test {
 	REGISTER_REPORTER("atma", atma_reporter_t);
 
 }}
+
+#endif
 
