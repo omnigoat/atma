@@ -70,6 +70,7 @@ namespace atma
 		char const zero_byte = '\0';
 	}
 
+
 	// there are a few values that are just not allowed anywhere in an utf8 encoding.
 	inline auto utf8_byte_is_valid(char const c) -> bool
 	{
@@ -77,28 +78,33 @@ namespace atma
 	}
 
 	// c is a valid utf8 byte and the leading byte of a sequence
-	inline auto utf8_byte_is_leading(char const c) -> bool {
+	inline auto utf8_byte_is_leading(char const c) -> bool
+	{
 		return detail::char_length_table[c] >= 1;
 	}
 
-	inline auto utf8_byte_is_run_on(char const c) -> bool {
+	inline auto utf8_byte_is_run_on(char const c) -> bool
+	{
 		return detail::char_length_table[c] == 0;
 	}
 
 	// c in codepoint [0, 128), a.k.a: ascii
-	inline auto utf8_char_is_ascii(char const c) -> bool {
+	inline auto utf8_char_is_ascii(char const c) -> bool
+	{
 		return detail::char_length_table[c] == 1;
 	}
 
 	// return how many bytes we need to advance, assuming we're at a leading byte
-	inline auto utf8_char_bytecount(char const* leading) -> int8 {
+	inline auto utf8_char_bytecount(char const* leading) -> int8
+	{
 		ATMA_ASSERT(leading);
 		ATMA_ENSURE(utf8_byte_is_leading(*leading));
 		return detail::char_length_table[*leading];
 	}
 
-	inline auto utf8_char_advance(char const* leading) -> char const* {
-		return leading + utf8_char_bytecount(leading);
+	inline auto utf8_char_advance(char const*& leading) -> void
+	{
+		leading += utf8_char_bytecount(leading);
 	}
 
 	inline auto utf8_char_equality(char const* lhs, char const* rhs) -> bool
@@ -118,7 +124,8 @@ namespace atma
 		return true;
 	}
 
-	inline auto utf8_char_codepoint(char const* x) -> codepoint
+#if 0
+	inline auto utf8_char_codepoint(utf8_char_t x) -> codepoint
 	{
 		ATMA_ASSERT(x);
 		ATMA_ASSERT(utf8_byte_is_leading(*x));
@@ -132,18 +139,63 @@ namespace atma
 		else if ((x[0] & 0xf0) == 0xe0)
 			r = ((x[0] & 0x0f) << 12) | ((x[1] & 0x3f) << 6) | (x[2] & 0x3f);
 		else if ((x[0] & 0xf8) == 0xf0)
-			r = ((x[0] & 0x07) << 18) | ((x[1] & 0x3f) << 12) | ((x[2] & 0x3f) << 6) | ((x[3] & 0x3f);
+			r = ((x[0] & 0x07) << 18) | ((x[1] & 0x3f) << 12) | ((x[2] & 0x3f) << 6) | (x[3] & 0x3f);
 
 		return r;
 	}
+#endif
 
+
+
+	struct utf8_char_t
+	{
+		utf8_char_t(char const* c)
+			: c(c)
+		{}
+
+		auto operator [](int i) -> char { return c[i]; }
+
+		auto bytecount() const -> size_t { return utf8_char_bytecount(c); }
+		auto data() const -> char const* { return c; }
+
+		operator char const*() const { return c; }
+
+	private:
+		char const* c;
+	};
+
+	static_assert(sizeof(utf8_char_t) == sizeof(char const*), "what happened?");
+
+	inline auto operator == (utf8_char_t lhs, utf8_char_t rhs) -> bool
+	{
+		return utf8_char_equality(lhs.data(), rhs.data());
+	}
+
+	inline auto operator == (utf8_char_t lhs, char rhs) -> bool
+	{
+		ATMA_ASSERT(utf8_char_is_ascii(rhs));
+		return lhs[0] == rhs;
+	}
+}
+
+
+
+
+//=====================================================================
+// charseq
+// ---------
+//  operations on a sequence of utf8-chars. "char const*" is
+//  indistinguishable when used as both a single char or many
+//=====================================================================
+namespace atma
+{
 	template <typename FN>
 	inline auto utf8_charseq_for_each(char const* seq, FN&& fn) -> void
 	{
 		ATMA_ASSERT(seq);
 		ATMA_ASSERT(utf8_byte_is_leading(*seq));
 
-		for (auto i = seq; *i; i = utf8_char_advance(i))
+		for (auto i = seq; *i; utf8_char_advance(i))
 			fn(i);
 	}
 
@@ -153,7 +205,7 @@ namespace atma
 		ATMA_ASSERT(seq);
 		ATMA_ASSERT(utf8_byte_is_leading(*seq));
 
-		for (auto i = seq; *i; i = utf8_char_advance(i))
+		for (auto i = seq; *i; utf8_char_advance(i))
 			if (pred(i))
 				return true;
 
@@ -161,15 +213,16 @@ namespace atma
 	}
 
 	template <typename T>
-	inline auto utf8_charseq_find(char const* seq, char const* x) -> char const*
+	inline auto utf8_charseq_find(char const* seq, utf8_char_t x) -> char const*
 	{
 		ATMA_ASSERT(seq);
 		ATMA_ASSERT(utf8_byte_is_leading(*seq));
 
-		for (auto i = seq; *i; i = utf8_char_advance(i))
-			if (utf8_char_equality(x, i))
+		for (auto i = seq; *i; utf8_char_advance(i))
+			if (x == i)
 				return i;
 
 		return nullptr;
 	}
+
 }

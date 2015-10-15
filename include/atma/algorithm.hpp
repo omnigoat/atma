@@ -1,6 +1,6 @@
 #pragma once
 
-
+#include <atma/function_traits.hpp>
 #include <atma/tuple.hpp>
 #include <atma/algorithm/filter.hpp>
 #include <atma/algorithm/map.hpp>
@@ -195,6 +195,44 @@ namespace atma
 			f(x);
 	}
 
+	template <typename R, typename F>
+	inline auto foldl(R&& range, F&& fn) -> typename function_traits<F>::result_type
+	{
+		ATMA_ASSERT(!range.empty());
+
+		auto r = range.first();
+
+		for (auto i = ++range.begin(); i != range.end(); ++i)
+			r = fn(r, *i);
+		
+		return r;
+	}
+
+	template <typename R, typename I, typename F>
+	inline auto foldl(R&& range, I&& initial, F&& fn) -> typename function_traits<F>::result_type
+	{
+		ATMA_ASSERT(!range.empty());
+
+		auto&& r = initial;
+
+		for (auto i = range.begin(); i != range.end(); ++i)
+			r = fn(r, *i);
+
+		return r;
+	}
+
+	template <typename IT, typename I, typename F>
+	inline auto foldl(IT const& begin, IT const& end, I&& initial, F&& fn) -> typename function_traits<F>::result_type
+	{
+		ATMA_ASSERT(!range.empty());
+
+		auto&& r = initial;
+
+		for (auto i = begin; i != end; ++i)
+			r = fn(r, *i);
+
+		return r;
+	}
 
 	//=====================================================================
 	// merge
