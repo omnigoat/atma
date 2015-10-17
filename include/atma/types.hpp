@@ -24,3 +24,14 @@ typedef uint64_t uint64;
 typedef intptr_t intptr;
 typedef uintptr_t uintptr;
 
+
+namespace atma
+{
+	//
+	//  transfer_const_t
+	//  ------------------
+	//    takes T, and if const, transforms M to be const, otherwise just M
+	//
+	template <typename T, typename M>
+	using transfer_const_t = std::conditional_t<std::is_const<T>::value, M const, M>;
+}
