@@ -48,14 +48,14 @@ namespace atma {
 		auto si = begin;
 		for (auto i = begin, pi = begin; i != end; ++i)
 		{
-			for (auto const* d = delims; *d; d = utf8_char_advance(d))
+			for (auto const* d = delims; *d; utf8_char_advance(d))
 			{
-				if (utf8_char_equality(*i, d))
-				{
-					result.push_back(atma::string(si, pi));
-					si = i;
-					break;
-				}
+				//if (utf8_char_equality(*i, d))
+				//{
+				//	result.push_back(atma::string(si, pi));
+				//	si = i;
+				//	break;
+				//}
 			}
 
 			pi = i;
