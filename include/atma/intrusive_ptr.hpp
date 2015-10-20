@@ -154,6 +154,9 @@ namespace atma {
 			return intrusive_ptr<Y>(dynamic_cast<Y*>(px));
 		}
 
+		template <typename... Args>
+		static auto make(Args&&... args) -> intrusive_ptr<T>;
+
 		static intrusive_ptr null;
 
 	private:
@@ -201,6 +204,13 @@ namespace atma {
 	inline auto ptr_cast_static(atma::intrusive_ptr<T> const& ptr) -> atma::intrusive_ptr<Y>
 	{
 		return intrusive_ptr<Y>(static_cast<Y*>(ptr.get()));
+	}
+
+	template <typename T>
+	template <typename... Args>
+	inline auto intrusive_ptr<T>::make(Args&&... args) -> intrusive_ptr<T>
+	{
+		return intrusive_ptr_expose_constructor::make<T>(std::forward<Args>(args)...);
 	}
 }
 
