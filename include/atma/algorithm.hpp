@@ -1,6 +1,6 @@
 #pragma once
 
-
+#include <atma/function_traits.hpp>
 #include <atma/tuple.hpp>
 #include <atma/algorithm/filter.hpp>
 #include <atma/algorithm/map.hpp>
@@ -93,6 +93,27 @@ namespace atma
 		return end_;
 	}
 
+	template <typename R, typename PR>
+	auto find_else(R&& range, decltype(range[0]) failure, decltype(range[0]) x) -> decltype(range[0])
+	{
+		auto i = std::find(range.begin(), range.end(), x);
+		if (i == range.end())
+			return failure;
+		else
+			return *i;
+	}
+
+	template <typename R, typename PR>
+	inline auto find_if_else(R&& range, decltype(range[0]) failure, PR&& pred) -> decltype(range[0])
+	{
+		auto i = std::find_if(range.begin(), range.end(), std::forward<PR>(pred));
+		if (i == range.end())
+			return failure;
+		else
+			return *i;
+	}
+
+#if 0
 	template <typename source_t>
 	inline auto make_vector(source_t&& source)
 		-> std::vector<typename std::remove_reference<source_t>::type::value_type>
@@ -204,6 +225,44 @@ namespace atma
 			f(x);
 	}
 
+	template <typename R, typename F>
+	inline auto foldl(R&& range, F&& fn) -> typename function_traits<F>::result_type
+	{
+		ATMA_ASSERT(!range.empty());
+
+		auto r = range.first();
+
+		for (auto i = ++range.begin(); i != range.end(); ++i)
+			r = fn(r, *i);
+		
+		return r;
+	}
+
+	template <typename R, typename I, typename F>
+	inline auto foldl(R&& range, I&& initial, F&& fn) -> typename function_traits<F>::result_type
+	{
+		ATMA_ASSERT(!range.empty());
+
+		auto&& r = initial;
+
+		for (auto i = range.begin(); i != range.end(); ++i)
+			r = fn(r, *i);
+
+		return r;
+	}
+
+	template <typename IT, typename I, typename F>
+	inline auto foldl(IT const& begin, IT const& end, I&& initial, F&& fn) -> typename function_traits<F>::result_type
+	{
+		ATMA_ASSERT(!range.empty());
+
+		auto&& r = initial;
+
+		for (auto i = begin; i != end; ++i)
+			r = fn(r, *i);
+
+		return r;
+	}
 
 	//=====================================================================
 	// merge
