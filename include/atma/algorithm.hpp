@@ -93,8 +93,26 @@ namespace atma
 		return end_;
 	}
 
+	template <typename R, typename PR>
+	auto find_else(R&& range, decltype(range[0]) failure, decltype(range[0]) x) -> decltype(range[0])
+	{
+		auto i = std::find(range.begin(), range.end(), x);
+		if (i == range.end())
+			return failure;
+		else
+			return *i;
+	}
 
-	
+	template <typename R, typename PR>
+	inline auto find_if_else(R&& range, decltype(range[0]) failure, PR&& pred) -> decltype(range[0])
+	{
+		auto i = std::find_if(range.begin(), range.end(), std::forward<PR>(pred));
+		if (i == range.end())
+			return failure;
+		else
+			return *i;
+	}
+
 #if 0
 	template <typename source_t>
 	inline auto make_vector(source_t&& source)
