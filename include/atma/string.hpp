@@ -34,17 +34,7 @@ namespace atma {
 		return s;
 	}
 
-	inline auto find_first_of(atma::string::const_iterator const& begin, atma::string::const_iterator const& end, char const* delims) -> atma::string::const_iterator
-	{
-		return find_if(begin, end, [&](utf8_char_t const& lhs) {
-			return utf8_charseq_any_of(delims, [&lhs](utf8_char_t const& rhs) {
-				return lhs == rhs; });});
-	}
-
-	inline auto find_first_of(atma::string const& str, char const* delims) -> atma::string::const_iterator
-	{
-		return find_first_of(str.begin(), str.end(), delims);
-	}
+	
 
 
 
