@@ -93,9 +93,6 @@ namespace atma
 		return end_;
 	}
 
-
-	
-#if 0
 	template <typename source_t>
 	inline auto make_vector(source_t&& source)
 		-> std::vector<typename std::remove_reference<source_t>::type::value_type>
@@ -103,6 +100,7 @@ namespace atma
 		return{source.begin(), source.end()};
 	}
 
+#if 0
 	template <size_t E, typename R, typename V, typename F, typename... FS>
 	auto count_all_impl(R& result, V const& value, F&& fn1, FS&&... fns) -> void
 	{
@@ -129,6 +127,7 @@ namespace atma
 
 		return result;
 	}
+#endif
 
 	template <typename xs_t, typename f_t>
 	auto all_of(xs_t&& xs, f_t&& f)
@@ -171,6 +170,7 @@ namespace atma
 		return result;
 	}
 
+
 	template <typename xs_t, typename c_t, typename m_t>
 	auto copy_if(xs_t&& xs, m_t(c_t::*member)() const)
 		-> std::enable_if_t<std::is_same<typename std::decay<xs_t>::type::value_type, c_t>::value, std::decay_t<xs_t>>
@@ -186,7 +186,16 @@ namespace atma
 		return result;
 	}
 
-#endif
+	
+	template <typename range_tx, typename pred_tx>
+	auto remove_erase(range_tx& range, pred_tx const& pred) -> void
+	{
+		range.erase(
+			std::remove_if(range.begin(), range.end(), pred),
+			range.end());
+	}
+
+
 	
 	template <typename xs_t, typename f_t>
 	inline auto for_each(xs_t&& xs, f_t&& f) -> void
