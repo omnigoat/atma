@@ -113,7 +113,6 @@ namespace atma
 			return *i;
 	}
 
-#if 0
 	template <typename source_t>
 	inline auto make_vector(source_t&& source)
 		-> std::vector<typename std::remove_reference<source_t>::type::value_type>
