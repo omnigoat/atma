@@ -1,15 +1,12 @@
-#ifndef ATMA_UTF_UTF8_STRING_RANGE_HPP
-#define ATMA_UTF_UTF8_STRING_RANGE_HPP
-//=====================================================================
+#pragma once
+
 #include <atma/assert.hpp>
 #include <atma/utf/algorithm.hpp>
 #include <atma/utf/utf8_string_header.hpp>
 #include <algorithm>
-//=====================================================================
-namespace atma {
-//=====================================================================
-	
 
+namespace atma
+{
 	//=====================================================================
 	// utf8_string_range_t
 	// ---------------------
@@ -20,9 +17,8 @@ namespace atma {
 	//   This range is immutable.
 	//
 	//=====================================================================
-	class utf8_string_range_t
+	struct utf8_string_range_t
 	{
-	public:
 		typedef char value_t;
 		typedef char const* iterator;
 
@@ -93,8 +89,4 @@ namespace atma {
 		return std::strncmp(lhs.begin(), str, n);
 	}
 
-//=====================================================================
-} // namespace atma
-//=====================================================================
-#endif // inclusion guard
-//=====================================================================
+}

@@ -38,7 +38,7 @@ namespace atma {
 	}
 
 	inline utf8_string_range_t::utf8_string_range_t(utf8_string_t::const_iterator const& begin, utf8_string_t::const_iterator const& end)
-		: begin_(begin->begin), end_(end->begin)
+		: begin_(*begin), end_(*end)
 	{
 	}
 
