@@ -14,5 +14,8 @@
     <ClCompile Include="..\src\entrypoint.cpp">
       <Filter>source</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\string.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
