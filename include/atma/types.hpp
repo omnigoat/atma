@@ -1,7 +1,7 @@
 #pragma once
-//======================================================================
+
 #include <cstdint>
-//======================================================================
+#include <type_traits>
 
 typedef unsigned char uchar;
 typedef unsigned short ushort;
