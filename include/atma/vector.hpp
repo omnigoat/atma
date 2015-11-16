@@ -55,6 +55,8 @@ namespace atma
 		auto end() -> T*;
 		auto front() const -> T const&;
 		auto back() const -> T const&;
+		auto front() -> T&;
+		auto back() -> T&;
 		auto data() -> T*;
 		auto data() const -> T const*;
 		auto empty() const -> bool;
@@ -239,6 +241,20 @@ namespace atma
 
 	template <typename T, typename A>
 	inline auto vector<T, A>::back() const -> T const&
+	{
+		ATMA_ASSERT(!empty());
+		return imem_.ptr[size_ - 1];
+	}
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::front() -> T&
+	{
+		ATMA_ASSERT(!empty());
+		return imem_.ptr[0];
+	}
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::back() -> T&
 	{
 		ATMA_ASSERT(!empty());
 		return imem_.ptr[size_ - 1];

@@ -3,42 +3,47 @@
 #include <atma/assert/config.hpp>
 #include <atma/assert/handling.hpp>
 
+#define BOOST_PP_VARIADICS
 #include <boost/preprocessor/seq.hpp>
 #include <boost/preprocessor/tuple/to_seq.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>
-//=====================================================================
-#ifdef ATMA_ENABLE_ASSERTS
-//=====================================================================
-	
+#include <boost/preprocessor/variadic/size.hpp>
+#include <boost/preprocessor/variadic/to_tuple.hpp>
 
+#if ATMA_ENABLE_ASSERTS
+
+	//=====================================================================
+	// ATMA_HALT()
+	// -------------------------
+	//   halts execution via the debug-break handler
+	//=====================================================================
 	#define ATMA_HALT(msg) \
 		do { \
 			ATMA_DEBUGBREAK(); \
 			break; \
 		} while(0)
 
-
 	//=====================================================================
-	// ATMA_ASSERT_MSG(x, msg)
-	// -------------------------
-	//   standard assert macro that takes a boolean expression @x and a
-	//   string @msg and generates an assertion if !x, displaying the message.
+	// ATMA_ASSERT(...)
+	// ------------------
+	//   two overloads
+	//     - first takes the simple boolean expression, strigifies it
+	//     - second takes the expression + info string
 	//=====================================================================
-	#define ATMA_ASSERT_MSG(x, msg) \
+	#define ATMA_ASSERT_III(x, msg) \
 		do { \
 			if ( !(x) && ::atma::assert::detail::handle(msg, __FILE__, __LINE__) ) \
 				{ ATMA_DEBUGBREAK(); } \
 			break; \
 		} while(0)
 
-
-	//=====================================================================
-	// ATMA_ASSERT(x)
-	// ----------------
-	//   Passthrough to ATMA_ASSERT_MSG that stringifies @x
-	//=====================================================================
-	#define ATMA_ASSERT(x) \
-		ATMA_ASSERT_MSG(x, #x)
+	#define ATMA_ASSERT_II_1(x) ATMA_ASSERT_III(x, #x)
+	#define ATMA_ASSERT_II_1_(args) ATMA_ASSERT_II_1 args
+	#define ATMA_ASSERT_II_2(x, m) ATMA_ASSERT_III(x, m)
+	#define ATMA_ASSERT_II_2_(args) ATMA_ASSERT_II_2 args
+	
+	#define ATMA_ASSERT(...) \
+		BOOST_PP_CAT(ATMA_ASSERT_II_, BOOST_PP_VARIADIC_SIZE(__VA_ARGS__))_((__VA_ARGS__))
 
 
 	//=====================================================================
@@ -122,6 +127,7 @@
 		BOOST_PP_CAT(ADD_PAREN_1 kindof_seq,_END)
 		
 
+
 //=====================================================================
 #else // ATMA_ENABLE_ASSERTS
 //=====================================================================
@@ -131,7 +137,5 @@
 	#define ATMA_ASSERT_ONE_OF(...)
 	#define ATMA_ASSERT_SWITCH(...)
 
-
-//=====================================================================
 #endif // ATMA_ENABLE_ASSERTS
-//=====================================================================
+
