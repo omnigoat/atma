@@ -61,21 +61,11 @@ namespace atma
 
 		using internal_iters_tuple_t = std::tuple<typename detail::zip_internal_range_iterator_t<Ranges>::type...>;
 
-		zip_range_iterator_t(internal_iters_tuple_t const& iters)
-			: iters_{iters}
-		{
-		}
+		zip_range_iterator_t(internal_iters_tuple_t const& iters);
 
-		auto operator ++ () -> zip_range_iterator_t&
-		{
-			atma::tuple_apply(atma::increment_functor_t(), iters_);
-			return *this;
-		}
-
-		auto operator *() -> value_type
-		{
-			return atma::tuple_apply(atma::dereference_functor_t(), iters_);
-		}
+		auto operator ++() -> zip_range_iterator_t&;
+		auto operator  *() -> reference;
+		auto operator  *() const -> reference const;
 
 	private:
 		internal_iters_tuple_t iters_;
@@ -126,35 +116,28 @@ namespace atma
 	// ITERATOR IMPLEMENTATION
 	//======================================================================
 	template <typename... Ranges>
-	auto operator == (zip_range_iterator_t<Ranges...> const& lhs, zip_range_iterator_t<Ranges...> const& rhs) -> bool
+	zip_range_iterator_t<Ranges...>::zip_range_iterator_t(internal_iters_tuple_t const& iters)
+		: iters_{iters}
 	{
-		// equality is defined whenever *any* of our internal iterators matches another.
-		// since some zipped ranges might have different lengths, we'll hit the "end" iterator
-		// earlier on some ranges. these will then be equal, but other ranges might still have valid
-		// iterators not pointing to the end-iterator. but this is the terminating point for zip, so
-		// we evaluate to equal, and end iteration.
-		//
-		// example shown. a zip of two ranges of differing lengths, showing where current iteration
-		// is, and where the "end" iterator of the zip-range has been constructed:
-		//
-		//    internal range 1:   {1, 2, 3, 4} end.
-		//    internal iter at:                ^
-		//    end iter at:                     ^
-		//
-		//    internal range 2:   {a, b, c, d, e, f} end.
-		//    internal iter at:                ^
-		//    end iter at:                           ^
-		//
-		// this demonstrates why zip-range-iterator equality is defined as when *any* of the internal
-		// iterators match. because otherwise we'd traverse past the end of some of them.
-		//
-		return atma::tuple_any_elem_eq(lhs.iters_, rhs.iters_);
+	}
+
+	template <typename... Ranges>
+	auto zip_range_iterator_t<Ranges...>::operator ++ () -> zip_range_iterator_t&
+	{
+		atma::tuple_apply(atma::increment_functor_t(), iters_);
+		return *this;
+	}
+
+	template <typename... Ranges>
+	auto zip_range_iterator_t<Ranges...>::operator *() -> reference
+	{
+		return atma::tuple_apply(atma::dereference_functor_t(), iters_);
 	}
 
 	template <typename... Ranges>
 	auto operator != (zip_range_iterator_t<Ranges...> const& lhs, zip_range_iterator_t<Ranges...> const& rhs) -> bool
 	{
-		return !operator == (lhs, rhs);
+		return atma::tuple_any_elem_neq(lhs.iters_, rhs.iters_);
 	}
 
 
