@@ -1,23 +1,12 @@
-//=====================================================================
-//
-//
-//
-//=====================================================================
-#ifndef ATMA_ASSERT_CONFIG_HPP
-#define ATMA_ASSERT_CONFIG_HPP
-//=====================================================================
-// setting up whether we assert or not
-//=====================================================================
+#pragma once
+
 #if _DEBUG
-#	define ATMA_ENABLE_ASSERTS
+#	define ATMA_ENABLE_ASSERTS 1
 #else
-#	define ATMA_ENABLE_ASSERTS
+#	define ATMA_ENABLE_ASSERTS 0
 #endif
 
 #ifdef ATMA_NO_ASSERT
 #	undef ATMA_ENABLE_ASSERTS
+#	define ATMA_ENABLE_ASSERTS 0
 #endif
-
-//=====================================================================
-#endif // inclusion guard
-//=====================================================================

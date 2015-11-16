@@ -172,6 +172,11 @@ namespace atma
 			: memory_view_t(c, 0, c.size())
 		{}
 
+		memory_view_t(E* begin, E* end)
+			: begin_(begin)
+			, end_(end)
+		{}
+
 		auto begin() const -> E* { return begin_; }
 		auto end() const -> E* { return end_; }
 		auto size() const -> size_t { return end() - begin(); }
