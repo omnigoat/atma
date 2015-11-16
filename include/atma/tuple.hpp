@@ -477,6 +477,15 @@ namespace atma {
 		}
 	};
 
+	struct neq_functor_t
+	{
+		template <typename LHS, typename RHS>
+		auto operator ()(LHS&& lhs, RHS&& rhs) -> bool
+		{
+			return lhs == rhs;
+		}
+	};
+
 	struct dereference_functor_t
 	{
 		template <typename T>
@@ -529,6 +538,17 @@ namespace atma {
 		static_assert(lhs_size == rhs_size, "sizes must be the same");
 
 		auto vs = tuple_binary_apply(eq_functor_t(), lhs, rhs);
+		return tuple_any_of(vs);
+	}
+
+	template <typename LHS, typename RHS>
+	auto tuple_any_elem_neq(LHS&& lhs, RHS&& rhs) -> bool
+	{
+		auto const lhs_size = std::tuple_size<std::decay_t<LHS>>::value;
+		auto const rhs_size = std::tuple_size<std::decay_t<RHS>>::value;
+		static_assert(lhs_size == rhs_size, "sizes must be the same");
+
+		auto vs = tuple_binary_apply(neq_functor_t(), lhs, rhs);
 		return tuple_any_of(vs);
 	}
 }
