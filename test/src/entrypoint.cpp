@@ -13,7 +13,7 @@ SCENARIO("vectors can be constructed", "[vector]")
 		CHECK(v.size() == 0);
 		CHECK(v.capacity() == 0);
 	}
-
+	
 	GIVEN("a vector constructed with size 4 default items")
 	{
 		atma::vector<int> v(4);

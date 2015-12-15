@@ -34,4 +34,16 @@ namespace atma
 	//
 	template <typename T, typename M>
 	using transfer_const_t = std::conditional_t<std::is_const<T>::value, M const, M>;
+
+	//
+	//  not
+	//  -----
+	//    negates a predicate type
+	//
+	template <typename T>
+	struct not
+	{
+		static auto const value = !T::value;
+		using type = bool;
+	};
 }

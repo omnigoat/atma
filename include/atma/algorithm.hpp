@@ -113,11 +113,10 @@ namespace atma
 			return *i;
 	}
 
-	template <typename source_t>
-	inline auto make_vector(source_t&& source)
-		-> std::vector<typename std::remove_reference<source_t>::type::value_type>
+	template <typename T, typename... Args>
+	inline auto make_vector(Args&&... args) -> std::vector<T>
 	{
-		return{source.begin(), source.end()};
+		return std::vector<T>{std::forward<Args>(args)...};
 	}
 
 #if 0

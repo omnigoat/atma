@@ -1,7 +1,7 @@
 #pragma once
 
 #include <atma/function_traits.hpp>
-
+#include <atma/function.hpp>
 
 namespace atma
 {
@@ -16,7 +16,7 @@ namespace atma
 		using source_container_t = std::remove_reference_t<C>;
 		using source_iterator_t  = decltype(std::declval<source_container_t>().begin());
 
-		using value_type      = typename function_traits<F>::result_type const;
+		using value_type      = result_of_t<F(typename std::remove_reference_t<C>::value_type)>;
 		using reference       = value_type;
 		using const_reference = value_type const;
 		using iterator        = std::conditional_t<std::is_const<source_container_t>::value, mapped_range_iterator_t<self_t const>, mapped_range_iterator_t<self_t>>;
@@ -25,12 +25,11 @@ namespace atma
 		using size_type       = typename source_container_t::size_type;
 
 
-		template <typename CC, typename FF>
-		mapped_range_t(CC&&, source_iterator_t const&, source_iterator_t const&, FF&&);
+		template <typename CC, typename FF> mapped_range_t(CC&&, FF&&);
 		mapped_range_t(mapped_range_t const&);
 
-		auto source_container() const -> C { return container_; }
-		auto f() const -> F { return fn_; }
+		auto source_container() const -> C const& { return container_; }
+		auto f() const -> F const& { return fn_; }
 
 		auto begin() const -> const_iterator;
 		auto end() const -> const_iterator;
@@ -39,8 +38,8 @@ namespace atma
 
 	private:
 		C container_;
-		source_iterator_t begin_, end_;
 		F fn_;
+		source_iterator_t begin_, end_;
 	};
 
 
@@ -55,10 +54,14 @@ namespace atma
 		{
 		}
 
+		~partial_mapped_range_t()
+		{
+		}
+
 		template <typename C>
 		inline auto operator <<= (C&& xs) -> mapped_range_t<C, F>
 		{
-			return {std::forward<C>(xs), xs.begin(), xs.end(), std::forward<F>(fn_)};
+			return mapped_range_t<C, F>(std::forward<C>(xs), std::forward<F>(fn_));
 		}
 
 	private:
@@ -102,14 +105,14 @@ namespace atma
 	//======================================================================
 	template <typename C, typename F>
 	template <typename CC, typename FF>
-	mapped_range_t<C, F>::mapped_range_t(CC&& source, source_iterator_t const& begin, source_iterator_t const& end, FF&& f)
-		: container_(std::forward<CC>(source)), begin_(begin), end_(end), fn_(std::forward<FF>(f))
+	inline mapped_range_t<C, F>::mapped_range_t(CC&& source, FF&& f)
+		: container_(std::forward<CC>(source)), fn_(std::forward<FF>(f)), begin_(container_.begin()), end_(container_.end())
 	{
 		using V = typename function_traits<F>::arg_type<0>;
 
 		static_assert(
-			!std::is_reference<V>::value || std::is_const<V>::value,
-			"no functions that could mutate values");
+			!std::is_reference<V>::value || std::is_const<std::remove_reference_t<V>>::value,
+			"functions that could mutate values are disallowed");
 	}
 
 	template <typename C, typename F>
@@ -118,27 +121,27 @@ namespace atma
 	{}
 
 	template <typename C, typename F>
-	auto mapped_range_t<C, F>::begin() -> iterator
+	inline auto mapped_range_t<C, F>::begin() -> iterator
 	{
-		return{this, begin_, end_};
+		return {this, begin_, end_};
 	}
 
 	template <typename C, typename F>
-	auto mapped_range_t<C, F>::end() -> iterator
+	inline auto mapped_range_t<C, F>::end() -> iterator
 	{
-		return{this, end_, end_};
+		return {this, end_, end_};
 	}
 
 	template <typename C, typename F>
-	auto mapped_range_t<C, F>::begin() const -> const_iterator
+	inline auto mapped_range_t<C, F>::begin() const -> const_iterator
 	{
-		return{this, begin_, end_};
+		return {this, begin_, end_};
 	}
 
 	template <typename C, typename F>
-	auto mapped_range_t<C, F>::end() const -> const_iterator
+	inline auto mapped_range_t<C, F>::end() const -> const_iterator
 	{
-		return{this, end_, end_};
+		return {this, end_, end_};
 	}
 
 
@@ -148,19 +151,19 @@ namespace atma
 	// ITERATOR IMPLEMENTATION
 	//======================================================================
 	template <typename C>
-	mapped_range_iterator_t<C>::mapped_range_iterator_t(owner_t* owner, source_iterator_t const& begin, source_iterator_t const& end)
+	inline mapped_range_iterator_t<C>::mapped_range_iterator_t(owner_t* owner, source_iterator_t const& begin, source_iterator_t const& end)
 		: owner_(owner), pos_(begin), end_(end)
 	{
 	}
 
 	template <typename C>
-	auto mapped_range_iterator_t<C>::operator *() -> value_type
+	inline auto mapped_range_iterator_t<C>::operator *() -> value_type
 	{
 		return owner_->f()(*pos_);
 	}
 
 	template <typename C>
-	auto mapped_range_iterator_t<C>::operator ++() -> mapped_range_iterator_t&
+	inline auto mapped_range_iterator_t<C>::operator ++() -> mapped_range_iterator_t&
 	{
 		++pos_;
 		return *this;
@@ -185,15 +188,16 @@ namespace atma
 	// FUNCTIONS
 	//======================================================================
 	template <typename C, typename F>
-	auto map(F&& f, C&& xs) -> mapped_range_t<C, F>
+	inline auto map(F&& f, C&& xs) -> mapped_range_t<C, F>
 	{
-		return {std::forward<C>(xs), xs.begin(), xs.end(), std::forward<F>(f)};
+		return {std::forward<C>(xs), std::forward<F>(f)};
 	}
 
 	template <typename F>
-	auto map(F&& f) -> partial_mapped_range_t<F>
+	inline auto map(F&& f) -> partial_mapped_range_t<F>
 	{
 		return {f};
 	}
+
 }
 
