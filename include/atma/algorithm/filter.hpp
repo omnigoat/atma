@@ -32,9 +32,11 @@ namespace atma
 		template <typename CC, typename FF>
 		filtered_range_t(CC&&, source_iterator_t const&, source_iterator_t const&, FF&&);
 		filtered_range_t(filtered_range_t const&);
+		filtered_range_t(filtered_range_t&&);
+		~filtered_range_t();
 
 		auto source_container() const -> C { return container_; }
-		auto predicate() const -> F { return predicate_; }
+		auto predicate() const -> F const& { return predicate_; }
 
 		auto begin() const -> const_iterator;
 		auto end() const -> const_iterator;
@@ -93,7 +95,7 @@ namespace atma
 
 		using either_reference  = std::conditional_t<std::is_const<owner_t>::value, const_reference, reference>;
 
-
+		filtered_range_iterator_t() : owner_() {}
 		filtered_range_iterator_t(C*, source_iterator_t const& begin, source_iterator_t const& end);
 
 		auto operator  *() -> either_reference;
@@ -120,7 +122,22 @@ namespace atma
 	template <typename C, typename F>
 	inline filtered_range_t<C, F>::filtered_range_t(filtered_range_t const& rhs)
 		: container_(rhs.container_), begin_(rhs.begin_), end_(rhs.end_), predicate_(rhs.predicate_)
-	{}
+	{
+	}
+
+	template <typename C, typename F>
+	inline filtered_range_t<C, F>::filtered_range_t(filtered_range_t&& rhs)
+		: container_(std::move(rhs.container_))
+		, predicate_(std::move(rhs.predicate_))
+		, begin_(std::move(rhs.begin_))
+		, end_(std::move(rhs.end_))
+	{
+	}
+
+	template <typename C, typename F>
+	inline filtered_range_t<C, F>::~filtered_range_t()
+	{
+	}
 
 	template <typename C, typename F>
 	inline auto filtered_range_t<C, F>::begin() -> either_iterator

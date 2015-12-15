@@ -154,6 +154,12 @@ namespace atma {
 	}
 
 	template <typename C, typename R, typename... Params, typename... Args>
+	auto call_fn(R(C::*fn)(Params...), C&& c, Args&&... args) -> R
+	{
+		return (c.*fn)(std::forward<Args>(args)...);
+	}
+
+	template <typename C, typename R, typename... Params, typename... Args>
 	auto call_fn(R(C::*fn)(Params...), C* c, Args&&... args) -> R
 	{
 		return (c->*fn)(std::forward<Args>(args)...);
@@ -166,12 +172,28 @@ namespace atma {
 	}
 
 	template <typename C, typename R, typename... Params, typename... Args>
+	auto call_fn(R(C::*fn)(Params...) const, C const& c, Args&&... args) -> R
+	{
+		return (c.*fn)(std::forward<Args>(args)...);
+	}
+
+	template <typename C, typename R, typename... Params, typename... Args>
+	auto call_fn(R(C::*fn)(Params...) const, C&& c, Args&&... args) -> R
+	{
+		return (c.*fn)(std::forward<Args>(args)...);
+	}
+
+	template <typename C, typename R, typename... Params, typename... Args>
 	auto call_fn(R(C::*fn)(Params...) const, C* c, Args&&... args) -> R
 	{
 		return (c->*fn)(std::forward<Args>(args)...);
 	}
 
-
+	template <typename C, typename R, typename... Params, typename... Args>
+	auto call_fn(R(C::*fn)(Params...) const, C const* c, Args&&... args) -> R
+	{
+		return (c->*fn)(std::forward<Args>(args)...);
+	}
 
 
 	//

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atma/bind.hpp>
 #include <atma/tuple.hpp>
 #include <tuple>
 
@@ -85,16 +86,17 @@ namespace atma
 
 			static auto move(functor_buf_t& dest, functor_buf_t&& src) -> void
 			{
-				auto&& rhs = reinterpret_cast<FN*&>(src);
-				auto&& lhs = reinterpret_cast<FN*&>(dest);
-				lhs = new FN{std::move(*rhs)};
+				FN*& rhs = reinterpret_cast<FN*&>(src);
+				FN*& lhs = reinterpret_cast<FN*&>(dest);
+				lhs = rhs;
+				rhs = nullptr;
 			}
 
 			static auto copy(functor_buf_t& dest, functor_buf_t const& src) -> void
 			{
-				auto&& rhs = reinterpret_cast<FN* const&>(src);
-				auto&& lhs = reinterpret_cast<FN*&>(dest);
-				lhs = new FN{std::move(*rhs)};
+				FN* const& rhs = reinterpret_cast<FN* const&>(src);
+				FN*& lhs = reinterpret_cast<FN*&>(dest);
+				lhs = new FN{*rhs};
 			}
 
 			static auto destruct(functor_buf_t& buf) -> void
@@ -164,7 +166,8 @@ namespace atma
 			functor_wrapper_t()
 				: vtable()
 				, buf{}
-			{}
+			{
+			}
 
 			template <typename FN>
 			explicit functor_wrapper_t(FN&& fn)
@@ -491,9 +494,9 @@ namespace atma
 	namespace detail
 	{
 		template <typename F, typename G, typename R, typename... Args>
-		inline auto composited(F&& f, G&& g, Args... args) -> R
+		inline auto composited(F f, G g, Args... args) -> R
 		{
-			return std::forward<F>(f)(std::forward<G>(g)(args...));
+			return call_fn(f, call_fn(g, args...));
 		}
 	}
 
@@ -503,6 +506,29 @@ namespace atma
 		return function<FR(GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GArgs...>, f, g)};
 	}
 
+	template <typename FR, typename GR, typename... GArgs>
+	inline auto operator * (function<FR(GR)> const& f, GR(*g)(GArgs...)) -> function<FR(GArgs...)>
+	{
+		return function<FR(GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GArgs...>, f, g)};
+	}
+
+	template <typename FR, typename GR, typename GC, typename... GArgs>
+	inline auto operator * (function<FR(GR)> const& f, GR(GC::*g)(GArgs...) const) -> function<FR(GC, GArgs...)>
+	{
+		return function<FR(GC, GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GC, GArgs...>, f, g)};
+	}
+
+	template <typename FR, typename GR, typename... GArgs>
+	inline auto operator * (FR(GR::*f)(), function<GR(GArgs...)> const& g) -> function<FR(GArgs...)>
+	{
+		return function<FR(GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GArgs...>, f, g)};
+	}
+
+	template <typename FR, typename GR, typename... GArgs>
+	inline auto operator * (FR(GR::*f)() const, function<GR(GArgs...)> const& g) -> function<FR(GArgs...)>
+	{
+		return function<FR(GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GArgs...>, f, g)};
+	}
 
 
 	namespace detail
