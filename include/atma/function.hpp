@@ -507,9 +507,21 @@ namespace atma
 	}
 
 	template <typename FR, typename GR, typename... GArgs>
+	inline auto operator * (FR(*f)(GR), function<GR(GArgs...)> const& g) -> function<FR(GArgs...)>
+	{
+		return function<FR(GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GArgs...>, f, g)};
+	}
+
+	template <typename FR, typename GR, typename... GArgs>
 	inline auto operator * (function<FR(GR)> const& f, GR(*g)(GArgs...)) -> function<FR(GArgs...)>
 	{
 		return function<FR(GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GArgs...>, f, g)};
+	}
+
+	template <typename FR, typename GR, typename GC, typename... GArgs>
+	inline auto operator * (function<FR(GR)> const& f, GR(GC::*g)(GArgs...)) -> function<FR(GC, GArgs...)>
+	{
+		return function<FR(GC, GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GC, GArgs...>, f, g)};
 	}
 
 	template <typename FR, typename GR, typename GC, typename... GArgs>
