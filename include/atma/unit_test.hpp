@@ -14,6 +14,11 @@
 
 #include "../../vendor/catch/catch.hpp"
 
+
+// used for canary_t
+#include <boost/preprocessor/tuple/enum.hpp>
+#include <map>
+
 #if defined(CATCH_CONFIG_MAIN)
 
 namespace atma { namespace unit_test {
@@ -336,4 +341,207 @@ namespace atma { namespace unit_test {
 }}
 
 #endif
+
+
+
+
+namespace atma { namespace unit_test {
+
+#ifndef CANARY_STDOUT
+#	define CANARY_STDOUT 0
+#endif
+
+	struct canary_t
+	{
+		static int const default_constructor = 0;
+		static int const direct_constructor = 1;
+		static int const copy_constructor = 2;
+		static int const move_constructor = 3;
+		static int const destructor = 4;
+
+		struct event_t
+		{
+			event_t(int instruction)
+				: id(-1), instruction(instruction), payload(-1)
+			{}
+
+			event_t(int id, int instruction)
+				: id(id), instruction(instruction), payload(-1)
+			{}
+
+			event_t(int id, int instruction, int payload)
+				: id(id), instruction(instruction), payload(payload)
+			{}
+
+			int id;
+			int instruction;
+			int payload;
+		};
+
+		struct scope_switcher_t
+		{
+			explicit scope_switcher_t(std::string const& name)
+			{
+				canary_t::switch_scope(name);
+			}
+
+			~scope_switcher_t()
+			{
+				canary_t::switch_scope_nil();
+			}
+
+			operator bool() const { return true; }
+		};
+
+		using event_log_t = std::vector<event_t>;
+		using event_log_map_t = std::map<std::string, std::pair<int, event_log_t>>;
+
+
+		canary_t()
+			: scope(current_scope())
+			, id(generate_id())
+			, payload()
+		{
+#if CANARY_STDOUT
+			std::cout << "[" << scope->first << ':' << id << "] canary_t::default-constructor(" << payload << ')' << std::endl;
+#endif
+			scope->second.second.emplace_back(id, default_constructor, payload);
+		}
+
+		canary_t(int payload)
+			: scope(current_scope())
+			, id(generate_id())
+			, payload(payload)
+		{
+#if CANARY_STDOUT
+			std::cout << "[" << scope->first << ':' << id << "] canary_t::direct-constructor(" << payload << ')' << std::endl;
+#endif
+			scope->second.second.emplace_back(id, direct_constructor, payload);
+		}
+
+		canary_t(canary_t const& rhs)
+			: scope(current_scope())
+			, id(generate_id())
+			, payload(rhs.payload)
+		{
+#if CANARY_STDOUT
+			std::cout << "[" << scope->first << ':' << id << "] canary_t::copy-constructor(" << payload << ')' << std::endl;
+#endif
+			scope->second.second.emplace_back(id, copy_constructor, payload);
+		}
+
+		canary_t(canary_t&& rhs)
+			: scope(current_scope())
+			, id(generate_id())
+			, payload(rhs.payload)
+		{
+			rhs.payload = 0;
+#if CANARY_STDOUT
+			std::cout << "[" << scope->first << ':' << id << "] canary_t::move-constructor(" << payload << ')' << std::endl;
+#endif
+			scope->second.second.emplace_back(id, move_constructor, payload);
+		}
+
+		~canary_t()
+		{
+#if CANARY_STDOUT
+			std::cout << "[" << scope->first << ':' << id << "] canary_t::destructor(" << payload << ')' << std::endl;
+#endif
+			scope->second.second.emplace_back(id, destructor, payload);
+		}
+
+
+
+		static auto event_log_matches(std::string const& name, std::vector<event_t> r) -> bool
+		{
+			auto const& event_log = event_log_handle(name)->second.second;
+
+			if (r.size() != event_log.size())
+				return false;
+
+			auto e = event_log.begin();
+			for (auto i = r.begin(); i != r.end(); ++i, ++e)
+			{
+				if (e->id != -1 && i->id != -1 && e->id != i->id)
+					return false;
+
+				if (e->instruction != -1 && i->instruction != -1 && e->instruction != i->instruction)
+					return false;
+
+				if (e->payload != -1 && i->payload != -1 && e->payload != i->payload)
+					return false;
+			}
+
+			return true;
+		}
+
+		int payload;
+
+	private:
+		event_log_map_t::iterator scope;
+		int id;
+
+	private:
+		static auto event_log_map() -> event_log_map_t&
+		{
+			thread_local static event_log_map_t logs;
+			return logs;
+		}
+
+		static auto event_log_handle(std::string const& name) -> event_log_map_t::iterator
+		{
+			auto& map = event_log_map();
+
+			auto it = map.find(name);
+			if (it == map.end())
+				it = map.insert({name, std::make_pair(0, event_log_t{})}).first;
+
+			return it;
+		}
+
+		static event_log_map_t::iterator& current_scope()
+		{
+			static event_log_map_t::iterator _;
+			return _;
+		}
+
+		static auto switch_scope(std::string const& name) -> void
+		{
+			current_scope() = event_log_handle(name);
+		}
+
+		static auto switch_scope_nil() -> void
+		{
+			current_scope() = event_log_map().end();
+		}
+
+		static int generate_id()
+		{
+			return ++current_scope()->second.first;
+		}
+	};
+
+	inline auto operator == (canary_t const& lhs, int rhs) -> bool
+	{
+		return lhs.payload == rhs;
+	}
+
+	inline auto operator == (canary_t const& lhs, canary_t const& rhs) -> bool
+	{
+		return lhs.payload == rhs.payload;
+	}
+
+#define CHECK_CANARY_SCOPE(name, ...) \
+	CHECK(::atma::unit_test::canary_t::event_log_matches(name, {__VA_ARGS__}))
+
+#define CANARY_CC_ORDER(...) \
+	BOOST_PP_TUPLE_ENUM((__VA_ARGS__))
+
+#define CANARY_SWITCH_SCOPE(name) \
+	if (auto S = ::atma::unit_test::canary_t::scope_switcher_t(name))
+
+}}
+
+
+
 
