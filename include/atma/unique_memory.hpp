@@ -56,15 +56,15 @@ namespace atma
 	inline basic_unique_memory_t<A>::basic_unique_memory_t(size_t size)
 		: size_(size)
 	{
-		memory_allocate(memory_, size);
+		memory_.allocate(size);
 	}
 
 	template <typename A>
 	inline basic_unique_memory_t<A>::basic_unique_memory_t(void const* data, size_t size)
 		: size_(size)
 	{
-		memory_allocate(memory_, size);
-		memcpy(memory_.ptr, data, size);
+		memory_.allcoate(size);
+		memory_.memcpy(0, data, size);
 	}
 
 	template <typename A>
@@ -80,14 +80,14 @@ namespace atma
 		: memory_{rhs.memory_}
 		, size_{rhs.size_}
 	{
-		rhs.memory_.ptr = nullptr;
+		rhs.memory_ = nullptr;
 		rhs.size_ = 0;
 	}
 
 	template <typename A>
 	inline basic_unique_memory_t<A>::~basic_unique_memory_t()
 	{
-		memory_deallocate(memory_);
+		memory_.deallocate();
 	}
 
 	template <typename A>
@@ -97,7 +97,7 @@ namespace atma
 		this->~basic_unique_memory_t();
 		memory_ = rhs.memory_;
 		size_ = rhs.size_;
-		rhs.memory_.ptr = nullptr;
+		rhs.memory_ = nullptr;
 		return *this;
 	}
 
@@ -116,25 +116,25 @@ namespace atma
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::begin() const -> byte const*
 	{
-		return memory_.ptr;
+		return memory_.data();
 	}
 
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::end() const -> byte const*
 	{
-		return memory_.ptr + size_;
+		return memory_.data() + size_;
 	}
 
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::begin() -> byte*
 	{
-		return memory_.ptr;
+		return memory_.data();
 	}
 
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::end() -> byte*
 	{
-		return memory_.ptr + size_;
+		return memory_.data() + size_;
 	}
 
 	template <typename A>
@@ -149,7 +149,7 @@ namespace atma
 	inline auto basic_unique_memory_t<A>::detach_memory() -> backing_t
 	{
 		auto tmp = memory_;
-		memory_.ptr = nullptr;
+		memory_ = nullptr;
 		return tmp;
 	}
 
