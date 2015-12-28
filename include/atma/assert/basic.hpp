@@ -3,7 +3,6 @@
 #include <atma/assert/config.hpp>
 #include <atma/assert/handling.hpp>
 
-#define BOOST_PP_VARIADICS
 #include <boost/preprocessor/seq.hpp>
 #include <boost/preprocessor/tuple/to_seq.hpp>
 #include <boost/preprocessor/variadic/to_seq.hpp>

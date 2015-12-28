@@ -1,6 +1,54 @@
 #pragma once
 
+#include <atma/aligned_allocator.hpp>
+
 #include <type_traits>
+
+
+
+
+//
+//
+//
+namespace atma
+{
+	template <typename T, typename A = aligned_allocator<T>>
+	inline auto memory_construct_default(T* dest, size_t count, A& allocator = A()) -> void
+	{
+		for (auto v = dest; v != dest + count; ++v)
+			allocator.construct(v);
+	}
+
+	template <typename T, typename A = aligned_allocator<T>>
+	inline auto memory_construct_copy(T* dest, T const& x, size_t count, A& allocator = A()) -> void
+	{
+		for (auto v = dest; v != dest + count; ++v)
+			allocator.construct(v, x);
+	}
+
+	template <typename T, typename A = aligned_allocator<T>>
+	inline auto memory_construct_copy_range(T* dest, T const* src, size_t count, A& allocator = A()) -> void
+	{
+		for (auto v = dest; v != dest + count; ++v, ++src)
+			allocator.construct(v, *src);
+	}
+
+	template <typename T, typename A = aligned_allocator<T>>
+	inline auto memory_construct_move(T* dest, T&& x, A& allocator = A()) -> void
+	{
+		allocator.construct(*dest, std::move(x));
+	}
+
+	template <typename T, typename A = aligned_allocator<T>>
+	inline auto memory_destruct(T* dest, size_t count, A& allocator = A()) -> void
+	{
+		for (auto v = dest; v != dest + count; ++v)
+			allocator.destroy(v);
+	}
+}
+
+
+
 
 //
 //  memory_t
@@ -81,120 +129,183 @@ namespace atma
 	struct memory_t : detail::base_memory_t<T, Allocator>
 	{
 		using value_type = T;
+		using reference = value_type&;
 
-		memory_t();
-		template <typename B> memory_t(memory_t<T, B> const&);
-		explicit memory_t(Allocator const& allocator);
+		explicit memory_t(Allocator const& = Allocator());
 		explicit memory_t(value_type* data, Allocator const& = Allocator());
+		explicit memory_t(size_t capacity, Allocator const& = Allocator());
+		template <typename B> memory_t(memory_t<T, B> const&);
 
+		auto operator = (value_type*) -> memory_t&;
 		template <typename B> auto operator = (memory_t<T, B> const&) -> memory_t&;
 
-		value_type* ptr;
+		auto data() const -> value_type* { return ptr_; }
+
+		auto operator *  () const -> reference;
+		auto operator ++ () -> memory_t&;
+		auto operator [] (intptr) const -> reference;
+
+		auto allocate(size_t) -> void;
+		auto deallocate() -> void;
+		auto construct_default(size_t idx, size_t count) -> void;
+		auto construct_copy(size_t idx, T const& x, size_t count) -> void;
+		auto construct_copy_range(size_t idx, T const* src, size_t count) -> void;
+		auto construct_move(size_t idx, T&& x) -> void;
+		auto construct_move_range(size_t idx, T const* src, size_t count) -> void;
+		auto construct_move_range(size_t idx, memory_t& src, size_t src_idx, size_t count) -> void;
+		auto destruct(size_t idx, size_t count) -> void;
+		auto memmove(size_t dest_idx, size_t src_idx, size_t count) -> void;
+		auto memcpy(size_t idx, T const*, size_t count) -> void;
+
+		template <typename H> auto construct_copy_range(size_t idx, H const& begin, H const& end) -> void;
+
+	private:
+		value_type* ptr_;
 	};
 
 
 
 
 	template <typename T, typename A>
-	inline memory_t<T,A>::memory_t()
-		: ptr()
-	{}
-
-	template <typename T, typename A>
-	inline memory_t<T,A>::memory_t(A const& allocator)
+	inline memory_t<T, A>::memory_t(A const& allocator)
 		: detail::base_memory_t<T, A>(allocator)
-		, ptr()
+		, ptr_()
 	{}
 
 	template <typename T, typename A>
-	template <typename B>
-	inline memory_t<T,A>::memory_t(memory_t<T, B> const& rhs)
-		: detail::base_memory_t<T, A>(rhs.allocator())
-		, ptr(rhs.ptr)
+	inline memory_t<T, A>::memory_t(value_type* data, A const& alloc)
+		: detail::base_memory_t<T, A>(alloc)
+		, ptr_(data)
+	{}
+
+	template <typename T, typename A>
+	inline memory_t<T, A>::memory_t(size_t capacity, A const& alloc)
+		: detail::base_memory_t<T, A>(alloc)
+		, ptr_()
 	{
-		rhs.ptr = nullptr;
+		allocate(capacity);
 	}
 
 	template <typename T, typename A>
-	inline memory_t<T,A>::memory_t(value_type* data, A const& alloc)
-		: detail::base_memory_t<T, A>(alloc)
-		, ptr(data)
+	template <typename B>
+	inline memory_t<T, A>::memory_t(memory_t<T, B> const& rhs)
+		: detail::base_memory_t<T, A>(rhs.allocator())
+		, ptr_(rhs.ptr_)
 	{}
+
+	template <typename T, typename A>
+	inline auto memory_t<T, A>::operator = (value_type* rhs) -> memory_t&
+	{
+		ptr_ = rhs;
+		return *this;
+	}
 
 	template <typename T, typename A>
 	template <typename B>
 	inline auto memory_t<T, A>::operator = (memory_t<T, B> const& rhs) -> memory_t&
 	{
-		ptr = nullptr;
+		ptr_ = rhs.ptr_;
 		allocator() = rhs.allocator();
 		return *this;
 	}
 
-
-
-
-
-
-
-
-
-
-
 	template <typename T, typename A>
-	inline auto memory_allocate(memory_t<T, A>& dest, size_t capacity) -> void
+	inline auto memory_t<T, A>::operator *  () const -> reference
 	{
-		dest.ptr = dest.allocator().allocate(capacity);
+		return *ptr_;
 	}
 
 	template <typename T, typename A>
-	inline auto memory_deallocate(memory_t<T, A>& dest) -> void
+	inline auto memory_t<T, A>::operator ++ () -> memory_t&
 	{
-		return dest.allocator().deallocate(dest.ptr, 0);
+		++ptr_;
+		return *this;
 	}
 
 	template <typename T, typename A>
-	inline auto memory_construct_default(memory_t<T, A>& dest, size_t offset, size_t count) -> void
+	inline auto memory_t<T, A>::operator [] (intptr idx) const -> reference
 	{
-		for (auto i = offset; i != offset + count; ++i)
-			dest.allocator().construct(dest.ptr + i);
+		return ptr_[idx];
 	}
 
 	template <typename T, typename A>
-	inline auto memory_construct_copy(memory_t<T, A>& dest, size_t offset, size_t count, T const& x) -> void
+	inline auto memory_t<T, A>::allocate(size_t capacity) -> void
 	{
-		for (auto i = offset; i != offset + count; ++i)
-			dest.allocator().construct(dest.ptr + i, x);
+		ptr_ = allocator().allocate(capacity);
 	}
 
 	template <typename T, typename A>
-	inline auto memory_construct_copy(memory_t<T, A>& dest, size_t offset, size_t count, T const* src) -> void
+	inline auto memory_t<T, A>::deallocate() -> void
 	{
-		for (auto i = size_t(), j = offset; i != count; ++i, ++j)
-			dest.allocator().construct(dest.ptr + j, src[i]);
+		allocator().deallocate(ptr_, 0);
 	}
 
 	template <typename T, typename A>
-	inline auto memory_construct_move(memory_t<T, A>& dest, size_t offset, T&& x) -> void
+	inline auto memory_t<T, A>::construct_default(size_t idx, size_t count) -> void
 	{
-		dest.allocator().construct(dest.ptr + offset, std::move(x));
+		for (auto i = idx; i != idx + count; ++i)
+			allocator().construct(ptr_ + i);
 	}
 
 	template <typename T, typename A>
-	inline auto memory_destruct(memory_t<T, A>& dest, size_t offset, size_t count) -> void
+	inline auto memory_t<T, A>::construct_copy(size_t idx, T const& x, size_t count) -> void
 	{
-		for (auto i = offset; i != offset + count; ++i)
-			dest.allocator().destroy(dest.ptr + i);
+		for (auto i = idx; i != idx + count; ++i)
+			allocator().construct(ptr_ + i, x);
 	}
 
 	template <typename T, typename A>
-	inline auto memory_memmove(memory_t<T, A>& dest, size_t dest_idx, size_t src_idx, size_t count) -> void
+	inline auto memory_t<T, A>::construct_copy_range(size_t idx, T const* src, size_t count) -> void
 	{
-		std::memmove(dest.ptr + dest_idx, dest.ptr + src_idx, sizeof(T) * count);
+		for (size_t i = 0, j = idx; i != count; ++i, ++j)
+			allocator().construct(ptr_ + j, src[i]);
 	}
 
-	template <typename T, typename A, typename Y, typename B>
-	inline auto memory_memcpy(memory_t<T, A>& dest, size_t dest_idx, memory_t<Y, B> const& src, size_t src_idx, size_t count) -> void
+	template <typename T, typename A>
+	inline auto memory_t<T, A>::construct_move(size_t idx, T&& x) -> void
 	{
-		std::memcpy(dest.ptr + dest_idx, reinterpret_cast<T const*>(src.ptr + src_idx), sizeof(T) * count);
+		allocator().construct(ptr_ + idx, std::move(x));
+	}
+
+	template <typename T, typename A>
+	inline auto memory_t<T, A>::construct_move_range(size_t idx, T const* x, size_t count) -> void
+	{
+		for (size_t i = 0, j = idx; i != count; ++i, ++j)
+			allocator().construct(ptr_ + j, std::move(x[i]));
+	}
+
+	template <typename T, typename A>
+	inline auto memory_t<T, A>::construct_move_range(size_t idx, memory_t<T, A>& src, size_t src_idx, size_t count) -> void
+	{
+		for (auto i = 0, j = idx, k = src_idx; i != count; ++i, ++j, ++k)
+			allocator().construct(ptr_ + j, std::move(src[k]));
+	}
+
+	template <typename T, typename A>
+	inline auto memory_t<T, A>::destruct(size_t idx, size_t count) -> void
+	{
+		for (auto i = idx; i != idx + count; ++i)
+			allocator().destroy(ptr_ + i);
+	}
+
+	template <typename T, typename A>
+	inline auto memory_t<T, A>::memmove(size_t dest_idx, size_t src_idx, size_t count) -> void
+	{
+		std::memmove(ptr_ + dest_idx, ptr_ + src_idx, sizeof(T) * count);
+	}
+
+	template <typename T, typename A>
+	inline auto memory_t<T, A>::memcpy(size_t idx, T const* src, size_t count) -> void
+	{
+		std::memmove(ptr_ + idx, src, sizeof(T) * count);
+	}
+
+	template <typename T, typename A>
+	template <typename H>
+	inline auto memory_t<T, A>::construct_copy_range(size_t idx, H const& begin, H const& end) -> void
+	{
+		auto iter = begin;
+		for (size_t i = 0; iter != end; ++i, ++iter)
+			allocator().construct(ptr_ + idx + i, *iter);
 	}
 }
