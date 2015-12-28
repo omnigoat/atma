@@ -19,7 +19,7 @@ namespace atma
 		typedef void const* const_pointer;
 		typedef void value_type;
 
-		template <typename U> struct rebind { typedef aligned_allocator_t<U, A> other_t; };
+		template <typename U> struct rebind { typedef aligned_allocator_t<U, A> other; };
 	};
 
 	template <typename T, uint32 A>
