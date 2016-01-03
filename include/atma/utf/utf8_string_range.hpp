@@ -1,15 +1,13 @@
-#ifndef ATMA_UTF_UTF8_STRING_RANGE_IMPLEMENTATION_HPP
-#define ATMA_UTF_UTF8_STRING_RANGE_IMPLEMENTATION_HPP
-//=====================================================================
+#pragma once
+
 #include <atma/utf/utf8_string_range_header.hpp>
 #include <atma/utf/utf8_string_header.hpp>
-//=====================================================================
-namespace atma {
-//=====================================================================
 
-	//=====================================================================
-	// utf8_string_range_t implementation
-	//=====================================================================
+//=====================================================================
+// utf8_string_range_t implementation
+//=====================================================================
+namespace atma
+{
 	inline utf8_string_range_t::utf8_string_range_t()
 		: begin_(), end_()
 	{
@@ -61,22 +59,5 @@ namespace atma {
 	{
 		return end_;
 	}
+}
 
-
-
-	//=====================================================================
-	// functions
-	//=====================================================================
-	inline auto rebase_string_range(utf8_string_t const& rebase, utf8_string_t const& oldbase, utf8_string_range_t const& range) -> utf8_string_range_t
-	{
-		return {
-			rebase.raw_begin() + (range.begin() - oldbase.raw_begin()),
-			rebase.raw_begin() + (range.end() - oldbase.raw_begin())
-		};
-	}
-
-//=====================================================================
-} // namespace atma
-//=====================================================================
-#endif // inclusion guard
-//=====================================================================

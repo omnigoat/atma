@@ -1,6 +1,8 @@
 #pragma once
 
 #include <atma/utf/utf8_string.hpp>
+#include <atma/utf/utf8_string_range.hpp>
+
 #include <atma/enable_if.hpp>
 #include <atma/vector.hpp>
 
@@ -10,7 +12,9 @@
 namespace atma {
 
 	// bam.
-	typedef utf8_string_t string;
+	using string = utf8_string_t;
+	using string_range_t = utf8_string_range_t;
+
 
 	template <typename T, typename = atma::enable_if<std::is_integral<T>, std::is_unsigned<T>>>
 	inline auto to_string(T x, uint base = 10) -> atma::string
