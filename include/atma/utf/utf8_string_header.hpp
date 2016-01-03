@@ -25,14 +25,13 @@ namespace atma
 		using const_iterator = iterator_t;
 
 		utf8_string_t();
+		utf8_string_t(char const* str, size_t size);
+		utf8_string_t(char const* str_begin, char const* str_end);
+		utf8_string_t(char const* str);
+		utf8_string_t(const_iterator const&, const_iterator const&);
+		utf8_string_t(utf8_string_range_t const&);
 		utf8_string_t(utf8_string_t const&);
 		utf8_string_t(utf8_string_t&&);
-
-		utf8_string_t(const_iterator const&, const_iterator const&);
-		utf8_string_t(char const* str);
-		utf8_string_t(char const* str_begin, char const* str_end);
-		utf8_string_t(char const* str, size_t size);
-		utf8_string_t(utf8_string_range_t const&);
 
 		~utf8_string_t();
 

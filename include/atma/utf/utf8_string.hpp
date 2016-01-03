@@ -7,13 +7,20 @@
 namespace atma {
 
 	inline utf8_string_t::utf8_string_t()
-		: utf8_string_t{"", size_t{}}
+		: capacity_(8)
+		, size_()
+		, data_(new char[capacity_])
 	{
+		memset(data_, 0, capacity_);
 	}
 
-	inline utf8_string_t::utf8_string_t(const_iterator const& begin, const_iterator const& end)
-		: utf8_string_t(*begin, *end)
+	inline utf8_string_t::utf8_string_t(char const* str, size_t size)
+		: capacity_(imem_quantize_capacity(size))
+		, size_(size)
+		, data_(new char[capacity_])
 	{
+		memcpy(data_, str, size_);
+		data_[size_] = '\0';
 	}
 
 	inline utf8_string_t::utf8_string_t(char const* begin, char const* end)
@@ -26,18 +33,19 @@ namespace atma {
 	{
 	}
 
+	inline utf8_string_t::utf8_string_t(const_iterator const& begin, const_iterator const& end)
+		: utf8_string_t(*begin, *end)
+	{
+	}
+
 	inline utf8_string_t::utf8_string_t(utf8_string_t const& str)
 		: utf8_string_t(str.raw_begin(), str.raw_size())
 	{
 	}
 
-	inline utf8_string_t::utf8_string_t(char const* str, size_t size)
-		: capacity_(imem_quantize_capacity(size))
-		, size_(size)
-		, data_(new char[capacity_])
+	inline utf8_string_t::utf8_string_t(utf8_string_range_t const& range)
+		: utf8_string_t{range.begin(), range.raw_size()}
 	{
-		memcpy(data_, str, size_);
-		data_[size_] = '\0';
 	}
 
 #if 0
