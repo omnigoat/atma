@@ -54,8 +54,8 @@ namespace atma
 		source_iterator_t begin_, end_;
 	};
 
-	template <typename xs_t>
-	auto slice(xs_t&& xs, uint begin, uint stop) -> range_t<xs_t>
+	template <typename XS>
+	auto slice(XS&& xs, uint begin, uint stop) -> range_t<XS>
 	{
 		return {xs, xs.begin() + begin, xs.begin() + stop};
 	}
@@ -93,64 +93,12 @@ namespace atma
 		return end_;
 	}
 
-	template <typename R, typename PR>
-	auto find_else(R&& range, decltype(range[0]) failure, decltype(range[0]) x) -> decltype(range[0])
-	{
-		auto i = std::find(range.begin(), range.end(), x);
-		if (i == range.end())
-			return failure;
-		else
-			return *i;
-	}
 
-	template <typename R, typename PR>
-	inline auto find_if_else(R&& range, decltype(range[0]) failure, PR&& pred) -> decltype(range[0])
-	{
-		auto i = std::find_if(range.begin(), range.end(), std::forward<PR>(pred));
-		if (i == range.end())
-			return failure;
-		else
-			return *i;
-	}
-
-	template <typename T, typename... Args>
-	inline auto make_vector(Args&&... args) -> std::vector<T>
-	{
-		return std::vector<T>{std::forward<Args>(args)...};
-	}
-
-#if 0
-	template <size_t E, typename R, typename V, typename F, typename... FS>
-	auto count_all_impl(R& result, V const& value, F&& fn1, FS&&... fns) -> void
-	{
-		if (fn1(value))
-			++std::get<E>(result);
-
-		count_all_impl<E + 1>(result, value, fns...);
-	}
-
-	template <size_t E, typename R, typename V>
-	auto count_all_impl(R& result, V const& value) -> void
-	{
-	}
-
-	template <typename xs_t, typename... fns_t>
-	auto count_all(xs_t&& xs, fns_t&&... fns) -> atma::tuple_integral_list_t<uint, sizeof...(fns_t)>
-	{
-		atma::tuple_integral_list_t<uint, sizeof...(fns_t)> result;
-
-		for (auto const& x : xs)
-		{
-			count_all_impl<0>(result, x, fns...);
-		}
-
-		return result;
-	}
-#endif
-
-	template <typename xs_t, typename f_t>
-	auto all_of(xs_t&& xs, f_t&& f)
-		-> typename std::enable_if<std::is_same<typename atma::function_traits<f_t>::result_type, bool>::value, bool>::type
+	//=====================================================================
+	// all_of
+	//=====================================================================
+	template <typename XS, typename F>
+	auto all_of(XS&& xs, F&& f) -> bool
 	{
 		for (auto const& x : xs)
 			if (!f(x))
@@ -159,11 +107,17 @@ namespace atma
 		return true;
 	}
 
-	template <typename xs_t, typename c_t, typename m_t>
-	auto copy_if(xs_t&& xs, m_t c_t::*member)
-		-> std::enable_if_t<std::is_same<typename std::decay<xs_t>::type::value_type, c_t>::value, std::decay_t<xs_t>>
+	//=====================================================================
+	// copy_if
+	//=====================================================================
+	template <typename XS, typename C, typename M>
+	auto copy_if(XS&& xs, M C::*member) -> std::decay_t<XS>
 	{
-		std::decay_t<xs_t> result;
+		using DXS = std::decay_t<XS>;
+
+		static_assert(std::is_same<DXS::value_type, C>::value, "member-pointer's class doesn't match range's value-type");
+
+		DXS result;
 
 		for (auto&& x : xs)
 		{
@@ -174,38 +128,41 @@ namespace atma
 		return result;
 	}
 
-	template <typename xs_t, typename c_t, typename m_t>
-	auto copy_if(xs_t&& xs, m_t(c_t::*member)())
-		-> std::enable_if_t<std::is_same<typename std::decay<xs_t>::type::value_type, c_t>::value, std::decay_t<xs_t>>
+	template <typename XS, typename C, typename M>
+	auto copy_if(XS&& xs, M(C::*method)()) -> std::decay_t<XS>
 	{
-		std::decay_t<xs_t> result;
+		using DXS = std::decay_t<XS>;
+		static_assert(std::is_same<DXS::value_type, C>::value, "method-pointer's class doesn't match range's value-type");
+		DXS result;
 
 		for (auto&& x : xs)
 		{
-			if ((x.*member)())
+			if ((x.*method)())
 				result.push_back(x);
 		}
 
 		return result;
 	}
 
-
-	template <typename xs_t, typename c_t, typename m_t>
-	auto copy_if(xs_t&& xs, m_t(c_t::*member)() const)
-		-> std::enable_if_t<std::is_same<typename std::decay<xs_t>::type::value_type, c_t>::value, std::decay_t<xs_t>>
+	template <typename XS, typename C, typename M>
+	auto copy_if(XS&& xs, M(C::*method)() const) -> std::decay_t<XS>
 	{
-		std::decay_t<xs_t> result;
+		using DXS = std::decay_t<XS>;
+		static_assert(std::is_same<DXS::value_type, C>::value, "method-pointer's class doesn't match range's value-type");
+		DXS result;
 
 		for (auto&& x : xs)
 		{
-			if ((x.*member)())
+			if ((x.*method)())
 				result.push_back(x);
 		}
 
 		return result;
 	}
 
-	
+	//=====================================================================
+	// remove_erase
+	//=====================================================================
 	template <typename range_tx, typename pred_tx>
 	auto remove_erase(range_tx& range, pred_tx const& pred) -> void
 	{
@@ -215,16 +172,43 @@ namespace atma
 	}
 
 
-	
-	template <typename xs_t, typename f_t>
-	inline auto for_each(xs_t&& xs, f_t&& f) -> void
+	//=====================================================================
+	// for_each / for_each2
+	//=====================================================================
+	template <typename XS, typename F>
+	inline auto for_each(XS&& xs, F&& f) -> void
 	{
 		for (auto&& x : xs)
 			f(x);
 	}
 
+	template <typename IT, typename F>
+	inline auto for_each(IT const& begin, IT const& end, F&& f) -> void
+	{
+		for (auto i = begin; i != end; ++i)
+			f(*i);
+	}
+
+	template <typename R, typename LHS, typename F>
+	inline auto for_each2(R&& range, LHS&& lhs, F&& fn) -> void
+	{
+		for (auto&& x : range)
+			fn(std::forward<LHS>(lhs), x);
+	}
+
+	template <typename IT, typename LHS, typename F>
+	inline auto for_each2(IT const& begin, IT const& end, LHS&& lhs, F&& fn) -> void
+	{
+		for (auto i = begin; i != end; ++i)
+			fn(std::forward<LHS>(lhs), *i);
+	}
+
+
+	//=====================================================================
+	// foldl
+	//=====================================================================
 	template <typename R, typename F>
-	inline auto foldl(R&& range, F&& fn) -> typename function_traits<F>::result_type
+	inline auto foldl(R&& range, F&& fn) -> typename std::decay_t<R>::value_type
 	{
 		ATMA_ASSERT(!range.empty());
 
@@ -237,11 +221,11 @@ namespace atma
 	}
 
 	template <typename R, typename I, typename F>
-	inline auto foldl(R&& range, I&& initial, F&& fn) -> typename function_traits<F>::result_type
+	inline auto foldl(R&& range, I&& initial, F&& fn) -> std::decay_t<I>
 	{
 		ATMA_ASSERT(!range.empty());
 
-		auto&& r = initial;
+		auto r = initial;
 
 		for (auto i = range.begin(); i != range.end(); ++i)
 			r = fn(r, *i);
@@ -250,17 +234,19 @@ namespace atma
 	}
 
 	template <typename IT, typename I, typename F>
-	inline auto foldl(IT const& begin, IT const& end, I&& initial, F&& fn) -> typename function_traits<F>::result_type
+	inline auto foldl(IT const& begin, IT const& end, I&& initial, F&& fn) -> std::decay_t<I>
 	{
 		ATMA_ASSERT(!range.empty());
 
-		auto&& r = initial;
+		auto r = initial;
 
 		for (auto i = begin; i != end; ++i)
 			r = fn(r, *i);
 
 		return r;
 	}
+
+	
 
 	//=====================================================================
 	// merge
