@@ -175,7 +175,6 @@ namespace atma {
 
 	inline auto utf8_string_t::append(char const* begin, char const* end) -> void
 	{
-#if 0
 		auto sz = end - begin;
 		if (sz == 0)
 			return;
@@ -184,7 +183,21 @@ namespace atma {
 		memcpy(data_ + size_, begin, sz);
 		size_ += sz;
 		data_[size_] = '\0';
-#endif
+	}
+
+	inline auto utf8_string_t::append(char const* str) -> void
+	{
+		append(str, str + strlen(str));
+	}
+
+	inline auto utf8_string_t::append(utf8_string_t const& str) -> void
+	{
+		append(str.raw_begin(), str.raw_end());
+	}
+
+	inline auto utf8_string_t::append(utf8_string_range_t const& str) -> void
+	{
+		append(str.begin(), str.end());
 	}
 
 	inline auto utf8_string_t::clear() -> void
@@ -431,5 +444,24 @@ namespace atma {
 	{
 		return find_first_of(str.begin(), str.end(), delims);
 	}
+
+	struct utf8_appender_t
+	{
+		utf8_appender_t(utf8_string_t& dest)
+			: str_(dest)
+		{}
+
+		template <typename T>
+		auto operator ()(T&& x) const -> utf8_appender_t const&
+		{
+			str_.append(std::forward<T>(x));
+			return *this;
+		}
+
+	private:
+		utf8_string_t& str_;
+	};
+
+
 }
 

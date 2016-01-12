@@ -54,7 +54,11 @@ namespace atma
 
 		auto push_back(char) -> void;
 		auto push_back(utf8_char_t) -> void;
+
 		auto append(char const*, char const*) -> void;
+		auto append(char const*) -> void;
+		auto append(utf8_string_t const&) -> void;
+		auto append(utf8_string_range_t const&) -> void;
 
 		auto clear() -> void;
 
