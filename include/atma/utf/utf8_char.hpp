@@ -173,8 +173,12 @@ namespace atma
 
 	inline auto operator == (utf8_char_t lhs, char rhs) -> bool
 	{
-		ATMA_ASSERT(utf8_char_is_ascii(rhs));
 		return lhs[0] == rhs;
+	}
+
+	inline auto operator != (utf8_char_t lhs, char rhs) -> bool
+	{
+		return lhs[0] != rhs;
 	}
 }
 

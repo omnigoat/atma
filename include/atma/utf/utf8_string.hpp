@@ -111,6 +111,14 @@ namespace atma {
 		return *this;
 	}
 
+	inline auto utf8_string_t::operator = (utf8_string_t&& rhs) -> utf8_string_t&
+	{
+		std::swap(capacity_, rhs.capacity_);
+		std::swap(size_, rhs.size_);
+		std::swap(data_, rhs.data_);
+		return *this;
+	}
+
 	inline auto utf8_string_t::empty() const -> bool
 	{
 		return size_ == 0;
@@ -350,6 +358,20 @@ namespace atma {
 	{
 		auto t = *this;
 		++*this;
+		return t;
+	}
+
+	inline auto utf8_string_t::iterator_t::operator -- () -> iterator_t&
+	{
+		while (ptr_ != owner_->data_ && utf8_byte_is_run_on(*ptr_))
+			--ptr_;
+		return *this;
+	}
+
+	inline auto utf8_string_t::iterator_t::operator -- (int) -> iterator_t
+	{
+		auto t = *this;
+		--*this;
 		return t;
 	}
 
