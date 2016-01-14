@@ -36,6 +36,7 @@ namespace atma
 		~utf8_string_t();
 
 		auto operator = (utf8_string_t const&) -> utf8_string_t&;
+		auto operator = (utf8_string_t&&) -> utf8_string_t&;
 		auto operator += (utf8_string_t const& rhs) -> utf8_string_t&;
 		auto operator += (char const*) -> utf8_string_t&;
 
@@ -113,6 +114,8 @@ namespace atma
 		auto operator = (iterator_t const&) -> iterator_t&;
 		auto operator ++ () -> iterator_t&;
 		auto operator ++ (int) -> iterator_t;
+		auto operator -- () -> iterator_t&;
+		auto operator -- (int) -> iterator_t;
 
 		auto operator * () const -> value_type;
 		auto operator -> () const -> value_type;
