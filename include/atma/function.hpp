@@ -385,8 +385,7 @@ namespace atma
 		}
 
 		template <typename... Args>
-		auto operator ()(Args&&... args) const
-			-> decltype(detail::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...))
+		decltype(auto) operator ()(Args&&... args) const
 		{
 			return detail::dispatcher_t<R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(dispatch_, wrapper_.buf, std::forward<Args>(args)...);
 		}
