@@ -24,6 +24,11 @@ typedef uint64_t uint64;
 typedef intptr_t intptr;
 typedef uintptr_t uintptr;
 
+#define ATMA_PP_CAT_II(a, b) a##b
+#define ATMA_PP_CAT(a, b) ATMA_PP_CAT_II(a, b)
+
+#define ATMA_SPLAT_FN_II(counter, pattern) int ATMA_PP_CAT(splat, counter)[] = {0, (pattern, void(), 0)...};
+#define ATMA_SPLAT_FN(pattern) ATMA_SPLAT_FN_II(__COUNTER__, pattern)
 
 namespace atma
 {

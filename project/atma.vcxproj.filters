@@ -214,5 +214,8 @@
     <ClInclude Include="..\include\atma\unit_test.hpp">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\atomic.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
