@@ -4,9 +4,7 @@
 
 namespace atma
 {
-#if ATMA_COMPILER_MSVC
-	
-	struct alignas(128) atomic128_t
+	struct alignas(16) atomic128_t
 	{
 		union {
 			int64 i64[2];
@@ -21,43 +19,76 @@ namespace atma
 		};
 	};
 
+#if ATMA_COMPILER_MSVC
 
 	namespace detail
 	{
 		template <typename T, size_t S = sizeof(T)> struct interlocked_t;
 
 		template <typename T>
-		struct interlocked_t<T, 16>
+		struct interlocked_t<T, 2>
 		{
-			static auto exchange(void* addr, T x) -> T {
-				return InterlockedExchange16((SHORT*)addr, reinterpret_cast<SHORT>(x));
+			static auto exchange(void* addr, T x) -> T
+			{
+				auto sx = *reinterpret_cast<SHORT*>(&x);
+				return InterlockedExchange16((SHORT*)addr, sx);
 			}
 		};
 
 		template <typename T>
-		struct interlocked_t<T, 128>
+		struct interlocked_t<T, 4>
 		{
-			static auto compare_exchange(void* addr, T const& x) -> T {
-				return InterlockedCompareExchange128((LONG64*)addr, x.i64[0], x.i64[1] reinterpret_cast<SHORT>(x));
+			static auto exchange(void* addr, T const& x) -> T
+			{
+				return InterlockedExchange((LONG*)addr, *reinterpret_cast<LONG*>(&x));
+			}
+
+			static auto compare_exchange(void* addr, T const& c, T const& x, T* outc) -> bool
+			{
+				// reinterpret c & x as an atomic128 for convenience
+				*outc = InterlockedCompareExchange((LONG*)addr, x, c);
+				return *outc == c;
+			}
+		};
+
+		template <typename T>
+		struct interlocked_t<T, 16>
+		{
+			static auto compare_exchange(void* addr, T const& c, T const& x, T* outc) -> bool
+			{
+				// reinterpret c & x as an atomic128 for convenience
+				//auto ac = *reinterpret_cast<atomic128_t const*>(&c);
+				auto const& ax = *reinterpret_cast<atomic128_t const*>(&x);
+				*outc = c;
+
+				return InterlockedCompareExchange128((LONG64*)addr, ax.i64[1], ax.i64[0], (LONG64*)outc) != 0;
 			}
 		};
 	}
+
+#endif
+
 
 	template <typename T>
 	inline auto atomic_exchange(void* addr, T const& x) -> T {
 		return detail::interlocked_t<T>::exchange(addr, x);
 	}
 
-	//inline auto atomic_exchange_i32(void* addr, int32 x) -> int32 { return InterlockedExchange((LONG*)addr, reinterpret_cast<LONG>(x)); }
-	//inline auto atomic_exchange_u32(void* addr, uint32 x) -> uint32 { return InterlockedExchange((LONG*)addr, reinterpret_cast<LONG>(x));  }
-	//
-	//inline auto atomic_exchange_i64(void* addr, int64 x) -> int64 { return InterlockedExchange64((LONGLONG*)addr, reinterpret_cast<LONGLONG>(x)); }
-	//inline auto atomic_exchange_u64(void* addr, uint64 x) -> uint64 { return InterlockedExchange64((LONGLONG*)addr, reinterpret_cast<LONGLONG>(x)); }
-	//
-	//inline auto atomic_compare_exchange_i32(void* addr, int32 comparand, int32 x) -> int32 { return InterlockedCompareExchange((LONG*)addr, reinterpret_cast<LONG>(x), reinterpret_cast<LONG>(comparand)); }
-	//inline auto atomic_compare_exchange_u32(void* addr, uint32 comparand, uint32 x) -> uint32 { return InterlockedCompareExchange((LONG*)addr, reinterpret_cast<LONG>(x), reinterpret_cast<LONG>(comparand)); }
+	template <typename T>
+	inline auto atomic_compare_exchange(void* addr, T const& c, T const& x, T* outc = nullptr) -> bool
+	{
+		static atomic128_t d;
 
-#endif
+		if (!outc)
+			outc = (T*)&d;
 
-	//inline bool atomic_compare_exchange
+		return detail::interlocked_t<T>::compare_exchange(addr, c, x, outc);
+	}
+
+	inline auto atomic_read128(void* dest, void* src) -> void
+	{
+		auto adest = reinterpret_cast<atomic128_t*>(dest);
+		atomic_compare_exchange(src, *adest, *adest, adest);
+	}
+
 }
