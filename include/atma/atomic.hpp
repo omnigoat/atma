@@ -6,6 +6,14 @@ namespace atma
 {
 	struct alignas(16) atomic128_t
 	{
+		atomic128_t()
+			: ui64{0, 0}
+		{}
+
+		atomic128_t(uint64 a, uint64 b)
+			: ui64{a, b}
+		{}
+
 		union {
 			int64 i64[2];
 			int32 i32[4];
