@@ -29,10 +29,6 @@
     <ClInclude Include="..\include\atma\hash_map.hpp" />
     <ClInclude Include="..\include\atma\memory.hpp" />
     <ClInclude Include="..\include\atma\assert.hpp" />
-    <ClInclude Include="..\include\atma\assert\basic.hpp" />
-    <ClInclude Include="..\include\atma\assert\config.hpp" />
-    <ClInclude Include="..\include\atma\assert\ensure.hpp" />
-    <ClInclude Include="..\include\atma\assert\handling.hpp" />
     <ClInclude Include="..\include\atma\bind.hpp" />
     <ClInclude Include="..\include\atma\bitmask.hpp" />
     <ClInclude Include="..\include\atma\com_ptr.hpp" />

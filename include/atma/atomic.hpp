@@ -60,6 +60,22 @@ namespace atma
 		};
 
 		template <typename T>
+		struct interlocked_t<T, 8>
+		{
+			static auto exchange(void* addr, T const& x) -> T
+			{
+				return InterlockedExchange64((LONG64*)addr, *reinterpret_cast<LONG64*>(&x));
+			}
+
+			static auto compare_exchange(void* addr, T const& c, T const& x, T* outc) -> bool
+			{
+				// reinterpret c & x as an atomic128 for convenience
+				*reinterpret_cast<LONG64*>(outc) = InterlockedCompareExchange64((LONG64*)addr, *(LONG64*)&x, *(LONG64*)&c);
+				return *outc == c;
+			}
+		};
+
+		template <typename T>
 		struct interlocked_t<T, 16>
 		{
 			static auto compare_exchange(void* addr, T const& c, T const& x, T* outc) -> bool
