@@ -48,7 +48,7 @@ namespace atma
 		{
 			static auto exchange(void* addr, T const& x) -> T
 			{
-				return InterlockedExchange((LONG*)addr, *reinterpret_cast<LONG*>(&x));
+				return InterlockedExchange((LONG*)addr, *reinterpret_cast<LONG const*>(&x));
 			}
 
 			static auto compare_exchange(void* addr, T const& c, T const& x, T* outc) -> bool
