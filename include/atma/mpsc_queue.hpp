@@ -252,39 +252,33 @@ namespace atma
 
 		if (growcmd_size <= available)
 		{
-			// allocate enough space for the jump command
-			uint32 gnwp = (wp + growcmd_size) % wbs;
-			if (atma::atomic_compare_exchange(&write_position_, wp, gnwp))
+			// current write-info
+			atma::atomic128_t q_write_info;
+			q_write_info.ui64[0] = (uint64)wb;
+			q_write_info.ui32[2] = wbs;
+			q_write_info.ui32[3] = wp;
+
+			// new-write-info
+			atma::atomic128_t nwi;
+			auto const nwbs = wbs * 2;
+			nwi.ui64[0] = (uint64)new byte[nwbs]();
+			nwi.ui32[2] = nwbs;
+			nwi.ui32[3] = 0;
+
+			// atomically change the write-info. this means no other thread is now writing
+			// into the old write-buffer after us
+			if (atma::atomic_compare_exchange(&write_info_, q_write_info, nwi))
 			{
+				// no other thread can touch the old write-buffer/write-position, so no
+				// need to perform atomic operations anymore
 				auto A = allocation_t{wb, wbs, wp, growcmd_size, command_t::jump};
-
-				// current write-info
-				atma::atomic128_t q_write_info;
-				q_write_info.ui64[0] = (uint64)wb;
-				q_write_info.ui32[2] = wbs;
-				q_write_info.ui32[3] = gnwp;
-
-				// new-write-info
-				atma::atomic128_t nwi;
-				auto const nwbs = wbs * 2;
-				nwi.ui64[0] = (uint64)new byte[nwbs]();
-				nwi.ui32[2] = nwbs;
-				nwi.ui32[3] = 0;
-
-				if (atma::atomic_compare_exchange(&write_info_, q_write_info, nwi))
-				{
-					// successfully (atomically) moved to new buffer encode "jump" command to new buffer
-					A.encode_uint64(nwi.ui64[0]);
-					A.encode_uint32(nwbs);
-				}
-				else
-				{
-					// we failed to move to new buffer: encode a nop
-					A.header = A.size() | ((int)command_t::nop << 30);
-					delete[] (byte*)nwi.ui64[0];
-				}
-
+				A.encode_uint64(nwi.ui64[0]);
+				A.encode_uint32(nwbs);
 				commit(A);
+			}
+			else
+			{
+				delete[](byte*)nwi.ui64[0];
 			}
 		}
 	}
