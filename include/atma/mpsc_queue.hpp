@@ -13,7 +13,8 @@ namespace atma
 		base_mpsc_queue_t(uint32);
 
 		auto commit(allocation_t&) -> void;
-		auto consume(decoder_t&) -> bool;
+		auto consume() -> decoder_t;
+		auto finalize(decoder_t&) -> void;
 
 	protected:
 		enum class command_t : byte;
@@ -123,9 +124,7 @@ namespace atma
 
 	struct base_mpsc_queue_t::decoder_t
 	{
-		decoder_t() {}
-
-		auto id() const -> byte { return id_; }
+		operator bool() const { return buf != nullptr; }
 
 		auto decode_byte(byte&) -> void;
 		auto decode_uint16(uint16&) -> void;
@@ -133,18 +132,22 @@ namespace atma
 		auto decode_uint64(uint64&) -> void;
 
 	private:
+		decoder_t()
+			: buf(), bufsize()
+			, size(), p()
+		{}
+
 		decoder_t(byte* buf, uint32 bufsize, uint32 rp)
 			: buf(buf), bufsize(bufsize)
-			, p(rp + header_size)
 			, size(*(uint32*)(buf + rp) & 0x3fffffff)
+			, p((rp + header_size) % bufsize)
 		{
 		}
 
 		byte*  buf;
 		uint32 bufsize;
-		uint32 p;
 		uint32 size;
-		byte id_ = 0;
+		uint32 p;
 
 		friend struct base_mpsc_queue_t;
 	};
@@ -217,7 +220,7 @@ namespace atma
 		// new-write-position can't be "one before" the end of the buffer,
 		// as we must write the first two bytes of the header atomically
 		uint32 nwp = (wp + size) % wbs;
-		if (nwp + header_size >= wbs) {
+		if (nwp + header_size >= wbs && (size + (wbs - nwp)) <= available) {
 			size += (wbs - nwp);
 			nwp = 0;
 		};
@@ -225,8 +228,8 @@ namespace atma
 		atma::atomic128_t oldwi{(uint64)wb, wbs, wp};
 		atma::atomic128_t newwi{(uint64)wb, wbs, nwp};
 
-		//return atma::atomic_compare_exchange(&write_info_, oldwi, newwi);
-		return atma::atomic_compare_exchange(&write_position_, wp, nwp);
+		return atma::atomic_compare_exchange(&write_info_, oldwi, newwi);
+		//return atma::atomic_compare_exchange(&write_position_, wp, nwp);
 	}
 
 	constexpr auto pow2(uint x) -> uint
@@ -249,33 +252,39 @@ namespace atma
 
 		if (growcmd_size <= available)
 		{
-			// current write-info
-			atma::atomic128_t q_write_info;
-			q_write_info.ui64[0] = (uint64)wb;
-			q_write_info.ui32[2] = wbs;
-			q_write_info.ui32[3] = wp;
-
-			// new-write-info
-			atma::atomic128_t nwi;
-			auto const nwbs = wbs * 2;
-			nwi.ui64[0] = (uint64)new byte[nwbs]();
-			nwi.ui32[2] = nwbs;
-			nwi.ui32[3] = 0;
-
-			// atomically change the write-info. this means no other thread is now writing
-			// into the old write-buffer after us
-			if (atma::atomic_compare_exchange(&write_info_, q_write_info, nwi))
+			// allocate enough space for the jump command
+			uint32 gnwp = (wp + growcmd_size) % wbs;
+			if (atma::atomic_compare_exchange(&write_position_, wp, gnwp))
 			{
-				// no other thread can touch the old write-buffer/write-position, so no
-				// need to perform atomic operations anymore
 				auto A = allocation_t{wb, wbs, wp, growcmd_size, command_t::jump};
-				A.encode_uint64(nwi.ui64[0]);
-				A.encode_uint32(nwbs);
+
+				// current write-info
+				atma::atomic128_t q_write_info;
+				q_write_info.ui64[0] = (uint64)wb;
+				q_write_info.ui32[2] = wbs;
+				q_write_info.ui32[3] = gnwp;
+
+				// new-write-info
+				atma::atomic128_t nwi;
+				auto const nwbs = wbs * 2;
+				nwi.ui64[0] = (uint64)new byte[nwbs]();
+				nwi.ui32[2] = nwbs;
+				nwi.ui32[3] = 0;
+
+				if (atma::atomic_compare_exchange(&write_info_, q_write_info, nwi))
+				{
+					// successfully (atomically) moved to new buffer encode "jump" command to new buffer
+					A.encode_uint64(nwi.ui64[0]);
+					A.encode_uint32(nwbs);
+				}
+				else
+				{
+					// we failed to move to new buffer: encode a nop
+					A.header = A.size() | ((int)command_t::nop << 30);
+					delete[] (byte*)nwi.ui64[0];
+				}
+
 				commit(A);
-			}
-			else
-			{
-				delete[] (byte*)nwi.ui64[0];
 			}
 		}
 	}
@@ -283,8 +292,9 @@ namespace atma
 	
 	auto base_mpsc_queue_t::commit(allocation_t& a) -> void
 	{
-		// we have already guaranteed that the first two bytes of the header
-		// does not wrap around our buffer
+		ATMA_ASSERT(((uint64)(a.buf + a.wp)) % 4 == 0);
+
+		// we have already guaranteed that the header does not wrap around our buffer
 		atma::atomic_exchange<uint32>(a.buf + a.wp, a.header);
 		a.wp = a.p = a.header = 0;
 	}
@@ -359,29 +369,25 @@ namespace atma
 		}
 	}
 
-	auto base_mpsc_queue_t::consume(decoder_t& D) -> bool
+	auto base_mpsc_queue_t::consume() -> decoder_t
 	{
 		auto header = *(uint32*)(read_buf_ + read_position_);
 		auto size = header & 0x3fffffff;
 		if (size == 0)
-			return false;
+			return decoder_t();
 
 		auto command = (command_t)((header & 0xc0000000) >> 30);
 
-		D.buf = read_buf_;
-		D.bufsize = read_buf_size_;
-		D.p = (read_position_ + header_size) % read_buf_size_;
-		D.size = size;
-
-		read_position_ = (read_position_ + size) % read_buf_size_;
+		decoder_t D{read_buf_, read_buf_size_, read_position_};
 
 		switch (command)
 		{
 			// nop means we move to the next location
 			case command_t::nop:
-				return consume(D);
+				finalize(D);
+				return consume();
 
-				// jump to the encoded, larger, read-buffer
+			// jump to the encoded, larger, read-buffer
 			case command_t::jump:
 			{
 				uint64 ptr;
@@ -393,7 +399,7 @@ namespace atma
 				read_buf_size_ = size;
 				read_position_ = 0;
 				std::cout << "JUMP" << std::endl;
-				return consume(D);
+				return consume();
 			}
 
 			// user
@@ -401,12 +407,19 @@ namespace atma
 				break;
 		}
 
-		return true;
+		return D;
+	}
+
+	inline auto base_mpsc_queue_t::finalize(decoder_t& D) -> void
+	{
+		read_position_ = (read_position_ + D.size) % read_buf_size_;
 	}
 
 	inline base_mpsc_queue_t::allocation_t::allocation_t(byte* buf, uint32 bufsize, uint32 wp, uint32 size, command_t c)
-		: buf(buf), bufsize(bufsize)
-		, wp(wp), p(wp + header_size)
+		: buf(buf)
+		, bufsize(bufsize)
+		, wp(wp)
+		, p((wp + header_size) % bufsize)
 		, header(((byte)c << 30) | size)
 	{
 		ATMA_ASSERT((uint)c < pow2(2));
