@@ -14,6 +14,13 @@ namespace atma
 			: ui64{a, b}
 		{}
 
+		atomic128_t(uint64 a, uint32 b, uint32 c)
+		{
+			ui64[0] = a;
+			ui32[2] = b;
+			ui32[3] = c;
+		}
+
 		union {
 			int64 i64[2];
 			int32 i32[4];
