@@ -29,6 +29,7 @@ namespace atma
 		auto impl_calculate_new_write_position(uint32 wbs, uint32 wp, uint32& size) -> uint32;
 		auto impl_perform_allocation(uint32 available, uint32 size, uint32 wp, uint32 nwp) -> bool;
 		auto impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 size, command_t) -> allocation_t;
+		auto impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void;
 
 	private:
 		
@@ -74,6 +75,11 @@ namespace atma
 	struct base_mpsc_queue_starvation_t
 	{
 		std::chrono::nanoseconds const starve_timeout{5000};
+
+		base_mpsc_queue_starvation_t()
+			: starve_thread_()
+			, starve_time_()
+		{}
 
 	protected:
 		auto starve_flag(size_t starve_id, size_t thread_id, std::chrono::nanoseconds const& starve_time) -> void;
@@ -232,78 +238,25 @@ namespace atma
 		return allocation_t{wb, wbs, wp, size, c};
 	}
 
-#if 0
-	auto base_mpsc_queue_t::allocate(uint32 size, byte user_header) -> allocation_t
+	inline auto base_mpsc_queue_t::impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void
 	{
-		// also need space for alloc header
-		size += header_size;
+		static_assert(sizeof(uint64) >= sizeof(void*), "pointers too large! where are you?");
 
-		ATMA_ASSERT(size <= write_buf_size_, "queue can not allocate that much");
+		uint32 const growcmd_size = sizeof(uint64) + sizeof(uint32) + header_size;
 
-		size_t thread_id = std::hash<std::thread::id>{}(std::this_thread::get_id());
-
-
-		byte* wb = nullptr;
-		uint32 wbs = 0;
-		uint32 wp = 0;
-
-		std::chrono::nanoseconds starvation{};
-		for (;;)
+		if (growcmd_size <= available)
 		{
-			auto time_start = std::chrono::high_resolution_clock::now();
+			uint32 gnwp = (wp + growcmd_size) % wbs;
 
-			// starve_id is either zero or our thread-id, at any point
-			// during this function-call "starve_.thread" could change
-			auto starve_id = starve_gate(thread_id);
-
-			// read 16 bytes of {write-buf, buf-size, write-pos}
-			atma::atomic128_t q_write_info;
-			atma::atomic_read128(&q_write_info, &write_info_);
-
-			// write-buffer, write-buffer-size, write-position
-			wb = (byte*)q_write_info.ui64[0];
-			wbs = q_write_info.ui32[2];
-			wp = q_write_info.ui32[3];
-
-			// read-buffer, read-position
-			atma::atomic128_t q_read_info;
-			atma::atomic_read128(&q_read_info, &read_info_);
-			auto rb = (byte*)q_read_info.ui64[0];
-			auto rp = q_read_info.ui32[3];
-
-			// size of available bytes. subtract one because we must never have
-			// the write-position and read-position equal the same value if the
-			// buffer is full, because we can't distinguish it from being empty
-			//
-			// if our buffers are differing (because we are mid-rebase), then
-			// we can only allocate up to the end of the new buffer
-			uint32 available = 0;
-			if (wb == rb)
-				available = (rp <= wp ? rp + wbs - wp : rp - wp) - 1;
-			else
-				available = wbs - wp - 1;
-
-
-			// new-write-position can't be "one before" the end of the buffer,
-			// as we must write the first two bytes of the header atomically
-			auto nwp = (wp + size) % wbs;
-			if (nwp == wbs - 1) {
-				++nwp;
-				++size;
-			}
-
-			if (size <= available)
+			if (atma::atomic_compare_exchange(&write_position_, wp, gnwp))
 			{
-				if (atma::atomic_compare_exchange(&write_position_, wp, nwp))
-					break;
-			}
-			// not enough space for our command. we may eventually have to block (busy-wait),
-			// but first let's try to create a *new* buffer, atomically set all new writes to
-			// write into that buffer, and encode a jump command in our current buffer. jump
-			// commands are very small (16 bytes), so maybe that'll work.
-			else
-			{
-				static_assert(sizeof(uint64) >= sizeof(void*), "pointers too large! where are you?");
+				auto A = allocation_t{wb, wbs, wp, growcmd_size, command_t::jump};
+
+				// update "known" write-position
+				atma::atomic128_t q_write_info;
+				q_write_info.ui64[0] = (uint64)wb;
+				q_write_info.ui32[2] = wbs;
+				q_write_info.ui32[3] = gnwp;
 
 				// new write-information
 				atma::atomic128_t nwi;
@@ -312,58 +265,23 @@ namespace atma
 				nwi.ui32[2] = nwbs;
 				nwi.ui32[3] = 0;
 
-
-				uint32 const growcmd_size = 12 + 4;
-				if (growcmd_size <= available)
+				if (atma::atomic_compare_exchange(&write_info_, q_write_info, nwi))
 				{
-					uint32 gnwp = (wp + growcmd_size) % wbs;
-
-					if (atma::atomic_compare_exchange(&write_position_, wp, gnwp))
-					{
-						auto A = allocation_t{wb, wbs, wp, growcmd_size};
-
-						// update "known" write-position
-						q_write_info.ui32[3] = gnwp;
-
-						if (atma::atomic_compare_exchange(&write_info_, q_write_info, nwi))
-						{
-							// successfully (atomically) moved to new buffer
-							// encode "jump" command to new buffer
-							A.encode_byte((byte)command_t::jump);
-							A.encode_byte(0);
-							A.encode_uint64(nwi.ui64[0]);
-							A.encode_uint32(nwbs);
-						}
-						else
-						{
-							// we failed to move to new buffer: encode a nop
-							buf_encode_header(wb, wbs, A, command_t::nop);
-							delete[](byte*)nwi.ui64[0];
-						}
-
-						commit(A);
-					}
+					// successfully (atomically) moved to new buffer encode "jump" command to new buffer
+					A.encode_uint64(nwi.ui64[0]);
+					A.encode_uint32(nwbs);
 				}
 				else
 				{
-					delete[](byte*)nwi.ui64[0];
+					// we failed to move to new buffer: encode a nop
+					A.header = A.size() | ((int)command_t::nop << 30);
+					delete[] (byte*)nwi.ui64[0];
 				}
+
+				commit(A);
 			}
-
-			auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - time_start);
-			starvation += elapsed;
-
-			starve_flag(starve_id, thread_id, starvation);
 		}
-
-		starve_unflag(starve_thread_, thread_id);
-
-		auto A = allocation_t{wb, wbs, wp, size};
-		A.encode_byte((byte)command_t::user);
-		A.encode_byte(user_header);
-		return A;
 	}
-#endif
 
 	
 	auto base_mpsc_queue_t::commit(allocation_t& a) -> void
@@ -409,8 +327,7 @@ namespace atma
 
 	
 
-#if 0
-	auto base_mpsc_queue_t::starve_gate(size_t thread_id) -> size_t
+	auto base_mpsc_queue_starvation_t::starve_gate(size_t thread_id) -> size_t
 	{
 		size_t st = starve_thread_;
 		if (st != 0)
@@ -423,7 +340,7 @@ namespace atma
 		return st;
 	}
 
-	auto base_mpsc_queue_t::starve_flag(size_t starve_id, size_t thread_id, std::chrono::nanoseconds const& starve_time) -> void
+	auto base_mpsc_queue_starvation_t::starve_flag(size_t starve_id, size_t thread_id, std::chrono::nanoseconds const& starve_time) -> void
 	{
 		if (starve_time > starve_timeout && (uint64)starve_time.count() > starve_time_)
 		{
@@ -437,14 +354,13 @@ namespace atma
 		}
 	}
 
-	auto base_mpsc_queue_t::starve_unflag(size_t starve_id, size_t thread_id) -> void
+	auto base_mpsc_queue_starvation_t::starve_unflag(size_t starve_id, size_t thread_id) -> void
 	{
 		if (starve_thread_ == thread_id)
 		{
 			ATMA_ENSURE(atma::atomic_compare_exchange(&starve_thread_, (uint64)thread_id, uint64()), "shouldn't have contention over resetting starvation");
 		}
 	}
-#endif
 
 	auto base_mpsc_queue_t::consume(decoder_t& D) -> bool
 	{
@@ -457,7 +373,7 @@ namespace atma
 
 		D.buf = read_buf_;
 		D.bufsize = read_buf_size_;
-		D.p = read_position_ + header_size;
+		D.p = (read_position_ + header_size) % read_buf_size_;
 		D.size = size;
 
 		read_position_ = (read_position_ + size) % read_buf_size_;
@@ -479,6 +395,7 @@ namespace atma
 				read_buf_ = (byte*)ptr;
 				read_buf_size_ = size;
 				read_position_ = 0;
+				std::cout << "JUMP" << std::endl;
 				return consume(D);
 			}
 
@@ -608,12 +525,110 @@ namespace atma
 			}
 
 			return impl_make_allocation(wb, wbs, wp, size, command_t::user);
-			//auto A = allocation_t{wb, wbs, wp, size};
-			//A.encode_byte((byte)command_t::user);
-			//A.encode_byte(user_header);
-			//return A;
 		}
+	};
 
-		
+	template <>
+	struct basic_mpsc_queue_t<true, false>
+		: base_mpsc_queue_t
+		, base_mpsc_queue_starvation_t
+	{
+		basic_mpsc_queue_t(void* buf, uint32 size)
+			: base_mpsc_queue_t{buf, size}
+			, base_mpsc_queue_starvation_t{}
+		{}
+
+		basic_mpsc_queue_t(uint32 size)
+			: base_mpsc_queue_t{size}
+		{}
+
+		auto allocate(uint32 size) -> allocation_t
+		{
+			// also need space for alloc header
+			size += base_mpsc_queue_t::header_size;
+
+			//ATMA_ASSERT(size <= write_buf_size_, "queue can not allocate that much");
+
+			// write-buffer, write-buffer-size, write-pos
+			byte* wb = nullptr;
+			uint32 wbs = 0;
+			uint32 wp = 0;
+
+			// read-buffer, read-position
+			byte* rb = nullptr;
+			uint32 rp = 0;
+
+			size_t thread_id = std::hash<std::thread::id>{}(std::this_thread::get_id());
+			std::chrono::nanoseconds starvation{};
+			for (;;)
+			{
+				auto time_start = std::chrono::high_resolution_clock::now();
+				auto starve_id = starve_gate(thread_id);
+
+				std::tie(wb, wbs, wp) = impl_read_queue_write_info();
+				std::tie(rb, rp) = impl_read_queue_read_info();
+
+				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp);
+				uint32 nwp = impl_calculate_new_write_position(wbs, wp, size);
+
+				if (impl_perform_allocation(available, size, wp, nwp))
+					break;
+
+				auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - time_start);
+				starvation += elapsed;
+
+				starve_flag(starve_id, thread_id, starvation);
+			}
+
+			starve_unflag(starve_thread_, thread_id);
+
+			return impl_make_allocation(wb, wbs, wp, size, command_t::user);
+		}
+	};
+
+	template <>
+	struct basic_mpsc_queue_t<false, true>
+		: base_mpsc_queue_t
+	{
+		basic_mpsc_queue_t(void* buf, uint32 size)
+			: base_mpsc_queue_t{buf, size}
+		{}
+
+		basic_mpsc_queue_t(uint32 size)
+			: base_mpsc_queue_t{size}
+		{}
+
+		auto allocate(uint32 size) -> allocation_t
+		{
+			// also need space for alloc header
+			size += base_mpsc_queue_t::header_size;
+
+			//ATMA_ASSERT(size <= write_buf_size_, "queue can not allocate that much");
+
+			// write-buffer, write-buffer-size, write-pos
+			byte* wb = nullptr;
+			uint32 wbs = 0;
+			uint32 wp = 0;
+
+			// read-buffer, read-position
+			byte* rb = nullptr;
+			uint32 rp = 0;
+
+			for (;;)
+			{
+				std::tie(wb, wbs, wp) = impl_read_queue_write_info();
+				std::tie(rb, rp) = impl_read_queue_read_info();
+
+				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp);
+				uint32 nwp = impl_calculate_new_write_position(wbs, wp, size);
+
+				if (impl_perform_allocation(available, size, wp, nwp))
+					break;
+				else
+					impl_encode_jump(available, wb, wbs, wp);
+			}
+
+			return impl_make_allocation(wb, wbs, wp, size, command_t::user);
+		}
 	};
 }
