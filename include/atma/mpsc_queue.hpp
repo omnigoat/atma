@@ -4,6 +4,18 @@
 
 namespace atma
 {
+	constexpr auto pow2(uint x) -> uint
+	{
+		return (x == 0) ? 1 : 2 * pow2(x - 1);
+	}
+
+	constexpr auto log2(uint x) -> uint
+	{
+		return (x == 0) ? 0 : (x == 1) ? 0 : 1 + log2(x >> 1);
+	}
+
+
+
 	struct base_mpsc_queue_t
 	{
 		struct allocation_t;
@@ -17,30 +29,38 @@ namespace atma
 		auto finalize(decoder_t&) -> void;
 
 	protected:
-		enum class command_t : byte;
+		struct headerer_t;
 
-		// header is {2-bits: id, 30-bits: size}, making the header-size 4 bytes
-		static uint32 const header_idfield_bitsize = 2;
-		static uint32 const header_szfield_bitsize = 30;
-		static uint32 const header_size = (header_idfield_bitsize + header_szfield_bitsize) / 8;
+		enum class alloctype_t : uint32
+		{
+			normal,
+			jump
+		};
+
+		// header is {1-bit: jump-flag, 2-bits: alignment, 29-bits: size}, making the header-size 4 bytes
+		//  - alignment is a two-bit number representing a pow-2 exponent, which is multiplied by 4
+		//      thus: 0b10 == 2 == pow2(2) == 4  ->  4 * 4 == 16, 16-byte alignment
+		//      thus: 0b11 == 3 == pow2(3) == 8  ->  8 * 4 == 32, 32-byte alignment
+		static uint32 const header_jumpflag_bitsize = 1;
+		static uint32 const header_alignment_bitsize = 2;
+		static uint32 const header_size_bitsize = 29;
+		static uint32 const header_size = 4;
+
+		static uint32 const header_size_bitmask = pow2(header_size_bitsize) - 1;
+		static uint32 const header_alignment_bitmask = pow2(header_alignment_bitsize) - 1;
 
 		auto impl_read_queue_write_info() -> std::tuple<byte*, uint32, uint32>;
 		auto impl_read_queue_read_info() -> std::tuple<byte*, uint32>;
 		auto impl_calculate_available_space(byte* rb, uint32 rp, byte* wb, uint32 wbs, uint32 wp) -> uint32;
-		auto impl_perform_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available, uint32& size) -> bool;
-		auto impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 size, command_t) -> allocation_t;
+		auto impl_perform_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available, uint32 alignment, uint32& size) -> bool;
+		auto impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t, uint32 alignment, uint32 size) -> allocation_t;
 		auto impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void;
 
 	private:
-		
-
-		auto buf_encode_header(byte*, uint32 bufsize, allocation_t&, command_t, byte = 0) -> void;
 		auto buf_encode_byte(byte*, uint32 bufsize, allocation_t&, byte) -> void;
 		auto buf_encode_uint16(byte*, uint32 bufsize, allocation_t&, uint16) -> void;
 		auto buf_encode_uint32(byte*, uint32 bufsize, allocation_t&, uint32) -> void;
 		auto buf_encode_uint64(byte*, uint32 bufsize, allocation_t&, uint64) -> void;
-
-		
 
 	private:
 		union
@@ -99,30 +119,43 @@ namespace atma
 		};
 	};
 
-	struct base_mpsc_queue_t::allocation_t
-	{
-		auto size() const -> uint32 { return header & 0x3fffffff; }
 
+	struct base_mpsc_queue_t::headerer_t
+	{
+		auto size() const -> uint32;
+		auto alignment() const -> uint32;
+
+	protected:
+		headerer_t(byte* buf, uint32 bufsize, uint32 op, uint32 p, uint32 header)
+			: buf(buf), bufsize(bufsize)
+			, op(op), p(p)
+			, header(header)
+		{}
+
+		auto raw_size() const -> uint32 { return header & header_size_bitmask; }
+
+	protected:
+		byte*  buf;
+		uint32 bufsize;
+		uint32 op, p;
+		uint32 header;
+	};
+
+
+	struct base_mpsc_queue_t::allocation_t : headerer_t
+	{
 		auto encode_byte(byte) -> void;
 		auto encode_uint16(uint16) -> void;
 		auto encode_uint32(uint32) -> void;
 		auto encode_uint64(uint64) -> void;
 
 	private:
-		allocation_t(byte* buf, uint32 bufsize, uint32 wp, uint32 size, command_t);
-
-		byte*  buf;
-		uint32 bufsize;
-		uint32 wp, p;
-		uint32 header;
+		allocation_t(byte* buf, uint32 bufsize, uint32 wp, alloctype_t type, uint32 alignment, uint32 size);
 
 		friend struct base_mpsc_queue_t;
 	};
 
-
-
-
-	struct base_mpsc_queue_t::decoder_t
+	struct base_mpsc_queue_t::decoder_t : base_mpsc_queue_t::headerer_t
 	{
 		operator bool() const { return buf != nullptr; }
 
@@ -133,37 +166,17 @@ namespace atma
 
 	private:
 		decoder_t()
-			: buf(), bufsize()
-			, size(), p()
+			: headerer_t(nullptr, 0, 0, 0, 0)
 		{}
 
 		decoder_t(byte* buf, uint32 bufsize, uint32 rp)
-			: buf(buf), bufsize(bufsize)
-			, size(*(uint32*)(buf + rp) & 0x3fffffff)
-			, p((rp + header_size) % bufsize)
+			: headerer_t(buf, bufsize, rp, rp, *(uint32*)(buf + rp))
 		{
+			p = (rp + header_size + alignment()) & ~(alignment() - 1);
 		}
-
-		byte*  buf;
-		uint32 bufsize;
-		uint32 size;
-		uint32 p;
 
 		friend struct base_mpsc_queue_t;
 	};
-
-
-
-
-	enum class base_mpsc_queue_t::command_t : byte
-	{
-		nop,
-		jump,
-		user
-	};
-
-
-
 
 	base_mpsc_queue_t::base_mpsc_queue_t(void* buf, uint32 size)
 		: write_buf_((byte*)buf)
@@ -212,43 +225,39 @@ namespace atma
 			return wbs - wp - 1;
 	}
 
-	inline auto base_mpsc_queue_t::impl_perform_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available, uint32& size) -> bool
+	inline auto base_mpsc_queue_t::impl_perform_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available, uint32 alignment, uint32& size) -> bool
 	{
-		if (available < size)
+		ATMA_ASSERT(alignment > 0);
+		ATMA_ASSERT(wp % 4 == 0);
+
+		// expand size for initial padding required for alignment
+		size += ((wp + header_size + alignment) & ~(alignment - 1)) - wp;
+		
+		// expand size so that next allocation is 4-byte aligned
+		size = (size + 4) & ~(uint32)0b11;
+
+		if (available < size + header_size)
 			return false;
 
-		// new-write-position can't be "one before" the end of the buffer,
-		// as we must write the first two bytes of the header atomically
-		uint32 nwp = (wp + size) % wbs;
-		if (nwp + header_size >= wbs && (size + (wbs - nwp)) <= available) {
-			size += (wbs - nwp);
-			nwp = 0;
-		};
-
-		atma::atomic128_t oldwi{(uint64)wb, wbs, wp};
-		atma::atomic128_t newwi{(uint64)wb, wbs, nwp};
-
-		return atma::atomic_compare_exchange(&write_info_, oldwi, newwi);
-		//return atma::atomic_compare_exchange(&write_position_, wp, nwp);
+		uint32 nwp = (wp + header_size + size) % wbs;
+		
+		return atma::atomic_compare_exchange(
+			&write_info_,
+			atma::atomic128_t{(uint64)wb, wbs, wp},
+			atma::atomic128_t{(uint64)wb, wbs, nwp});
 	}
 
-	constexpr auto pow2(uint x) -> uint
+	
+	inline auto base_mpsc_queue_t::impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t type, uint32 alignment, uint32 size) -> allocation_t
 	{
-		return (x == 0) ? 1 : 2 * pow2(x - 1);
-	}
-
-	inline auto base_mpsc_queue_t::impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 size, command_t c) -> allocation_t
-	{
-		return allocation_t{wb, wbs, wp, size, c};
+		return allocation_t{wb, wbs, wp, type, alignment, size};
 	}
 
 	inline auto base_mpsc_queue_t::impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void
 	{
 		static_assert(sizeof(uint64) >= sizeof(void*), "pointers too large! where are you?");
 
-		uint32 const growcmd_size = sizeof(uint64) + sizeof(uint32) + header_size;
-
-		uint32 gnwp = (wp + growcmd_size) % wbs;
+		uint32 const growcmd_size = header_size + sizeof(uint64) + sizeof(uint32);
 
 		if (growcmd_size <= available)
 		{
@@ -271,7 +280,7 @@ namespace atma
 			{
 				// no other thread can touch the old write-buffer/write-position, so no
 				// need to perform atomic operations anymore
-				auto A = allocation_t{wb, wbs, wp, growcmd_size, command_t::jump};
+				auto A = allocation_t{wb, wbs, wp, alloctype_t::jump, 0, growcmd_size};
 				A.encode_uint64(nwi.ui64[0]);
 				A.encode_uint32(nwbs);
 				commit(A);
@@ -286,22 +295,15 @@ namespace atma
 	
 	auto base_mpsc_queue_t::commit(allocation_t& a) -> void
 	{
-		ATMA_ASSERT(((uint64)(a.buf + a.wp)) % 4 == 0);
+		ATMA_ASSERT(((uint64)(a.buf + a.op)) % 4 == 0);
 
 		// we have already guaranteed that the header does not wrap around our buffer
-		atma::atomic_exchange<uint32>(a.buf + a.wp, a.header);
-		a.wp = a.p = a.header = 0;
-	}
-
-	auto base_mpsc_queue_t::buf_encode_header(byte* buf, uint32 bufsize, allocation_t& A, command_t c, byte b) -> void
-	{
-		buf_encode_byte(buf, bufsize, A, (byte)c);
-		buf_encode_byte(buf, bufsize, A, b);
+		atma::atomic_exchange<uint32>(a.buf + a.op, a.header);
 	}
 
 	auto base_mpsc_queue_t::buf_encode_byte(byte* buf, uint32 bufsize, allocation_t& A, byte b) -> void
 	{
-		ATMA_ASSERT(A.p != (A.wp + A.size()) % bufsize);
+		ATMA_ASSERT(A.p != (A.op + header_size + A.raw_size()) % bufsize);
 		ATMA_ASSERT(0 <= A.p && A.p < bufsize);
 
 		buf[A.p] = b;
@@ -366,23 +368,22 @@ namespace atma
 	auto base_mpsc_queue_t::consume() -> decoder_t
 	{
 		auto header = *(uint32*)(read_buf_ + read_position_);
-		auto size = header & 0x3fffffff;
+		auto size = header & header_size_bitmask;
 		if (size == 0)
 			return decoder_t();
 
-		auto command = (command_t)((header & 0xc0000000) >> 30);
+		auto command = (alloctype_t)(header >> 31);
 
 		decoder_t D{read_buf_, read_buf_size_, read_position_};
 
 		switch (command)
 		{
 			// nop means we move to the next location
-			case command_t::nop:
-				finalize(D);
-				return consume();
-
+			case alloctype_t::normal:
+				break;
+				
 			// jump to the encoded, larger, read-buffer
-			case command_t::jump:
+			case alloctype_t::jump:
 			{
 				uint64 ptr;
 				uint32 size;
@@ -395,10 +396,6 @@ namespace atma
 				std::cout << "JUMP" << std::endl;
 				return consume();
 			}
-
-			// user
-			default:
-				break;
 		}
 
 		return D;
@@ -406,23 +403,49 @@ namespace atma
 
 	inline auto base_mpsc_queue_t::finalize(decoder_t& D) -> void
 	{
-		read_position_ = (read_position_ + D.size) % read_buf_size_;
+		read_position_ = (read_position_ + header_size + D.raw_size()) % read_buf_size_;
 	}
 
-	inline base_mpsc_queue_t::allocation_t::allocation_t(byte* buf, uint32 bufsize, uint32 wp, uint32 size, command_t c)
-		: buf(buf)
-		, bufsize(bufsize)
-		, wp(wp)
-		, p((wp + header_size) % bufsize)
-		, header(((byte)c << 30) | size)
+
+
+
+
+
+
+
+
+
+	auto base_mpsc_queue_t::headerer_t::size() const -> uint32
 	{
-		ATMA_ASSERT((uint)c < pow2(2));
-		ATMA_ASSERT(size < pow2(30));
+		// size after all alignment shenanigans
+		uint32 sz = header & header_size_bitmask;
+		uint32 ag = alignment();
+		sz -= (op + ag) & ~(ag - 1);
+		return sz;
 	}
 
+	auto base_mpsc_queue_t::headerer_t::alignment() const -> uint32
+	{
+		return 4 * pow2((header >> header_size_bitsize) & header_alignment_bitmask);
+	}
+
+
+
+	inline base_mpsc_queue_t::allocation_t::allocation_t(byte* buf, uint32 bufsize, uint32 wp, alloctype_t type, uint32 alignment, uint32 size)
+		: headerer_t(buf, bufsize, wp, wp, ((uint32)type << 31) | log2(alignment / 4) << 29 | size)
+	{
+		p += header_size;
+		uint32 ag = this->alignment();
+		if (ag > 4)
+			p = (p + ag) & ~(ag - 1);
+		
+		ATMA_ASSERT(size <= header_size_bitmask);
+	}
+
+	
 	auto base_mpsc_queue_t::allocation_t::encode_byte(byte b) -> void
 	{
-		ATMA_ASSERT(p != (wp + size()) % bufsize);
+		ATMA_ASSERT(p != (op + header_size + raw_size()) % bufsize);
 		ATMA_ASSERT(0 <= p && p < bufsize);
 
 		buf[p] = b;
@@ -500,12 +523,15 @@ namespace atma
 			: base_mpsc_queue_t{size}
 		{}
 
-		auto allocate(uint32 size) -> allocation_t
+		auto allocate(uint32 size, uint32 alignment = 1) -> allocation_t
 		{
+			ATMA_ASSERT(alignment > 0);
+
 			// also need space for alloc header
-			size += base_mpsc_queue_t::header_size;
+			auto size_orig = size;
 
 			//ATMA_ASSERT(size <= write_buf_size_, "queue can not allocate that much");
+			//auto alignment_bitmask = log2(alignment);
 
 			// write-buffer, write-buffer-size, write-pos
 			byte* wb = nullptr;
@@ -523,14 +549,17 @@ namespace atma
 
 				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp);
 				
-				if (impl_perform_allocation(wb, wbs, wp, available, size))
+				if (impl_perform_allocation(wb, wbs, wp, available, alignment, size))
 					break;
+
+				size = size_orig;
 			}
 
-			return impl_make_allocation(wb, wbs, wp, size, command_t::user);
+			return impl_make_allocation(wb, wbs, wp, alloctype_t::normal, alignment, size);
 		}
 	};
 
+#if 0
 	template <>
 	struct basic_mpsc_queue_t<true, false>
 		: base_mpsc_queue_t
@@ -545,10 +574,9 @@ namespace atma
 			: base_mpsc_queue_t{size}
 		{}
 
-		auto allocate(uint32 size) -> allocation_t
+		auto allocate(uint32 size, uint32 alignment = 0) -> allocation_t
 		{
-			// also need space for alloc header
-			size += base_mpsc_queue_t::header_size;
+			auto size_orig = size;
 
 			//ATMA_ASSERT(size <= write_buf_size_, "queue can not allocate that much");
 
@@ -573,9 +601,10 @@ namespace atma
 
 				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp);
 				
-				if (impl_perform_allocation(wb, wbs, wp, available, size))
+				if (impl_perform_allocation(wb, wbs, wp, available, alignment, size))
 					break;
 
+				size = size_orig;
 				auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - time_start);
 				starvation += elapsed;
 
@@ -584,7 +613,7 @@ namespace atma
 
 			starve_unflag(starve_thread_, thread_id);
 
-			return impl_make_allocation(wb, wbs, wp, size, command_t::user);
+			return impl_make_allocation(wb, wbs, wp, alloctype_t::normal, alignment, size);
 		}
 	};
 
@@ -632,4 +661,6 @@ namespace atma
 			return impl_make_allocation(wb, wbs, wp, size, command_t::user);
 		}
 	};
+#endif
+
 }
