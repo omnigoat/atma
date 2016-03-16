@@ -14,6 +14,10 @@ namespace atma
 		return (x == 0) ? 0 : (x == 1) ? 0 : 1 + log2(x >> 1);
 	}
 
+	constexpr auto alignby(uint x, uint a) -> uint
+	{
+		return (x + a - 1) & ~(a - 1);
+	}
 
 
 	struct base_mpsc_queue_t
@@ -172,7 +176,9 @@ namespace atma
 		decoder_t(byte* buf, uint32 bufsize, uint32 rp)
 			: headerer_t(buf, bufsize, rp, rp, *(uint32*)(buf + rp))
 		{
-			p = (rp + header_size + alignment()) & ~(alignment() - 1);
+			p += header_size;
+			p = alignby(p, alignment());
+			p %= bufsize;
 		}
 
 		friend struct base_mpsc_queue_t;
@@ -230,11 +236,11 @@ namespace atma
 		ATMA_ASSERT(alignment > 0);
 		ATMA_ASSERT(wp % 4 == 0);
 
-		// expand size for initial padding required for alignment
-		size += ((wp + header_size + alignment) & ~(alignment - 1)) - wp;
-		
 		// expand size so that next allocation is 4-byte aligned
-		size = (size + 4) & ~(uint32)0b11;
+		size = alignby(size, 4);
+
+		// expand size for initial padding required for requested alignment
+		size += alignby(wp + header_size, alignment) - wp - header_size;
 
 		if (available < size + header_size)
 			return false;
@@ -434,11 +440,9 @@ namespace atma
 	inline base_mpsc_queue_t::allocation_t::allocation_t(byte* buf, uint32 bufsize, uint32 wp, alloctype_t type, uint32 alignment, uint32 size)
 		: headerer_t(buf, bufsize, wp, wp, ((uint32)type << 31) | log2(alignment / 4) << 29 | size)
 	{
-		p += header_size;
-		uint32 ag = this->alignment();
-		if (ag > 4)
-			p = (p + ag) & ~(ag - 1);
-		
+		p = alignby(p + header_size, this->alignment());
+		p %= bufsize;
+
 		ATMA_ASSERT(size <= header_size_bitmask);
 	}
 
