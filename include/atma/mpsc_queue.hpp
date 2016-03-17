@@ -569,7 +569,6 @@ namespace atma
 		}
 	};
 
-#if 0
 	template <>
 	struct basic_mpsc_queue_t<true, false>
 		: base_mpsc_queue_t
@@ -584,8 +583,11 @@ namespace atma
 			: base_mpsc_queue_t{size}
 		{}
 
-		auto allocate(uint32 size, uint32 alignment = 0) -> allocation_t
+		auto allocate(uint32 size, uint32 alignment = 1) -> allocation_t
 		{
+			ATMA_ASSERT(alignment > 0);
+			ATMA_ASSERT(is_pow2(alignment));
+
 			auto size_orig = size;
 
 			//ATMA_ASSERT(size <= write_buf_size_, "queue can not allocate that much");
@@ -627,6 +629,7 @@ namespace atma
 		}
 	};
 
+#if 1
 	template <>
 	struct basic_mpsc_queue_t<false, true>
 		: base_mpsc_queue_t
@@ -639,11 +642,12 @@ namespace atma
 			: base_mpsc_queue_t{size}
 		{}
 
-		auto allocate(uint32 size) -> allocation_t
+		auto allocate(uint32 size, uint32 alignment = 1) -> allocation_t
 		{
-			// also need space for alloc header
-			size += base_mpsc_queue_t::header_size;
+			ATMA_ASSERT(alignment > 0);
+			ATMA_ASSERT(is_pow2(alignment));
 
+			auto size_orig = size;
 			//ATMA_ASSERT(size <= write_buf_size_, "queue can not allocate that much");
 
 			// write-buffer, write-buffer-size, write-position
@@ -662,13 +666,15 @@ namespace atma
 
 				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp);
 
-				if (impl_perform_allocation(wb, wbs, wp, available, size))
+				if (impl_perform_allocation(wb, wbs, wp, available, alignment, size))
 					break;
 				else
 					impl_encode_jump(available, wb, wbs, wp);
+
+				size = size_orig;
 			}
 
-			return impl_make_allocation(wb, wbs, wp, size, command_t::user);
+			return impl_make_allocation(wb, wbs, wp, alloctype_t::normal, alignment, size);
 		}
 	};
 #endif
