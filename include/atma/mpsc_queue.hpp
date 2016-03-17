@@ -19,6 +19,11 @@ namespace atma
 		return (x + a - 1) & ~(a - 1);
 	}
 
+	constexpr auto is_pow2(uint x) -> bool
+	{
+		return x && (x & (x - 1)) == 0;
+	}
+
 
 	struct base_mpsc_queue_t
 	{
@@ -530,6 +535,7 @@ namespace atma
 		auto allocate(uint32 size, uint32 alignment = 1) -> allocation_t
 		{
 			ATMA_ASSERT(alignment > 0);
+			ATMA_ASSERT(is_pow2(alignment));
 
 			// also need space for alloc header
 			auto size_orig = size;
