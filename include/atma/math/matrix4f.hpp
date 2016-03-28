@@ -4,6 +4,12 @@
 #include <atma/math/scalar.hpp>
 #include <atma/math/vector4f.hpp>
 #include <atma/types.hpp>
+#include <atma/assert.hpp>
+
+#if ATMA_PLATFORM_WIN32
+# undef near
+# undef far
+#endif
 
 namespace atma { namespace math {
 
@@ -518,6 +524,8 @@ namespace atma { namespace math {
 
 	inline auto perspective_fov(float fov, float aspect, float near_plane, float far_plane) -> matrix4f
 	{
+		ATMA_ASSERT(aspect != 0.f);
+
 		float sin_fov, cos_fov;
 		retrieve_sin_cos(sin_fov, cos_fov, 0.5f * fov);
 
@@ -543,8 +551,7 @@ namespace atma { namespace math {
 	inline auto orthographic(float left, float right, float top, float bottom, float near, float far) -> matrix4f
 	{
 		// todo: SIMD this
-		return matrix4f
-		{
+		return matrix4f{
 			vector4f{2.f / (right - left), 0.f, 0.f, 0.f},
 			vector4f{0.f, 2.f / (top - bottom), 0.f, 0.f},
 			vector4f{0.f, 0.f, 1.f / (far - near), 0.f},

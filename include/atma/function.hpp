@@ -3,6 +3,7 @@
 #include <atma/bind.hpp>
 #include <atma/tuple.hpp>
 #include <tuple>
+#include <functional>
 
 namespace atma
 {
