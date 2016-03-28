@@ -113,6 +113,128 @@ namespace atma {
 	}
 
 
+	//
+	//  something
+	//  ----------------
+	//
+	//
+	//
+	namespace detail
+	{
+		template <typename Bindings>
+		struct bindings_count_tx;
+
+		template <int I, typename... Bindings>
+		struct bindings_count_tx<std::tuple<placeholder_t<I>, Bindings...>> {
+			static int const value = 1 + bindings_count_tx<std::tuple<Bindings...>>::value;
+		};
+
+		template <int I, typename... Bindings>
+		struct bindings_count_tx<std::tuple<placeholder_t<I> const, Bindings...>> {
+			static int const value = 1 + bindings_count_tx<std::tuple<Bindings...>>::value;
+		};
+
+		template <typename X, typename... Bindings>
+		struct bindings_count_tx<std::tuple<X, Bindings...>>
+		{
+			static int const value = bindings_count_tx<std::tuple<Bindings...>>::value;
+		};
+
+		template <>
+		struct bindings_count_tx<std::tuple<>>
+		{
+			static int const value = 0;
+		};
+
+
+		template <typename Bindings>
+		struct highest_binding_tx;
+
+		template <int I, typename... Bindings>
+		struct highest_binding_tx<std::tuple<placeholder_t<I> const, Bindings...>>
+		{
+			static int const value = I > highest_binding_tx<std::tuple<Bindings...>>::value ? I : highest_binding_tx<std::tuple<Bindings...>>::value;
+		};
+
+		template <typename X, typename... Bindings>
+		struct highest_binding_tx<std::tuple<X, Bindings...>>
+		{
+			static int const value = highest_binding_tx<std::tuple<Bindings...>>::value;
+		};
+
+		template <>
+		struct highest_binding_tx<std::tuple<>>
+		{
+			static int const value = 0;
+		};
+
+		template <typename Args, typename Bindings, int Bidx, int Idx>
+		struct original_args_type_t;
+
+		template <typename Args, int Bidx, int Idx, typename X, typename... Bs>
+		struct original_args_type_t<Args, std::tuple<X, Bs...>, Bidx, Idx>
+		{
+			using type = typename original_args_type_t<Args, std::tuple<Bs...>, Bidx + 1, Idx>::type;
+		};
+
+		template <typename Args, int Bidx, int Midx, typename... Bs>
+		struct original_args_type_t<Args, std::tuple<placeholder_t<Midx> const, Bs...>, Bidx, Midx>
+		{
+			using type = tuple_get_t<Bidx, Args>;
+		};
+
+		//template <typename Args, int Idx, int Bidx, typename... Bs>
+		//struct original_args_type_t<Args, std::tuple<placeholder_t<Bidx> const, Bs...>, Idx>
+		//{
+		//	using type = typename std::conditional<Idx == Bidx,
+		//		tuple_get_t<Idx, Args>,
+		//		typename original_args_type_t<Args, std::tuple<Bs...>, Idx>::type>::type;
+		//};
+
+		template <typename A, int I, int B>
+		struct original_args_type_t<A, std::tuple<>, B, I>
+		{
+			// uh oh!
+		};
+
+		template <typename Args, typename Bindings, int Idx, int End>
+		struct resultant_args_ii_t
+		{
+			static_assert(End != 0, "bad End");
+
+			using type = typename tuple_push_front_t<
+				typename resultant_args_ii_t<Args, Bindings, Idx + 1, End>::type,
+				typename original_args_type_t<Args, Bindings, 0, Idx>::type>;
+		};
+
+		template <typename Args, typename Bindings, int Fin>
+		struct resultant_args_ii_t<Args, Bindings, Fin, Fin>
+		{
+			using type = std::tuple<>;
+		};
+
+		template <typename Args, typename Bindings>
+		struct resultant_args_t
+		{
+			using type = typename resultant_args_ii_t<Args, Bindings,
+				0, highest_binding_tx<Bindings>::value + 1>::type;
+		};
+
+
+
+	}
+
+	template <typename Bindings>
+	using bindings_count_t = detail::bindings_count_tx<Bindings>;
+
+	template <typename Bindings>
+	using highest_binding_t = detail::highest_binding_tx<Bindings>;
+
+
+
+
+
+
 
 
 	template <typename R, typename from, typename to>
@@ -212,8 +334,7 @@ namespace atma {
 	namespace detail
 	{
 		template <typename F, typename Tuple, size_t... Idxs>
-		inline auto call_fn_tuple_impl(F&& f, Tuple&& xs, idxs_t<Idxs...>)
-			-> decltype(call_fn(std::forward<F>(f), std::get<Idxs>(std::forward<Tuple>(xs))...))
+		inline auto call_fn_tuple_impl(F&& f, Tuple&& xs, idxs_t<Idxs...>) -> decltype(auto)
 		{
 			return call_fn(std::forward<F>(f), std::get<Idxs>(std::forward<Tuple>(xs))...);
 		}
@@ -221,8 +342,7 @@ namespace atma {
 
 	// catch-all
 	template <typename F, typename Tuple>
-	inline auto call_fn_tuple(F&& f, Tuple&& xs)
-		-> decltype(detail::call_fn_tuple_impl(std::forward<F>(f), std::forward<Tuple>(xs), idxs_list_t<tuple_size>()))
+	inline auto call_fn_tuple(F&& f, Tuple&& xs) -> decltype(auto)
 	{
 		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
 
@@ -329,7 +449,7 @@ namespace atma {
 	//    takes a function, and a tuple of bindings, and returns a functor taking 
 	//
 	//
-	template <typename F, typename BindingsRef>
+	template <typename F, typename BindingsRef> //, typename... Args>
 	struct bind_t
 	{
 		// bind doesn't take anything by reference, so we just straight-up store
@@ -358,6 +478,39 @@ namespace atma {
 		bindings_t bindings_;
 	};
 
+#if 0
+	template <typename F, typename BindingsRef>
+	struct bind_t //: bind_base_t<F, BindingsRef>
+		
+	{
+		// bind doesn't take anything by reference, so we just straight-up store
+		// by value. this will still perform construct-by-reference (rvalue/lvalue)
+		using function_t = std::decay_t<F>;
+		using bindings_t = tuple_map_t<std::decay, BindingsRef>;
+
+		template <typename FF, typename BB>
+		bind_t(FF&& fn, BB&& bindings)
+			: fn_(std::forward<FF>(fn))
+			, bindings_(std::forward<BB>(bindings))
+		{
+		}
+
+		template <typename... Args>
+		auto operator ()(Args&&... args) -> decltype(call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...)))
+		{
+			return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
+		}
+
+		auto fn() const -> function_t const& { return fn_; }
+		auto bindings() const -> bindings_t const& { return bindings_; }
+
+	private:
+		function_t fn_;
+		bindings_t bindings_;
+	};
+#endif
+
+#if 0
 	template <typename PreF, typename PreBindings, typename NewBindings>
 	struct bind_t<bind_t<PreF, PreBindings>, NewBindings>
 	{
@@ -386,6 +539,7 @@ namespace atma {
 		function_t fn_;
 		bindings_t bindings_;
 	};
+#endif
 
 	// regular bind
 	template <typename F, typename... Bindings>
@@ -438,6 +592,7 @@ namespace atma {
 	{
 	};
 
+#endif
 
 
 	template <typename, size_t, typename> struct comb;
@@ -474,16 +629,14 @@ namespace atma {
 	{
 		using result_type = typename function_traits<F>::result_type;
 		using tupled_args_type = typename comb<typename function_traits<F>::tupled_args_type, 0, Bindings>::type;
-			
-		//using tupled_args_type = tuple_select_t<idxs_list_t< typename function_traits<F>::tupled_args_type;
 		
-		enum { arity = function_traits<F>::arity - tuple_nonplaceholder_size_t<Bindings>::value };
-
-
-		template <size_t i>
-		using arg_type = typename function_traits<F>::template arg_type<i + tuple_nonplaceholder_size_t<Bindings>::value>;
+		//
+		static int const arity = function_traits<F>::arity - tuple_nonplaceholder_size_t<Bindings>::value;
+		//
+		//
+		//template <size_t i>
+		//using arg_type = typename function_traits<F>::template arg_type<i + tuple_nonplaceholder_size_t<Bindings>::value>;
 	};
-#endif
 
 
 	//
