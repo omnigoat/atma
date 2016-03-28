@@ -18,11 +18,17 @@ namespace atma
 	template <typename T, typename Allocator = atma::aligned_allocator_t<T, 4>>
 	struct vector
 	{
-		using value_type     = T;
-		using const_iterator = T const*;
-		using iterator       = T*;
-		using reference_type = T&;
-		using buffer_type    = atma::basic_unique_memory_t<Allocator>;
+		using value_type      = T;
+		using allocator_type  = Allocator;
+		using size_type       = std::size_t;
+		using difference_type = std::ptrdiff_t;
+		using reference       = value_type&;
+		using const_reference = value_type const&;
+		using pointer         = typename std::allocator_traits<Allocator>::pointer;
+		using const_pointer   = typename std::allocator_traits<Allocator>::const_pointer;
+		using iterator        = T*;
+		using const_iterator  = T const*;
+		using buffer_type     = atma::basic_unique_memory_t<Allocator>;
 		
 		vector();
 		explicit vector(size_t size);

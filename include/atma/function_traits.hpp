@@ -62,8 +62,8 @@ namespace atma
 		template <size_t i>
 		using arg_type = typename std::tuple_element<i, std::tuple<Args...>>::type;
 
-		static size_t const arity = sizeof...(Args);
-		static bool   const is_memfnptr = false;
+		constexpr static size_t const arity = sizeof...(Args);
+		constexpr static bool   const is_memfnptr = false;
 	};
 
 
