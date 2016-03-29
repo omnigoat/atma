@@ -25,6 +25,9 @@ constexpr struct inc_t {
 	constexpr auto operator ()(int x) const -> int { return x + 1; }
 } const inc;
 
+constexpr struct dec_t {
+	constexpr auto operator ()(int x) const -> int { return x - 1; }
+} const dec;
 
 constexpr struct square_t {
 	constexpr auto operator ()(int x) const -> int { return x * x; }
@@ -57,6 +60,22 @@ template <int I>
 constexpr bool const lulz = true;
 
 
+int times2(int x) { return x * 2; }
+
+int test()
+{
+	//static_assert(atma::detail::bindings_count_tx<std::tuple<decltype(arg1)>>::value == 1, "oh 1");
+	using k1 = atma::detail::resultant_args_t<
+		typename atma::function_traits<decltype(&times2)>::tupled_args_type,
+		 std::tuple<decltype(arg1)>>;
+
+	static_assert(std::is_same<k1, std::tuple<int>>::value, "yay");
+
+	auto b = atma::bind(&times2, arg1);
+	auto b2 = atma::bind(b, 4);
+}
+
+#error stop
 
 template <typename F, typename G,
 	typename std::enable_if<
@@ -138,7 +157,7 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 		kk ki;
 		//static_assert(atma::function_traits<inc_t>::arity == 2, "bad arity");
 		//filter_fnt filter;
-		auto something = (inc % mult);
+		auto something = dec % (inc % mult);
 		auto r = something(4);
 		THEN("standard filtering works")
 		{

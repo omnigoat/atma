@@ -43,6 +43,7 @@ namespace atma
 		: function_traits<R(Args...)>
 	{
 		static bool   const is_memfnptr = true;
+		using class_type = C;
 	};
 
 	template <typename C, typename R, typename... Args>
@@ -50,6 +51,7 @@ namespace atma
 		: function_traits<R(Args...)>
 	{
 		static bool   const is_memfnptr = true;
+		using class_type = C;
 	};
 
 
@@ -64,6 +66,7 @@ namespace atma
 
 		constexpr static size_t const arity = sizeof...(Args);
 		constexpr static bool   const is_memfnptr = false;
+		using class_type = void;
 	};
 
 
