@@ -29,7 +29,7 @@ constexpr struct dec_t {
 	constexpr auto operator ()(int x) const -> int { return x - 1; }
 } const dec;
 
-constexpr struct square_t {
+constexpr struct mult_t {
 	constexpr auto operator ()(int x) const -> int { return x * x; }
 } const mult;
 
@@ -62,7 +62,12 @@ constexpr bool const lulz = true;
 
 int times2(int x) { return x * 2; }
 
-int test()
+template <typename F, typename G, typename A>
+auto compos(F f, G g, A a) -> decltype(auto)
+{
+	return f(g(a));
+}
+void test()
 {
 	//static_assert(atma::detail::bindings_count_tx<std::tuple<decltype(arg1)>>::value == 1, "oh 1");
 	using k1 = atma::detail::resultant_args_t<
@@ -72,10 +77,24 @@ int test()
 	static_assert(std::is_same<k1, std::tuple<int>>::value, "yay");
 
 	auto b = atma::bind(&times2, arg1);
-	auto b2 = atma::bind(b, 4);
+	static_assert(atma::function_traits<decltype(b)>::arity == 1, "arity");
+	auto b2 = atma::bind(&decltype(b)::operator (), b, 4);
+
+
+	auto ffn = atma::curry(&inc_t::operator (), inc);
+	auto gfn = atma::curry(&mult_t::operator (), mult);
+	auto hfn = atma::curry(&dec_t::operator (), dec);
+
+	auto a2 = atma::curry(&compos<inc_t, mult_t, int>, inc, mult);
+
+	auto b3 = atma::bind(&compos<decltype(ffn), decltype(gfn), int>, ffn, gfn, arg1);
+	auto b4 = atma::curry(&decltype(b3)::operator (), b3);
+	//static_assert(atma::function_traits<decltype(b4)>::arity == 1, "arity");
+	//std::string s = b3;
+	auto b5 = atma::bind(&compos<decltype(b3), decltype(hfn), int>, b3, hfn, arg1);
 }
 
-#error stop
+//#error stop
 
 template <typename F, typename G,
 	typename std::enable_if<
@@ -88,11 +107,12 @@ template <typename F, typename G,
 >
 auto operator % (F&& lhs, G&& rhs) -> decltype(auto)
 {
-	//using ftype = decltype(&std::remove_reference_t<F>::operator ());
-	//using gtype = decltype(&std::remove_reference_t<G>::operator ());
-	auto ffn = atma::curry(&std::decay_t<F>::operator (), lhs);
-	auto gfn = atma::curry(&std::decay_t<G>::operator (), rhs);
-	return atma::curry(&atma::detail::composited<decltype(ffn), decltype(gfn), int, int>, ffn, gfn);
+	using ftype = std::remove_reference_t<F>;
+	using gtype = std::remove_reference_t<G>;
+	using rtype = typename atma::function_traits<F>::result_type;
+	using atype = typename atma::function_traits<G>::template arg_type<0>;
+
+	return atma::curry(&atma::detail::composited<ftype, gtype, rtype, atype>, lhs, rhs);
 }
 
 #if 0
@@ -110,23 +130,21 @@ private:
 };
 
 
+#endif
 struct filter_fnt 
 {
-	template <typename F, typename C>
-	constexpr auto operator()(F&& f, C&& c) const -> decltype(auto)
-	{
-		return atma::filter(std::forward<F>(f), std::forward<C>(c));
-	}
+	//template <typename F, typename C>
+	//constexpr auto operator()(F&& f, C&& c) const -> decltype(auto)
+	//{
+	//	return atma::filter(std::forward<F>(f), std::forward<C>(c));
+	//}
 
-	template <typename F>
-	constexpr auto operator ()(F&& f) const -> decltype(auto)
-	{
-		//return atma::filter(f);
-		return atma::bind(atma::filter)
-	}
+	//template <typename F>
+	//constexpr auto operator ()(F&& f) const -> decltype(auto)
+	//{
+	//}
 };
 
-#endif
 
 
 auto blam() -> void
@@ -143,22 +161,18 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 		auto numbers = atma::vector<int>{1, 2, 3, 4};
 		auto is_even = [](int i) { return i % 2 == 0; };
 
-		static_assert(atma::detail::bindings_count_tx<std::tuple<decltype(arg1)>>::value == 1, "oh 1");
-		static_assert(atma::detail::bindings_count_tx<std::tuple<int, decltype(arg1), char, decltype(arg2)>>::value == 2, "oh");
+		//static_assert(atma::detail::bindings_count_tx<std::tuple<decltype(arg1)>>::value == 1, "oh 1");
+		//static_assert(atma::detail::bindings_count_tx<std::tuple<int, decltype(arg1), char, decltype(arg2)>>::value == 2, "oh");
 
-		// should be {int, char}
-		using k1 = typename atma::detail::original_args_type_t<
-			std::tuple<char, float, int>,
-			std::tuple<decltype(arg2), float, decltype(arg1)>, 0, 1>::type;
-
-		k1 ki1;
-
-		using kk = typename atma::detail::resultant_args_t<std::tuple<char, float, int>, std::tuple<decltype(arg2), decltype(arg1), decltype(arg1)>>::type;
-		kk ki;
+		//using kk = typename atma::detail::resultant_args_t<std::tuple<char, float, int>, std::tuple<decltype(arg2), decltype(arg1), decltype(arg1)>>::type;
+		//kk ki;
 		//static_assert(atma::function_traits<inc_t>::arity == 2, "bad arity");
 		//filter_fnt filter;
-		auto something = dec % (inc % mult);
+		
+		auto something = (inc % mult % dec);
+		//std::string lsdkjf = decltype(something)();
 		auto r = something(4);
+
 		THEN("standard filtering works")
 		{
 			auto result = atma::filter(is_even, numbers);
