@@ -507,7 +507,7 @@ namespace atma {
 		{
 		}
 
-		auto operator ()(Args... args) -> decltype(auto) //call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...)))
+		auto operator ()(Args... args) -> decltype(auto)
 		{
 			return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
 		}
@@ -521,7 +521,7 @@ namespace atma {
 	};
 
 
-	template <typename F, typename BindingsRef> //, typename... Args>
+	template <typename F, typename BindingsRef>
 	struct bind_t : 
 		bind_base_t<F, BindingsRef,
 			detail::resultant_args_t<
@@ -532,76 +532,34 @@ namespace atma {
 					typename function_traits<F>::tupled_args_type>,
 				BindingsRef>>
 	{
-		auto zomg() const -> bind_base_t<F, BindingsRef,
-			detail::resultant_args_t<
-				std::conditional_t<function_traits<F>::is_memfnptr,
-					tuple_push_front_t<
-						typename function_traits<F>::tupled_args_type,
-						typename function_traits<F>::class_type>,
-					typename function_traits<F>::tupled_args_type>,
-				BindingsRef>>
-		{
-			return *this;
-		}
-
-		// bind doesn't take anything by reference, so we just straight-up store
-		// by value. this will still perform construct-by-reference (rvalue/lvalue)
-		using function_t = std::decay_t<F>;
-		using bindings_t = tuple_map_t<std::decay, BindingsRef>;
-
 		template <typename FF, typename BB>
 		bind_t(FF&& fn, BB&& bindings)
 			: bind_base_t{std::forward<FF>(fn), std::forward<BB>(bindings)}
 		{
 		}
-
-#if 0
-		template <typename... Args>
-		auto operator ()(Args&&... args) -> decltype(call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...)))
-		{
-			return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
-		}
-
-		auto fn() const -> function_t const& { return fn_; }
-		auto bindings() const -> bindings_t const& { return bindings_; }
-
-	private:
-		function_t fn_;
-		bindings_t bindings_;
-#endif
 	};
 
-
-#if 0
 	template <typename PreF, typename PreBindings, typename NewBindings>
 	struct bind_t<bind_t<PreF, PreBindings>, NewBindings>
+		: bind_base_t<PreF, bound_arguments_t<PreBindings, NewBindings>,
+			detail::resultant_args_t<
+				std::conditional_t<function_traits<PreF>::is_memfnptr,
+					tuple_push_front_t<
+						typename function_traits<PreF>::tupled_args_type,
+						typename function_traits<PreF>::class_type>,
+					typename function_traits<PreF>::tupled_args_type>,
+				bound_arguments_t<PreBindings, NewBindings>>>
 	{
-		using function_t = std::decay_t<PreF>;
-		using bindings_t = tuple_map_t<std::decay, bound_arguments_t<PreBindings, NewBindings>>;
-
 		template <typename FF, typename BB>
 		bind_t(FF&& fn, BB&& bindings)
-			: fn_(fn.fn())
-			, bindings_(
+			: bind_base_t{
+				fn_(fn.fn()),
 				std::forward<decltype(bind_arguments(fn.bindings(), std::forward<BB>(bindings)))>(
-					bind_arguments(fn.bindings(), std::forward<BB>(bindings))))
+					bind_arguments(fn.bindings(), std::forward<BB>(bindings)))}
 		{
 		}
-
-		template <typename... Args>
-		auto operator ()(Args&&... args) -> decltype(call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...)))
-		{
-			return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
-		}
-
-		auto fn() const -> PreF const& { return fn_; }
-		auto bindings() const -> bindings_t const& { return bindings_; }
-
-	private:
-		function_t fn_;
-		bindings_t bindings_;
 	};
-#endif
+
 
 	// regular bind
 	template <typename F, typename... Bindings>
@@ -698,16 +656,13 @@ namespace atma {
 	struct function_traits<bind_t<F, Bindings>>
 	{
 		using result_type = typename function_traits<F>::result_type;
-		using tupled_args_type = typename comb<typename function_traits<F>::tupled_args_type, 0, Bindings>::type;
-		
+		using tupled_args_type = detail::resultant_args_t<typename function_traits<F>::tupled_args_type, Bindings>;
+		template <int Idx> using arg_type = typename std::tuple_element<Idx, tupled_args_type>::type;
+
 		static bool const is_memfnptr = false;
 		using class_type = void;
-		//
-		static int const arity = function_traits<F>::arity - tuple_nonplaceholder_size_t<Bindings>::value;
-		//
-		//
-		//template <size_t i>
-		//using arg_type = typename function_traits<F>::template arg_type<i + tuple_nonplaceholder_size_t<Bindings>::value>;
+
+		static int const arity = function_traits<F>::arity - tuple_nonplaceholder_size_t<detail::normalize_placeholders_t<Bindings>>::value;
 	};
 
 
