@@ -33,10 +33,13 @@ constexpr struct dec_t {
 	auto operator ()(int x) const -> int { return x - 1; }
 } const dec;
 
-constexpr struct mult_t {
+constexpr struct square_t {
 	constexpr auto operator ()(int x) const -> int { return x * x; }
-} const mult;
+} const square;
 
+constexpr struct mult_t {
+	constexpr auto operator ()(int x, int y) const -> int { return x * y; }
+} const mult;
 
 #define ATMA_DEFINE_FUNCTOR(name, code) \
 	namespace { \
@@ -79,10 +82,6 @@ auto compos(F f, G g, A a) -> decltype(auto)
 {
 	return f(g(a));
 }
-void test()
-{
-	
-}
 
 //#error stop
 
@@ -93,7 +92,6 @@ struct composited_t
 	template <typename... Args>
 	auto operator ()(Args&&... args) -> decltype(auto)
 	{
-		std::forward<G>(g)(std::forward<Args>(args)...);
 		return std::forward<F>(f)(std::forward<G>(g)(std::forward<Args>(args)...));
 	}
 
@@ -106,6 +104,12 @@ auto operator % (F&& f, G&& g) -> decltype(auto)
 {
 	return composited_t<F, G>{std::forward<F>(f), std::forward<G>(g)};
 }
+
+void test()
+{
+	
+}
+
 
 #if 0
 template <typename A, typename B, template <typename, typename> typename R>
@@ -163,6 +167,18 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 		auto wrange = works(numbers);
 		auto wrangev = atma::vector<int>{wrange.begin(), wrange.end()};
 
+		//atma::detail::valid_bindings_t<std::tuple<decltype(arg1), decltype(arg3)>> lulz;
+
+		//auto bi = atma::bind(&mult_t::operator (), mult, 5, arg2, arg1);
+		//auto bi2 = atma::curry(&decltype(bi)::operator (), bi);
+		//bi()
+		//bi("lulz", 4);
+
+		auto b1 = atma::curry(&times2);
+		//auto b2 = atma::curry(&times2);
+		//auto br = b1 % b2;
+		//auto rbr = br(4);
+
 		//static_assert(atma::detail::bindings_count_tx<std::tuple<decltype(arg1)>>::value == 1, "oh 1");
 		//static_assert(atma::detail::bindings_count_tx<std::tuple<int, decltype(arg1), char, decltype(arg2)>>::value == 2, "oh");
 
@@ -171,7 +187,7 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 		//static_assert(atma::function_traits<inc_t>::arity == 2, "bad arity");
 		//filter_fnt filter;
 		
-		auto something = (inc % mult % dec);
+		auto something = atma::bind(&mult_t::operator (), mult, 3, arg1) % (b1 % inc % square % dec);
 		//std::string lsdkjf = decltype(something)();
 		auto r = something(4);
 
