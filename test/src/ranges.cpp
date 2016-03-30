@@ -1,5 +1,8 @@
 #include <atma/unit_test.hpp>
+
 #include <atma/algorithm/filter.hpp>
+#include <atma/algorithm/map.hpp>
+
 #include <atma/vector.hpp>
 
 template <typename T>
@@ -26,12 +29,28 @@ constexpr struct inc_t {
 } const inc;
 
 constexpr struct dec_t {
-	constexpr auto operator ()(int x) const -> int { return x - 1; }
+	auto operator ()(std::string x) const -> int { return 1; }
+	auto operator ()(int x) const -> int { return x - 1; }
 } const dec;
 
 constexpr struct mult_t {
 	constexpr auto operator ()(int x) const -> int { return x * x; }
 } const mult;
+
+
+#define ATMA_DEFINE_FUNCTOR(name, code) \
+	namespace { \
+	struct name##_t { \
+		code \
+	} const name; }
+
+
+ATMA_DEFINE_FUNCTOR(things, 
+	template <typename C>
+	auto operator ()(C&& xs) const -> decltype(auto) { 
+		return atma::map([](int x){return x + 1;}, xs);
+	}
+);
 
 
 
@@ -53,13 +72,6 @@ struct all_of_t<A>
 	constexpr static bool const value = A;
 };
 
-template <bool R>
-bool const all_of_v = all_of_t<R>::value;
-
-template <int I>
-constexpr bool const lulz = true;
-
-
 int times2(int x) { return x * 2; }
 
 template <typename F, typename G, typename A>
@@ -69,50 +81,30 @@ auto compos(F f, G g, A a) -> decltype(auto)
 }
 void test()
 {
-	//static_assert(atma::detail::bindings_count_tx<std::tuple<decltype(arg1)>>::value == 1, "oh 1");
-	using k1 = atma::detail::resultant_args_t<
-		typename atma::function_traits<decltype(&times2)>::tupled_args_type,
-		 std::tuple<decltype(arg1)>>;
-
-	static_assert(std::is_same<k1, std::tuple<int>>::value, "yay");
-
-	auto b = atma::bind(&times2, arg1);
-	static_assert(atma::function_traits<decltype(b)>::arity == 1, "arity");
-	auto b2 = atma::bind(&decltype(b)::operator (), b, 4);
-
-
-	auto ffn = atma::curry(&inc_t::operator (), inc);
-	auto gfn = atma::curry(&mult_t::operator (), mult);
-	auto hfn = atma::curry(&dec_t::operator (), dec);
-
-	auto a2 = atma::curry(&compos<inc_t, mult_t, int>, inc, mult);
-
-	auto b3 = atma::bind(&compos<decltype(ffn), decltype(gfn), int>, ffn, gfn, arg1);
-	auto b4 = atma::curry(&decltype(b3)::operator (), b3);
-	//static_assert(atma::function_traits<decltype(b4)>::arity == 1, "arity");
-	//std::string s = b3;
-	auto b5 = atma::bind(&compos<decltype(b3), decltype(hfn), int>, b3, hfn, arg1);
+	
 }
 
 //#error stop
 
-template <typename F, typename G,
-	typename std::enable_if<
-		all_of_t<
-			atma::function_traits<F>::arity == 1,
-			atma::function_traits<G>::arity == 1,
-		std::is_same<typename atma::function_traits<F>::template arg_type<0>, typename atma::function_traits<G>::result_type>::value
-		>::value, int
-	>::type incorrect_arguments = 0
->
-auto operator % (F&& lhs, G&& rhs) -> decltype(auto)
-{
-	using ftype = std::remove_reference_t<F>;
-	using gtype = std::remove_reference_t<G>;
-	using rtype = typename atma::function_traits<F>::result_type;
-	using atype = typename atma::function_traits<G>::template arg_type<0>;
 
-	return atma::curry(&atma::detail::composited<ftype, gtype, rtype, atype>, lhs, rhs);
+template <typename F, typename G>
+struct composited_t
+{
+	template <typename... Args>
+	auto operator ()(Args&&... args) -> decltype(auto)
+	{
+		std::forward<G>(g)(std::forward<Args>(args)...);
+		return std::forward<F>(f)(std::forward<G>(g)(std::forward<Args>(args)...));
+	}
+
+	F f;
+	G g;
+};
+
+template <typename F, typename G>
+auto operator % (F&& f, G&& g) -> decltype(auto)
+{
+	return composited_t<F, G>{std::forward<F>(f), std::forward<G>(g)};
 }
 
 #if 0
@@ -139,19 +131,21 @@ struct filter_fnt
 	//	return atma::filter(std::forward<F>(f), std::forward<C>(c));
 	//}
 
-	//template <typename F>
-	//constexpr auto operator ()(F&& f) const -> decltype(auto)
-	//{
-	//}
+	template <typename F>
+	constexpr auto operator ()(F&& f) const -> int
+	{
+		return 4;
+	}
 };
 
-
-
-auto blam() -> void
+struct map_fnt
 {
-	//atma::function_object<thing> 
-}
-
+	template <typename F>
+	auto operator ()(F&& f) const -> decltype(auto)
+	{
+		return 4;
+	}
+};
 
 
 SCENARIO("ranges can be filtered", "[ranges/filter_t]")
@@ -160,6 +154,14 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 	{
 		auto numbers = atma::vector<int>{1, 2, 3, 4};
 		auto is_even = [](int i) { return i % 2 == 0; };
+		auto plus_10 = [](int i) { return i + 10; };
+
+		//auto rmap = atma::map(plus_10) <<= numbers;
+		//auto rmapv = atma::vector<int>{rmap.begin(), rmap.end()};
+
+		auto works = things % atma::map(plus_10) % atma::filter(is_even);
+		auto wrange = works(numbers);
+		auto wrangev = atma::vector<int>{wrange.begin(), wrange.end()};
 
 		//static_assert(atma::detail::bindings_count_tx<std::tuple<decltype(arg1)>>::value == 1, "oh 1");
 		//static_assert(atma::detail::bindings_count_tx<std::tuple<int, decltype(arg1), char, decltype(arg2)>>::value == 2, "oh");
@@ -185,7 +187,8 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 
 		THEN("lazy binding filtering works")
 		{
-			auto result = atma::filter(is_even) <<= numbers;
+			auto filter2 = atma::filter(is_even);
+			auto result = filter2(numbers);
 			auto resultv = atma::vector<int>{result.begin(), result.end()};
 
 			CHECK(resultv.size() == 2);
