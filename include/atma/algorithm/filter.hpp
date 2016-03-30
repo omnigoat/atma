@@ -63,12 +63,6 @@ namespace atma
 		template <typename C>
 		auto operator ()(C&& xs) -> filtered_range_t<C, F>
 		{
-			return *this <<= xs;
-		}
-
-		template <typename C>
-		inline auto operator <<= (C&& xs) -> filtered_range_t<C, F>
-		{
 			return filtered_range_t<C, F>(
 				std::forward<C>(xs),
 				xs.begin(),
