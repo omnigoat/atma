@@ -205,5 +205,8 @@
     <ClInclude Include="..\include\atma\mpsc_queue.hpp">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\function_composition.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
