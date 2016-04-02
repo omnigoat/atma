@@ -208,5 +208,8 @@
     <ClInclude Include="..\include\atma\function_composition.hpp">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\atma\call_fn.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
