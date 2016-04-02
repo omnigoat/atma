@@ -27,7 +27,12 @@ namespace atma
 	template <typename T>
 	struct function_traits
 		: function_traits<decltype(&T::operator())>
-	{};
+	{
+		// subtle interaction: a functor is *not* a member-function-pointer,
+		// even though we derive the majority of our definition from the member-
+		// function-pointer of its call-operator
+		static bool const is_memfnptr = false;
+	};
 
 
 	// function-pointer
