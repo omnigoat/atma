@@ -25,6 +25,7 @@
     <ClInclude Include="..\include\atma\algorithm\zip.hpp" />
     <ClInclude Include="..\include\atma\aligned_allocator.hpp" />
     <ClInclude Include="..\include\atma\atomic.hpp" />
+    <ClInclude Include="..\include\atma\call_fn.hpp" />
     <ClInclude Include="..\include\atma\function.hpp" />
     <ClInclude Include="..\include\atma\function_composition.hpp" />
     <ClInclude Include="..\include\atma\hash_map.hpp" />

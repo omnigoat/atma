@@ -5,6 +5,7 @@
 #include <atma/placeholders.hpp>
 #include <atma/function_traits.hpp>
 #include <atma/function_composition.hpp>
+#include <atma/call_fn.hpp>
 
 namespace atma {
 
@@ -264,165 +265,6 @@ namespace atma {
 	}
 
 
-	//
-	//  call_fn
-	//  ---------
-	//    takes a callable object and a variadic list of arguments, and calls the
-	//    object with those arguments. @f may be a function-pointer,
-	//    a member-function-pointer (with the first argument being a
-	//    pointer/ref to an instantiation of the class), or a generic callable
-	//    object, like a std::function<>, or even a lambda.
-	//
-	template <typename F, typename... Args>
-	auto call_fn(F&& f, Args&&... args) -> decltype(auto)
-	{
-		return f(std::forward<Args>(args)...);
-	}
-
-	template <typename R, typename... Params, typename... Args>
-	auto call_fn(R(*fn)(Params...), Args&&... args) -> R
-	{
-		return (*fn)(std::forward<Args>(args)...);
-	}
-
-	template <typename C, typename R, typename... Params, typename... Args>
-	auto call_fn(R(C::*fn)(Params...), C& c, Args&&... args) -> R
-	{
-		return (c.*fn)(std::forward<Args>(args)...);
-	}
-
-	template <typename C, typename R, typename... Params, typename... Args>
-	auto call_fn(R(C::*fn)(Params...), C&& c, Args&&... args) -> R
-	{
-		return (c.*fn)(std::forward<Args>(args)...);
-	}
-
-	template <typename C, typename R, typename... Params, typename... Args>
-	auto call_fn(R(C::*fn)(Params...), C* c, Args&&... args) -> R
-	{
-		return (c->*fn)(std::forward<Args>(args)...);
-	}
-
-	template <typename C, typename R, typename... Params, typename... Args>
-	auto call_fn(R(C::*fn)(Params...) const, C& c, Args&&... args) -> R
-	{
-		return (c.*fn)(std::forward<Args>(args)...);
-	}
-
-	template <typename C, typename R, typename... Params, typename... Args>
-	auto call_fn(R(C::*fn)(Params...) const, C const& c, Args&&... args) -> R
-	{
-		return (c.*fn)(std::forward<Args>(args)...);
-	}
-
-	template <typename C, typename R, typename... Params, typename... Args>
-	auto call_fn(R(C::*fn)(Params...) const, C&& c, Args&&... args) -> R
-	{
-		return (c.*fn)(std::forward<Args>(args)...);
-	}
-
-	template <typename C, typename R, typename... Params, typename... Args>
-	auto call_fn(R(C::*fn)(Params...) const, C* c, Args&&... args) -> R
-	{
-		return (c->*fn)(std::forward<Args>(args)...);
-	}
-
-	template <typename C, typename R, typename... Params, typename... Args>
-	auto call_fn(R(C::*fn)(Params...) const, C const* c, Args&&... args) -> R
-	{
-		return (c->*fn)(std::forward<Args>(args)...);
-	}
-
-
-	//
-	//  call_fn_tuple
-	//  ---------------
-	//    Takes a callable object and a tuple of arguments, and calls the
-	//    object with those arguments. @f may be a function-pointer,
-	//    a member-function-pointer (with the first tuple element being a
-	//    pointer/ref to an instantiation of the class), or a generic callable
-	//    object, like a std::function<>, or even a lambda.
-	//  
-	//    A helper function is provided for member-function-pointers where
-	//    the pointer to the instantiation isn't in the tuple to begin with.
-	//    For speeeed.
-	//
-	namespace detail
-	{
-		template <typename F, typename Tuple, size_t... Idxs>
-		inline auto call_fn_tuple_impl(F&& f, Tuple&& xs, idxs_t<Idxs...>) -> decltype(auto)
-		{
-			return call_fn(std::forward<F>(f), std::get<Idxs>(std::forward<Tuple>(xs))...);
-		}
-
-		template <typename R, typename from, typename to>
-		struct type_if_castible :
-			std::enable_if<std::is_convertible<std::remove_reference_t<from>&, std::remove_reference_t<to>&>::value, R>
-		{};
-
-		template <typename R, typename From, typename To>
-		using type_if_castible_t = typename type_if_castible<R, From, To>::type;
-	}
-
-	// catch-all
-	template <typename F, typename Tuple>
-	inline auto call_fn_tuple(F&& f, Tuple&& xs) -> decltype(auto)
-	{
-		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
-
-		return detail::call_fn_tuple_impl(std::forward<F>(f), std::forward<Tuple>(xs), idxs_list_t<tuple_size>());
-	}
-
-	// memfnptr helpers
-	template <typename R, typename C, typename... Params, typename CC, typename Tuple>
-	inline auto call_fn_tuple(R(C::*f)(Params...), CC* c, Tuple&& xs) -> detail::type_if_castible_t<R, CC, C>
-	{
-		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
-		static_assert(tuple_size == sizeof...(Params), "incorrect number of arguments");
-
-		return detail::call_fn_tuple_impl(
-			f,
-			tuple_push_front(std::forward<Tuple>(xs), c),
-			idxs_list_t<tuple_size + 1>());
-	}
-
-	template <typename R, typename C, typename... Params, typename CC, typename Tuple>
-	inline auto call_fn_tuple(R(C::*f)(Params...) const, CC* c, Tuple&& xs) -> detail::type_if_castible_t<R, CC, C const>
-	{
-		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
-		static_assert(tuple_size == sizeof...(Params), "incorrect number of arguments");
-
-		return detail::call_fn_tuple_impl(
-			f,
-			tuple_push_front(std::forward<Tuple>(xs), c),
-			idxs_list_t<tuple_size + 1>());
-	}
-
-	template <typename R, typename C, typename... Params, typename CC, typename Tuple>
-	inline auto call_fn_tuple(R(C::*f)(Params...), CC&& c, Tuple&& xs) -> detail::type_if_castible_t<R, CC, C>
-	{
-		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
-		static_assert(tuple_size == sizeof...(Params), "incorrect number of arguments");
-
-		return detail::call_fn_tuple_impl(
-			f,
-			tuple_push_front(std::forward<Tuple>(xs), c),
-			idxs_list_t<tuple_size + 1>());
-	}
-
-	template <typename R, typename C, typename... Params, typename CC, typename Tuple>
-	inline auto call_fn_tuple(R(C::*f)(Params...) const, CC&& c, Tuple&& xs) -> detail::type_if_castible_t<R, CC, C const>
-	{
-		auto const tuple_size = std::tuple_size<std::decay_t<Tuple>>::value;
-		static_assert(tuple_size == sizeof...(Params), "incorrect number of arguments");
-
-		return detail::call_fn_tuple_impl(
-			f,
-			tuple_push_front(std::forward<Tuple>(xs), c),
-			idxs_list_t<tuple_size + 1>());
-	}
-
-
 
 
 	//
@@ -471,10 +313,8 @@ namespace atma {
 	//    takes a function, and a tuple of bindings, and returns a functor taking 
 	//
 	//
-#if 1
 	template <typename F, typename BindingsRef, typename Args>
 	struct bind_base_t;
-
 
 	template <typename F, typename BindingsRef, typename... Args>
 	struct bind_base_t<F, BindingsRef, std::tuple<Args...>>
@@ -560,53 +400,6 @@ namespace atma {
 
 		static int const arity = function_traits<F>::arity - tuple_nonplaceholder_size_t<detail::normalize_placeholders_t<Bindings>>::value;
 	};
-
-
-#else
-	template <typename F, typename BindingsRef>
-	struct bind_t
-	{
-		// bind doesn't take anything by reference, so we just straight-up store
-		// by value. this will still perform construct-by-reference (rvalue/lvalue)
-		using function_t = std::decay_t<F>;
-		using bindings_t = tuple_map_t<std::decay, BindingsRef>;
-
-		template <typename FF, typename BB>
-		bind_t(FF&& fn, BB&& bindings)
-			: fn_(std::forward<FF>(fn))
-			, bindings_(std::forward<BB>(bindings))
-		{
-		}
-
-		template <typename... Args>
-		auto operator ()(Args&&... args) -> decltype(auto)
-		{
-			return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
-		}
-
-		auto fn() const -> function_t const& { return fn_; }
-		auto bindings() const -> bindings_t const& { return bindings_; }
-
-	private:
-		function_t fn_;
-		bindings_t bindings_;
-	};
-
-	template <typename F, typename Bindings>
-	struct function_traits<bind_t<F, Bindings>>
-	{
-		//using result_type = typename function_traits<F>::result_type;
-		//using tupled_args_type = detail::resultant_args_t<typename function_traits<F>::tupled_args_type, Bindings>;
-		//template <int Idx> using arg_type = typename std::tuple_element<Idx, tupled_args_type>::type;
-
-		static bool const is_memfnptr = false;
-		using class_type = void;
-
-		//static int const arity = function_traits<F>::arity - tuple_nonplaceholder_size_t<detail::normalize_placeholders_t<Bindings>>::value;
-	};
-
-#endif
-
 
 
 

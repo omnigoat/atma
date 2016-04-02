@@ -32,11 +32,26 @@ namespace atma
 	}
 
 
+	//
+	// composition, like the dot-operator in Haskell, if that floats your boat
+	//
 	template <typename F, typename G>
 	inline decltype(auto) operator % (F&& f, G&& g) {
 		return detail::composited_t<F, G>{std::forward<F>(f), std::forward<G>(g)};
 	}
 
+
+	//
+	// an attempt at a '$' operator like haskell, so we can avoid parens:
+	//
+	//  inc(square(4))
+	//  (inc % square)(4)
+	//  inc % square << 4
+	//
+	template <typename F, typename A>
+	inline decltype(auto) operator << (F&& f, A&& a) {
+		return call_fn(std::forward<F>(f), std::forward<A>(a));
+	}
 
 #if 0
 	// this style of overloads could be used to dramatically restrict composition, but
