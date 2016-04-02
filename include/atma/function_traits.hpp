@@ -5,6 +5,80 @@
 
 namespace atma
 {
+	//
+	//  has_functor_operator_v
+	//  ------------------------
+	//    boolean. true if type T has an `operator ()`
+	//
+	namespace detail
+	{
+		// SFINAE test
+#if 0
+		template <typename T>
+		struct has_functor_operator_t
+		{
+		private:
+			template <typename C> constexpr static bool test(decltype(&C::helloworld)) { return true; }
+			template <typename C> constexpr static bool test(...) { return false; }
+
+		public:
+			constexpr static bool value = test<T>(0);
+		};
+#endif
+		template <typename T>
+		class has_functor_operator_t
+		{
+			typedef char one;
+			typedef long two;
+
+			template <typename C> static one test(decltype(&C::operator ()));
+			template <typename C> static two test(...);
+
+		public:
+			enum { value = sizeof(test<T>(0)) == sizeof(char) };
+		};
+
+	}
+
+	template <typename T>
+	constexpr bool const has_functor_operator_v = detail::has_functor_operator_t<T>::value;
+
+
+	//
+	//  is_callable_v
+	//
+	namespace detail
+	{
+		template <typename T>
+		struct is_callable_t
+			: has_functor_operator_t<T>
+		{};
+
+		template <typename R, typename... Args>
+		struct is_callable_t<R(*)(Args...)> {
+			constexpr static bool value = true;
+		};
+
+		template <typename R, typename C, typename... Args>
+		struct is_callable_t<R(C::*)(Args...)> {
+			constexpr static bool value = true;
+		};
+
+		template <typename R, typename C, typename... Args>
+		struct is_callable_t<R(C::*)(Args...) const> {
+			constexpr static bool value = true;
+		};
+	}
+
+	template <typename T>
+	constexpr bool const is_callable_v = detail::is_callable_t<T>::value;
+
+
+
+
+
+
+
 	template <typename F>
 	struct function_traits;
 

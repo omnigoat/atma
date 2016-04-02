@@ -166,6 +166,7 @@ $(TargetPath) -r atma</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\bind_and_function.cpp" />
     <ClCompile Include="..\src\entrypoint.cpp" />
     <ClCompile Include="..\src\ranges.cpp" />
     <ClCompile Include="..\src\string.cpp" />
