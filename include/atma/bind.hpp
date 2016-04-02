@@ -4,7 +4,7 @@
 #include <atma/tuple.hpp>
 #include <atma/placeholders.hpp>
 #include <atma/function_traits.hpp>
-
+#include <atma/function_composition.hpp>
 
 namespace atma {
 
@@ -355,8 +355,6 @@ namespace atma {
 			return call_fn(std::forward<F>(f), std::get<Idxs>(std::forward<Tuple>(xs))...);
 		}
 
-
-
 		template <typename R, typename from, typename to>
 		struct type_if_castible :
 			std::enable_if<std::is_convertible<std::remove_reference_t<from>&, std::remove_reference_t<to>&>::value, R>
@@ -440,16 +438,14 @@ namespace atma {
 	namespace detail
 	{
 		template <typename F, typename Bindings, typename Args, size_t... Idxs>
-		inline auto call_fn_bound_tuple_impl(F&& f, Bindings&& bindings, Args&& args, idxs_t<Idxs...>)
-			-> decltype(call_fn(std::forward<F>(f), select_bound_arg(std::get<Idxs>(std::forward<Bindings>(bindings)), std::forward<Args>(args))...))
+		inline decltype(auto) call_fn_bound_tuple_impl(F&& f, Bindings&& bindings, Args&& args, idxs_t<Idxs...>)
 		{
 			return call_fn(std::forward<F>(f), select_bound_arg(std::get<Idxs>(std::forward<Bindings>(bindings)), std::forward<Args>(args))...);
 		}
 	}
 
 	template <typename F, typename Bindings, typename Args>
-	inline auto call_fn_bound_tuple(F&& f, Bindings&& b, Args&& a)
-		-> decltype(detail::call_fn_bound_tuple_impl(std::forward<F>(f), std::forward<Bindings>(b), std::forward<Args>(a), idxs_list_t<std::tuple_size<std::decay_t<Bindings>>::value>()))
+	inline decltype(auto) call_fn_bound_tuple(F&& f, Bindings&& b, Args&& a)
 	{
 		// this following code won't work for a functor that has overloaded operator (),
 		// beacuse function_traits won't be able to auto-magically guess the traits. if this
