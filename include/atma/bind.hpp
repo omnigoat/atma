@@ -33,12 +33,10 @@ namespace atma {
 				std::tuple<B...>,
 				tuple_placeholder_list_t<fn_arity + (int)fn_ismemfn - (int)bindings_size>>;
 		};
+
+		template <typename F, typename... B>
+		using curried_bindings_t = typename detail::curried_bindings_tx<F, B...>::type;
 	}
-
-	template <typename F, typename... B>
-	using curried_bindings_t = typename detail::curried_bindings_tx<F, B...>::type;
-
-
 
 
 	//
@@ -65,8 +63,6 @@ namespace atma {
 			return std::get<I>(std::forward<Args>(args));
 		}
 	}
-
-
 
 
 	//
@@ -265,6 +261,34 @@ namespace atma {
 	}
 
 
+	//
+	//  bind_fn_args_t
+	//  ----------------
+	//    member-function-pointers (but not functors) add an additional argument
+	//    whilst resolving concrete bindings, because the first parameter is the
+	//    class instance.
+	//
+	namespace detail
+	{
+		template <typename F, bool = function_traits<F>::is_memfnptr>
+		struct bind_fn_args_tx
+		{
+			using type = typename function_traits<F>::tupled_args_type;
+		};
+
+		template <typename F>
+		struct bind_fn_args_tx<F, true>
+		{
+			using type = 
+				tuple_push_front_t<
+					typename function_traits<F>::tupled_args_type,
+					typename function_traits<F>::class_type*>;
+		};
+
+		template <typename F>
+		using bind_fn_args_t = typename bind_fn_args_tx<std::decay_t<F>>::type;
+	}
+
 
 
 	//
@@ -280,7 +304,8 @@ namespace atma {
 	namespace detail
 	{
 		template <typename F, typename Bindings, typename Args, size_t... Idxs>
-		inline decltype(auto) call_fn_bound_tuple_impl(F&& f, Bindings&& bindings, Args&& args, idxs_t<Idxs...>)
+		inline auto call_fn_bound_tuple_impl(F&& f, Bindings&& bindings, Args&& args, idxs_t<Idxs...>)
+		-> decltype(call_fn(std::forward<F>(f), select_bound_arg(std::get<Idxs>(std::forward<Bindings>(bindings)), std::forward<Args>(args))...))
 		{
 			return call_fn(std::forward<F>(f), select_bound_arg(std::get<Idxs>(std::forward<Bindings>(bindings)), std::forward<Args>(args))...);
 		}
@@ -289,14 +314,8 @@ namespace atma {
 	template <typename F, typename Bindings, typename Args>
 	inline decltype(auto) call_fn_bound_tuple(F&& f, Bindings&& b, Args&& a)
 	{
-		// this following code won't work for a functor that has overloaded operator (),
-		// beacuse function_traits won't be able to auto-magically guess the traits. if this
-		// becomes a problem, comment out everything save the return-statement.
-		auto const param_size = function_traits<F>::arity + (size_t)function_traits<F>::is_memfnptr;
 		auto const binding_size = std::tuple_size<std::decay_t<Bindings>>::value;
 
-		static_assert(param_size == binding_size, "incorrect number of bindings (must match parameter-count)");
-		
 		return detail::call_fn_bound_tuple_impl(
 			std::forward<F>(f),
 			std::forward<Bindings>(b),
@@ -313,36 +332,11 @@ namespace atma {
 	//    takes a function, and a tuple of bindings, and returns a functor taking 
 	//
 	//
+#if 0
 	template <typename F, typename BindingsRef, typename Args>
 	struct bind_base_t;
 
-	template <typename F, typename BindingsRef, typename... Args>
-	struct bind_base_t<F, BindingsRef, std::tuple<Args...>>
-	{
-		// bind doesn't take anything by reference, so we just straight-up store
-		// by value. this will still perform construct-by-reference (rvalue/lvalue)
-		using function_t = std::decay_t<F>;
-		using bindings_t = tuple_map_t<std::decay, BindingsRef>;
-
-		template <typename FF, typename BB>
-		bind_base_t(FF&& fn, BB&& bindings)
-			: fn_(std::forward<FF>(fn))
-			, bindings_(std::forward<BB>(bindings))
-		{
-		}
-
-		auto operator ()(Args... args) -> decltype(auto)
-		{
-			return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
-		}
-
-		auto fn() const -> function_t const& { return fn_; }
-		auto bindings() const -> bindings_t const& { return bindings_; }
-
-	private:
-		function_t fn_;
-		bindings_t bindings_;
-	};
+	
 
 
 	template <typename F, typename BindingsRef>
@@ -368,31 +362,151 @@ namespace atma {
 	template <typename PreF, typename PreBindings, typename PreArguments, typename NewBindings>
 	struct bind_t<bind_base_t<PreF, PreBindings, PreArguments>, NewBindings>
 		: bind_base_t<PreF, detail::bound_arguments_t<PreBindings, detail::valid_bindings_t<NewBindings>>,
-			detail::resultant_args_t<
-				std::conditional_t<function_traits<PreF>::is_memfnptr,
-					tuple_push_front_t<
-						typename function_traits<PreF>::tupled_args_type,
-						typename function_traits<PreF>::class_type>,
-					typename function_traits<PreF>::tupled_args_type>,
-				detail::bound_arguments_t<PreBindings, NewBindings>>>
+		detail::resultant_args_t<
+		std::conditional_t<function_traits<PreF>::is_memfnptr,
+		tuple_push_front_t<
+		typename function_traits<PreF>::tupled_args_type,
+		typename function_traits<PreF>::class_type>,
+		typename function_traits<PreF>::tupled_args_type>,
+		detail::bound_arguments_t<PreBindings, NewBindings>>>
 	{
 		template <typename FF, typename BB>
 		bind_t(FF&& fn, BB&& bindings)
 			: bind_base_t{
-				fn_(fn.fn()),
-				std::forward<decltype(bind_arguments(fn.bindings(), std::forward<BB>(bindings)))>(
-					bind_arguments(fn.bindings(), std::forward<BB>(bindings)))}
+			fn_(fn.fn()),
+			std::forward<decltype(bind_arguments(fn.bindings(), std::forward<BB>(bindings)))>(
+				bind_arguments(fn.bindings(), std::forward<BB>(bindings)))}
 		{}
 	};
 #endif
 
 
 
+#else
+	namespace detail
+	{
+		template <typename F, typename BindingsRef, typename Args>
+		struct bind_iii_t;
+
+		template <typename F, typename BindingsRef, typename... Args>
+		struct bind_iii_t<F, BindingsRef, std::tuple<Args...>>
+		{
+			// bind doesn't take anything by reference, so we just straight-up store
+			// by value. this will still perform construct-by-reference (rvalue/lvalue)
+			using function_t = std::decay_t<F>;
+			using bindings_t = tuple_map_t<std::decay, BindingsRef>;
+
+			template <typename FF, typename BB>
+			bind_iii_t(FF&& fn, BB&& bindings)
+				: fn_(std::forward<FF>(fn))
+				, bindings_(std::forward<BB>(bindings))
+			{
+			}
+
+			auto operator ()(Args... args) -> decltype(auto)
+			{
+				return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
+			}
+
+			auto fn() const -> function_t const& { return fn_; }
+			auto bindings() const -> bindings_t const& { return bindings_; }
+
+		private:
+			function_t fn_;
+			bindings_t bindings_;
+		};
+
+		template <typename F, typename BindingsRef, bool Op>
+		struct bind_ii_t : 
+			bind_iii_t<F, BindingsRef, detail::resultant_args_t<detail::bind_fn_args_t<F>, BindingsRef>>
+		{
+			template <typename FF, typename BB>
+			bind_ii_t(FF&& f, BB&& b)
+				: bind_iii_t{std::forward<FF>(f), std::forward<BB>(b)}
+			{}
+		};
+
+		template <typename F, typename BindingsRef>
+		struct bind_ii_t<F, BindingsRef, false>
+		{
+			// bind doesn't take anything by reference, so we just straight-up store
+			// by value. this will still perform construct-by-reference (rvalue/lvalue)
+			using function_t = std::decay_t<F>;
+			using bindings_t = tuple_map_t<std::decay, BindingsRef>;
+
+			template <typename FF, typename BB>
+			bind_ii_t(FF&& fn, BB&& bindings)
+				: fn_(std::forward<FF>(fn))
+				, bindings_(std::forward<BB>(bindings))
+			{
+			}
+
+			template <typename... Args>
+			auto operator ()(Args&&... args) -> decltype(call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...)))
+			{
+				return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
+			}
+
+			auto fn() const -> function_t const& { return fn_; }
+			auto bindings() const -> bindings_t const& { return bindings_; }
+
+		private:
+			function_t fn_;
+			bindings_t bindings_;
+		};
+	}
+
+	template <typename F, typename BindingsRef>
+	struct bind_t : detail::bind_ii_t<F, BindingsRef, is_callable_v<F>>
+	{
+		template <typename FF, typename BB>
+		bind_t(FF&& f, BB&& b)
+			: bind_ii_t{std::forward<FF>(f), std::forward<BB>(b)}
+		{}
+	};
+
+#if 0
+	template <typename PreF, typename PreBindings, typename NewBindings>
+	struct bind_t<bind_t<PreF, PreBindings>, NewBindings>
+	{
+		using function_t = std::decay_t<PreF>;
+		using bindings_t = tuple_map_t<std::decay, detail::bound_arguments_t<PreBindings, NewBindings>>;
+
+		template <typename FF, typename BB>
+		bind_t(FF&& fn, BB&& bindings)
+			: fn_(fn.fn())
+			, bindings_(
+				std::forward<decltype(bind_arguments(fn.bindings(), std::forward<BB>(bindings)))>(
+					bind_arguments(fn.bindings(), std::forward<BB>(bindings))))
+		{
+		}
+
+		template <typename... Args>
+		auto operator ()(Args&&... args) -> decltype(call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...)))
+		{
+			return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
+		}
+
+		auto fn() const -> PreF const& { return fn_; }
+		auto bindings() const -> bindings_t const& { return bindings_; }
+
+	private:
+		function_t fn_;
+		bindings_t bindings_;
+	};
+#endif
+#endif
+
+	//
+	//  function_traits
+	//  -----------------
+	//    specialization for function_traits
+	//
 	template <typename F, typename Bindings>
 	struct function_traits<bind_t<F, Bindings>>
 	{
 		using result_type = typename function_traits<F>::result_type;
-		using tupled_args_type = detail::resultant_args_t<typename function_traits<F>::tupled_args_type, Bindings>;
+		using tupled_args_type = detail::resultant_args_t<detail::bind_fn_args_t<F>, Bindings>;
 		template <int Idx> using arg_type = typename std::tuple_element<Idx, tupled_args_type>::type;
 
 		static bool const is_memfnptr = false;
@@ -403,14 +517,14 @@ namespace atma {
 
 
 
+
 	//
 	//  bind
 	//  ------
 	//    hooray!
 	//
 	template <typename F, typename... Bindings>
-	inline auto bind(F&& f, Bindings&&... bindings)
-		-> bind_t<std::remove_reference_t<F>, std::tuple<Bindings...>>
+	inline auto bind(F&& f, Bindings&&... bindings) -> bind_t<std::remove_reference_t<F>, std::tuple<Bindings...>>
 	{
 		return {std::forward<F>(f), std::forward_as_tuple(bindings...)};
 	}
@@ -420,11 +534,13 @@ namespace atma {
 	//  curry
 	//  -------
 	//    takes a function, and a list of bindings, and returns a functor taking those bindings
-	//    and any additional implicit bindings	
+	//    and any additional implicit bindings.
+	//
+	//    NOTE: this *does* require function_traits<F> to know the number of arguments, which
+	//          means you can't curry a templated function/functor. deal with it.
 	//
 	template <typename F, typename... Bindings>
-	inline auto curry(F&& f, Bindings&&... bindings)
-		-> bind_t<F, curried_bindings_t<F, Bindings...>>
+	inline auto curry(F&& f, Bindings&&... bindings) -> bind_t<F, detail::curried_bindings_t<F, Bindings...>>
 	{
 		auto const param_size = function_traits<F>::arity + (size_t)function_traits<F>::is_memfnptr;
 		auto const binding_size = sizeof...(Bindings);
@@ -442,8 +558,7 @@ namespace atma {
 	//    takes a function and generates a binding that flips the order of the arguments
 	//
 	template <typename F>
-	inline auto flip(F&& f)
-		-> bind_t<F, tuple_flip_t<curried_bindings_t<F>>>
+	inline auto flip(F&& f) -> bind_t<F, tuple_flip_t<detail::curried_bindings_t<F>>>
 	{
 		return {f, tuple_flip_t<curried_bindings_t<F>>()};
 	}

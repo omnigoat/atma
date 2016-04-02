@@ -22,7 +22,7 @@ namespace atma
 	//    SERIOUSLY, this can be replaced by std::invoke when c++17 is more prevalent
 	//
 	template <typename F, typename... Args>
-	auto call_fn(F&& f, Args&&... args) -> decltype(auto)
+	auto call_fn(F f, Args&&... args) -> decltype(auto)
 	{
 		return f(std::forward<Args>(args)...);
 	}
@@ -52,6 +52,12 @@ namespace atma
 	}
 
 	template <typename C, typename R, typename... Params, typename... Args>
+	auto call_fn(R(C::*fn)(Params...), std::reference_wrapper<C> c, Args&&... args) -> R
+	{
+		return (((C&)c).*fn)(std::forward<Args>(args)...);
+	}
+
+	template <typename C, typename R, typename... Params, typename... Args>
 	auto call_fn(R(C::*fn)(Params...) const, C& c, Args&&... args) -> R
 	{
 		return (c.*fn)(std::forward<Args>(args)...);
@@ -61,6 +67,13 @@ namespace atma
 	auto call_fn(R(C::*fn)(Params...) const, C const& c, Args&&... args) -> R
 	{
 		return (c.*fn)(std::forward<Args>(args)...);
+	}
+
+	template <typename C, typename R, typename... Params, typename... Args>
+	auto call_fn(R(C::*fn)(Params...), C const& c, Args&&... args) -> R
+	{
+		static_assert(false, "illegal call of non-const member function for constant instance");
+		return (const_cast<C&>(c).*fn)(std::forward<Args>(args)...);
 	}
 
 	template <typename C, typename R, typename... Params, typename... Args>
@@ -76,9 +89,22 @@ namespace atma
 	}
 
 	template <typename C, typename R, typename... Params, typename... Args>
+	auto call_fn(R(C::*fn)(Params...) const, std::reference_wrapper<C const> c, Args&&... args) -> R
+	{
+		return (((C const&)c).*fn)(std::forward<Args>(args)...);
+	}
+
+	template <typename C, typename R, typename... Params, typename... Args>
 	auto call_fn(R(C::*fn)(Params...) const, C const* c, Args&&... args) -> R
 	{
 		return (c->*fn)(std::forward<Args>(args)...);
+	}
+
+	template <typename C, typename R, typename... Params, typename... Args>
+	auto call_fn(R(C::*fn)(Params...), C const* c, Args&&... args) -> R
+	{
+		static_assert(false, "illegal call of non-const member function for constant instance");
+		return (const_cast<C*>(c)->*fn)(std::forward<Args>(args)...);
 	}
 
 
