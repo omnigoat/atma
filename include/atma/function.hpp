@@ -466,7 +466,7 @@ namespace atma
 	//    specialization for function_traits
 	//
 	template <typename R, typename... Params>
-	struct function_traits<function<R(Params...)>>
+	struct function_traits_override<function<R(Params...)>>
 		: function_traits<R(Params...)>
 	{
 	};

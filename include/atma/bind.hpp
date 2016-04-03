@@ -503,16 +503,15 @@ namespace atma {
 	//    specialization for function_traits
 	//
 	template <typename F, typename Bindings>
-	struct function_traits<bind_t<F, Bindings>>
+	struct function_traits_override<bind_t<F, Bindings>>
 	{
 		using result_type = typename function_traits<F>::result_type;
 		using tupled_args_type = detail::resultant_args_t<detail::bind_fn_args_t<F>, Bindings>;
-		template <int Idx> using arg_type = typename std::tuple_element<Idx, tupled_args_type>::type;
+		template <int Idx> using arg_type = std::tuple_element_t<Idx, tupled_args_type>;
 
 		static bool const is_memfnptr = false;
-		using class_type = void;
 
-		static int const arity = function_traits<F>::arity - tuple_nonplaceholder_size_t<detail::normalize_placeholders_t<Bindings>>::value;
+		constexpr static size_t arity = std::tuple_size_v<tupled_args_type>;
 	};
 
 
