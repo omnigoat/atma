@@ -13,9 +13,6 @@ struct mathing_t {
 
 struct tm_t
 {
-	template <typename A> int lulz(A a) { return a; }
-
-
 	template <typename A>
 	std::enable_if_t<std::is_same_v<A, int>, int>
 	operator ()(A a) { return a; }
@@ -25,19 +22,12 @@ struct tm_t
 	operator ()(A a) { return a * 2.f; }
 };
 
-template <typename F>
-void doit(F f)
-{
-	f(4);
-}
+
 
 SCENARIO("bind works with various things", "[bind]")
 {
 	GIVEN("functions of various flavours")
 	{
-		auto ft1 = atma::is_callable_v<mathing_t>;
-		auto ft2 = atma::is_callable_v<tm_t>;
-
 		// regular function
 		auto b1 = atma::bind(&square, arg1);
 
@@ -63,7 +53,9 @@ SCENARIO("bind works with various things", "[bind]")
 		auto b4v2 = atma::bind(F, arg2, arg3, arg1);
 
 		// composition object with well-defined arguments
-		auto b5 = atma::curry(b2v6 % b2v5);
+		auto b5v1 = atma::curry(b2v6 % b2v5);
+		auto b5v2 = atma::bind(b5v1 % b2v2, arg1);
+		auto b5v3 = b5v1 % b2v7;
 		
 		// composition object with a templated `operator ()`
 		tm_t tm;
@@ -97,7 +89,8 @@ SCENARIO("bind works with various things", "[bind]")
 
 		THEN("b5s play nice")
 		{
-			CHECK(b5(12) == 3);
+			CHECK(b5v1(12) == 3);
+			CHECK(b5v2(16) == 2);
 		}
 
 		THEN("b6 works at all. accomplishment.")
