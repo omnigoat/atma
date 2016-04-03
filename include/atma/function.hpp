@@ -2,7 +2,10 @@
 
 #include <atma/bind.hpp>
 #include <atma/tuple.hpp>
+#include <atma/function_composition.hpp>
+
 #include <tuple>
+#include <functional>
 
 namespace atma
 {
@@ -432,6 +435,30 @@ namespace atma
 
 
 
+	namespace detail
+	{
+		template <typename R, typename... Params, typename Args, size_t I>
+		template <typename... More>
+		auto dispatcher_ii_t<R, std::tuple<Params...>, Args, I, false, true>::call(dispatch_fnptr_t<R, Params...> fn, functor_buf_t const& buf, Params... params, More&&...) -> R
+		{
+			return fn(buf, params...);
+		};
+
+		template <typename R, typename... Params, typename Args, size_t I>
+		inline auto dispatcher_ii_t<R, std::tuple<Params...>, Args, I, false, false>::call(dispatch_fnptr_t<R, Params...> fn, functor_buf_t const& buf, Params... params) -> R
+		{
+			return fn(buf, params...);
+		}
+
+		template <typename R, typename... Params, typename... UParams, typename... RParams>
+		auto dispatcher_iii_t<R, std::tuple<Params...>, std::tuple<UParams...>, std::tuple<RParams...>>::call(dispatch_fnptr_t<R, Params...> fn, functor_buf_t const& buf, UParams... params) -> function<R(RParams...)>
+		{
+			return function<R(RParams...)>{curry(fn, buf, params...)};
+		}
+	}
+
+
+
 
 	//
 	//  function_traits
@@ -439,7 +466,7 @@ namespace atma
 	//    specialization for function_traits
 	//
 	template <typename R, typename... Params>
-	struct function_traits<function<R(Params...)>>
+	struct function_traits_override<function<R(Params...)>>
 		: function_traits<R(Params...)>
 	{
 	};
@@ -468,8 +495,6 @@ namespace atma
 		typename function_traits<std::decay_t<FN>>::tupled_args_type>::type;
 
 
-
-
 	//
 	//  functionize
 	//  -------------
@@ -482,85 +507,4 @@ namespace atma
 	}
 
 
-
-	//
-	//  function composiition
-	//  -----------------------
-	//    operator * composes two function together:
-	//
-	//    f(b)->c  *  g(a)->b  === h(a)->c === f(g(a))->c
-	//
-	namespace detail
-	{
-		template <typename F, typename G, typename R, typename... Args>
-		inline auto composited(F f, G g, Args... args) -> R
-		{
-			return call_fn(f, call_fn(g, args...));
-		}
-	}
-
-	template <typename FR, typename GR, typename... GArgs>
-	inline auto operator * (function<FR(GR)> const& f, function<GR(GArgs...)> const& g) -> function<FR(GArgs...)>
-	{
-		return function<FR(GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GArgs...>, f, g)};
-	}
-
-	template <typename FR, typename GR, typename... GArgs>
-	inline auto operator * (FR(*f)(GR), function<GR(GArgs...)> const& g) -> function<FR(GArgs...)>
-	{
-		return function<FR(GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GArgs...>, f, g)};
-	}
-
-	template <typename FR, typename GR, typename... GArgs>
-	inline auto operator * (function<FR(GR)> const& f, GR(*g)(GArgs...)) -> function<FR(GArgs...)>
-	{
-		return function<FR(GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GArgs...>, f, g)};
-	}
-
-	template <typename FR, typename GR, typename GC, typename... GArgs>
-	inline auto operator * (function<FR(GR)> const& f, GR(GC::*g)(GArgs...)) -> function<FR(GC, GArgs...)>
-	{
-		return function<FR(GC, GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GC, GArgs...>, f, g)};
-	}
-
-	template <typename FR, typename GR, typename GC, typename... GArgs>
-	inline auto operator * (function<FR(GR)> const& f, GR(GC::*g)(GArgs...) const) -> function<FR(GC, GArgs...)>
-	{
-		return function<FR(GC, GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GC, GArgs...>, f, g)};
-	}
-
-	template <typename FR, typename GR, typename... GArgs>
-	inline auto operator * (FR(GR::*f)(), function<GR(GArgs...)> const& g) -> function<FR(GArgs...)>
-	{
-		return function<FR(GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GArgs...>, f, g)};
-	}
-
-	template <typename FR, typename GR, typename... GArgs>
-	inline auto operator * (FR(GR::*f)() const, function<GR(GArgs...)> const& g) -> function<FR(GArgs...)>
-	{
-		return function<FR(GArgs...)>{curry(&detail::composited<decltype(f), decltype(g), FR, GArgs...>, f, g)};
-	}
-
-
-	namespace detail
-	{
-		template <typename R, typename... Params, typename Args, size_t I>
-		template <typename... More>
-		auto dispatcher_ii_t<R, std::tuple<Params...>, Args, I, false, true>::call(dispatch_fnptr_t<R, Params...> fn, functor_buf_t const& buf, Params... params, More&&...) -> R
-		{
-			return fn(buf, params...);
-		};
-
-		template <typename R, typename... Params, typename Args, size_t I>
-		inline auto dispatcher_ii_t<R, std::tuple<Params...>, Args, I, false, false>::call(dispatch_fnptr_t<R, Params...> fn, functor_buf_t const& buf, Params... params) -> R
-		{
-			return fn(buf, params...);
-		}
-
-		template <typename R, typename... Params, typename... UParams, typename... RParams>
-		auto dispatcher_iii_t<R, std::tuple<Params...>, std::tuple<UParams...>, std::tuple<RParams...>>::call(dispatch_fnptr_t<R, Params...> fn, functor_buf_t const& buf, UParams... params) -> function<R(RParams...)>
-		{
-			return function<R(RParams...)>{curry(fn, buf, params...)};
-		}
-	}
 }
