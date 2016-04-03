@@ -28,8 +28,9 @@ SCENARIO("bind works with various things", "[bind]")
 {
 	GIVEN("functions of various flavours")
 	{
-		// regular function
-		auto b1 = atma::bind(&square, arg1);
+		// regular function & binding a binding
+		auto b1v1 = atma::bind(&square, arg1);
+		auto b1v2 = atma::bind(b1v1, 4);
 
 		// mumber function
 		mathing_t m;
@@ -62,7 +63,11 @@ SCENARIO("bind works with various things", "[bind]")
 		auto b6 = atma::bind(tm, arg1);
 
 
-
+		THEN("b1s are playing nice.")
+		{
+			CHECK(4 == b1v1(2));
+			CHECK(16 == b1v2());
+		}
 
 		THEN("all b2s match each other")
 		{
