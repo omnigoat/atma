@@ -17,5 +17,11 @@
     <ClCompile Include="..\src\string.cpp">
       <Filter>source</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\ranges.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\bind_and_function.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

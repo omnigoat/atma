@@ -13,8 +13,6 @@
 //#	pragma warning(pop)
 #	undef min
 #	undef max
-#	undef near
-#	undef far
 #endif
 
 #if defined(_MSC_VER)

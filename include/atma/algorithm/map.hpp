@@ -16,7 +16,7 @@ namespace atma
 		using source_container_t = std::remove_reference_t<C>;
 		using source_iterator_t  = decltype(std::declval<source_container_t>().begin());
 
-		using value_type      = result_of_t<F(typename std::remove_reference_t<C>::value_type)>;
+		using value_type      = std::result_of_t<F(typename std::remove_reference_t<C>::value_type)>;
 		using reference       = value_type;
 		using const_reference = value_type const;
 		using iterator        = std::conditional_t<std::is_const<source_container_t>::value, mapped_range_iterator_t<self_t const>, mapped_range_iterator_t<self_t>>;
@@ -54,12 +54,8 @@ namespace atma
 		{
 		}
 
-		~partial_mapped_range_t()
-		{
-		}
-
 		template <typename C>
-		inline auto operator <<= (C&& xs) -> mapped_range_t<C, F>
+		inline auto operator ()(C&& xs) -> mapped_range_t<C, F>
 		{
 			return mapped_range_t<C, F>(std::forward<C>(xs), std::forward<F>(fn_));
 		}
@@ -80,7 +76,7 @@ namespace atma
 		using owner_t           = C;
 		using source_iterator_t = typename owner_t::source_iterator_t;
 
-		using iterator_category = typename source_iterator_t::iterator_category;
+		using iterator_category = std::forward_iterator_tag;
 		using value_type        = typename owner_t::value_type;
 		using difference_type   = ptrdiff_t;
 		using distance_type     = ptrdiff_t;

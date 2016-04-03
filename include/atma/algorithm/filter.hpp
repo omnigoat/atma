@@ -1,8 +1,8 @@
 #pragma once
 
 #include <atma/bind.hpp>
-
-
+#include <atma/assert.hpp>
+#include <atma/function.hpp>
 
 namespace atma
 {
@@ -61,7 +61,7 @@ namespace atma
 		{}
 
 		template <typename C>
-		inline auto operator <<= (C&& xs) -> filtered_range_t<C, F>
+		auto operator ()(C&& xs) -> filtered_range_t<C, F>
 		{
 			return filtered_range_t<C, F>(
 				std::forward<C>(xs),
@@ -214,12 +214,21 @@ namespace atma
 	//======================================================================
 	// FUNCTIONS
 	//======================================================================
+	
 	template <typename F, typename C>
 	inline auto filter(F&& predicate, C&& container) -> filtered_range_t<C, F>
 	{
 		return {std::forward<C>(container), container.begin(), container.end(), std::forward<F>(predicate)};
 	}
 
+	template <typename F, typename C>
+	inline auto filter2(F&& predicate, C&& container) -> filtered_range_t<C, F>
+	{
+		return{std::forward<C>(container), container.begin(), container.end(), std::forward<F>(predicate)};
+	}
+
+	//constexpr auto filter = functionize(&filterf);
+	//
 	template <typename F>
 	inline auto filter(F&& predicate) -> partial_filtered_range_t<F>
 	{
