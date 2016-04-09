@@ -3,6 +3,7 @@
 #include <atma/bind.hpp>
 #include <atma/tuple.hpp>
 #include <atma/function_composition.hpp>
+#include <atma/assert.hpp>
 
 #include <tuple>
 #include <functional>
@@ -51,6 +52,11 @@ namespace atma
 				new (&buf) FN{fn};
 			}
 
+			static auto store(functor_buf_t<BS>& buf, void* exbuf, FN const& fn) -> void
+			{
+				new (&buf) FN{fn};
+			}
+
 			static auto destruct(functor_buf_t<BS>& fn) -> void
 			{
 				reinterpret_cast<FN&>(fn).~FN();
@@ -88,6 +94,18 @@ namespace atma
 			static auto store(functor_buf_t<BS>& buf, FN const& fn) -> void
 			{
 				reinterpret_cast<FN*&>(buf) = new FN(fn);
+				ATMA_ASSERT((reinterpret_cast<intptr&>(buf) & 1) == 0, "bad pointer for allocated function");
+			}
+
+			static auto store(functor_buf_t<BS>& buf, void* exbuf, FN const& fn) -> void
+			{
+				ATMA_ASSERT(((intptr)exbuf & 1) == 0, "bad pointer for external buffer");
+
+				reinterpret_cast<FN*&>(buf) = reinterpret_cast<FN*&>(exbuf);
+				new (reinterpret_cast<FN*&>(buf)) FN{fn};
+				
+				// 1 for external
+				reinterpret_cast<intptr&>(buf) |= 1;
 			}
 
 			static auto move(functor_buf_t<BS>& dest, functor_buf_t<BS>&& src) -> void
@@ -107,14 +125,17 @@ namespace atma
 
 			static auto destruct(functor_buf_t<BS>& buf) -> void
 			{
-				auto&& tbuf = reinterpret_cast<FN*&>(buf);
-				delete tbuf;
+				// only delete if we're not in external buffer
+				auto ip = reinterpret_cast<intptr const&>(buf);
+				if (~ip & 1)
+					delete reinterpret_cast<FN*&>(buf);
 			}
 
 			template <typename R, typename... Args>
 			static auto call(functor_buf_t<BS> const& buf, Args... args) -> R
 			{
-				return (*reinterpret_cast<FN* const&>(buf))(std::forward<Args>(args)...);
+				auto ip = reinterpret_cast<intptr const&>(buf) & ~intptr(1);
+				return (*reinterpret_cast<FN* const&>(ip))(std::forward<Args>(args)...);
 			}
 
 			static auto target(functor_buf_t<BS>& buf) -> void*
@@ -181,6 +202,14 @@ namespace atma
 				, buf{}
 			{
 				vtable_impl_t<BS, std::decay_t<FN>>::store(buf, fn);
+			}
+
+			template <typename FN>
+			explicit functor_wrapper_t(void* exbuf, FN&& fn)
+				: vtable{generate_vtable<BS, std::decay_t<FN>, R, Params...>()}
+				, buf{}
+			{
+				vtable_impl_t<BS, std::decay_t<FN>>::store(buf, exbuf, fn);
 			}
 
 			functor_wrapper_t(functor_wrapper_t const& rhs)
@@ -330,6 +359,12 @@ namespace atma
 			init_fn(detail::functorize(std::forward<FN>(fn)));
 		}
 
+		template <typename FN>
+		explicit basic_function_t(void* exbuf, FN&& fn)
+		{
+			init_fn(exbuf, detail::functorize(std::forward<FN>(fn)));
+		}
+
 		basic_function_t(basic_function_t const& rhs)
 			: dispatch_{rhs.dispatch_}
 			, wrapper_(rhs.wrapper_)
@@ -427,6 +462,13 @@ namespace atma
 		{
 			dispatch_ = &detail::vtable_impl_t<BS, std::decay_t<FN>>::template call<R, Params...>;
 			new (&wrapper_) detail::functor_wrapper_t<BS, R, Params...>{std::forward<FN>(fn)};
+		}
+
+		template <typename FN>
+		auto init_fn(void* exbuf, FN&& fn) -> void
+		{
+			dispatch_ = &detail::vtable_impl_t<BS, std::decay_t<FN>>::template call<R, Params...>;
+			new (&wrapper_) detail::functor_wrapper_t<BS, R, Params...>{exbuf, std::forward<FN>(fn)};
 		}
 
 	private:
