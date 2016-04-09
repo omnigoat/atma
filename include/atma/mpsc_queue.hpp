@@ -1,6 +1,11 @@
 #pragma once
 
 #include <atma/types.hpp>
+#include <atma/atomic.hpp>
+
+#include <chrono>
+#include <thread>
+
 
 namespace atma
 {
@@ -133,6 +138,7 @@ namespace atma
 	{
 		auto size() const -> uint32;
 		auto alignment() const -> uint32;
+		auto data() const -> void*;
 
 	protected:
 		headerer_t(byte* buf, uint32 bufsize, uint32 op, uint32 p, uint32 header)
@@ -404,7 +410,6 @@ namespace atma
 				read_buf_ = (byte*)ptr;
 				read_buf_size_ = size;
 				read_position_ = 0;
-				std::cout << "JUMP" << std::endl;
 				return consume();
 			}
 		}
@@ -440,7 +445,10 @@ namespace atma
 		return 4 * pow2((header >> header_size_bitsize) & header_alignment_bitmask);
 	}
 
-
+	auto base_mpsc_queue_t::headerer_t::data() const -> void*
+	{
+		return buf + (alignby(op + header_size, alignment()) % bufsize);
+	}
 
 	inline base_mpsc_queue_t::allocation_t::allocation_t(byte* buf, uint32 bufsize, uint32 wp, alloctype_t type, uint32 alignment, uint32 size)
 		: headerer_t(buf, bufsize, wp, wp, ((uint32)type << 31) | log2(alignment / 4) << 29 | size)
