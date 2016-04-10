@@ -2,6 +2,7 @@
 
 #include <atma/bind.hpp>
 #include <atma/function.hpp>
+#include <atma/thread/engine.hpp>
 
 int square(int x) { return x * x; }
 
@@ -22,12 +23,12 @@ struct tm_t
 	operator ()(A a) { return a * 2.f; }
 };
 
-
-
 SCENARIO("bind works with various things", "[bind]")
 {
 	GIVEN("functions of various flavours")
 	{
+		atma::thread::inplace_engine_t<true> lulz{4096};
+
 		// regular function & binding a binding
 		auto b1v1 = atma::bind(&square, arg1);
 		auto b1v2 = atma::bind(b1v1, 4);
@@ -62,6 +63,13 @@ SCENARIO("bind works with various things", "[bind]")
 		tm_t tm;
 		auto b6 = atma::bind(tm, arg1);
 
+		THEN("blam")
+		{
+			char buf[128];
+			auto tb = atma::bind(&square, 4);
+			atma::basic_function_t<8, int()> tf{buf, tb};
+			tf();
+		}
 
 		THEN("b1s are playing nice.")
 		{
