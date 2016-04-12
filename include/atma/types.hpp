@@ -46,7 +46,7 @@ namespace atma
 	//    negates a predicate type
 	//
 	template <typename T>
-	struct not
+	struct not_v
 	{
 		static auto const value = !T::value;
 		using type = bool;
