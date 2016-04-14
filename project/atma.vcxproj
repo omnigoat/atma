@@ -29,6 +29,7 @@
     <ClInclude Include="..\include\atma\function.hpp" />
     <ClInclude Include="..\include\atma\function_composition.hpp" />
     <ClInclude Include="..\include\atma\hash_map.hpp" />
+    <ClInclude Include="..\include\atma\logging.hpp" />
     <ClInclude Include="..\include\atma\memory.hpp" />
     <ClInclude Include="..\include\atma\assert.hpp" />
     <ClInclude Include="..\include\atma\bind.hpp" />
