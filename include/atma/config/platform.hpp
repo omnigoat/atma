@@ -3,8 +3,13 @@
 // at the moment, we only support win32 :P
 
 
-#if defined(_WIN32) || defined(WIN32)
-#	define ATMA_PLATFORM_WIN32 true
+#if defined(_WIN32) || defined(_WIN64)
+#  define ATMA_PLATFORM_WINDOWS true
+#  if defined(_WIN64)
+#    define ATMA_PLATFORM_WIN64 true
+#  else
+#    define ATMA_PLATFORM_WIN32 true
+#  endif
 //#	pragma warning(push)
 //#	pragma warning(disable: 467)
 #	include "windows.h"
