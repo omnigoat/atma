@@ -15,7 +15,7 @@
 //    CONFIG
 //
 //=====================================================================
-#ifdef ATMA_PLATFORM_WIN32
+#ifdef ATMA_PLATFORM_WINDOWS
 #	define ATMA_DEBUGBREAK() DebugBreak()
 #else
 #	define ATMA_DEBUGBREAK()

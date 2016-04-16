@@ -13,7 +13,7 @@ namespace atma { namespace platform {
 			return nullptr;
 		}
 
-#ifdef ATMA_PLATFORM_WIN32
+#ifdef ATMA_PLATFORM_WINDOWS
 		return _aligned_malloc(size, align);
 #else
 		return nullptr;
@@ -23,7 +23,7 @@ namespace atma { namespace platform {
 
 	inline auto deallocate_aligned_memory(void *ptr) -> void
 	{
-#ifdef ATMA_PLATFORM_WIN32
+#ifdef ATMA_PLATFORM_WINDOWS
 		_aligned_free(ptr);
 #endif
 	}
