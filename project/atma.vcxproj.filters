@@ -211,7 +211,7 @@
     <ClInclude Include="..\include\atma\call_fn.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\atma\logging.hpp">
+    <ClInclude Include="..\include\atma\threading.hpp">
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
