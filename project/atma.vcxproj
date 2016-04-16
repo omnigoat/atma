@@ -29,7 +29,6 @@
     <ClInclude Include="..\include\atma\function.hpp" />
     <ClInclude Include="..\include\atma\function_composition.hpp" />
     <ClInclude Include="..\include\atma\hash_map.hpp" />
-    <ClInclude Include="..\include\atma\logging.hpp" />
     <ClInclude Include="..\include\atma\memory.hpp" />
     <ClInclude Include="..\include\atma\assert.hpp" />
     <ClInclude Include="..\include\atma\bind.hpp" />
@@ -60,6 +59,7 @@
     <ClInclude Include="..\include\atma\platform\allocation.hpp" />
     <ClInclude Include="..\include\atma\shared_memory.hpp" />
     <ClInclude Include="..\include\atma\string.hpp" />
+    <ClInclude Include="..\include\atma\threading.hpp" />
     <ClInclude Include="..\include\atma\thread\engine.hpp" />
     <ClInclude Include="..\include\atma\tuple.hpp" />
     <ClInclude Include="..\include\atma\types.hpp" />
