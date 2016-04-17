@@ -29,6 +29,7 @@
     <ClInclude Include="..\include\atma\function.hpp" />
     <ClInclude Include="..\include\atma\function_composition.hpp" />
     <ClInclude Include="..\include\atma\hash_map.hpp" />
+    <ClInclude Include="..\include\atma\logging.hpp" />
     <ClInclude Include="..\include\atma\memory.hpp" />
     <ClInclude Include="..\include\atma\assert.hpp" />
     <ClInclude Include="..\include\atma\bind.hpp" />
@@ -133,10 +134,10 @@
     <OutDir>$(SolutionDir)$(ProjectName)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>../vendor;../include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\vendor\;$(ProjectDir)..\include\;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>../vendor;../include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\vendor;$(ProjectDir)..\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <IncludePath>../vendor;../include;$(IncludePath)</IncludePath>

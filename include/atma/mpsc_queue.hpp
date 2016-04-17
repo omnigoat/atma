@@ -2,6 +2,7 @@
 
 #include <atma/types.hpp>
 #include <atma/atomic.hpp>
+#include <atma/unique_memory.hpp>
 
 #include <chrono>
 #include <thread>
@@ -47,17 +48,19 @@ namespace atma
 
 		enum class alloctype_t : uint32
 		{
-			normal,
-			jump
+			normal = 0x00,
+			jump = 0x10,
+			pad = 0x01,
 		};
 
-		// header is {1-bit: jump-flag, 2-bits: alignment, 29-bits: size}, making the header-size 4 bytes
+		// header is {1-bit: jump-flag, 1-bit: pad-flag, 2-bits: alignment, 28-bits: size}, making the header-size 4 bytes
 		//  - alignment is a two-bit number representing a pow-2 exponent, which is multiplied by 4
 		//      thus: 0b10 == 2 == pow2(2) == 4  ->  4 * 4 == 16, 16-byte alignment
 		//      thus: 0b11 == 3 == pow2(3) == 8  ->  8 * 4 == 32, 32-byte alignment
 		static uint32 const header_jumpflag_bitsize = 1;
+		static uint32 const header_padflag_bitsize = 1;
 		static uint32 const header_alignment_bitsize = 2;
-		static uint32 const header_size_bitsize = 29;
+		static uint32 const header_size_bitsize = 28;
 		static uint32 const header_size = 4;
 
 		static uint32 const header_size_bitmask = pow2(header_size_bitsize) - 1;
@@ -67,7 +70,7 @@ namespace atma
 
 		auto impl_read_queue_write_info() -> std::tuple<byte*, uint32, uint32>;
 		auto impl_read_queue_read_info() -> std::tuple<byte*, uint32>;
-		auto impl_calculate_available_space(byte* rb, uint32 rp, byte* wb, uint32 wbs, uint32 wp) -> uint32;
+		auto impl_calculate_available_space(byte* rb, uint32 rp, byte* wb, uint32 wbs, uint32 wp, bool ct) -> uint32;
 		auto impl_perform_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available, uint32 alignment, uint32& size) -> bool;
 		auto impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t, uint32 alignment, uint32 size) -> allocation_t;
 		auto impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void;
@@ -147,6 +150,8 @@ namespace atma
 		auto encode_uint16(uint16) -> void;
 		auto encode_uint32(uint32) -> void;
 		auto encode_uint64(uint64) -> void;
+		auto encode_pointer(void*) -> void;
+		auto encode_data(void const*, uint32) -> void;
 
 	private:
 		allocation_t(byte* buf, uint32 bufsize, uint32 wp, alloctype_t type, uint32 alignment, uint32 size);
@@ -167,6 +172,8 @@ namespace atma
 		auto decode_uint16(uint16&) -> void;
 		auto decode_uint32(uint32&) -> void;
 		auto decode_uint64(uint64&) -> void;
+		template <typename T> auto decode_pointer(T*&) -> void;
+		auto decode_data() -> unique_memory_t;
 
 	private:
 		decoder_t();
@@ -220,7 +227,7 @@ namespace atma
 		if (size == 0)
 			return decoder_t();
 
-		auto command = (alloctype_t)(header >> 31);
+		auto command = (alloctype_t)(header >> 30);
 
 		decoder_t D{read_buf_, read_buf_size_, read_position_};
 
@@ -237,12 +244,19 @@ namespace atma
 				uint32 size;
 				D.decode_uint64(ptr);
 				D.decode_uint32(size);
+				finalize(D);
 				if (owner_)
 					delete[] read_buf_;
 				read_buf_ = (byte*)ptr;
 				read_buf_size_ = size;
 				read_position_ = 0;
 				owner_ = true;
+				return consume();
+			}
+
+			case alloctype_t::pad:
+			{
+				finalize(D);
 				return consume();
 			}
 		}
@@ -274,12 +288,15 @@ namespace atma
 	// the write-position and read-position equal the same value if the
 	// buffer is full, because we can't distinguish it from being empty
 	//
+	// if contiguous, then ignore the [begin, read-pointer) area of the
+	// buffer;
+	//
 	// if our buffers are differing (because we are mid-rebase), then
 	// we can only allocate up to the end of the new buffer
-	inline auto base_mpsc_queue_t::impl_calculate_available_space(byte* rb, uint32 rp, byte* wb, uint32 wbs, uint32 wp) -> uint32
+	inline auto base_mpsc_queue_t::impl_calculate_available_space(byte* rb, uint32 rp, byte* wb, uint32 wbs, uint32 wp, bool ct) -> uint32
 	{
 		if (wb == rb)
-			return (rp <= wp ? rp + wbs - wp : rp - wp) - 1;
+			return (rp <= wp ? (rp * (1 - (int)ct)) + wbs - wp : rp - wp) - 1;
 		else
 			return wbs - wp - 1;
 	}
@@ -415,7 +432,7 @@ namespace atma
 
 	// allocation_t
 	inline base_mpsc_queue_t::allocation_t::allocation_t(byte* buf, uint32 bufsize, uint32 wp, alloctype_t type, uint32 alignment, uint32 size)
-		: headerer_t(buf, bufsize, wp, wp, ((uint32)type << 31) | log2(alignment / 4) << 29 | size)
+		: headerer_t(buf, bufsize, wp, wp, ((uint32)type << 30) | log2(alignment / 4) << base_mpsc_queue_t::header_size_bitsize | size)
 	{
 		p = alignby(p + header_size, this->alignment());
 		p %= bufsize;
@@ -448,6 +465,26 @@ namespace atma
 	{
 		encode_uint32(i & 0xffffffff);
 		encode_uint32(i >> 32);
+	}
+
+	inline auto base_mpsc_queue_t::allocation_t::encode_pointer(void* p) -> void
+	{
+#if ATMA_POINTER_SIZE == 8
+			encode_uint64((uint64)p);
+#elif ATMA_POINTER_SIZE == 4
+			encode_uint32((uint32)p);
+#else
+#  error unknown pointer size??
+#endif
+	}
+
+	inline auto base_mpsc_queue_t::allocation_t::encode_data(void const* data, uint32 size) -> void
+	{
+		static_assert(sizeof(uint64) <= sizeof(uintptr), "pointer is greater than 64 bits??");
+
+		encode_uint32(size);
+		for (uint32 i = 0; i != size; ++i)
+			encode_byte(reinterpret_cast<char const*>(data)[i]);
 	}
 
 	// decoder_t
@@ -512,27 +549,51 @@ namespace atma
 		decode_byte(bs[7]);
 	}
 
+	template <typename T>
+	inline auto base_mpsc_queue_t::decoder_t::decode_pointer(T*& p) -> void
+	{
+#if ATMA_POINTER_SIZE == 8
+		decode_uint64((uint64&)p);
+#elif ATMA_POINTER_SIZE == 4
+		decode_uint32((uint32&)p);
+#else
+#  error unknown pointer size??
+#endif
+	}
+
+	inline auto base_mpsc_queue_t::decoder_t::decode_data() -> unique_memory_t
+	{
+		uint32 size;
+		decode_uint32(size);
+		unique_memory_t um{size};
+
+		for (uint32 i = 0; i != size; ++i)
+			decode_byte(um.begin()[i]);
+
+		return std::move(um);
+	}
+
 
 
 
 
 
 	template <bool DynamicGrowth>
-	struct basic_mpsc_queue_t;
+	struct mpsc_queue_t;
 
 	template <>
-	struct basic_mpsc_queue_t<false>
+	struct mpsc_queue_t<false>
 		: base_mpsc_queue_t
 	{
-		basic_mpsc_queue_t(void* buf, uint32 size)
+		mpsc_queue_t(void* buf, uint32 size)
 			: base_mpsc_queue_t{buf, size}
 		{}
 
-		basic_mpsc_queue_t(uint32 size)
+		mpsc_queue_t(uint32 size)
 			: base_mpsc_queue_t{size}
 		{}
 
-		auto allocate(uint32 size, uint32 alignment = 1) -> allocation_t
+		auto allocate(uint32 size, uint32 alignment = 1, bool contiguous = false) -> allocation_t
 		{
 			ATMA_ASSERT(alignment > 0);
 			ATMA_ASSERT(is_pow2(alignment));
@@ -559,8 +620,11 @@ namespace atma
 				std::tie(wb, wbs, wp) = impl_read_queue_write_info();
 				std::tie(rb, rp) = impl_read_queue_read_info();
 
-				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp);
-				
+				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp, contiguous);
+				if (available < size && contiguous) {
+					if (impl_perform_allocation(wb, wbs, wp, available, 1, available)) 
+						impl_make_allocation(wb, wbs, wp, alloctype_t::pad, 1, available);
+
 				if (impl_perform_allocation(wb, wbs, wp, available, alignment, size))
 					break;
 
@@ -578,18 +642,18 @@ namespace atma
 	};
 
 	template <>
-	struct basic_mpsc_queue_t<true>
+	struct mpsc_queue_t<true>
 		: base_mpsc_queue_t
 	{
-		basic_mpsc_queue_t(void* buf, uint32 size)
+		mpsc_queue_t(void* buf, uint32 size)
 			: base_mpsc_queue_t{buf, size}
 		{}
 
-		basic_mpsc_queue_t(uint32 size)
+		mpsc_queue_t(uint32 size)
 			: base_mpsc_queue_t{size}
 		{}
 
-		auto allocate(uint32 size, uint32 alignment = 1) -> allocation_t
+		auto allocate(uint32 size, uint32 alignment = 1, bool contiguous = false) -> allocation_t
 		{
 			ATMA_ASSERT(alignment > 0);
 			ATMA_ASSERT(is_pow2(alignment));
@@ -616,7 +680,7 @@ namespace atma
 				std::tie(wb, wbs, wp) = impl_read_queue_write_info();
 				std::tie(rb, rp) = impl_read_queue_read_info();
 
-				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp);
+				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp, contiguous);
 
 				if (impl_perform_allocation(wb, wbs, wp, available, alignment, size))
 					break;
