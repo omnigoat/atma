@@ -122,7 +122,7 @@ namespace atma { namespace thread {
 	struct inplace_engine_t
 	{
 		using signal_t = basic_function_t<sizeof(void*), void()>;
-		using queue_t  = basic_mpsc_queue_t<Dynamic>;
+		using queue_t  = mpsc_queue_t<Dynamic>;
 
 		inplace_engine_t(uint32 bufsize);
 		inplace_engine_t(void* buf, uint32 bufsize);
@@ -178,7 +178,8 @@ namespace atma { namespace thread {
 	{
 		while (good) {
 			if (auto D = queue_.consume()) {
-				auto f = (signal_t*)D.data();
+				signal_t* f;
+				D.decode_pointer(f);
 				(*f)();
 				queue_.finalize(D);
 			}
@@ -192,8 +193,7 @@ namespace atma { namespace thread {
 		if (!running_)
 			return;
 
-
-		auto A = queue_.allocate(sizeof(signal_t) + sizeof(std::decay_t<F>));
+		auto A = queue_.allocate(sizeof(signal_t) + sizeof(std::decay_t<F>), 1, true);
 		new (A.data()) signal_t{(char*)A.data() + sizeof(signal_t), std::forward<F>(f)};
 		queue_.commit(A);
 	}
