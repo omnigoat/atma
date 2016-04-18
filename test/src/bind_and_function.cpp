@@ -27,7 +27,7 @@ SCENARIO("bind works with various things", "[bind]")
 {
 	GIVEN("functions of various flavours")
 	{
-		atma::thread::inplace_engine_t<true> lulz{4096};
+		//atma::thread::inplace_engine_t<true> lulz{4096};
 
 		// regular function & binding a binding
 		auto b1v1 = atma::bind(&square, arg1);

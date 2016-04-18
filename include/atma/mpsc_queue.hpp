@@ -49,8 +49,8 @@ namespace atma
 		enum class alloctype_t : uint32
 		{
 			normal = 0x00,
-			jump = 0x10,
-			pad = 0x01,
+			jump = 0x01,
+			pad = 0x10,
 		};
 
 		// header is {1-bit: jump-flag, 1-bit: pad-flag, 2-bits: alignment, 28-bits: size}, making the header-size 4 bytes
@@ -72,6 +72,7 @@ namespace atma
 		auto impl_read_queue_read_info() -> std::tuple<byte*, uint32>;
 		auto impl_calculate_available_space(byte* rb, uint32 rp, byte* wb, uint32 wbs, uint32 wp, bool ct) -> uint32;
 		auto impl_perform_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available, uint32 alignment, uint32& size) -> bool;
+		auto impl_perform_pad_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available) -> bool;
 		auto impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t, uint32 alignment, uint32 size) -> allocation_t;
 		auto impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void;
 	
@@ -296,9 +297,9 @@ namespace atma
 	inline auto base_mpsc_queue_t::impl_calculate_available_space(byte* rb, uint32 rp, byte* wb, uint32 wbs, uint32 wp, bool ct) -> uint32
 	{
 		if (wb == rb)
-			return (rp <= wp ? (rp * (1 - (int)ct)) + wbs - wp : rp - wp) - 1;
+			return (rp <= wp ? (rp * (1 - (int)ct)) + wbs - wp : rp - wp) - header_size;
 		else
-			return wbs - wp - 1;
+			return wbs - wp - header_size;
 	}
 
 	inline auto base_mpsc_queue_t::impl_perform_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available, uint32 alignment, uint32& size) -> bool
@@ -306,11 +307,11 @@ namespace atma
 		ATMA_ASSERT(alignment > 0);
 		ATMA_ASSERT(wp % 4 == 0);
 
-		// expand size so that next allocation is 4-byte aligned
-		size = alignby(size, 4);
-
 		// expand size for initial padding required for requested alignment
 		size += alignby(wp + header_size, alignment) - wp - header_size;
+
+		// expand size so that next allocation is 4-byte aligned
+		size = alignby(size, 4);
 
 		if (available < size + header_size)
 			return false;
@@ -323,7 +324,23 @@ namespace atma
 			atma::atomic128_t{(uint64)wb, wbs, nwp});
 	}
 
-	
+	inline auto base_mpsc_queue_t::impl_perform_pad_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available) -> bool
+	{
+		ATMA_ASSERT(available >= header_size);
+		ATMA_ASSERT(wp % 4 == 0);
+
+		if (available < 4)
+			return false;
+
+		uint32 nwp = (wp + available) % wbs;
+		//ATMA_ASSERT((wp + available) % wbs == 0 || (wp + available) % wbs == 0);
+
+		return atma::atomic_compare_exchange(
+			&write_info_,
+			atma::atomic128_t{(uint64)wb, wbs, wp},
+			atma::atomic128_t{(uint64)wb, wbs, nwp});
+	}
+
 	inline auto base_mpsc_queue_t::impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t type, uint32 alignment, uint32 size) -> allocation_t
 	{
 		return allocation_t{wb, wbs, wp, type, alignment, size};
@@ -432,7 +449,7 @@ namespace atma
 
 	// allocation_t
 	inline base_mpsc_queue_t::allocation_t::allocation_t(byte* buf, uint32 bufsize, uint32 wp, alloctype_t type, uint32 alignment, uint32 size)
-		: headerer_t(buf, bufsize, wp, wp, ((uint32)type << 30) | log2(alignment / 4) << base_mpsc_queue_t::header_size_bitsize | size)
+		: headerer_t{buf, bufsize, wp, wp, ((uint32)type << 30) | log2(alignment / 4) << base_mpsc_queue_t::header_size_bitsize | size}
 	{
 		p = alignby(p + header_size, this->alignment());
 		p %= bufsize;
@@ -620,15 +637,23 @@ namespace atma
 				std::tie(wb, wbs, wp) = impl_read_queue_write_info();
 				std::tie(rb, rp) = impl_read_queue_read_info();
 
-				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp, contiguous);
-				if (available < size && contiguous) {
-					if (impl_perform_allocation(wb, wbs, wp, available, 1, available)) 
-						impl_make_allocation(wb, wbs, wp, alloctype_t::pad, 1, available);
-
-				if (impl_perform_allocation(wb, wbs, wp, available, alignment, size))
-					break;
-
 				size = size_orig;
+				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp, contiguous);
+
+				if (available < size && contiguous)
+				{
+					if (available >= 4 && impl_perform_pad_allocation(wb, wbs, wp, available))
+					{
+						auto A = impl_make_allocation(wb, wbs, wp, alloctype_t::pad, 0, available - header_size);
+						commit(A);
+						continue;
+					}
+				}
+				else if (impl_perform_allocation(wb, wbs, wp, available, alignment, size))
+				{
+					break;
+				}
+
 				auto elapsed = std::chrono::high_resolution_clock::now() - time_start;
 				starvation += elapsed;
 
