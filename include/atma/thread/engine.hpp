@@ -1,7 +1,7 @@
 #pragma once
 
 #include <atma/lockfree/queue.hpp>
-#include <atma/mpsc_queue.hpp>
+//#include <atma/mpsc_queue.hpp>
 #include <atma/function.hpp>
 
 #include <vector>
@@ -114,122 +114,127 @@ namespace atma { namespace thread {
 
 
 
+#if 0
 
 
-namespace atma { namespace thread {
+namespace atma {
+	namespace thread {
 
-	template <bool Dynamic>
-	struct inplace_engine_t
-	{
-		using signal_t = basic_function_t<sizeof(void*), void()>;
-		using queue_t  = mpsc_queue_t<Dynamic>;
-
-		inplace_engine_t(uint32 bufsize);
-		inplace_engine_t(void* buf, uint32 bufsize);
-		~inplace_engine_t();
-
-		template <typename F> auto signal(F&&) -> void;
-		template <typename F> auto signal_evergreen(F&&) -> void;
-		auto signal_block() -> void;
-
-	private:
-		auto reenter(std::atomic<bool> const& blocked) -> void;
-
-		std::thread handle_;
-		queue_t queue_;
-		std::atomic<bool> running_;
-	};
-
-
-	template <bool D>
-	inline inplace_engine_t<D>::inplace_engine_t(uint32 bufsize)
-		: running_{true}
-		, queue_{bufsize}
-	{
-		handle_ = std::thread([&]
+		template <bool Dynamic>
+		struct inplace_engine_t
 		{
-			reenter(running_);
-		});
-	}
+			using signal_t = basic_function_t<sizeof(void*), void()>;
+			using queue_t = mpsc_queue_t<Dynamic>;
 
-	template <bool D>
-	inline inplace_engine_t<D>::inplace_engine_t(void* buf, uint32 bufsize)
-		: running_{true}
-		, queue_{buf, bufsize}
-	{
-		handle_ = std::thread([&]
-		{
-			reenter(running_);
-		});
-	}
+			inplace_engine_t(uint32 bufsize);
+			inplace_engine_t(void* buf, uint32 bufsize);
+			~inplace_engine_t();
 
-	template <bool D>
-	inline inplace_engine_t<D>::~inplace_engine_t()
-	{
-		signal([&] {
-			running_ = false;
-		});
+			template <typename F> auto signal(F&&) -> void;
+			template <typename F> auto signal_evergreen(F&&) -> void;
+			auto signal_block() -> void;
 
-		handle_.join();
-	}
+		private:
+			auto reenter(std::atomic<bool> const& blocked) -> void;
 
-	template <bool D>
-	inline auto inplace_engine_t<D>::reenter(std::atomic<bool> const& good) -> void
-	{
-		while (good) {
-			if (auto D = queue_.consume()) {
-				signal_t* f;
-				D.decode_pointer(f);
-				(*f)();
-				queue_.finalize(D);
-			}
-		}
-	}
-
-	template <bool D>
-	template <typename F>
-	inline auto inplace_engine_t<D>::signal(F&& f) -> void
-	{
-		if (!running_)
-			return;
-
-		auto A = queue_.allocate(sizeof(signal_t) + sizeof(std::decay_t<F>), 1, true);
-		new (A.data()) signal_t{(char*)A.data() + sizeof(signal_t), std::forward<F>(f)};
-		queue_.commit(A);
-	}
-
-	template <bool D>
-	template <typename F>
-	inline auto inplace_engine_t<D>::signal_evergreen(F&& fn) -> void
-	{
-		auto sg = [&, fn]() {
-			fn();
-			signal_evergreen(fn);
+			std::thread handle_;
+			queue_t queue_;
+			std::atomic<bool> running_;
 		};
 
-		signal(sg);
-	}
 
-	template <bool D>
-	inline auto inplace_engine_t<D>::signal_block() -> void
-	{
-		if (!running_)
-			return;
-
-		std::atomic<bool> blocked{true};
-		signal([&blocked]{ blocked = false; });
-
-		// the engine thread can't block itself!
-		if (std::this_thread::get_id() == handle_.get_id())
+		template <bool D>
+		inline inplace_engine_t<D>::inplace_engine_t(uint32 bufsize)
+			: running_{true}
+			, queue_{bufsize}
 		{
-			reenter(blocked);
+			handle_ = std::thread([&]
+			{
+				reenter(running_);
+			});
 		}
-		else
+
+		template <bool D>
+		inline inplace_engine_t<D>::inplace_engine_t(void* buf, uint32 bufsize)
+			: running_{true}
+			, queue_{buf, bufsize}
 		{
-			while (blocked)
-				;
+			handle_ = std::thread([&]
+			{
+				reenter(running_);
+			});
 		}
+
+		template <bool D>
+		inline inplace_engine_t<D>::~inplace_engine_t()
+		{
+			signal([&] {
+				running_ = false;
+			});
+
+			handle_.join();
+		}
+
+		template <bool D>
+		inline auto inplace_engine_t<D>::reenter(std::atomic<bool> const& good) -> void
+		{
+			while (good) {
+				if (auto D = queue_.consume()) {
+					signal_t* f;
+					D.decode_pointer(f);
+					(*f)();
+					queue_.finalize(D);
+				}
+			}
+		}
+
+		template <bool D>
+		template <typename F>
+		inline auto inplace_engine_t<D>::signal(F&& f) -> void
+		{
+			if (!running_)
+				return;
+
+			auto A = queue_.allocate(sizeof(signal_t) + sizeof(std::decay_t<F>), 1, true);
+			new (A.data()) signal_t{(char*)A.data() + sizeof(signal_t), std::forward<F>(f)};
+			queue_.commit(A);
+		}
+
+		template <bool D>
+		template <typename F>
+		inline auto inplace_engine_t<D>::signal_evergreen(F&& fn) -> void
+		{
+			auto sg = [&, fn]() {
+				fn();
+				signal_evergreen(fn);
+			};
+
+			signal(sg);
+		}
+
+		template <bool D>
+		inline auto inplace_engine_t<D>::signal_block() -> void
+		{
+			if (!running_)
+				return;
+
+			std::atomic<bool> blocked{true};
+			signal([&blocked] { blocked = false; });
+
+			// the engine thread can't block itself!
+			if (std::this_thread::get_id() == handle_.get_id())
+			{
+				reenter(blocked);
+			}
+			else
+			{
+				while (blocked)
+					;
+			}
+		}
+
 	}
+}
 
-} }
 
+#endif // 0
