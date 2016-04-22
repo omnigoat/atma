@@ -17,7 +17,7 @@ namespace atma
 
 	constexpr auto log2(uint x) -> uint
 	{
-		return (x == 0) ? 0 : (x == 1) ? 0 : 1 + log2(x >> 1);
+		return (x <= 1) ? 0 : 1 + log2(x >> 1);
 	}
 
 	constexpr auto alignby(uint x, uint a) -> uint
@@ -55,8 +55,10 @@ namespace atma
 
 		// header is {1-bit: jump-flag, 1-bit: pad-flag, 2-bits: alignment, 28-bits: size}, making the header-size 4 bytes
 		//  - alignment is a two-bit number representing a pow-2 exponent, which is multiplied by 4
-		//      thus: 0b10 == 2 == pow2(2) == 4  ->  4 * 4 == 16, 16-byte alignment
-		//      thus: 0b11 == 3 == pow2(3) == 8  ->  8 * 4 == 32, 32-byte alignment
+		//      thus: 0b00 -> pow2(0) == 1  ->  1 * 4 ==  4,  4-byte alignment
+		//      thus: 0b01 -> pow2(1) == 2  ->  2 * 4 ==  8,  8-byte alignment
+		//      thus: 0b10 -> pow2(2) == 4  ->  4 * 4 == 16, 16-byte alignment
+		//      thus: 0b11 -> pow2(3) == 8  ->  8 * 4 == 32, 32-byte alignment
 		static uint32 const header_jumpflag_bitsize = 1;
 		static uint32 const header_padflag_bitsize = 1;
 		static uint32 const header_alignment_bitsize = 2;
@@ -267,6 +269,7 @@ namespace atma
 
 	inline auto base_mpsc_queue_t::finalize(decoder_t& D) -> void
 	{
+		memset(read_buf_ + read_position_, 0, header_size);
 		read_position_ = (read_position_ + header_size + D.raw_size()) % read_buf_size_;
 		D.buf = nullptr;
 	}
@@ -297,7 +300,7 @@ namespace atma
 	inline auto base_mpsc_queue_t::impl_calculate_available_space(byte* rb, uint32 rp, byte* wb, uint32 wbs, uint32 wp, bool ct) -> uint32
 	{
 		if (wb == rb)
-			return (rp <= wp ? (rp * (1 - (int)ct)) + wbs - wp : rp - wp) - header_size;
+			return (rp <= wp ? (wbs - wp + (ct ? 0 : rp)) : rp - wp) - header_size;
 		else
 			return wbs - wp - header_size;
 	}
@@ -610,10 +613,9 @@ namespace atma
 			: base_mpsc_queue_t{size}
 		{}
 
-		auto allocate(uint32 size, uint32 alignment = 1, bool contiguous = false) -> allocation_t
+		auto allocate(uint32 size, uint32 alignment = 4, bool contiguous = false) -> allocation_t
 		{
-			ATMA_ASSERT(alignment > 0);
-			ATMA_ASSERT(is_pow2(alignment));
+			ATMA_ASSERT(alignment == 4 || alignment == 8 || alignment == 16 || alignment == 32);
 
 			auto size_orig = size;
 			ATMA_ASSERT(size <= write_buf_size_, "queue can not allocate that much");
@@ -642,9 +644,9 @@ namespace atma
 
 				if (available < size && contiguous)
 				{
-					if (available >= 4 && impl_perform_pad_allocation(wb, wbs, wp, available))
+					if (available >= header_size && rp < wp && impl_perform_pad_allocation(wb, wbs, wp, available))
 					{
-						auto A = impl_make_allocation(wb, wbs, wp, alloctype_t::pad, 0, available - header_size);
+						auto A = impl_make_allocation(wb, wbs, wp, alloctype_t::pad, 4, available - header_size);
 						commit(A);
 						continue;
 					}
@@ -654,10 +656,14 @@ namespace atma
 					break;
 				}
 
-				auto elapsed = std::chrono::high_resolution_clock::now() - time_start;
-				starvation += elapsed;
-
-				starve_flag(starve_id, thread_id, starvation);
+				// contiguous allocations can't flag themselves as starved, otherwise
+				// it may take precedence, and never have space to allocate
+				if (!contiguous)
+				{
+					auto elapsed = std::chrono::high_resolution_clock::now() - time_start;
+					starvation += elapsed;
+					starve_flag(starve_id, thread_id, starvation);
+				}
 			}
 
 			starve_unflag(starve_thread_, thread_id);
@@ -705,18 +711,35 @@ namespace atma
 				std::tie(wb, wbs, wp) = impl_read_queue_write_info();
 				std::tie(rb, rp) = impl_read_queue_read_info();
 
+				size = size_orig;
 				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp, contiguous);
 
-				if (impl_perform_allocation(wb, wbs, wp, available, alignment, size))
+				if (available < size && contiguous)
+				{
+					if (available >= header_size && rp < wp && impl_perform_pad_allocation(wb, wbs, wp, available))
+					{
+						auto A = impl_make_allocation(wb, wbs, wp, alloctype_t::pad, 4, available - header_size);
+						commit(A);
+						continue;
+					}
+				}
+				else if (impl_perform_allocation(wb, wbs, wp, available, alignment, size))
+				{
 					break;
+				}
 				else
+				{
 					impl_encode_jump(available, wb, wbs, wp);
+				}
 
-				size = size_orig;
-				auto elapsed = std::chrono::high_resolution_clock::now() - time_start;
-				starvation += elapsed;
 
-				starve_flag(starve_id, thread_id, starvation);
+				if (contiguous)
+				{
+					auto elapsed = std::chrono::high_resolution_clock::now() - time_start;
+					starvation += elapsed;
+
+					starve_flag(starve_id, thread_id, starvation);
+				}
 			}
 
 			starve_unflag(starve_thread_, thread_id);
