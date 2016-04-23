@@ -49,9 +49,9 @@ namespace atma
 		enum class alloctype_t : uint32
 		{
 			invalid = 0,
-			normal = 0x01,
-			jump = 0x10,
-			pad = 0x11,
+			normal = 1,
+			jump = 2,
+			pad = 3,
 		};
 
 		// header is {1-bit: jump-flag, 1-bit: pad-flag, 2-bits: alignment, 28-bits: size}, making the header-size 4 bytes
@@ -243,6 +243,10 @@ namespace atma
 
 		switch (D.type())
 		{
+			case alloctype_t::invalid:
+			case alloctype_t::normal:
+				break;
+			
 			// jump to the encoded, larger, read-buffer
 			case alloctype_t::jump:
 			{
@@ -273,12 +277,10 @@ namespace atma
 	inline auto base_mpsc_queue_t::finalize(decoder_t& D) -> void
 	{
 		// very required
-		auto szL = std::max((read_position_ + header_size + D.raw_size()) % read_buf_size_ - (int64)read_position_, 0ll);
-		auto sz = std::max((read_position_ + header_size + D.raw_size()) - (int64)read_buf_size_, 0ll);
-		memset(read_buf_ + read_position_, 0, szL);
-		memset(read_buf_, 0, sz);
-		std::cout << "memset [" << read_position_ << ", " << (read_position_ + szL) << ")" << std::endl;
-		std::cout << "memset [0, " << sz << ")" << std::endl;
+		auto szH = std::max((read_position_ + header_size + D.raw_size()) - (int64)read_buf_size_, 0ll);
+		auto szT = std::max((read_position_ + header_size + D.raw_size()) % read_buf_size_ - (int64)read_position_, 0ll);
+		memset(read_buf_, 0, szH);
+		memset(read_buf_ + read_position_, 0, szT);
 
 		read_position_ = (read_position_ + header_size + D.raw_size()) % read_buf_size_;
 		D.type_ = 0;
@@ -460,7 +462,7 @@ namespace atma
 
 	// allocation_t
 	inline base_mpsc_queue_t::allocation_t::allocation_t(byte* buf, uint32 bufsize, uint32 wp, alloctype_t type, uint32 alignment, uint32 size)
-		: headerer_t{buf, bufsize, wp, wp, ((uint32)type << 30) | log2(alignment / 4) << base_mpsc_queue_t::header_size_bitsize | size}
+		: headerer_t{buf, bufsize, wp, wp, (uint32)type, alignment, size}
 	{
 		p = alignby(p + header_size, this->alignment());
 		p %= bufsize;
