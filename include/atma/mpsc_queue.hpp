@@ -48,9 +48,10 @@ namespace atma
 
 		enum class alloctype_t : uint32
 		{
-			normal = 0x00,
-			jump = 0x01,
-			pad = 0x10,
+			invalid = 0,
+			normal = 0x01,
+			jump = 0x10,
+			pad = 0x11,
 		};
 
 		// header is {1-bit: jump-flag, 1-bit: pad-flag, 2-bits: alignment, 28-bits: size}, making the header-size 4 bytes
@@ -59,14 +60,15 @@ namespace atma
 		//      thus: 0b01 -> pow2(1) == 2  ->  2 * 4 ==  8,  8-byte alignment
 		//      thus: 0b10 -> pow2(2) == 4  ->  4 * 4 == 16, 16-byte alignment
 		//      thus: 0b11 -> pow2(3) == 8  ->  8 * 4 == 32, 32-byte alignment
-		static uint32 const header_jumpflag_bitsize = 1;
 		static uint32 const header_padflag_bitsize = 1;
+		static uint32 const header_jumpflag_bitsize = 1;
 		static uint32 const header_alignment_bitsize = 2;
 		static uint32 const header_size_bitsize = 28;
 		static uint32 const header_size = 4;
 
-		static uint32 const header_size_bitmask = pow2(header_size_bitsize) - 1;
+		static uint32 const header_type_bitmask = pow2(header_padflag_bitsize + header_jumpflag_bitsize) - 1;
 		static uint32 const header_alignment_bitmask = pow2(header_alignment_bitsize) - 1;
+		static uint32 const header_size_bitmask = pow2(header_size_bitsize) - 1;
 
 		std::chrono::nanoseconds const starve_timeout{5000};
 
@@ -129,19 +131,31 @@ namespace atma
 		auto data() const -> void*;
 
 	protected:
-		headerer_t(byte* buf, uint32 bufsize, uint32 op, uint32 p, uint32 header)
+		headerer_t(byte* buf, uint32 bufsize, uint32 op, uint32 p, uint32 type, uint32 alignment, uint32 size)
 			: buf(buf), bufsize(bufsize)
 			, op(op), p(p)
-			, header(header)
+			, type_(type), alignment_(alignment), size_(size)
 		{}
 
-		auto raw_size() const -> uint32 { return header & header_size_bitmask; }
+		headerer_t(byte* buf, uint32 bufsize, uint32 op, uint32 p, uint32 header)
+			: headerer_t{buf, bufsize, op, p,
+				header >> (header_size_bitsize + header_alignment_bitsize),
+				(header >> header_size_bitsize) & header_alignment_bitmask,
+				header & header_size_bitmask}
+		{}
+
+		auto header() const -> uint32 { return (type_ << 30) | (alignment_ << 28) | size_; }
+		auto type() const -> alloctype_t { return (alloctype_t)type_; }
+		auto raw_size() const -> uint32 { return size_; }
 
 	protected:
 		byte*  buf;
 		uint32 bufsize;
 		uint32 op, p;
-		uint32 header;
+
+		uint32 type_      :  2;
+		uint32 alignment_ :  2;
+		uint32 size_      : 28;
 	};
 
 	// allocation_t
@@ -169,7 +183,7 @@ namespace atma
 		decoder_t(decoder_t&&);
 		~decoder_t();
 
-		operator bool() const { return buf != nullptr; }
+		operator bool() const { return type_ != 0; }
 
 		auto decode_byte(byte&) -> void;
 		auto decode_uint16(uint16&) -> void;
@@ -220,26 +234,15 @@ namespace atma
 		ATMA_ASSERT(((uint64)(a.buf + a.op)) % 4 == 0);
 
 		// we have already guaranteed that the header does not wrap around our buffer
-		atma::atomic_exchange<uint32>(a.buf + a.op, a.header);
+		atma::atomic_exchange<uint32>(a.buf + a.op, a.header());
 	}
 
 	inline auto base_mpsc_queue_t::consume() -> decoder_t
 	{
-		auto header = *(uint32*)(read_buf_ + read_position_);
-		auto size = header & header_size_bitmask;
-		if (size == 0)
-			return decoder_t();
-
-		auto command = (alloctype_t)(header >> 30);
-
 		decoder_t D{read_buf_, read_buf_size_, read_position_};
 
-		switch (command)
+		switch (D.type())
 		{
-			// nop means we move to the next location
-			case alloctype_t::normal:
-				break;
-
 			// jump to the encoded, larger, read-buffer
 			case alloctype_t::jump:
 			{
@@ -269,9 +272,16 @@ namespace atma
 
 	inline auto base_mpsc_queue_t::finalize(decoder_t& D) -> void
 	{
-		memset(read_buf_ + read_position_, 0, header_size);
+		// very required
+		auto szL = std::max((read_position_ + header_size + D.raw_size()) % read_buf_size_ - (int64)read_position_, 0ll);
+		auto sz = std::max((read_position_ + header_size + D.raw_size()) - (int64)read_buf_size_, 0ll);
+		memset(read_buf_ + read_position_, 0, szL);
+		memset(read_buf_, 0, sz);
+		std::cout << "memset [" << read_position_ << ", " << (read_position_ + szL) << ")" << std::endl;
+		std::cout << "memset [0, " << sz << ")" << std::endl;
+
 		read_position_ = (read_position_ + header_size + D.raw_size()) % read_buf_size_;
-		D.buf = nullptr;
+		D.type_ = 0;
 	}
 
 	inline auto base_mpsc_queue_t::impl_read_queue_write_info() -> std::tuple<byte*, uint32, uint32>
@@ -434,15 +444,13 @@ namespace atma
 	inline auto base_mpsc_queue_t::headerer_t::size() const -> uint32
 	{
 		// size after all alignment shenanigans
-		uint32 sz = header & header_size_bitmask;
 		uint32 ag = alignment();
-		sz -= (op + ag) & ~(ag - 1);
-		return sz;
+		return size_ - ((op + ag) & ~(ag - 1));
 	}
 
 	inline auto base_mpsc_queue_t::headerer_t::alignment() const -> uint32
 	{
-		return 4 * pow2((header >> header_size_bitsize) & header_alignment_bitmask);
+		return 4 * pow2(alignment_);
 	}
 
 	inline auto base_mpsc_queue_t::headerer_t::data() const -> void*
@@ -521,14 +529,14 @@ namespace atma
 	}
 
 	inline base_mpsc_queue_t::decoder_t::decoder_t(decoder_t&& rhs)
-		: headerer_t(rhs.buf, rhs.bufsize, rhs.op, rhs.p, rhs.header)
+		: headerer_t(rhs.buf, rhs.bufsize, rhs.op, rhs.p, rhs.type_, rhs.alignment_, rhs.size_)
 	{
 		memset(&rhs, 0, sizeof(decoder_t));
 	}
 
 	inline base_mpsc_queue_t::decoder_t::~decoder_t()
 	{
-		ATMA_ASSERT(buf == nullptr, "decoder not finalized before destructing");
+		ATMA_ASSERT(type_ == 0, "decoder not finalized before destructing");
 	}
 
 	inline auto base_mpsc_queue_t::decoder_t::decode_byte(byte& b) -> void
