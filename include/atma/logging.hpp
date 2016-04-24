@@ -34,61 +34,13 @@ namespace atma
 
 	struct logging_handler_t : ref_counted
 	{
-		virtual auto handle(void const*) -> void = 0;
+		virtual auto handle(log_level_t, unique_memory_t const&) -> void = 0;
 	};
 
 	using logging_handler_ptr = intrusive_ptr<logging_handler_t>;
 
 
 
-
-	struct logging_director_t : ref_counted
-	{
-		using handlers_t = std::set<logging_handler_ptr>;
-		using handler_handle_t = handlers_t::const_iterator;
-		using replicants_t = vector<logging_director_t*>;
-		using visited_replicants_t = std::set<logging_director_t*>;
-
-		auto add_replicant(logging_director_t* r) -> void
-		{
-			replicants_.push_back(r);
-		}
-		
-		auto register_handler(logging_handler_ptr const& h) -> handler_handle_t
-		{
-			return handlers_.insert(h).first;
-		}
-
-		auto detach_handler(handler_handle_t const& h) -> void
-		{
-			handlers_.erase(h);
-		}
-
-		auto process(visited_replicants_t& visited, void const* data) -> void
-		{
-			if (visited.find(this) != visited.end())
-				return;
-
-			if (!replicants_.empty())
-			{
-				for (auto& x : replicants_)
-					x->process(visited, data);
-			}
-		}
-
-	protected:
-		virtual auto process_impl(void const* data) -> void
-		{
-			for (auto const& x : handlers_)
-				x->handle(data);
-		}
-
-	private:
-		replicants_t replicants_;
-		handlers_t handlers_;
-	};
-
-	using logging_director_ptr = intrusive_ptr<logging_director_t>;
 
 	struct logging_runtime_t;
 
@@ -104,10 +56,21 @@ namespace atma
 	struct logging_runtime_t
 	{
 		using log_queue_t = mpsc_queue_t<false>;
+		using handlers_t = std::set<logging_handler_t*>;
+		using replicants_t = vector<logging_runtime_t*>;
+		using visited_replicants_t = std::set<logging_runtime_t*>;
 
-		logging_runtime_t()
-			: log_queue_{1024 * 1024}
-			, director_{new logging_director_t}
+		enum class command_t : uint32
+		{
+			connect_replicant,
+			disconnect_replicant,
+			attach_handler,
+			detach_handler,
+			log,
+		};
+
+		logging_runtime_t(uint32 size = 1024 * 1024)
+			: log_queue_{size}
 		{
 			ATMA_ASSERT(detail::current_runtime() == nullptr);
 
@@ -124,29 +87,165 @@ namespace atma
 			distribution_thread_.join();
 		}
 
-		auto log(void const* data, uint32 size) -> void
+		auto connect_replicant(logging_runtime_t* r) -> void
 		{
-			auto A = log_queue_.allocate(size);
+			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(void*));
+			A.encode_uint32((uint32)command_t::connect_replicant);
+			A.encode_pointer(r);
+			log_queue_.commit(A);
+		}
+
+		auto disconnect_replicant(logging_runtime_t* r) -> void
+		{
+			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(void*));
+			A.encode_uint32((uint32)command_t::disconnect_replicant);
+			A.encode_pointer(r);
+			log_queue_.commit(A);
+		}
+
+		auto attach_handler(logging_handler_t* h) -> void
+		{
+			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(void*));
+			A.encode_uint32((uint32)command_t::attach_handler);
+			A.encode_pointer(h);
+			log_queue_.commit(A);
+		}
+
+		auto detach_handler(logging_handler_t* h) -> void
+		{
+			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(void*));
+			A.encode_uint32((uint32)command_t::detach_handler);
+			A.encode_pointer(h);
+			log_queue_.commit(A);
+		}
+
+		auto log(log_level_t level, void const* data, uint32 size) -> void
+		{
+			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(uint32) + sizeof(log_level_t) + sizeof(uint32) + size);
+			A.encode_uint32((uint32)command_t::log);
+			A.encode_uint32(0);
+			//A.encode_pointer(this);
+			A.encode_uint32((uint32)level);
 			A.encode_data(data, size);
 			log_queue_.commit(A);
-
-			for (auto* x : replicants_)
-				x->log(data, size);
 		}
 
 	private:
 		auto distribute() -> void
 		{
 			atma::this_thread::set_debug_name("logging distribution");
+
 			while (running_)
 			{
 				if (auto D = log_queue_.consume())
 				{
-					auto data = D.decode_data();
+					command_t id;
+					D.decode_uint32((uint32&)id);
+
+					switch (id)
+					{
+						case command_t::connect_replicant:
+						{
+							logging_runtime_t* r;
+							D.decode_pointer(r);
+							dist_connect_replicant(r);
+							break;
+						}
+
+						case command_t::disconnect_replicant:
+						{
+							logging_runtime_t* r;
+							D.decode_pointer(r);
+							dist_disconnect_replicant(r);
+							break;
+						}
+
+						case command_t::attach_handler:
+						{
+							logging_handler_t* h;
+							D.decode_pointer(h);
+							dist_attach_handler(h);
+							break;
+						}
+
+						case command_t::detach_handler:
+						{
+							logging_handler_t* h;
+							D.decode_pointer(h);
+							dist_detach_handler(h);
+							break;
+						}
+
+						case command_t::log:
+						{
+							log_level_t level;
+
+							auto visited = D.decode_data();
+							D.decode_uint32((uint32&)level);
+							auto data = D.decode_data();
+
+							dist_log(visited, level, data);
+							break;
+						}
+					}
+
 					log_queue_.finalize(D);
-					logging_director_t::visited_replicants_t visited;
-					director_->process(visited, data.begin());
 				}
+			}
+		}
+
+	private:
+		auto dist_connect_replicant(logging_runtime_t* r) -> void
+		{
+			replicants_.push_back(r);
+		}
+
+		auto dist_disconnect_replicant(logging_runtime_t* r) -> void
+		{
+			replicants_.erase(
+				std::find(replicants_.begin(), replicants_.end(), r),
+				replicants_.end());
+		}
+
+		auto dist_attach_handler(logging_handler_t* h) -> void
+		{
+			handlers_.insert(h);
+		}
+
+		auto dist_detach_handler(logging_handler_t* h) -> void
+		{
+			handlers_.erase(h);
+		}
+
+		auto dist_log(unique_memory_t const& visited_data, log_level_t level, unique_memory_t const& data) -> void
+		{
+			memory_view_t<logging_runtime_t* const> visited{visited_data};
+
+			for (auto const* x : visited)
+				if (x == this)
+					return;
+			
+			for (auto* handler : handlers_)
+				handler->handle(level, data);
+
+			if (replicants_.empty())
+				return;
+
+			for (auto* x : replicants_)
+			{
+				auto A = x->log_queue_.allocate(
+					sizeof(command_t) + 
+					sizeof(uint32) + ((uint32)visited.size() + 1) * sizeof(this) + 
+					sizeof(log_level_t) + sizeof(uint32) + (uint32)data.size());
+
+				A.encode_uint32((uint32)command_t::log);
+				A.encode_uint32((uint32)visited.size() + 1);
+				for (auto const* x : visited)
+					A.encode_pointer(x);
+				A.encode_pointer(this);
+				A.encode_uint32((uint32)level);
+				A.encode_data(data.begin(), (uint32)data.size());
+				x->log_queue_.commit(A);
 			}
 		}
 
@@ -155,9 +254,9 @@ namespace atma
 		log_queue_t log_queue_;
 
 		std::thread distribution_thread_;
-		logging_director_ptr director_;
 
-		std::vector<logging_runtime_t*> replicants_;
+		replicants_t replicants_;
+		handlers_t handlers_;
 	};
 
 
