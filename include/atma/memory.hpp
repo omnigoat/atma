@@ -277,7 +277,7 @@ namespace atma
 	template <typename T, typename A>
 	inline auto memory_t<T, A>::construct_move_range(size_t idx, memory_t<T, A>& src, size_t src_idx, size_t count) -> void
 	{
-		for (auto i = 0, j = idx, k = src_idx; i != count; ++i, ++j, ++k)
+		for (auto i = size_t(), j = idx, k = src_idx; i != count; ++i, ++j, ++k)
 			allocator().construct(ptr_ + j, std::move(src[k]));
 	}
 

@@ -448,6 +448,7 @@ namespace atma
 		auto const offset = begin - this->begin();
 		auto const offset_end = end - this->begin();
 		auto const rangesize = end - begin;
+		auto const tailsize = size_ - offset_end;
 
 		imem_.destruct(offset, rangesize);
 
@@ -455,14 +456,15 @@ namespace atma
 		if (newcap < capacity_)
 		{
 			auto tmp = internal_memory_t{std::move(imem_)};
-			imem_.alloc(newcap);
-			imem_.memcpy(0, tmp, 0, offset);
-			imem_.memcpy(offset, tmp, offset_end, size_ - offset_end);
+			imem_.allocate(newcap);
+			imem_.construct_move_range(0, tmp, 0, offset);
+			imem_.construct_move_range(offset, tmp, offset_end, tailsize);
 			tmp.deallocate();
 		}
 		else
 		{
-			imem_.construct_move_range(offset, imem_, offset_end, count);
+			imem_.construct_move_range(offset, imem_, offset_end, tailsize);
+			imem_.destruct(offset_end, tailsize);
 		}
 
 		size_ -= rangesize;
