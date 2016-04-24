@@ -167,7 +167,7 @@ namespace atma
 		auto encode_uint16(uint16) -> void;
 		auto encode_uint32(uint32) -> void;
 		auto encode_uint64(uint64) -> void;
-		auto encode_pointer(void*) -> void;
+		template <typename T> auto encode_pointer(T*) -> void;
 		auto encode_data(void const*, uint32) -> void;
 
 	private:
@@ -497,7 +497,8 @@ namespace atma
 		encode_uint32(i >> 32);
 	}
 
-	inline auto base_mpsc_queue_t::allocation_t::encode_pointer(void* p) -> void
+	template <typename T>
+	inline auto base_mpsc_queue_t::allocation_t::encode_pointer(T* p) -> void
 	{
 #if ATMA_POINTER_SIZE == 8
 			encode_uint64((uint64)p);
