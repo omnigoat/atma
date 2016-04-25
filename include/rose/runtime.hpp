@@ -1,17 +1,21 @@
 #pragma once
 
-#include <rose/console.hpp>
+#include <memory>
 
 
 namespace rose
 {
+	struct console_t;
+
 	struct runtime_t
 	{
+		~runtime_t();
+
 		auto initialize_console() -> void;
 		
-		auto get_console() const -> console_t& { return console_; }
+		auto get_console() -> console_t&;
 
 	private:
-		console_t* console_;
+		std::unique_ptr<console_t> console_;
 	};
 }
