@@ -23,6 +23,11 @@ console_t::console_t()
 	console_handle_ = (uintptr)GetStdHandle(STD_OUTPUT_HANDLE);
 }
 
+auto console_t::set_color(uint32 c) -> void
+{
+	SetConsoleTextAttribute((HANDLE)console_handle_, (WORD)c);
+}
+
 auto console_t::write(char const* str, size_t size) -> size_t
 {
 	DWORD numwrit;

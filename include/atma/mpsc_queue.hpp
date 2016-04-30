@@ -3,9 +3,11 @@
 #include <atma/types.hpp>
 #include <atma/atomic.hpp>
 #include <atma/unique_memory.hpp>
+#include <atma/assert.hpp>
 
 #include <chrono>
 #include <thread>
+#include <algorithm>
 
 
 namespace atma

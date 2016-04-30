@@ -35,7 +35,7 @@ namespace atma
 
 	namespace this_thread
 	{
-		auto set_debug_name(char const* name)
+		inline auto set_debug_name(char const* name)
 		{
 			detail::set_debug_name_impl(-1, name);
 		}
