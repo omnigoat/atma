@@ -4,6 +4,9 @@
 #include <atma/mpsc_queue.hpp>
 #include <atma/threading.hpp>
 #include <atma/assert.hpp>
+#include <atma/intrusive_ptr.hpp>
+#include <atma/vector.hpp>
+#include <atma/bind.hpp>
 
 #include <atomic>
 #include <thread>
@@ -19,6 +22,19 @@ namespace atma
 		debug,
 		warn,
 		error
+	};
+
+	enum class log_style_t : byte
+	{
+		oneline,
+		pretty_print,
+	};
+
+	enum class log_instruction_t : byte
+	{
+		pad,
+		text,
+		color,
 	};
 
 	struct logbuf_t
@@ -124,7 +140,6 @@ namespace atma
 			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(uint32) + sizeof(log_level_t) + sizeof(uint32) + size);
 			A.encode_uint32((uint32)command_t::log);
 			A.encode_uint32(0);
-			//A.encode_pointer(this);
 			A.encode_uint32((uint32)level);
 			A.encode_data(data, size);
 			log_queue_.commit(A);
@@ -233,6 +248,9 @@ namespace atma
 
 			for (auto* x : replicants_)
 			{
+				x->log(level, data.begin(), data.size());
+				continue;
+
 				auto A = x->log_queue_.allocate(
 					sizeof(command_t) + 
 					sizeof(uint32) + ((uint32)visited.size() + 1) * sizeof(this) + 
@@ -260,9 +278,58 @@ namespace atma
 	};
 
 
-
-	inline auto error(char const* msg) -> void
+	template <typename MF, typename CF, typename TF>
+	inline auto decode_logging_data(unique_memory_t const& memory, MF&& mf, CF&& cf, TF&& tf) -> void
 	{
+		byte const* data = memory.begin();
+		size_t p = 0;
+
+		mf((log_style_t)data[0]);
+		p = 1;
+
+
+
+		while (p != memory.size())
+		{
+			// decode header
+			log_instruction_t id = (log_instruction_t)*(byte*)(data + p);
+			p += 1;
+
+			if (id == log_instruction_t::color)
+			{
+				byte color = *(byte*)(data + p);
+				p += 1;
+
+				cf(color);
+			}
+			else if (id == log_instruction_t::text)
+			{
+				uint16 size = *(uint16*)(data + p);
+				p += 2;
+
+				tf((char const*)data + p, size);
+				p += size;
+			}
+		}
 	}
+
+	inline auto logging_encode_color(void* dest, byte color) -> size_t
+	{
+		*((byte*&)dest)++ = (int)log_instruction_t::color;
+		*((byte*&)dest)++ = color;
+
+		return 3;
+	}
+
+	template <typename... Args>
+	inline auto logging_encode_string(void* dest, char const* format, Args&&... args) -> size_t
+	{
+		auto r = sprintf((char*)dest + 3, format, std::forward<Args>(args)...);
+		*(byte*)((byte*)dest) = (int)log_instruction_t::text;
+		*(uint16*)((byte*)dest + 1) = r;
+		return r + 3;
+	}
+
+
 
 }
