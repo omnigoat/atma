@@ -46,8 +46,6 @@ namespace atma
 	};
 
 
-
-
 	struct logging_handler_t : ref_counted
 	{
 		virtual auto handle(log_level_t, unique_memory_t const&) -> void = 0;
@@ -55,19 +53,6 @@ namespace atma
 
 	using logging_handler_ptr = intrusive_ptr<logging_handler_t>;
 
-
-
-
-	struct logging_runtime_t;
-
-	namespace detail
-	{
-		inline auto current_runtime() -> logging_runtime_t*&
-		{
-			static logging_runtime_t* R = nullptr;
-			return R;
-		}
-	}
 
 	struct logging_runtime_t
 	{
@@ -88,17 +73,12 @@ namespace atma
 		logging_runtime_t(uint32 size = 1024 * 1024)
 			: log_queue_{size}
 		{
-			ATMA_ASSERT(detail::current_runtime() == nullptr);
-
 			distribution_thread_ = std::thread(
 				atma::bind(&logging_runtime_t::distribute, this));
-
-			detail::current_runtime() = this;
 		}
 
 		~logging_runtime_t()
 		{
-			detail::current_runtime() = nullptr;
 			running_ = false;
 			distribution_thread_.join();
 		}
