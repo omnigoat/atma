@@ -7,6 +7,7 @@
 #include <atma/intrusive_ptr.hpp>
 #include <atma/vector.hpp>
 #include <atma/bind.hpp>
+#include <atma/streams.hpp>
 
 #include <atomic>
 #include <thread>
@@ -228,7 +229,7 @@ namespace atma
 
 			for (auto* x : replicants_)
 			{
-				x->log(level, data.begin(), data.size());
+				x->log(level, data.begin(), (uint32)data.size());
 				continue;
 
 				auto A = x->log_queue_.allocate(
@@ -257,6 +258,55 @@ namespace atma
 		handlers_t handlers_;
 	};
 
+
+	struct logging_encoder_t
+	{
+		logging_encoder_t(output_stream_ptr const& dest)
+			: dest_{dest}
+		{}
+
+		auto encode_header(log_style_t) -> size_t;
+		auto encode_color(byte) -> size_t;
+		auto encode_cstr(char const*, size_t) -> size_t;
+
+		template <typename... Args>
+		auto encode_sprintf(char const*, Args&&...) -> size_t;
+
+	private:
+		output_stream_ptr dest_;
+	};
+
+	inline auto logging_encoder_t::encode_header(log_style_t style) -> size_t
+	{
+		byte data[] = {(byte)style};
+		return dest_->write(data, 1).bytes_written;
+	}
+
+	inline auto logging_encoder_t::encode_color(byte color) -> size_t
+	{
+		byte data[] = {(byte)log_instruction_t::color, color};
+		return dest_->write(data, 2).bytes_written;
+	}
+
+	inline auto logging_encoder_t::encode_cstr(char const* str, size_t size) -> size_t
+	{
+		byte header[] = {(byte)log_instruction_t::text, (byte)size, (byte)(size >> 8)};
+		auto R = dest_->write(header, 3).bytes_written;
+		R += dest_->write(str, size).bytes_written;
+		return R;
+	}
+
+	template <typename... Args>
+	inline auto logging_encoder_t::encode_sprintf(char const* fmt, Args&&... args) -> size_t
+	{
+		byte buf[2048];
+		int R = sprintf((char*)buf + 3, fmt, std::forward<Args>(args)...);
+		buf[0] = (byte)log_instruction_t::text;
+		buf[1] = (byte)R;
+		buf[2] = (byte)(R >> 8);
+		auto R2 = dest_->write(buf, R + 3);
+		return R2.bytes_written;
+	}
 
 	template <typename MF, typename CF, typename TF>
 	inline auto decode_logging_data(unique_memory_t const& memory, MF&& mf, CF&& cf, TF&& tf) -> void
