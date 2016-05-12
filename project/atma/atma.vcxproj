@@ -59,6 +59,7 @@
     <ClInclude Include="..\..\include\atma\placeholders.hpp" />
     <ClInclude Include="..\..\include\atma\platform\allocation.hpp" />
     <ClInclude Include="..\..\include\atma\shared_memory.hpp" />
+    <ClInclude Include="..\..\include\atma\streams.hpp" />
     <ClInclude Include="..\..\include\atma\string.hpp" />
     <ClInclude Include="..\..\include\atma\threading.hpp" />
     <ClInclude Include="..\..\include\atma\thread\engine.hpp" />
