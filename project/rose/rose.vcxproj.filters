@@ -20,12 +20,18 @@
     <ClInclude Include="..\..\include\rose\runtime.hpp">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\rose\mmap.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\source\rose\windows\console.cpp">
       <Filter>source\windows</Filter>
     </ClCompile>
     <ClCompile Include="..\..\source\rose\runtime.cpp">
+      <Filter>source\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\source\rose\windows\mmap.cpp">
       <Filter>source\windows</Filter>
     </ClCompile>
   </ItemGroup>
