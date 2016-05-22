@@ -118,6 +118,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\rose\console.hpp" />
+    <ClInclude Include="..\..\include\rose\file.hpp" />
     <ClInclude Include="..\..\include\rose\mmap.hpp" />
     <ClInclude Include="..\..\include\rose\runtime.hpp" />
   </ItemGroup>

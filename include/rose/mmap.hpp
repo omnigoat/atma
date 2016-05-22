@@ -30,6 +30,7 @@ namespace rose
 		~mmap_t();
 
 		auto valid() const -> bool;
+		auto handle() const -> handle_t;
 		auto size() const -> size_t;
 
 	private:
@@ -47,6 +48,11 @@ namespace rose
 	inline auto mmap_t::valid() const -> bool
 	{
 		return handle_ != nullptr;
+	}
+
+	inline auto mmap_t::handle() const -> handle_t
+	{
+		return handle_;
 	}
 
 	inline auto mmap_t::size() const -> size_t
