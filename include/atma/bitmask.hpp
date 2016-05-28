@@ -1,5 +1,8 @@
 #pragma once
 
+#include <type_traits>
+
+
 namespace atma
 {
 	template <typename T>
@@ -31,7 +34,7 @@ namespace atma
 		}
 
 		operator storage_type() const {
-			return mask_;
+			return static_cast<storage_type>(mask_);
 		}
 
 		static bitmask_t const none;
