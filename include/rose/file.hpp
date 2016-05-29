@@ -1,5 +1,7 @@
 #pragma once
 
+#include <rose/rose_fwd.hpp>
+
 #include <atma/streams.hpp>
 #include <atma/string.hpp>
 #include <atma/unique_memory.hpp>
@@ -9,21 +11,16 @@
 
 namespace rose
 {
-	enum class file_access_t : uint
-	{
-		read,
-		write,
-		read_write,
-	};
-
 	struct file_t
+		: atma::random_access_input_stream_t
+		, atma::random_access_output_stream_t
 	{
 #if ATMA_PLATFORM_WINDOWS
 		using handle_t = std::shared_ptr<FILE>;
 #endif
 
 		file_t();
-		file_t(atma::string const&, file_access_t = file_access_t::read);
+		file_t(atma::string const&, file_access_mask_t = file_access_t::read);
 
 		auto valid() const -> bool;
 		auto size() const -> size_t;
@@ -55,13 +52,27 @@ namespace rose
 
 	private:
 		atma::string filename_;
-		file_access_t access_;
+		file_access_mask_t access_;
 
 		handle_t handle_;
 		size_t filesize_;
 	};
 
 
+	inline auto file_t::valid() const -> bool
+	{
+		return handle_ != nullptr;
+	}
+
+	inline auto file_t::size() const -> size_t
+	{
+		return filesize_;
+	}
+
+	inline auto file_t::position() const -> size_t
+	{
+		return ftell(handle_.get());
+	}
 
 
 	inline auto read_into_memory(file_t& file) -> atma::unique_memory_t
@@ -72,7 +83,7 @@ namespace rose
 	}
 
 	template <size_t Bufsize, typename FN>
-	inline auto for_each_line(input_stream_t& stream, size_t maxsize, FN&& fn) -> void
+	inline auto for_each_line(atma::input_stream_t& stream, size_t maxsize, FN&& fn) -> void
 	{
 		char buf[Bufsize];
 		atma::string line;
