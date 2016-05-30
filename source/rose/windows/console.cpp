@@ -7,7 +7,6 @@
 using namespace rose;
 using rose::console_t;
 
-
 console_t::console_t()
 {
 	auto hwnd = GetConsoleWindow();
@@ -30,8 +29,11 @@ auto console_t::set_color(uint32 c) -> void
 
 auto console_t::write(char const* str, size_t size) -> size_t
 {
+	wchar_t buf[4 * 1024];
+	int r = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str, size, buf, 4 * 1024);
+
 	DWORD numwrit;
-	WriteConsole((HANDLE)console_handle_, str, (DWORD)size, &numwrit, nullptr);
+	WriteConsole((HANDLE)console_handle_, buf, (DWORD)r, &numwrit, nullptr);
 	return numwrit;
 }
 
