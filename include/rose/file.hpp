@@ -89,8 +89,8 @@ namespace rose
 		atma::string line;
 
 		// read bytes into line until newline is found
-		auto rr = read_result_t{stream_status_t::good, 0};
-		while (rr.status == stream_status_t::good)
+		auto rr = atma::read_result_t{atma::stream_status_t::good, 0};
+		while (rr.status == atma::stream_status_t::good)
 		{
 			rr = stream.read(buf, Bufsize);
 			auto bufend = buf + rr.bytes_read;
