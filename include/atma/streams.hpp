@@ -198,6 +198,7 @@ namespace atma
 	{
 		size_t r = std::min(size, size_ - position_);
 		memcpy(data_ + position_, data, r);
+		position_ += r;
 
 		if (r == size)
 			return{stream_status_t::good, r};
