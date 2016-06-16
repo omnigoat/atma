@@ -12,8 +12,8 @@
 namespace rose
 {
 	struct file_t
-		: atma::random_access_input_stream_t
-		, atma::random_access_output_stream_t
+		: atma::random_access_input_bytestream_t
+		, atma::random_access_output_bytestream_t
 	{
 #if ATMA_PLATFORM_WINDOWS
 		using handle_t = std::shared_ptr<FILE>;
@@ -83,7 +83,7 @@ namespace rose
 	}
 
 	template <size_t Bufsize, typename FN>
-	inline auto for_each_line(atma::input_stream_t& stream, size_t maxsize, FN&& fn) -> void
+	inline auto for_each_line(atma::input_bytestream_t& stream, size_t maxsize, FN&& fn) -> void
 	{
 		char buf[Bufsize];
 		atma::string line;
