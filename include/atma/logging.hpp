@@ -261,7 +261,7 @@ namespace atma
 
 	struct logging_encoder_t
 	{
-		logging_encoder_t(output_stream_ptr const& dest)
+		logging_encoder_t(output_bytestream_ptr const& dest)
 			: dest_{dest}
 		{}
 
@@ -273,7 +273,7 @@ namespace atma
 		auto encode_sprintf(char const*, Args&&...) -> size_t;
 
 	private:
-		output_stream_ptr dest_;
+		output_bytestream_ptr dest_;
 	};
 
 	inline auto logging_encoder_t::encode_header(log_style_t style) -> size_t
