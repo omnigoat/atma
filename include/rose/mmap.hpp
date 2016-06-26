@@ -34,7 +34,7 @@ namespace rose
 		handle_t handle_;
 		size_t size_;
 
-		friend struct mmap_stream_t;
+		friend struct mmap_bytestream_t;
 	};
 
 	using mmap_ptr = atma::intrusive_ptr<mmap_t>;
