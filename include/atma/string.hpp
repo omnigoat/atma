@@ -24,9 +24,16 @@ namespace atma {
 		string_encoder_t(char* buf, size_t size);
 		string_encoder_t(string& buf);
 
-		auto operator << (char const*) -> string_encoder_t&;
-		auto operator << (int) -> string_encoder_t&;
-		auto operator << (uint) -> string_encoder_t&;
+		template <typename T>
+		auto operator << (T&& t) -> string_encoder_t&
+		{
+			write(std::forward<T>(t));
+			return *this;
+		}
+
+		auto write(char const*) -> size_t;
+		auto write(int64) -> size_t;
+		auto write(uint64) -> size_t;
 
 	private:
 		bool put_buf(char);
@@ -59,19 +66,33 @@ namespace atma {
 		return true;
 	}
 
-	inline auto string_encoder_t::operator << (char const* str) -> string_encoder_t&
+	inline auto string_encoder_t::write(char const* str) -> size_t
 	{
-		while (*str)
+		size_t r = 0;
+		for ( ; *str; ++str, ++r)
 		{
 			if (!(this->*put_fn_)(*str))
 				break;
-			++str;
 		}
 
-		return *this;
+		return r;
 	}
 
+	inline auto string_encoder_t::write(int64 x) -> size_t
+	{
+		if (!(this->*put_fn_)('-'))
+			return 0;
 
+		return 1 + write(uint64(x));
+	}
+
+	inline auto string_encoder_t::write(uint64 x) -> size_t
+	{
+		if (!(this->*put_fn_)('-'))
+			return 0;
+
+		return 1 + write(uint64(x));
+	}
 
 
 
