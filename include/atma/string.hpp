@@ -5,6 +5,7 @@
 
 #include <atma/enable_if.hpp>
 #include <atma/vector.hpp>
+#include <atma/streams.hpp>
 
 #include <algorithm>
 
@@ -45,24 +46,21 @@ namespace atma {
 		put_fn put_fn_;
 
 	private:
-		char* buf_ = nullptr;
-		size_t size_ = 0;
-		size_t p_ = 0;
-
+		memory_bytestream_t stream_;
 		string* str_ = nullptr;
 	};
 
 	inline string_encoder_t::string_encoder_t(char* buf, size_t size)
-		: buf_(buf), size_(size)
+		: stream_{buf, size}
 		, put_fn_(&string_encoder_t::put_buf)
 	{}
 
 	inline bool string_encoder_t::put_buf(char c)
 	{
-		if (p_ == size_)
+		if (stream_.position() == stream_.size())
 			return false;
 
-		buf_[p_++] = c;
+		stream_.write(&c, 1);
 		return true;
 	}
 
@@ -78,21 +76,18 @@ namespace atma {
 		return r;
 	}
 
-	inline auto string_encoder_t::write(int64 x) -> size_t
-	{
-		if (!(this->*put_fn_)('-'))
-			return 0;
+	//inline auto string_encoder_t::write(int64 x) -> size_t
+	//{
+	//	if (x < 0)
+	//		if (!(this->*put_fn_)('-'))
+	//			return 0;
+	//		else
+	//			return 1 + write(uint64(x) - ULLONG_MAX + 1);
+	//	else
+	//		return write(uint64(x));
+	//}
 
-		return 1 + write(uint64(x));
-	}
-
-	inline auto string_encoder_t::write(uint64 x) -> size_t
-	{
-		if (!(this->*put_fn_)('-'))
-			return 0;
-
-		return 1 + write(uint64(x));
-	}
+	//inline auto string_encoder_t::write(uint64 x) -> size_t;
 
 
 
