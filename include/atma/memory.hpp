@@ -3,8 +3,8 @@
 #include <atma/aligned_allocator.hpp>
 
 #include <type_traits>
-
-
+#include <vector>
+#include <memory>
 
 
 //
@@ -125,7 +125,7 @@ namespace atma
 	}
 
 
-	template <typename T, typename Allocator>
+	template <typename T, typename Allocator = atma::aligned_allocator_t<T>>
 	struct memory_t : detail::base_memory_t<T, Allocator>
 	{
 		using value_type = T;
@@ -309,3 +309,5 @@ namespace atma
 			allocator().construct(ptr_ + idx + i, *iter);
 	}
 }
+
+
