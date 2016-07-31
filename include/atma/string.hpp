@@ -5,6 +5,7 @@
 
 #include <atma/enable_if.hpp>
 #include <atma/vector.hpp>
+#include <atma/streams.hpp>
 
 #include <algorithm>
 
@@ -21,8 +22,8 @@ namespace atma {
 
 	struct string_encoder_t
 	{
-		string_encoder_t(char* buf, size_t size);
-		string_encoder_t(string& buf);
+		string_encoder_t(char*, size_t);
+		string_encoder_t(string&);
 
 		template <typename T>
 		auto operator << (T&& t) -> string_encoder_t&
@@ -31,6 +32,7 @@ namespace atma {
 			return *this;
 		}
 
+		auto write(char const*, size_t) -> size_t;
 		auto write(char const*) -> size_t;
 		auto write(int64) -> size_t;
 		auto write(uint64) -> size_t;
@@ -45,25 +47,34 @@ namespace atma {
 		put_fn put_fn_;
 
 	private:
-		char* buf_ = nullptr;
-		size_t size_ = 0;
-		size_t p_ = 0;
-
+		memory_bytestream_t stream_;
 		string* str_ = nullptr;
 	};
 
 	inline string_encoder_t::string_encoder_t(char* buf, size_t size)
-		: buf_(buf), size_(size)
+		: stream_{buf, size}
 		, put_fn_(&string_encoder_t::put_buf)
 	{}
 
 	inline bool string_encoder_t::put_buf(char c)
 	{
-		if (p_ == size_)
+		if (stream_.position() == stream_.size())
 			return false;
 
-		buf_[p_++] = c;
+		stream_.write(&c, 1);
 		return true;
+	}
+
+	inline auto string_encoder_t::write(char const* str, size_t size) -> size_t
+	{
+		size_t r = 0;
+		for ( ; r != size; ++r)
+		{
+			if (!(this->*put_fn_)(*str))
+				break;
+		}
+
+		return r;
 	}
 
 	inline auto string_encoder_t::write(char const* str) -> size_t
@@ -80,14 +91,18 @@ namespace atma {
 
 	inline auto string_encoder_t::write(int64 x) -> size_t
 	{
-		if (!(this->*put_fn_)('-'))
-			return 0;
-
-		return 1 + write(uint64(x));
+		if (x < 0)
+			if (!(this->*put_fn_)('-'))
+				return 0;
+			else
+				return 1 + write(ULLONG_MAX - uint64(x) + 1);
+		else
+			return write(uint64(x));
 	}
 
 	inline auto string_encoder_t::write(uint64 x) -> size_t
 	{
+<<<<<<< HEAD
 		// first step: find no. of digits
 		uint64 x2 = x;
 		size_t digits = 0;
@@ -101,8 +116,51 @@ namespace atma {
 
 		return 4;
 	}
+=======
+		// binary search for digits (max value: 18,446,744,073,709,551,615)
+		uint64 digits = 0;
+		uint64 d = 0;
+		if (x < 1'000'000'000'000)
+			if (x < 1'000'000)
+				if (x < 1000)
+					if (x < 10) { digits = 1; d = 1; }
+					else if (x < 100) { digits = 2; d = 10; }
+					else { digits = 3; d = 100; }
+				else
+					if (x < 10'000) { digits = 4; d = 1000; }
+					else if (x < 100'000) { digits = 5; d = 10'000; }
+					else { digits = 6; d = 100'000; }
+			else
+				if (x < 1'000'000'000)
+					if (x < 10'000'000) { digits = 7; d = 1'000'000; }
+					else if (x < 100'000'000) { digits = 8; d = 10'000'000; }
+					else { digits = 9; d = 100'000'000; }
+				else
+					if (x < 10'000'000'000) { digits = 10; d = 1'000'000'000; }
+					else if (x < 100'000'000'000) { digits = 11; d = 10'000'000'000; }
+					else { digits = 12; d = 100'000'000'000; }
+		else if (x < 1'000'000'000'000'000)
+			if (x < 10'000'000'000'000) { digits = 13; d = 1'000'000'000'000; }
+			else if (x < 100'000'000'000'000) { digits = 14; d = 10'000'000'000'000; }
+			else { digits = 15; d = 100'000'000'000'000; }
+		else if (x < 100'000'000'000'000'000)
+			if (x < 10'000'000'000'000'000) { digits = 16; d = 1'000'000'000'000'000; }
+			else { digits = 17; d = 10'000'000'000'000'000; }
+		else if (x < 1'000'000'000'000'000'000) { digits = 18; d = 100'000'000'000'000'000; }
+		else if (x < 10'000'000'000'000'000'000) { digits = 19; d = 1'000'000'000'000'000'000; }
+		else { digits = 20; d = 10'000'000'000'000'000'000; }
+>>>>>>> be2c458ff95c29a5747fab6d928fb5f7d54709e4
 
+		size_t r = 0;
+		for (; d != 0; d /= 10, ++r)
+		{
+			char c = (x / d) % 10;
+			if (!(this->*put_fn_)('0' + c))
+				break;
+		}
 
+		return r;
+	}
 
 
 
