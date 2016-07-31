@@ -8,7 +8,7 @@
 
 namespace atma
 {
-	template <typename T, uint32 A>
+	template <typename T, uint32 A = alignof(T)>
 	struct aligned_allocator_t;
 
 

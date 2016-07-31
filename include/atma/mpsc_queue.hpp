@@ -291,14 +291,14 @@ namespace atma
 	inline auto base_mpsc_queue_t::impl_read_queue_write_info() -> std::tuple<byte*, uint32, uint32>
 	{
 		atma::atomic128_t q_write_info;
-		atma::atomic_read128(&q_write_info, &write_info_);
+		atma::atomic_load_128(&q_write_info, &write_info_);
 		return std::make_tuple((byte*)q_write_info.ui64[0], q_write_info.ui32[2], q_write_info.ui32[3]);
 	}
 
 	inline auto base_mpsc_queue_t::impl_read_queue_read_info() -> std::tuple<byte*, uint32>
 	{
 		atma::atomic128_t q_read_info;
-		atma::atomic_read128(&q_read_info, &read_info_);
+		atma::atomic_load_128(&q_read_info, &read_info_);
 		return std::make_tuple((byte*)q_read_info.ui64[0], q_read_info.ui32[3]);
 	}
 

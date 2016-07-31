@@ -88,10 +88,18 @@ namespace atma {
 
 	inline auto string_encoder_t::write(uint64 x) -> size_t
 	{
-		if (!(this->*put_fn_)('-'))
-			return 0;
+		// first step: find no. of digits
+		uint64 x2 = x;
+		size_t digits = 0;
+		uint64 m = 1;
+		for (;;) { x2 /= 10; ++digits; if (x2 != 0) break; m *= 10; }
 
-		return 1 + write(uint64(x));
+		for ( ; digits != 0; m /= 10)
+		{
+			(this->*put_fn_)('0' + (x / m) % 10);
+		}
+
+		return 4;
 	}
 
 
