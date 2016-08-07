@@ -102,21 +102,6 @@ namespace atma {
 
 	inline auto string_encoder_t::write(uint64 x) -> size_t
 	{
-<<<<<<< HEAD
-		// first step: find no. of digits
-		uint64 x2 = x;
-		size_t digits = 0;
-		uint64 m = 1;
-		for (;;) { x2 /= 10; ++digits; if (x2 != 0) break; m *= 10; }
-
-		for ( ; digits != 0; m /= 10)
-		{
-			(this->*put_fn_)('0' + (x / m) % 10);
-		}
-
-		return 4;
-	}
-=======
 		// binary search for digits (max value: 18,446,744,073,709,551,615)
 		uint64 digits = 0;
 		uint64 d = 0;
@@ -149,7 +134,6 @@ namespace atma {
 		else if (x < 1'000'000'000'000'000'000) { digits = 18; d = 100'000'000'000'000'000; }
 		else if (x < 10'000'000'000'000'000'000) { digits = 19; d = 1'000'000'000'000'000'000; }
 		else { digits = 20; d = 10'000'000'000'000'000'000; }
->>>>>>> be2c458ff95c29a5747fab6d928fb5f7d54709e4
 
 		size_t r = 0;
 		for (; d != 0; d /= 10, ++r)

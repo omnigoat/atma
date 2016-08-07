@@ -220,5 +220,8 @@
     <ClInclude Include="..\..\include\atma\streams.hpp">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\atma\handle_table.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
