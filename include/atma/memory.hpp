@@ -147,12 +147,14 @@ namespace atma
 
 		auto allocate(size_t) -> void;
 		auto deallocate() -> void;
-		auto construct_default(size_t idx, size_t count) -> void;
-		auto construct_copy(size_t idx, T const& x, size_t count) -> void;
+
+		template <typename... Args>
+		auto construct(size_t idx, size_t count, Args&&...) -> void;
+
 		auto construct_copy_range(size_t idx, T const* src, size_t count) -> void;
-		auto construct_move(size_t idx, T&& x) -> void;
-		auto construct_move_range(size_t idx, T const* src, size_t count) -> void;
+		auto construct_move_range(size_t idx, T* src, size_t count) -> void;
 		auto construct_move_range(size_t idx, memory_t& src, size_t src_idx, size_t count) -> void;
+
 		auto destruct(size_t idx, size_t count) -> void;
 		auto memmove(size_t dest_idx, size_t src_idx, size_t count) -> void;
 		auto memcpy(size_t idx, T const*, size_t count) -> void;
@@ -241,17 +243,11 @@ namespace atma
 	}
 
 	template <typename T, typename A>
-	inline auto memory_t<T, A>::construct_default(size_t idx, size_t count) -> void
+	template <typename... Args>
+	inline auto memory_t<T, A>::construct(size_t idx, size_t count, Args&&... args) -> void
 	{
-		for (auto i = idx; i != idx + count; ++i)
-			allocator().construct(ptr_ + i);
-	}
-
-	template <typename T, typename A>
-	inline auto memory_t<T, A>::construct_copy(size_t idx, T const& x, size_t count) -> void
-	{
-		for (auto i = idx; i != idx + count; ++i)
-			allocator().construct(ptr_ + i, x);
+		for (size_t i = 0, j = idx; i != count; ++i, ++j)
+			allocator().construct(ptr_ + j, std::forward<Args>(args)...);
 	}
 
 	template <typename T, typename A>
@@ -262,13 +258,7 @@ namespace atma
 	}
 
 	template <typename T, typename A>
-	inline auto memory_t<T, A>::construct_move(size_t idx, T&& x) -> void
-	{
-		allocator().construct(ptr_ + idx, std::move(x));
-	}
-
-	template <typename T, typename A>
-	inline auto memory_t<T, A>::construct_move_range(size_t idx, T const* x, size_t count) -> void
+	inline auto memory_t<T, A>::construct_move_range(size_t idx, T* x, size_t count) -> void
 	{
 		for (size_t i = 0, j = idx; i != count; ++i, ++j)
 			allocator().construct(ptr_ + j, std::move(x[i]));

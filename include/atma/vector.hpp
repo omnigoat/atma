@@ -125,7 +125,7 @@ namespace atma
 		, size_(size)
 	{
 		imem_.allocate(capacity_);
-		imem_.construct_default(0, size_);
+		imem_.construct(0, size_);
 	}
 
 	template <typename T, typename A>
@@ -133,7 +133,7 @@ namespace atma
 		: capacity_(size), size_(size)
 	{
 		imem_.allocate(capacity_);
-		imem_.construct_copy(0, d, size_);
+		imem_.construct(0, size_, d);
 	}
 
 	template <typename T, typename A>
@@ -354,7 +354,7 @@ namespace atma
 			imem_.destruct(size, size_ - size);
 		}
 		else if (size_ < size) {
-			imem_.construct_copy(size_, x, size - size_);
+			imem_.construct(size_, size - size_, x);
 		}
 
 		IMEM_GUARD_GT(size);
@@ -367,7 +367,7 @@ namespace atma
 	{
 		IMEM_GUARD_LT(size_ + 1);
 
-		imem_.construct_copy(size_, x, 1);
+		imem_.construct(size_, 1, x);
 		++size_;
 	}
 
@@ -376,7 +376,7 @@ namespace atma
 	{
 		IMEM_GUARD_LT(size_ + 1);
 
-		imem_.construct_move(size_, std::move(x));
+		imem_.construct(size_, 1, std::move(x));
 		++size_;
 	}
 
@@ -396,7 +396,7 @@ namespace atma
 		IMEM_GUARD_LT(size_ + 1);
 
 		imem_.move(offset + 2, offset + 1, 1);
-		imem_.construct_copy(offset + 1, x, 1);
+		imem_.construct(offset + 1, 1, x);
 		++size_;
 	}
 
@@ -408,7 +408,7 @@ namespace atma
 		IMEM_GUARD_LT(size_ + 1);
 
 		imem_.memmove(offset + 2, offset + 1, 1);
-		imem_.construct_move(offset + 1, x, 1);
+		imem_.construct(offset + 1, 1, std::move(x));
 		++size_;
 	}
 
