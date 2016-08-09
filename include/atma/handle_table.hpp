@@ -30,21 +30,29 @@ namespace atma
 
 		handle_table_t();
 
-		template <typename... Args> auto allocate(Args&&...) -> handle_t;
+		// construct
+		template <typename... Args>
+		auto construct(Args&&...) -> handle_t;
+
+		// release
 		auto release(handle_t) -> bool;
+
+
+		auto get(handle_t) -> Payload*;
+		auto get(handle_t) const -> Payload const*;
 
 		auto dump_ascii() -> void;
 
 
 	private: // internal math constants
 		static const uint32 genr_bits = 8;
-		static const uint32 slot_bits = 6;
+		static const uint32 slot_bits = 12;
 		static const uint32 page_bits = 12;
-		//static_assert(genr_bits + slot_bits + page_bits == 32, "bad bits");
+		static_assert(genr_bits + slot_bits + page_bits == 32, "bad bits");
 
-		static const uint32 slot_byte_bits = 1;
+		static const uint32 slot_byte_bits = 7;
 		static const uint32 slot_bit_bits = 5;
-		//static_assert(slot_bit_bits + slot_byte_bits == slot_bits, "bad bits");
+		static_assert(slot_bit_bits + slot_byte_bits == slot_bits, "bad bits");
 
 		static const uint32 genr_max = atma::math::ct::exp2(genr_bits);
 		static const uint32 slot_max = atma::math::ct::exp2(slot_bits);
@@ -53,7 +61,7 @@ namespace atma
 		static const uint32 genr_mask = (genr_max - 1) << slot_bits << page_bits;
 		static const uint32 slot_mask = (slot_max - 1) << page_bits;
 		static const uint32 page_mask = (page_max - 1);
-		//static_assert((genr_mask | slot_mask | page_mask) == 0xffffffff, "bad bits");
+		static_assert((genr_mask | slot_mask | page_mask) == 0xffffffff, "bad bits");
 
 		static const uint32 slot_byte_mask = (math::ct::exp2(slot_byte_bits) - 1) << slot_bit_bits << page_bits;
 		static const uint32 slot_bit_mask = (math::ct::exp2(slot_bit_bits) - 1) << page_bits;;
@@ -79,11 +87,13 @@ namespace atma
 	template <typename P>
 	struct alignas(4) handle_table_t<P>::slot_t
 	{
-		slot_t(uint32 genr = 0)
+		template <typename... Args>
+		slot_t(uint32 genr, Args&&... args)
 			: ref_count{0}
 			, genr{genr}
 			, prev_slot{0}
 			, prev_page{0}
+			, payload{std::forward<Args>(args)...}
 		{}
 
 		std::atomic<uint32> ref_count;
@@ -123,7 +133,7 @@ namespace atma
 
 	template <typename T>
 	template <typename... Args>
-	inline auto handle_table_t<T>::allocate(Args&&... args) -> handle_t
+	inline auto handle_table_t<T>::construct(Args&&... args) -> handle_t
 	{
 	pages_begin:
 		page_t* p = first_page_;
@@ -209,7 +219,8 @@ namespace atma
 						atma::atomic_pre_increment(&p->size);
 						idx = (i << slot_bit_bits) | j;
 						// construct now-owned slot
-						p->memory.construct_default(idx, 1);
+						//p->memory.construct_default(idx, 1);
+						p->memory.construct(idx, 1, 0, std::forward<Args>(args)...);
 						p->memory[idx].ref_count++;
 						ATMA_ASSERT(p->memory[idx].ref_count == 1);
 						goto freeslot_end;
@@ -239,11 +250,9 @@ namespace atma
 		if (p == nullptr)
 			return false;
 
-		auto midx = extract_slot_idx(h);
-		if (pidx == 0 && midx == 0)
-			int breakpoint = 4;
-		p->memory[midx].ref_count--;
-		ATMA_ASSERT(p->memory[midx].ref_count == 0);
+		auto sidx = extract_slot_idx(h);
+		p->memory[sidx].ref_count--;
+		ATMA_ASSERT(p->memory[sidx].ref_count == 0);
 		
 		auto byteidx = extract_slot_byte_idx(h);
 		auto bitidx = extract_slot_bit_idx(h);
@@ -272,7 +281,7 @@ namespace atma
 			for (int j = 0; j != slot_max; ++j)
 			{
 				if (i == 0 && j == 0)
-					std::cout << "%";
+					std::cout << "-";
 				else if (p->freefield[j / 32] & (0x80000000 >> (j % 32)))
 					std::cout << pages_[i]->memory[j].ref_count.load();
 				else
