@@ -34,7 +34,8 @@ namespace atma
 		template <typename... Args>
 		auto construct(Args&&...) -> handle_t;
 
-		// release
+		// ref-counting
+		auto retain(handle_t) -> void;
 		auto release(handle_t) -> bool;
 
 
@@ -72,8 +73,8 @@ namespace atma
 		static uint32 extract_slot_bit_idx(handle_t h) { return (h & slot_bit_mask) >> page_bits; }
 		static uint32 extract_page_idx(handle_t h) { return h & page_mask; }
 
-		static auto construct_handle(uint32 genr, uint32 slot_idx, uint32 page_idx) -> handle_t
-			{ return (genr << slot_bits << page_bits) | (slot_idx << page_bits) | page_idx; }
+		static auto construct_handle(uint32 slot_idx, uint32 page_idx) -> handle_t
+			{ return (slot_idx << page_bits) | page_idx; }
 
 	private: // table management
 		struct slot_t;
@@ -85,22 +86,21 @@ namespace atma
 	};
 
 	template <typename P>
-	struct alignas(4) handle_table_t<P>::slot_t
+	struct handle_table_t<P>::slot_t
 	{
 		template <typename... Args>
-		slot_t(uint32 genr, Args&&... args)
+		slot_t(Args&&... args)
 			: ref_count{0}
-			, genr{genr}
 			, prev_slot{0}
 			, prev_page{0}
 			, payload{std::forward<Args>(args)...}
 		{}
 
 		std::atomic<uint32> ref_count;
-		uint32 genr : 8;
+		std::atomic<uint32> wref_count;
+		P payload;
 		uint32 prev_slot : 12;
 		uint32 prev_page : 12;
-		P payload;
 	};
 
 	template <typename T>
@@ -111,10 +111,6 @@ namespace atma
 			, memory{slot_max}
 			, freefield{}
 		{}
-
-		// returns slot_max if no slot could be allocated
-		auto allocate_slot() -> uint32;
-		auto release_slot(uint32) -> bool;
 
 		uint32 id = 0;
 		uint32 size = 0;
@@ -218,9 +214,9 @@ namespace atma
 					{
 						atma::atomic_pre_increment(&p->size);
 						idx = (i << slot_bit_bits) | j;
+
 						// construct now-owned slot
-						//p->memory.construct_default(idx, 1);
-						p->memory.construct(idx, 1, 0, std::forward<Args>(args)...);
+						p->memory.construct(idx, 1, std::forward<Args>(args)...);
 						p->memory[idx].ref_count++;
 						ATMA_ASSERT(p->memory[idx].ref_count == 1);
 						goto freeslot_end;
@@ -239,7 +235,52 @@ namespace atma
 		if (idx == slot_max)
 			goto pages_begin;
 
-		return construct_handle(0, idx, p->id);
+		return construct_handle(idx, p->id);
+	}
+
+	template <typename T>
+	inline auto handle_table_t<T>::retain(handle_t h) -> void
+	{
+		uint32 pidx = extract_page_idx(h);
+		page_t* p = pages_[pidx];
+		if (p == nullptr)
+			return;
+
+		auto sidx = extract_slot_idx(h);
+		if (p->memory[sidx].ref_count.load() == 0)
+			return;
+
+		p->memory[sidx].ref_count++;
+	}
+
+	template <typename T>
+	inline auto handle_table_t<T>::get(handle_t h) -> T*
+	{
+		uint32 pidx = extract_page_idx(h);
+		page_t* p = pages_[pidx];
+		if (p == nullptr)
+			return nullptr;
+
+		auto sidx = extract_slot_idx(h);
+		if (p->memory[sidx].ref_count.load() == 0)
+			return nullptr;
+
+		return &p->memory[sidx].payload;
+	}
+
+	template <typename T>
+	inline auto handle_table_t<T>::get(handle_t h) const -> T const*
+	{
+		uint32 pidx = extract_page_idx(h);
+		page_t* p = pages_[pidx];
+		if (p == nullptr)
+			return nullptr;
+
+		auto sidx = extract_slot_idx(h);
+		if (p->memory[sidx].ref_count.load() == 0)
+			return nullptr;
+
+		return &p->memory[sidx].payload;
 	}
 
 	template <typename T>
@@ -251,15 +292,14 @@ namespace atma
 			return false;
 
 		auto sidx = extract_slot_idx(h);
-		p->memory[sidx].ref_count--;
-		ATMA_ASSERT(p->memory[sidx].ref_count == 0);
-		
-		auto byteidx = extract_slot_byte_idx(h);
-		auto bitidx = extract_slot_bit_idx(h);
+		if (--p->memory[sidx].ref_count != 0)
+			return false;
 
+		uint32 byteidx = extract_slot_byte_idx(h);
+		uint32 bitidx = extract_slot_bit_idx(h);
 		uint32 u32 = p->freefield[byteidx];
-
 		uint32 nu32;
+
 		do {
 			nu32 = u32 & ~(0x80000000 >> bitidx);
 		} while (!atma::atomic_compare_exchange(&p->freefield[byteidx], u32, nu32, &u32));
@@ -268,6 +308,7 @@ namespace atma
 
 		return true;
 	}
+
 
 	template <typename T>
 	inline auto handle_table_t<T>::dump_ascii() -> void
