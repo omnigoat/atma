@@ -1,17 +1,10 @@
-//=====================================================================
-//
-//
-//
-//=====================================================================
-#ifndef ATMA_CONSOLE_HPP
-#define ATMA_CONSOLE_HPP
-//=====================================================================
+#pragma once
+
 #include <atma/config/platform.hpp>
-//=====================================================================
+#include <atma/logging.hpp>
+
 namespace atma {
-namespace console {
-//=====================================================================
-	
+
 	struct combined_color_t {
 		combined_color_t(unsigned char color) : color(color) {}
 		const unsigned char color;
@@ -147,10 +140,25 @@ namespace console {
 
 		combined_color_t reset(0x07);
 	}
+
+
+	struct console_logging_handler_t : logging_handler_t
+	{
+		console_logging_handler_t()
+		{
+			
+		}
+
+		auto handle(log_level_t level, unique_memory_t const& data) -> void override
+		{
+			
+		}
+	};
+
+
+
+
+
+
 	
-//=====================================================================
-} // namespace console
-} // namespace atma
-//=====================================================================
-#endif // inclusion guard
-//=====================================================================
+}
