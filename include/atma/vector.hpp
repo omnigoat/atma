@@ -125,7 +125,7 @@ namespace atma
 		, size_(size)
 	{
 		imem_.allocate(capacity_);
-		imem_.construct_default(0, size_);
+		imem_.construct(0, size_);
 	}
 
 	template <typename T, typename A>
@@ -133,7 +133,7 @@ namespace atma
 		: capacity_(size), size_(size)
 	{
 		imem_.allocate(capacity_);
-		imem_.construct_copy(0, d, size_);
+		imem_.construct(0, size_, d);
 	}
 
 	template <typename T, typename A>
@@ -354,7 +354,7 @@ namespace atma
 			imem_.destruct(size, size_ - size);
 		}
 		else if (size_ < size) {
-			imem_.construct_copy(size_, x, size - size_);
+			imem_.construct(size_, size - size_, x);
 		}
 
 		IMEM_GUARD_GT(size);
@@ -367,7 +367,7 @@ namespace atma
 	{
 		IMEM_GUARD_LT(size_ + 1);
 
-		imem_.construct_copy(size_, x, 1);
+		imem_.construct(size_, 1, x);
 		++size_;
 	}
 
@@ -376,7 +376,7 @@ namespace atma
 	{
 		IMEM_GUARD_LT(size_ + 1);
 
-		imem_.construct_move(size_, std::move(x));
+		imem_.construct(size_, 1, std::move(x));
 		++size_;
 	}
 
@@ -396,7 +396,7 @@ namespace atma
 		IMEM_GUARD_LT(size_ + 1);
 
 		imem_.move(offset + 2, offset + 1, 1);
-		imem_.construct_copy(offset + 1, x, 1);
+		imem_.construct(offset + 1, 1, x);
 		++size_;
 	}
 
@@ -408,7 +408,7 @@ namespace atma
 		IMEM_GUARD_LT(size_ + 1);
 
 		imem_.memmove(offset + 2, offset + 1, 1);
-		imem_.construct_move(offset + 1, x, 1);
+		imem_.construct(offset + 1, 1, std::move(x));
 		++size_;
 	}
 
@@ -448,6 +448,7 @@ namespace atma
 		auto const offset = begin - this->begin();
 		auto const offset_end = end - this->begin();
 		auto const rangesize = end - begin;
+		auto const tailsize = size_ - offset_end;
 
 		imem_.destruct(offset, rangesize);
 
@@ -455,14 +456,15 @@ namespace atma
 		if (newcap < capacity_)
 		{
 			auto tmp = internal_memory_t{std::move(imem_)};
-			imem_.alloc(newcap);
-			imem_.memcpy(0, tmp, 0, offset);
-			imem_.memcpy(offset, tmp, offset_end, size_ - offset_end);
+			imem_.allocate(newcap);
+			imem_.construct_move_range(0, tmp, 0, offset);
+			imem_.construct_move_range(offset, tmp, offset_end, tailsize);
 			tmp.deallocate();
 		}
 		else
 		{
-			imem_.construct_move_range(offset, imem_, offset_end, count);
+			imem_.construct_move_range(offset, imem_, offset_end, tailsize);
+			imem_.destruct(offset_end, tailsize);
 		}
 
 		size_ -= rangesize;

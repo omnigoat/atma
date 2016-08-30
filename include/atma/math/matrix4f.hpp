@@ -6,7 +6,7 @@
 #include <atma/types.hpp>
 #include <atma/assert.hpp>
 
-#if ATMA_PLATFORM_WIN32
+#if ATMA_PLATFORM_WINDOWS
 # undef near
 # undef far
 #endif
