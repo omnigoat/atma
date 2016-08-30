@@ -37,6 +37,7 @@ namespace atma
 		// ref-counting
 		auto retain(handle_t) -> void;
 		auto release(handle_t) -> bool;
+		auto expired(handle_t) const -> bool;
 
 		// weak ref-counting
 		auto weak_retain(handle_t) -> void;
@@ -83,7 +84,10 @@ namespace atma
 		struct slot_t;
 		struct page_t;
 
-		auto weak_release_impl(page_t*, slot_t&, handle_t) -> void;
+		auto weak_release_impl(page_t*, slot_t*, handle_t) -> void;
+
+		auto lookup_handle(handle_t) -> std::pair<page_t*, slot_t*>;
+		auto lookup_handle(handle_t) const -> std::pair<page_t const*, slot_t const*>;
 
 		page_t* pages_[page_max] = {};
 		page_t* first_page_ = nullptr;
@@ -223,7 +227,6 @@ namespace atma
 
 						// construct now-owned slot
 						p->memory.construct(idx, 1, std::forward<Args>(args)...);
-						ATMA_ASSERT(p->memory[idx].ref_count == 1);
 						goto freeslot_end;
 					}
 
@@ -246,113 +249,94 @@ namespace atma
 	template <typename T>
 	inline auto handle_table_t<T>::retain(handle_t h) -> void
 	{
-		uint32 pidx = extract_page_idx(h);
-		page_t* page = pages_[pidx];
-		if (page == nullptr)
-			return;
-
-		auto sidx = extract_slot_idx(h);
-		auto& slot = page->memory[sidx];
-
-		if (slot.ref_count.load() == 0)
-			return;
-
-		++slot.ref_count;
+		auto ps = lookup_handle(h);
+		if (ps.first && ps.second)
+		{
+			++ps.second->ref_count;
+		}
 	}
 
 	template <typename T>
 	inline auto handle_table_t<T>::release(handle_t h) -> bool
 	{
-		uint32 pidx = extract_page_idx(h);
-		page_t* page = pages_[pidx];
-		if (page == nullptr)
-			return false;
+		auto ps = lookup_handle(h);
+		if (ps.first && ps.second)
+		{
+			ATMA_ASSERT(ps.second->ref_count > 0, "bad ref counts");
 
-		auto sidx = extract_slot_idx(h);
-		auto& slot = page->memory[sidx];
+			if (--ps.second->ref_count == 0)
+			{
+				ps.second->payload.~T();
+				weak_release_impl(ps.first, ps.second, h);
+				return true;
+			}
+		}
 
-		ATMA_ASSERT(slot.ref_count > 0, "bad ref counts");
+		return false;
+	}
 
-		if (--slot.ref_count != 0)
-			return false;
+	template <typename T>
+	inline auto handle_table_t<T>::expired(handle_t h) const -> bool
+	{
+		auto ps = lookup_handle(h);
+		if (ps.first && ps.second)
+		{
+			return ps.second->ref_count == 0;
+		}
 
-		slot.payload.~T();
-
-		weak_release_impl(page, slot, h);
 		return true;
 	}
 
 	template <typename T>
 	inline auto handle_table_t<T>::weak_retain(handle_t h) -> void
 	{
-		uint32 pidx = extract_page_idx(h);
-		page_t* page = pages_[pidx];
-		if (page == nullptr)
-			return;
-
-		auto sidx = extract_slot_idx(h);
-		auto& slot = page->memory[sidx];
-
-		if (slot.wref_count.load() == 0)
-			return;
-
-		++slot.wref_count;
+		auto ps = lookup_handle(h);
+		if (ps.first && ps.second)
+		{
+			++ps.second->wref_count;
+		}
 	}
 
 	template <typename T>
 	inline auto handle_table_t<T>::weak_release(handle_t h) -> void
 	{
-		uint32 pidx = extract_page_idx(h);
-		page_t* page = pages_[pidx];
-		if (page == nullptr)
-			return false;
-
-		auto sidx = extract_slot_idx(h);
-		auto& slot = page->memory[sidx];
-
-		weak_release_impl(page, slot, h);
+		auto ps = lookup_handle(h);
+		if (ps.first && ps.second)
+		{
+			weak_release_impl(ps.first, ps.second, h);
+		}
 	}
 
 	template <typename T>
 	inline auto handle_table_t<T>::get(handle_t h) -> T*
 	{
-		uint32 pidx = extract_page_idx(h);
-		page_t* page = pages_[pidx];
-		if (page == nullptr)
-			return nullptr;
+		auto ps = lookup_handle(h);
+		if (ps.first && ps.second)
+		{
+			return &ps.second->payload;
+		}
 
-		auto sidx = extract_slot_idx(h);
-		auto& slot = page->memory[sidx];
-
-		if (slot.ref_count.load() == 0)
-			return nullptr;
-
-		return &slot.payload;
+		return nullptr;
 	}
 
 	template <typename T>
 	inline auto handle_table_t<T>::get(handle_t h) const -> T const*
 	{
-		uint32 pidx = extract_page_idx(h);
-		page_t* page = pages_[pidx];
-		if (page == nullptr)
-			return nullptr;
+		auto ps = lookup_handle(h);
+		if (ps.first && ps.second)
+		{
+			return &ps.second->payload;
+		}
 
-		auto sidx = extract_slot_idx(h);
-		auto& slot = page->memory[sidx];
-
-		if (slot.ref_count.load() == 0)
-			return nullptr;
-
-		return &slot.payload;
+		return nullptr;
 	}
 
 	template <typename T>
-	inline auto handle_table_t<T>::weak_release_impl(page_t* page, slot_t& slot, handle_t h) -> void
+	inline auto handle_table_t<T>::weak_release_impl(page_t* page, slot_t* slot, handle_t h) -> void
 	{
-		ATMA_ASSERT(slot.wref_count > 0, "bad wref counts");
+		ATMA_ASSERT(slot->wref_count > 0, "bad wref counts");
 
-		if (--slot.wref_count != 0)
+		if (--slot->wref_count != 0)
 			return;
 
 		uint32 byteidx = extract_slot_byte_idx(h);
@@ -393,5 +377,38 @@ namespace atma
 		std::cout << "E" << std::endl;
 	}
 
+	template <typename T>
+	inline auto handle_table_t<T>::lookup_handle(handle_t h) -> std::pair<page_t*, slot_t*>
+	{
+		if (h == 0)
+			return {nullptr, nullptr};
+
+		uint32 pidx = extract_page_idx(h);
+		page_t* page = pages_[pidx];
+		if (page == nullptr)
+			return {nullptr, nullptr};
+
+		auto sidx = extract_slot_idx(h);
+		auto* slot = &page->memory[sidx];
+
+		return {page, slot};
+	}
+
+	template <typename T>
+	inline auto handle_table_t<T>::lookup_handle(handle_t h) const -> std::pair<page_t const*, slot_t const*>
+	{
+		if (h == 0)
+			return {nullptr, nullptr};
+
+		uint32 pidx = extract_page_idx(h);
+		page_t* page = pages_[pidx];
+		if (page == nullptr)
+			return {nullptr, nullptr};
+
+		auto sidx = extract_slot_idx(h);
+		auto const* slot = &page->memory[sidx];
+
+		return {page, slot};
+	}
 }
 
