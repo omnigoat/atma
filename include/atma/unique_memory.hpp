@@ -56,15 +56,18 @@ namespace atma
 	inline basic_unique_memory_t<A>::basic_unique_memory_t(size_t size)
 		: size_(size)
 	{
-		memory_.allocate(size);
+		if (size)
+			memory_.allocate(size);
 	}
 
 	template <typename A>
 	inline basic_unique_memory_t<A>::basic_unique_memory_t(void const* data, size_t size)
 		: size_(size)
 	{
-		memory_.allcoate(size);
-		memory_.memcpy(0, data, size);
+		if (size) {
+			memory_.allocate(size);
+			memory_.memcpy(0, data, size);
+		}
 	}
 
 	template <typename A>

@@ -41,6 +41,21 @@ namespace atma
 		template <typename T, size_t S = sizeof(T)> struct interlocked_t;
 
 		template <typename T>
+		struct interlocked_t<T, 1>
+		{
+			static auto exchange(void* addr, T x) -> T
+			{
+				auto sx = *reinterpret_cast<CHAR*>(&x);
+				return InterlockedExchange8((CHAR*)addr, sx);
+			}
+
+			static auto bit_or(T* addr, T x) -> T
+			{
+				return InterlockedOr8((LONG*)addr, x);
+			}
+		};
+
+		template <typename T>
 		struct interlocked_t<T, 2>
 		{
 			static auto exchange(void* addr, T x) -> T
@@ -53,6 +68,30 @@ namespace atma
 		template <typename T>
 		struct interlocked_t<T, 4>
 		{
+			static auto pre_inc(void volatile* addr) -> T
+			{
+				auto v = InterlockedIncrement((LONG*)addr);
+				return *reinterpret_cast<T*>(&v);
+			}
+
+			static auto post_inc(void volatile* addr) -> T
+			{
+				auto v = InterlockedIncrement((LONG*)addr) - 1;
+				return *reinterpret_cast<T*>(&v);
+			}
+
+			static auto pre_dec(void volatile* addr) -> T
+			{
+				auto v = InterlockedDecrement((LONG*)addr);
+				return *reinterpret_cast<T*>(&v);
+			}
+
+			static auto post_dec(void volatile* addr) -> T
+			{
+				auto v = InterlockedDecrement((LONG*)addr) - 1;
+				return *reinterpret_cast<T*>(&v);
+			}
+
 			static auto exchange(void* addr, T const& x) -> T
 			{
 				return InterlockedExchange((LONG*)addr, *reinterpret_cast<LONG const*>(&x));
@@ -60,9 +99,10 @@ namespace atma
 
 			static auto compare_exchange(void* addr, T const& c, T const& x, T* outc) -> bool
 			{
-				// reinterpret c & x as an atomic128 for convenience
-				*outc = InterlockedCompareExchange((LONG*)addr, x, c);
-				return *outc == c;
+				auto v = InterlockedCompareExchange((LONG*)addr, x, c);
+				bool r = (c == v);
+				*outc = v;
+				return r;
 			}
 		};
 
@@ -99,6 +139,15 @@ namespace atma
 
 #endif
 
+	template <typename T> inline auto atomic_pre_increment(T* addr) -> T { return detail::interlocked_t<T>::pre_inc(addr); }
+	template <typename T> inline auto atomic_post_increment(T* addr) -> T { return detail::interlocked_t<T>::post_inc(addr); }
+	template <typename T> inline auto atomic_pre_decrement(T* addr) -> T { return detail::interlocked_t<T>::pre_dec(addr); }
+	template <typename T> inline auto atomic_post_decrement(T* addr) -> T { return detail::interlocked_t<T>::post_dec(addr); }
+
+	template <typename T>
+	inline auto atomic_bitwise_or(T* addr, T x) -> T {
+		return detail::interlocked_t<T>::bit_or(addr, x);
+	}
 
 	template <typename T>
 	inline auto atomic_exchange(void* addr, T const& x) -> T {
@@ -106,20 +155,22 @@ namespace atma
 	}
 
 	template <typename T>
-	inline auto atomic_compare_exchange(void* addr, T const& c, T const& x, T* outc = nullptr) -> bool
+	inline auto atomic_compare_exchange(void* addr, T const& c, T const& x) -> bool
 	{
 		static atomic128_t d;
+		return detail::interlocked_t<T>::compare_exchange(addr, c, x, reinterpret_cast<T*>(&d));
+	}
 
-		if (!outc)
-			outc = (T*)&d;
-
+	template <typename T>
+	inline auto atomic_compare_exchange(void* addr, T const& c, T const& x, T* outc) -> bool
+	{
 		return detail::interlocked_t<T>::compare_exchange(addr, c, x, outc);
 	}
 
-	inline auto atomic_read128(void* dest, void* src) -> void
+	inline auto atomic_load_128(void* dest, void* src) -> void
 	{
-		auto adest = reinterpret_cast<atomic128_t*>(dest);
-		atomic_compare_exchange(src, *adest, *adest, adest);
+		static const atomic128_t t;
+		atomic_compare_exchange(src, t, t, reinterpret_cast<atomic128_t*>(dest));
 	}
 
 }

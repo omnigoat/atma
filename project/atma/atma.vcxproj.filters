@@ -1,0 +1,227 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="include">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="include\algorithm">
+      <UniqueIdentifier>{d9e4acd0-ccff-486a-91b8-6971087abf08}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\config">
+      <UniqueIdentifier>{24f56b7f-e2dd-40a2-836e-a21f2f8164a9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\filesystem">
+      <UniqueIdentifier>{51dcc423-2e06-41d9-938b-0b79754dbea3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\lockfree">
+      <UniqueIdentifier>{145f0927-0d27-44fe-92f1-ab9ad4710a05}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\math">
+      <UniqueIdentifier>{6a21c52c-1458-45d2-ac50-fb769cd6ca66}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\platform">
+      <UniqueIdentifier>{4b60b3f3-e111-4d4f-a0b4-891b036c28bc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\thread">
+      <UniqueIdentifier>{ed4438da-80b5-405f-9b06-d7ee5e25a7bf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\unittest">
+      <UniqueIdentifier>{be554768-952a-4324-bc9a-482fbaeb54f8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\utf">
+      <UniqueIdentifier>{56575bb8-07a7-4c79-9adb-214074d8fee8}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\include\atma\math\vector4f.hpp">
+      <Filter>include\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\math\matrix4f.hpp">
+      <Filter>include\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\lockfree\queue.hpp">
+      <Filter>include\lockfree</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\math\vector4i.hpp">
+      <Filter>include\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\utf\algorithm.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\utf\utf8_istream.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\utf\utf8_iterator.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\config\platform.hpp">
+      <Filter>include\config</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\utf\utf8_string_header.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\utf\utf8_string.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\utf\utf8_string_range_header.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\utf\utf8_string_range.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\thread\engine.hpp">
+      <Filter>include\thread</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\math\scalar.hpp">
+      <Filter>include\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\platform\allocation.hpp">
+      <Filter>include\platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\filesystem\file.hpp">
+      <Filter>include\filesystem</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\utf\utf8_char.hpp">
+      <Filter>include\utf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\unittest\emission.hpp">
+      <Filter>include\unittest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\unittest\unittest.hpp">
+      <Filter>include\unittest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\unittest\run.hpp">
+      <Filter>include\unittest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\unittest\compile.hpp">
+      <Filter>include\unittest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\unittest\ennumerate.hpp">
+      <Filter>include\unittest</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\math\intersection.hpp">
+      <Filter>include\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\math\aabb.hpp">
+      <Filter>include\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\algorithm\filter.hpp">
+      <Filter>include\algorithm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\algorithm\map.hpp">
+      <Filter>include\algorithm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\math\triangle.hpp">
+      <Filter>include\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\algorithm\zip.hpp">
+      <Filter>include\algorithm</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\math\aabc.hpp">
+      <Filter>include\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\math\constants.hpp">
+      <Filter>include\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\algorithm.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\aligned_allocator.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\assert.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\atomic.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\bind.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\bitmask.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\call_fn.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\com_ptr.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\console.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\enable_if.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\enable_multiple_shared_from_this.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\event.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\function.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\function_composition.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\function_traits.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\hash.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\hash_map.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\idxs.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\intrusive_ptr.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\logging.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\memory.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\mpsc_queue.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\placeholders.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\shared_memory.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\string.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\threading.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\tuple.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\types.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\unique_memory.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\unit_test.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\vector.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\streams.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\handle_table.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
