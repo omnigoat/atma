@@ -46,6 +46,18 @@ namespace atma
 		log_level_t level_;
 	};
 
+	struct colorbyte
+	{
+		constexpr explicit colorbyte()
+			: value()
+		{}
+
+		constexpr explicit colorbyte(byte v)
+			: value(v)
+		{}
+
+		byte const value;
+	};
 
 	struct logging_handler_t : ref_counted
 	{
@@ -68,7 +80,8 @@ namespace atma
 			disconnect_replicant,
 			attach_handler,
 			detach_handler,
-			log,
+			send,
+			flush,
 		};
 
 		logging_runtime_t(uint32 size = 1024 * 1024)
@@ -119,11 +132,22 @@ namespace atma
 		auto log(log_level_t level, void const* data, uint32 size) -> void
 		{
 			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(uint32) + sizeof(log_level_t) + sizeof(uint32) + size);
-			A.encode_uint32((uint32)command_t::log);
+			A.encode_uint32((uint32)command_t::send);
 			A.encode_uint32(0);
 			A.encode_uint32((uint32)level);
 			A.encode_data(data, size);
 			log_queue_.commit(A);
+		}
+
+		auto flush() -> void
+		{
+			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(byte), 4, true);
+			A.encode_uint32((uint32)command_t::flush);
+			A.encode_byte(0);
+			byte* b = reinterpret_cast<byte*>(A.data()) + 4;
+			log_queue_.commit(A);
+			while (*b == 0)
+				;
 		}
 
 	private:
@@ -172,7 +196,7 @@ namespace atma
 							break;
 						}
 
-						case command_t::log:
+						case command_t::send:
 						{
 							log_level_t level;
 
@@ -181,6 +205,13 @@ namespace atma
 							auto data = D.decode_data();
 
 							dist_log(visited, level, data);
+							break;
+						}
+
+						case command_t::flush:
+						{
+							byte* b = reinterpret_cast<byte*>(D.data()) + 4;
+							*b = 1;
 							break;
 						}
 					}
@@ -237,7 +268,7 @@ namespace atma
 					sizeof(uint32) + ((uint32)visited.size() + 1) * sizeof(this) + 
 					sizeof(log_level_t) + sizeof(uint32) + (uint32)data.size());
 
-				A.encode_uint32((uint32)command_t::log);
+				A.encode_uint32((uint32)command_t::send);
 				A.encode_uint32((uint32)visited.size() + 1);
 				for (auto const* x : visited)
 					A.encode_pointer(x);
@@ -266,11 +297,36 @@ namespace atma
 		{}
 
 		auto encode_header(log_style_t) -> size_t;
-		auto encode_color(byte) -> size_t;
+		auto encode_color(colorbyte) -> size_t;
 		auto encode_cstr(char const*, size_t) -> size_t;
 
 		template <typename... Args>
 		auto encode_sprintf(char const*, Args&&...) -> size_t;
+
+		template <typename... Args>
+		auto encode_all(Args&&... args) -> size_t
+		{
+			return encode_all_impl(std::forward<Args>(args)...);
+		}
+
+	private:
+		auto encode_all_impl() -> size_t
+		{
+			return 0;
+		}
+
+		template <typename... Args>
+		auto encode_all_impl(colorbyte color, Args&&... args) -> size_t
+		{
+			return encode_color(color) + encode_all_impl(std::forward<Args>(args)...);
+		}
+
+		template <typename... Args>
+		auto encode_all_impl(char const* str, Args&&... args) -> size_t
+		{
+			auto len = strlen(str);
+			return encode_cstr(str, len) + encode_all_impl(std::forward<Args>(args)...);
+		}
 
 	private:
 		output_bytestream_ptr dest_;
@@ -282,9 +338,9 @@ namespace atma
 		return dest_->write(data, 1).bytes_written;
 	}
 
-	inline auto logging_encoder_t::encode_color(byte color) -> size_t
+	inline auto logging_encoder_t::encode_color(colorbyte color) -> size_t
 	{
-		byte data[] = {(byte)log_instruction_t::color, color};
+		byte data[] = {(byte)log_instruction_t::color, color.value};
 		return dest_->write(data, 2).bytes_written;
 	}
 
@@ -316,8 +372,6 @@ namespace atma
 
 		mf((log_style_t)data[0]);
 		p = 1;
-
-
 
 		while (p != memory.size())
 		{
@@ -362,4 +416,74 @@ namespace atma
 
 
 
+	template <typename... Args>
+	inline auto send_log(logging_runtime_t* R, log_level_t level, char const* title, char const* filename, int line, Args&&... args) -> void
+	{
+		if (R == nullptr)
+			return;
+
+		// allocate static buffer & encoder
+		size_t const bufsize = 8 * 1024;
+		char buf[bufsize];
+		auto memstream = intrusive_ptr<memory_bytestream_t>::make(buf, bufsize);
+		logging_encoder_t encoder{memstream};
+
+		log_style_t styles[] = {
+			log_style_t::oneline,
+			log_style_t::oneline,
+			log_style_t::oneline,
+			log_style_t::pretty_print,
+			log_style_t::pretty_print,
+		};
+
+		colorbyte colors[] = {
+			colorbyte{0x08},
+			colorbyte{0x1f},
+			colorbyte{0x8f},
+			colorbyte{0xe4},
+			colorbyte{0xcf},
+		};
+
+		colorbyte location_colors[] = {
+			colorbyte{0x07},
+			colorbyte{0x07},
+			colorbyte{0x07},
+			colorbyte{0x0e},
+			colorbyte{0x0c},
+		};
+
+		char const* caption[] = {
+			"Trace:",
+			"[info]",
+			"[debug]",
+			"[Warning]",
+			"[ERROR]"
+		};
+
+
+		size_t p = 0;
+		p += encoder.encode_header(styles[(int)level]);
+		p += encoder.encode_color(colors[(int)level]);
+		p += encoder.encode_sprintf("%s", caption[(int)level]);
+
+		if (title)
+			p += encoder.encode_sprintf(" (%s) ", title);
+
+		p += encoder.encode_color(location_colors[(int)level]);
+
+		if ((int)level >= (int)log_level_t::warn)
+		{
+			p += encoder.encode_sprintf("\n%s:%d\n", filename, line);
+			p += encoder.encode_color(colorbyte{0x07});
+		}
+		else
+		{
+			p += encoder.encode_cstr(" ", 1);
+		}
+
+		p += encoder.encode_all(std::forward<Args>(args)...);
+
+		R->log(level, buf, (uint32)p);
+	}
 }
+
