@@ -47,7 +47,7 @@ auto console_t::set_color(uint32 c) -> void
 auto console_t::write(char const* str, size_t size) -> size_t
 {
 	wchar_t buf[4 * 1024];
-	int r = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str, (int)size - 1, buf, 4 * 1024);
+	int r = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str, (int)size, buf, 4 * 1024);
 	if (r == 0)
 	{
 		auto e = GetLastError();
