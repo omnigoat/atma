@@ -3,6 +3,27 @@
 #include "aligned_allocator.hpp"
 #include "hash.hpp"
 
+#include <greg7mdp/sparsepp.hpp>
+
+namespace atma
+{
+	template <
+		typename Key,
+		typename Value,
+		typename HashFn = hash_t<Key>,
+		typename EqFn = std::equal_to<Key>,
+		typename Alloc = aligned_allocator_t<std::pair<Key const, Value>>>
+	using hash_map = spp::sparse_hash_map<Key, Value, HashFn, EqFn, Alloc>;
+
+	template <
+		typename Value,
+		typename HashFn = hash_t<Value>,
+		typename EqFn = std::equal_to<Value>,
+		typename Alloc = aligned_allocator_t<Value>>
+	using hash_set = spp::sparse_hash_set<Value, HashFn, EqFn, Alloc>;
+}
+
+#if 0
 namespace atma
 {
 	template <typename T>
@@ -61,3 +82,4 @@ namespace atma
 		: elements_(new node_t[64 * 8])
 	{}
 }
+#endif
