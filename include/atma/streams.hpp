@@ -12,7 +12,7 @@ namespace atma
 	enum class stream_status_t
 	{
 		good,
-		eof,
+		exhausted,
 		error,
 	};
 
@@ -43,6 +43,7 @@ namespace atma
 	struct stream_t
 		: atma::ref_counted
 	{
+		virtual auto stream_status() const -> stream_status_t = 0;
 		virtual auto stream_opers() const -> stream_opers_mask_t = 0;
 	};
 
@@ -96,16 +97,10 @@ namespace atma
 		, random_access_output_bytestream_t
 	{
 		memory_bytestream_t();
-		memory_bytestream_t(void* data, size_t size_);
-
-		auto valid() const -> bool;
-		auto size() const -> size_t;
-		auto position() const -> size_t;
-
-		auto seek(size_t) -> stream_status_t;
-		auto move(int64) -> stream_status_t;
+		memory_bytestream_t(void* data, size_t size);
 
 		// abstract-stream
+		auto stream_status() const -> stream_status_t override;
 		auto stream_opers() const -> stream_opers_mask_t override;
 
 		// input-stream
@@ -113,6 +108,11 @@ namespace atma
 
 		// output-stream
 		auto write(void const*, size_t) -> write_result_t override;
+
+		auto size() const -> size_t;
+		auto position() const -> size_t;
+		auto seek(size_t) -> stream_status_t;
+		auto move(int64) -> stream_status_t;
 
 	protected:
 		auto memory_stream_reset(void*, size_t size) -> void;
@@ -145,11 +145,6 @@ namespace atma
 		, size_(size)
 		, position_()
 	{}
-
-	inline auto memory_bytestream_t::valid() const -> bool
-	{
-		return data_ != nullptr;
-	}
 
 	inline auto memory_bytestream_t::size() const -> size_t
 	{
@@ -191,7 +186,7 @@ namespace atma
 		if (r == size)
 			return{stream_status_t::good, r};
 		else
-			return{stream_status_t::eof, r};
+			return{stream_status_t::exhausted, r};
 	}
 
 	inline auto memory_bytestream_t::write(void const* data, size_t size) -> write_result_t
@@ -203,10 +198,20 @@ namespace atma
 		if (r == size)
 			return{stream_status_t::good, r};
 		else
-			return{stream_status_t::eof, r};
+			return{stream_status_t::exhausted, r};
 	}
 
 	// absract-stream
+	inline auto memory_bytestream_t::stream_status() const -> stream_status_t
+	{
+		if (data_ == nullptr || position_ > size_)
+			return stream_status_t::error;
+		else if (position_ == size_)
+			return stream_status_t::exhausted;
+		else
+			return stream_status_t::good;
+	}
+
 	inline auto memory_bytestream_t::stream_opers() const -> stream_opers_mask_t
 	{
 		return stream_opers_t::read | stream_opers_t::write | stream_opers_t::random_access;
