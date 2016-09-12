@@ -250,7 +250,7 @@ namespace atma
 			template <typename T>
 			auto target() const -> T const*
 			{
-				return reinterpret_cast<T const*>(vtable->target(const_cast<detail::functor_buf_t&>(buf)));
+				return reinterpret_cast<T const*>(vtable->target(const_cast<detail::functor_buf_t<BS>&>(buf)));
 			}
 
 			auto move_into(functor_wrapper_t& rhs) -> void
@@ -354,7 +354,7 @@ namespace atma
 		}
 
 		template <typename FN>
-		explicit basic_function_t(FN&& fn)
+		basic_function_t(FN&& fn)
 		{
 			init_fn(detail::functorize(std::forward<FN>(fn)));
 		}
