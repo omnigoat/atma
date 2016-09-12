@@ -22,14 +22,8 @@ namespace rose
 		file_t();
 		file_t(atma::string const&, file_access_mask_t = file_access_t::read);
 
-		auto valid() const -> bool;
-		auto size() const -> size_t;
-		auto position() const -> size_t;
-
-		auto seek(size_t) -> atma::stream_status_t;
-		auto move(int64) -> atma::stream_status_t;
-
 		// abstract-stream
+		auto stream_status() const -> atma::stream_status_t override;
 		auto stream_opers() const -> atma::stream_opers_mask_t override;
 
 		// input-stream
@@ -38,6 +32,10 @@ namespace rose
 		// output-stream
 		auto write(void const*, size_t) -> atma::write_result_t override;
 
+		auto size() const -> size_t;
+		auto position() const -> size_t;
+		auto seek(size_t) -> atma::stream_status_t;
+		auto move(int64) -> atma::stream_status_t;
 
 	private:
 		// random-access-input-stream
@@ -59,11 +57,58 @@ namespace rose
 	};
 
 
-	inline auto file_t::valid() const -> bool
+	// absract-stream
+	inline auto file_t::stream_status() const -> atma::stream_status_t
 	{
-		return handle_ != nullptr;
+		if (handle_ == nullptr || position() > filesize_)
+			return atma::stream_status_t::error;
+		else if (position() == filesize_)
+			return atma::stream_status_t::exhausted;
+		else
+			return atma::stream_status_t::good;
 	}
 
+	inline auto file_t::stream_opers() const -> atma::stream_opers_mask_t
+	{
+		return atma::stream_opers_mask_t{
+			atma::stream_opers_t::read,
+			atma::stream_opers_t::write,
+			atma::stream_opers_t::random_access};
+	}
+
+	// input-stream
+	inline auto file_t::g_size() const -> size_t
+	{
+		return filesize_;
+	}
+
+	inline auto file_t::g_seek(size_t x) -> atma::stream_status_t
+	{
+		return seek(x);
+	}
+
+	inline auto file_t::g_move(int64 x) -> atma::stream_status_t
+	{
+		return move(x);
+	}
+
+	// output-stream
+	inline auto file_t::p_size() const -> size_t
+	{
+		return filesize_;
+	}
+
+	inline auto file_t::p_seek(size_t x) -> atma::stream_status_t
+	{
+		return seek(x);
+	}
+
+	inline auto file_t::p_move(int64 x) -> atma::stream_status_t
+	{
+		return move(x);
+	}
+
+	// file_t
 	inline auto file_t::size() const -> size_t
 	{
 		return filesize_;
@@ -79,6 +124,14 @@ namespace rose
 	{
 		atma::unique_memory_t memory{file.size()};
 		file.read(memory.begin(), file.size());
+		return memory;
+	}
+
+	inline auto read_into_memory_nt(file_t& file) -> atma::unique_memory_t
+	{
+		atma::unique_memory_t memory{file.size()};
+		file.read(memory.begin(), file.size() + 1);
+		memory.begin()[file.size()] = '\0';
 		return memory;
 	}
 
