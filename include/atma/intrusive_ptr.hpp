@@ -175,6 +175,26 @@ namespace atma {
 	}
 
 	template <typename T>
+	inline auto operator == (intrusive_ptr<T> const& lhs, T const* rhs) -> bool {
+		return lhs.get() == rhs;
+	}
+
+	template <typename T>
+	inline auto operator == (T const* lhs, intrusive_ptr<T> const& rhs) -> bool {
+		return lhs == rhs.get();
+	}
+
+	template <typename T>
+	inline auto operator == (intrusive_ptr<T> const& lhs, std::nullptr_t) -> bool {
+		return lhs.get() == nullptr;
+	}
+
+	template <typename T>
+	inline auto operator == (std::nullptr_t, intrusive_ptr<T> const& rhs) -> bool {
+		return nullptr = rhs.get();
+	}
+
+	template <typename T>
 	inline auto operator != (intrusive_ptr<T> const& lhs, intrusive_ptr<T> const& rhs) -> bool {
 		return lhs.get() != rhs.get();
 	}
@@ -185,7 +205,7 @@ namespace atma {
 	}
 
 
-	struct intrusive_ptr_expose_constructor
+	struct enable_intrusive_ptr_make
 	{
 		template <typename T, typename... Args>
 		static auto make(Args&&... args) -> intrusive_ptr<T>
@@ -197,7 +217,7 @@ namespace atma {
 	template <typename T, typename... Args>
 	inline auto make_intrusive(Args&&... args) -> intrusive_ptr<T>
 	{
-		return intrusive_ptr_expose_constructor::make<T>(std::forward<Args>(args)...);
+		return enable_intrusive_ptr_make::make<T>(std::forward<Args>(args)...);
 	}
 
 	template <typename Y, typename T>
@@ -210,7 +230,7 @@ namespace atma {
 	template <typename... Args>
 	inline auto intrusive_ptr<T>::make(Args&&... args) -> intrusive_ptr<T>
 	{
-		return intrusive_ptr_expose_constructor::make<T>(std::forward<Args>(args)...);
+		return enable_intrusive_ptr_make::make<T>(std::forward<Args>(args)...);
 	}
 }
 
