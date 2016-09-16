@@ -117,11 +117,7 @@ namespace atma
 		if (*lhs != *rhs)
 			return false;
 
-		for (int8 i = 1, end = utf8_char_bytecount(lhs); i != end; ++i)
-			if (lhs[i] != rhs[i])
-				return false;
-		
-		return true;
+		return memcmp(lhs + 1, rhs + 1, utf8_char_bytecount(lhs)) == 0;
 	}
 
 #if 0
