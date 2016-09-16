@@ -15,4 +15,15 @@ namespace rose
 	};
 
 	ATMA_BITMASK(file_access_mask_t, file_access_t);
+
+	enum class file_change_t
+	{
+		created,
+		changed,
+		deleted,
+		attributed,
+		securitied,
+	};
+
+	ATMA_BITMASK(file_change_mask_t, file_change_t);
 }

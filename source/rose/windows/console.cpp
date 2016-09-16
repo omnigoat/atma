@@ -21,7 +21,6 @@ console_t::console_t()
 
 	console_handle_ = (uintptr)GetStdHandle(STD_OUTPUT_HANDLE);
 
-	// Redirect the CRT standard input, output, and error handles to the console
 	freopen("CONIN$", "r", stdin);
 	freopen("CONOUT$", "w", stdout);
 	freopen("CONOUT$", "w", stderr);
