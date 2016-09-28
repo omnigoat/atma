@@ -34,6 +34,24 @@ file_t::file_t(atma::string const& filename, file_access_mask_t access)
 	fseek(handle_.get(), 0, SEEK_SET);
 }
 
+file_t::file_t(file_t&& rhs)
+	: filename_{std::move(rhs.filename_)}
+	, access_{rhs.access_}
+	, filesize_{rhs.filesize_}
+	, handle_{std::move(rhs.handle_)}
+{
+}
+
+auto file_t::operator = (file_t&& rhs) -> file_t&
+{
+	filename_ = std::move(rhs.filename_);
+	access_ = rhs.access_;
+	filesize_ = rhs.filesize_;
+	handle_.swap(rhs.handle_);
+
+	return *this;
+}
+
 auto file_t::seek(size_t x) -> stream_status_t
 {
 	auto r = fseek(handle_.get(), (long)x, SEEK_SET);

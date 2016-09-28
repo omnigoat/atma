@@ -124,6 +124,7 @@
     <ClInclude Include="..\..\include\rose\console.hpp" />
     <ClInclude Include="..\..\include\rose\file.hpp" />
     <ClInclude Include="..\..\include\rose\mmap.hpp" />
+    <ClInclude Include="..\..\include\rose\path.hpp" />
     <ClInclude Include="..\..\include\rose\rose_fwd.hpp" />
     <ClInclude Include="..\..\include\rose\runtime.hpp" />
   </ItemGroup>

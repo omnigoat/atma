@@ -16,8 +16,14 @@ namespace atma { namespace thread {
 		using queue_t  = atma::lockfree::queue_t<signal_t>;
 		using batch_t  = queue_t::batch_t;
 
+		struct defer_start_t {};
+
 		engine_t();
+		engine_t(defer_start_t);
 		~engine_t();
+
+		auto is_running() const -> bool { return running_.load(); }
+		auto start() -> void;
 
 		auto signal(signal_t const&) -> void;
 		auto signal_batch(batch_t&) -> void;
@@ -44,6 +50,11 @@ namespace atma { namespace thread {
 		});
 	}
 
+	inline engine_t::engine_t(defer_start_t)
+		: running_{false}
+	{
+	}
+
 	inline engine_t::~engine_t()
 	{
 		signal([&] {
@@ -51,6 +62,16 @@ namespace atma { namespace thread {
 		});
 
 		handle_.join();
+	}
+
+	inline auto engine_t::start() -> void
+	{
+		running_ = true;
+
+		handle_.swap(std::thread([&]
+		{
+			reenter(running_);
+		}));
 	}
 
 	inline auto engine_t::reenter(std::atomic<bool> const& good) -> void

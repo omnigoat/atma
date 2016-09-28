@@ -4,8 +4,8 @@
 #include <atma/utf/utf8_string_range_header.hpp>
 
 
-namespace atma {
-
+namespace atma
+{
 	inline utf8_string_t::utf8_string_t()
 		: capacity_(8)
 		, size_()
@@ -152,6 +152,16 @@ namespace atma {
 	inline auto utf8_string_t::end() const -> const_iterator
 	{
 		return const_iterator(this, raw_end());
+	}
+
+	inline auto utf8_string_t::rbegin() const -> const_reverse_iterator
+	{
+		return const_reverse_iterator(end());
+	}
+
+	inline auto utf8_string_t::rend() const -> const_reverse_iterator
+	{
+		return const_reverse_iterator(begin());
 	}
 
 	inline auto utf8_string_t::raw_iter_of(const_iterator const& iter) const -> char const*
@@ -331,6 +341,7 @@ namespace atma {
 	inline utf8_string_t::iterator_t::iterator_t(owner_t const* owner, char const* ptr)
 		: owner_(owner)
 		, ptr_(ptr)
+		, ch_{ptr}
 	{
 		ATMA_ASSERT(ptr);
 		ATMA_ASSERT(utf8_byte_is_leading(*ptr));
@@ -339,6 +350,7 @@ namespace atma {
 	inline utf8_string_t::iterator_t::iterator_t(iterator_t const& rhs)
 		: owner_(rhs.owner_)
 		, ptr_(rhs.ptr_)
+		, ch_{rhs.ptr_}
 	{}
 
 	inline auto utf8_string_t::iterator_t::operator = (iterator_t const& rhs) -> iterator_t&
@@ -363,8 +375,12 @@ namespace atma {
 
 	inline auto utf8_string_t::iterator_t::operator -- () -> iterator_t&
 	{
-		while (ptr_ != owner_->data_ && utf8_byte_is_run_on(*ptr_))
-			--ptr_;
+		if (ptr_ == owner_->data_)
+			return *this;
+
+		while (--ptr_ != owner_->data_ && utf8_byte_is_run_on(*ptr_))
+			;
+
 		return *this;
 	}
 
@@ -375,14 +391,16 @@ namespace atma {
 		return t;
 	}
 
-	inline auto utf8_string_t::iterator_t::operator * () const -> value_type
+	inline auto utf8_string_t::iterator_t::operator * () const -> reference
 	{
-		return utf8_char_t{ptr_};
+		ch_ = utf8_char_t{ptr_};
+		return ch_;
 	}
 
-	inline auto utf8_string_t::iterator_t::operator -> () const -> value_type
+	inline auto utf8_string_t::iterator_t::operator -> () const -> pointer
 	{
-		return utf8_char_t{ptr_};
+		ch_ = utf8_char_t{ptr_};
+		return &ch_;
 	}
 
 	inline auto operator == (utf8_string_t::iterator_t const& lhs, utf8_string_t::iterator_t const& rhs) -> bool
@@ -400,6 +418,7 @@ namespace atma {
 	//=====================================================================
 	// functions
 	//=====================================================================
+#if 0
 	inline auto strcpy(utf8_string_t& dest, utf8_string_t const& src) -> void
 	{
 		ATMA_ASSERT(dest.raw_size() >= src.raw_size());
@@ -408,7 +427,7 @@ namespace atma {
 		for (auto& x : src)
 			*i++ = x;
 	}
-
+#endif
 
 
 	//
@@ -416,6 +435,17 @@ namespace atma {
 	//
 	template <typename T>
 	inline auto find_if(utf8_string_t::const_iterator const& begin, utf8_string_t::const_iterator const& end, T&& pred) -> utf8_string_t::const_iterator
+	{
+		auto i = begin;
+		for (; i != end; ++i)
+			if (pred(*i))
+				break;
+
+		return i;
+	}
+
+	template <typename T>
+	inline auto find_if(utf8_string_t::const_reverse_iterator const& begin, utf8_string_t::const_reverse_iterator const& end, T&& pred) -> utf8_string_t::const_reverse_iterator
 	{
 		auto i = begin;
 		for (; i != end; ++i)
@@ -440,6 +470,15 @@ namespace atma {
 
 		return find_if(begin, end, [&](utf8_char_t const& lhs) {
 			return utf8_charseq_any_of(delims, [&lhs](utf8_char_t const& rhs) {
+				return lhs == rhs; }); });
+	}
+
+	inline auto find_first_of(utf8_string_t::const_reverse_iterator const& begin, utf8_string_t::const_reverse_iterator const& end, char const* delims) -> utf8_string_t::const_reverse_iterator
+	{
+		ATMA_ASSERT(delims);
+
+		return find_if(begin, end, [&](utf8_char_t lhs) {
+			return utf8_charseq_any_of(delims, [lhs](utf8_char_t const& rhs) {
 				return lhs == rhs; }); });
 	}
 

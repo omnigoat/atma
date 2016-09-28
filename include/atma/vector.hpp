@@ -71,6 +71,9 @@ namespace atma
 		auto push_back(T&&) -> void;
 		auto push_back(T const&) -> void;
 
+		template <typename... Args>
+		auto emplace_back(Args&&... args) -> reference;
+
 		template <typename H> auto assign(H begin, H end) -> void;
 		auto insert(const_iterator, T const&) -> void;
 		auto insert(const_iterator, T&&) -> void;
@@ -378,6 +381,18 @@ namespace atma
 
 		imem_.construct(size_, 1, std::move(x));
 		++size_;
+	}
+
+	template <typename T, typename A>
+	template <typename... Args>
+	inline auto vector<T, A>::emplace_back(Args&&... args) -> reference
+	{
+		IMEM_GUARD_LT(size_ + 1);
+
+		imem_.construct(size_, 1, std::forward<Args>(args)...);
+		++size_;
+
+		return imem_[size_ - 1];
 	}
 
 	template <typename T, typename A>
