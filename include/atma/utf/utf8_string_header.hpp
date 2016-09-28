@@ -2,16 +2,16 @@
 
 #include <atma/types.hpp>
 #include <atma/assert.hpp>
-#include <atma/utf/algorithm.hpp>
+
 #include <atma/utf/utf8_char.hpp>
 
 #include <string>
-#include <vector>
-#include <cstdint>
+#include <iterator>
 
 
 namespace atma
 {
+	struct utf8_char_t;
 	struct utf8_string_t;
 	struct utf8_string_range_t;
 
@@ -19,10 +19,12 @@ namespace atma
 	struct utf8_string_t
 	{
 		struct iterator_t;
-		
-		using value_t        = char;
-		using iterator       = iterator_t;
-		using const_iterator = iterator_t;
+
+		using value_t                = char;
+		using iterator               = iterator_t;
+		using const_iterator         = iterator_t;
+		using reverse_iterator       = std::reverse_iterator<iterator>;
+		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 		utf8_string_t();
 		utf8_string_t(char const* str, size_t size);
@@ -47,6 +49,8 @@ namespace atma
 
 		auto begin() const -> const_iterator;
 		auto end() const -> const_iterator;
+		auto rbegin() const -> const_reverse_iterator;
+		auto rend() const -> const_reverse_iterator;
 
 		auto raw_begin() const -> char const*;
 		auto raw_end() const -> char const*;
@@ -79,11 +83,14 @@ namespace atma
 		friend class utf16_string_t;
 	};
 
-	auto operator == (utf8_string_t const&, utf8_string_t const&) -> bool;
-	auto operator != (utf8_string_t const&, utf8_string_t const&) -> bool;
 
+	auto operator == (utf8_string_t const&, utf8_string_t const&) -> bool;
 	auto operator == (utf8_string_t const&, char const*) -> bool;
 	auto operator == (char const*, utf8_string_t const&) -> bool;
+
+	auto operator != (utf8_string_t const&, utf8_string_t const&) -> bool;
+	auto operator != (utf8_string_t const&, char const*) -> bool;
+	auto operator != (char const*, utf8_string_t const&) -> bool;
 
 	auto operator + (utf8_string_t const&, utf8_string_t const&)       -> utf8_string_t;
 	auto operator + (utf8_string_t const&, char const*)                -> utf8_string_t;
@@ -91,10 +98,13 @@ namespace atma
 	auto operator + (utf8_string_t const&, utf8_string_range_t const&) -> utf8_string_t;
 
 	auto operator << (std::ostream&, utf8_string_t const&) -> std::ostream&;
+}
 
 
 
 
+namespace atma
+{
 	struct utf8_string_t::iterator_t
 	{
 	private:
@@ -117,8 +127,8 @@ namespace atma
 		auto operator -- () -> iterator_t&;
 		auto operator -- (int) -> iterator_t;
 
-		auto operator * () const -> value_type;
-		auto operator -> () const -> value_type;
+		auto operator * () const -> reference;
+		auto operator -> () const -> pointer;
 
 	private:
 		iterator_t(owner_t const*, char const*);
@@ -126,11 +136,12 @@ namespace atma
 	private:
 		owner_t const* owner_;
 		char const* ptr_;
+		mutable utf8_char_t ch_;
 
 		friend auto operator == (utf8_string_t::iterator_t const&, utf8_string_t::iterator_t const&) -> bool;
 	};
 
+
 	inline auto operator == (utf8_string_t::iterator_t const&, utf8_string_t::iterator_t const&) -> bool;
 	inline auto operator != (utf8_string_t::iterator_t const&, utf8_string_t::iterator_t const&) -> bool;
-
 }

@@ -11,6 +11,7 @@
 
 namespace rose
 {
+	// a noncopyable file
 	struct file_t
 		: atma::random_access_input_bytestream_t
 		, atma::random_access_output_bytestream_t
@@ -21,6 +22,12 @@ namespace rose
 
 		file_t();
 		file_t(atma::string const&, file_access_mask_t = file_access_t::read);
+		file_t(file_t&&);
+		auto operator = (file_t&&) -> file_t&;
+
+		// noncopyable
+		file_t(file_t const&) = delete;
+		auto operator = (file_t const&) -> file_t& = delete;
 
 		// abstract-stream
 		auto stream_status() const -> atma::stream_status_t override;

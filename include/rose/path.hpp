@@ -3,6 +3,7 @@
 
 #include <atma/string.hpp>
 
+#include <filesystem>
 
 namespace stdfs = std::experimental::filesystem;
 
@@ -64,6 +65,11 @@ namespace rose
 		auto rit = atma::find_first_of(string_.rbegin(), string_.rend(), "/");
 
 		return path_t{string_.raw_begin(), (*rit).data()};
+	}
+
+	inline auto operator < (path_t const& lhs, path_t const& rhs)
+	{
+		return lhs.string() < rhs.string();
 	}
 
 	inline auto operator == (path_t const& lhs, path_t const& rhs) -> bool

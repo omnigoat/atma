@@ -20,6 +20,7 @@ namespace rose
 	{
 		created,
 		changed,
+		renamed,
 		deleted,
 		attributed,
 		securitied,

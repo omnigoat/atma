@@ -20,7 +20,14 @@ namespace rose
 #endif
 
 		mmap_t(stdfs::path const&, file_access_mask_t = file_access_t::read);
+		mmap_t(mmap_t&&);
 		~mmap_t();
+
+		auto operator = (mmap_t&&) -> mmap_t&;
+
+		// not copyable
+		mmap_t(mmap_t const&) = delete;
+		mmap_t& operator = (mmap_t const&) = delete;
 
 		auto valid() const -> bool;
 		auto handle() const -> handle_t;
@@ -38,11 +45,6 @@ namespace rose
 	};
 
 	using mmap_ptr = atma::intrusive_ptr<mmap_t>;
-
-	inline auto mmap_t::valid() const -> bool
-	{
-		return handle_ != nullptr;
-	}
 
 	inline auto mmap_t::handle() const -> handle_t
 	{
