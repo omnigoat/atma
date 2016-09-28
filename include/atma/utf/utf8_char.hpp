@@ -117,7 +117,7 @@ namespace atma
 		if (*lhs != *rhs)
 			return false;
 
-		return memcmp(lhs + 1, rhs + 1, utf8_char_bytecount(lhs)) == 0;
+		return memcmp(lhs + 1, rhs + 1, utf8_char_bytecount(lhs) - 1) == 0;
 	}
 
 #if 0
@@ -155,6 +155,12 @@ namespace atma
 		auto data() const -> char const* { return c; }
 
 		operator char const*() const { return c; }
+
+		auto operator = (utf8_char_t const& rhs) -> utf8_char_t&
+		{
+			c = rhs.c;
+			return *this;
+		}
 
 	private:
 		char const* c;

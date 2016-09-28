@@ -29,6 +29,9 @@
     <ClInclude Include="..\..\include\rose\rose_fwd.hpp">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\rose\path.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\source\rose\windows\console.cpp">
