@@ -18,8 +18,8 @@ namespace rose
 
 	struct runtime_t
 	{
-		using file_change_callback_t = atma::function<void(atma::string const&, file_change_t)>;
-		using dir_watchers_t = std::map<path_t, intptr_t>;
+		using file_change_callback_t = atma::function<void(path_t const&, file_change_t)>;
+		using dir_watchers_t = std::map<path_t, size_t>;
 		using dir_watch_handle_t = intptr_t;
 
 		runtime_t();
@@ -59,6 +59,8 @@ namespace rose
 
 	struct runtime_t::dir_watch_t
 	{
+		using callbacks_t = std::vector<file_change_callback_t>;
+
 		static const int bufsize = 512;
 
 		OVERLAPPED overlapped;
@@ -66,5 +68,6 @@ namespace rose
 		alignas(4) char buf[bufsize];
 		uint32 notify;
 		HANDLE handle;
+		callbacks_t callbacks;
 	};
 }
