@@ -14,14 +14,29 @@ static void CALLBACK rose::FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNu
 
 	if (FILE_NOTIFY_INFORMATION* fni = (FILE_NOTIFY_INFORMATION*)info.buf)
 	{
-		while (fni)
+		for (;;)
 		{
-			// do something?
+			fni = (FILE_NOTIFY_INFORMATION*)((byte*)fni + fni->NextEntryOffset);
+
+			char buf[256];
+			int L = WideCharToMultiByte(CP_ACP, 0, fni->FileName, fni->FileNameLength, buf, 256, NULL, NULL);
+			auto filename = atma::string{buf, buf + L};
+
+			FILE* f = nullptr;
+			auto yay = (info.path / filename).string();
+			while ((f = fopen(yay.c_str(), "r")) == nullptr)
+				std::cout << "waiting..." << std::endl;
+			fclose(f);
+
+			for (auto& c : info.callbacks) 
+				c(filename, file_change_t::changed);
+
 			if (fni->NextEntryOffset == 0)
 				break;
 
-			fni = (FILE_NOTIFY_INFORMATION*)((byte*)fni + fni->NextEntryOffset);
+			fni = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(reinterpret_cast<char*>(info.buf) + fni->NextEntryOffset);
 		}
+
 	}
 	
 	ReadDirectoryChangesW(
@@ -110,7 +125,11 @@ auto runtime_t::register_directory_watch(
 	{
 		auto candidate = dir_watchers_.find(path);
 		if (candidate != dir_watchers_.end())
+		{
+			ATMA_ASSERT(dir_infos_.size() > candidate->second);
+			dir_infos_[(int)candidate->second].callbacks.push_back(callback);
 			return;
+		}
 
 		// WIN32 strings :(
 		int char16s = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path.c_str(), -1, nullptr, 0);
@@ -132,6 +151,7 @@ auto runtime_t::register_directory_watch(
 			return;
 
 		info.handle = dir;
+		info.callbacks.push_back(callback);
 
 		DWORD bytes = 0;
 		BOOL success = ReadDirectoryChangesW(dir,
@@ -144,6 +164,8 @@ auto runtime_t::register_directory_watch(
 		{
 			dir_handles_.push_back(dir);
 		}
+
+		dir_watchers_[path] = dir_handles_.size() - 1;
 	});
 
 	
