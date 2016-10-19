@@ -10,6 +10,8 @@
 
 #include <memory>
 #include <map>
+#include <chrono>
+#include <set>
 
 
 namespace rose
@@ -69,5 +71,10 @@ namespace rose
 		uint32 notify;
 		HANDLE handle;
 		callbacks_t callbacks;
+
+		// changes
+		bool pending_change = false;
+		std::chrono::time_point<std::chrono::high_resolution_clock> trigger;
+		std::set<std::tuple<atma::string, file_change_t>> files;
 	};
 }

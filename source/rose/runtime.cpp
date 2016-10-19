@@ -28,8 +28,9 @@ static void CALLBACK rose::FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNu
 				std::cout << "waiting..." << std::endl;
 			fclose(f);
 
-			for (auto& c : info.callbacks) 
-				c(filename, file_change_t::changed);
+			info.trigger = std::chrono::high_resolution_clock::now();
+			info.pending_change = true;
+			info.files.insert(std::make_tuple(filename, file_change_t::changed));
 
 			if (fni->NextEntryOffset == 0)
 				break;
@@ -76,27 +77,35 @@ auto runtime_t::get_console() -> console_t&
 auto runtime_t::initialize_watching() -> void
 {
 	filewatch_engine_.start();
-	filewatch_engine_.signal([]{ atma::this_thread::set_debug_name("filewatching"); });
+
+	filewatch_engine_.signal([]
+	{
+		atma::this_thread::set_debug_name("filewatching");
+	});
 
 	filewatch_engine_.signal_evergreen([&]
 	{
-		auto status = WaitForMultipleObjectsEx((DWORD)dir_handles_.size(), dir_handles_.data(), FALSE, 1000, TRUE);
+		auto status = WaitForMultipleObjectsEx((DWORD)dir_handles_.size(), dir_handles_.data(), FALSE, 100, TRUE);
 		if (status == WAIT_TIMEOUT)
 			return;
+	});
 
-		//for (auto i = 0; i != dir_handles_.size(); ++i)
-		//{
-		//	if (status == WAIT_OBJECT_0 + i)
-		//	{
-		//		auto& info = dir_infos_[i];
-		//		std::cout << "change in " << info.path.string() << std::endl;
-		//
-		//		//FindNextChangeNotification(dir_handles_[i]);
-		//		
-		//
-		//		break;
-		//	}
-		//}
+	filewatch_engine_.signal_evergreen([&]
+	{
+		auto now = std::chrono::high_resolution_clock::now();
+
+		for (auto& info : dir_infos_)
+		{
+			auto d = std::chrono::duration_cast<std::chrono::milliseconds>(now - info.trigger);
+			if (info.pending_change && d > std::chrono::milliseconds{100})
+			{
+				for (auto const& file : info.files)
+					for (auto const& c : info.callbacks)
+						c(std::get<0>(file), std::get<1>(file));
+
+				info.pending_change = false;
+			}
+		}
 	});
 }
 
