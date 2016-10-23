@@ -49,11 +49,13 @@ namespace rose
 
 		auto initialize_watching() -> void;
 
-		atma::thread::engine_t filewatch_engine_;
 
 		dir_watch_handles_t dir_handles_;
 		dir_watch_infos_t dir_infos_;
 		dir_watchers_t dir_watchers_;
+
+		// placed last for good reason (other thread still using members!)
+		atma::thread::engine_t filewatch_engine_;
 
 		friend VOID CALLBACK FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped);
 	};
@@ -67,7 +69,8 @@ namespace rose
 
 		OVERLAPPED overlapped;
 		path_t path;
-		alignas(4) char buf[bufsize];
+		alignas(4) char bufs[2][bufsize];
+		uint32 bufidx = 0;
 		uint32 notify;
 		HANDLE handle;
 		callbacks_t callbacks;
