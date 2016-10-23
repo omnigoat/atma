@@ -46,6 +46,8 @@ namespace atma
 		auto get(handle_t) -> Payload*;
 		auto get(handle_t) const -> Payload const*;
 
+		auto swap(handle_t, handle_t) -> void;
+
 		auto dump_ascii() -> void;
 
 
@@ -329,6 +331,19 @@ namespace atma
 		}
 
 		return nullptr;
+	}
+
+	template <typename T>
+	inline auto handle_table_t<T>::swap(handle_t a, handle_t b) -> void
+	{
+		auto as = lookup_handle(a);
+		auto bs = lookup_handle(b);
+
+		if (as.first && as.second && bs.first && bs.second)
+		{
+			using std::swap;
+			swap(as.second->payload, bs.second->payload);
+		}
 	}
 
 	template <typename T>
