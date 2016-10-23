@@ -159,6 +159,12 @@ namespace atma {
 
 		static intrusive_ptr null;
 
+		friend void swap(intrusive_ptr& lhs, intrusive_ptr& rhs)
+		{
+			using namespace std;
+			swap(lhs.px, rhs.px);
+		}
+
 	private:
 		T* px;
 
@@ -205,32 +211,44 @@ namespace atma {
 	}
 
 
-	struct enable_intrusive_ptr_make
-	{
-		template <typename T, typename... Args>
-		static auto make(Args&&... args) -> intrusive_ptr<T>
-		{
-			return intrusive_ptr<T>(new T(std::forward<Args>(args)...));
-		}
-	};
-
-	template <typename T, typename... Args>
-	inline auto make_intrusive(Args&&... args) -> intrusive_ptr<T>
-	{
-		return enable_intrusive_ptr_make::make<T>(std::forward<Args>(args)...);
-	}
-
 	template <typename Y, typename T>
 	inline auto ptr_cast_static(atma::intrusive_ptr<T> const& ptr) -> atma::intrusive_ptr<Y>
 	{
 		return intrusive_ptr<Y>(static_cast<Y*>(ptr.get()));
 	}
 
+	struct enable_default_intrusive_ptr_make
+	{
+		template <typename T, typename... Args>
+		static auto make(Args&&... args) -> T*
+		{
+			return new T(std::forward<Args>(args)...);
+		}
+	};
+
+	template <typename T>
+	struct intrusive_ptr_make
+	{
+		template <typename... Args>
+		static auto make(Args&&... args) -> T*
+		{
+			return enable_default_intrusive_ptr_make::make<T>(std::forward<Args>(args)...);
+		}
+	};
+
 	template <typename T>
 	template <typename... Args>
 	inline auto intrusive_ptr<T>::make(Args&&... args) -> intrusive_ptr<T>
 	{
-		return enable_intrusive_ptr_make::make<T>(std::forward<Args>(args)...);
+		return intrusive_ptr{intrusive_ptr_make<T>::make(std::forward<Args>(args)...)};
+	}
+
+
+
+	template <typename T, typename... Args>
+	inline auto make_intrusive(Args&&... args) -> intrusive_ptr<T>
+	{
+		return intrusive_ptr<T>::make(std::forward<Args>(args)...);
 	}
 }
 
