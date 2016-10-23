@@ -20,7 +20,7 @@ namespace rose
 		path_t(atma::string const& x) : string_{x} {}
 		path_t(char const* x) : string_{x} {}
 		path_t(char const* begin, char const* end) : string_{begin, end} {}
-		path_t(atma::string&& x) : string_{x} {}
+		path_t(atma::string&& x) : string_{std::move(x)} {}
 
 		auto operator /= (atma::string const&) -> path_t&;
 
