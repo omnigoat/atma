@@ -12,21 +12,24 @@ static void CALLBACK rose::FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNu
 {
 	auto& info = *reinterpret_cast<rose::runtime_t::dir_watch_t*>(lpOverlapped);
 
-	if (FILE_NOTIFY_INFORMATION* fni = (FILE_NOTIFY_INFORMATION*)info.buf)
+	if (FILE_NOTIFY_INFORMATION* fni = (FILE_NOTIFY_INFORMATION*)info.bufs[info.bufidx])
 	{
 		for (;;)
 		{
 			fni = (FILE_NOTIFY_INFORMATION*)((byte*)fni + fni->NextEntryOffset);
 
 			char buf[256];
-			int L = WideCharToMultiByte(CP_ACP, 0, fni->FileName, fni->FileNameLength, buf, 256, NULL, NULL);
-			auto filename = atma::string{buf, buf + L};
+			memset(buf, 0, 256);
+			int L = WideCharToMultiByte(CP_ACP, 0, fni->FileName, -1, buf, 256, NULL, NULL);
+			auto filename = atma::string{buf, buf + L - 1}; // minus one to exclude null-terminator
 
+#if 0 
 			FILE* f = nullptr;
 			auto yay = (info.path / filename).string();
 			while ((f = fopen(yay.c_str(), "r")) == nullptr)
 				std::cout << "waiting..." << std::endl;
 			fclose(f);
+#endif
 
 			info.trigger = std::chrono::high_resolution_clock::now();
 			info.pending_change = true;
@@ -35,14 +38,18 @@ static void CALLBACK rose::FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNu
 			if (fni->NextEntryOffset == 0)
 				break;
 
-			fni = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(reinterpret_cast<char*>(info.buf) + fni->NextEntryOffset);
+			fni = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(reinterpret_cast<char*>(info.bufs[info.bufidx]) + fni->NextEntryOffset);
 		}
 
 	}
-	
+
+	memset(info.bufs[info.bufidx], 0, sizeof(info.bufs[0]));
+	info.bufidx = (info.bufidx + 1) % 2;
+
+
 	ReadDirectoryChangesW(
 		info.handle,
-		info.buf, info.bufsize,
+		info.bufs[info.bufidx], info.bufsize,
 		FALSE, info.notify,
 		nullptr, &info.overlapped,
 		&FileIOCompletionRoutine);
@@ -104,6 +111,7 @@ auto runtime_t::initialize_watching() -> void
 						c(std::get<0>(file), std::get<1>(file));
 
 				info.pending_change = false;
+				info.files.clear();
 			}
 		}
 	});
@@ -164,7 +172,7 @@ auto runtime_t::register_directory_watch(
 
 		DWORD bytes = 0;
 		BOOL success = ReadDirectoryChangesW(dir,
-			info.buf, info.bufsize,
+			info.bufs[info.bufidx], info.bufsize,
 			FALSE, notify,
 			&bytes, &info.overlapped,
 			&FileIOCompletionRoutine);
