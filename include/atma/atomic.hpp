@@ -21,121 +21,201 @@ namespace atma
 			ui32[3] = c;
 		}
 
-		union {
-			int64 i64[2];
-			int32 i32[4];
-			int16 i16[8];
-			int8  i8[16];
+		static_assert(sizeof(uint64) == sizeof(uintptr), "bad sizes");
 
-			uint64 ui64[2];
-			uint32 ui32[4];
-			uint16 ui16[8];
-			uint8  ui8[16];
+		union
+		{
+			intptr iptr[2];
+			int64  i64[2];
+			int32  i32[4];
+			int16  i16[8];
+			int8   i8[16];
+
+			uintptr uptr[2];
+			uint64  ui64[2];
+			uint32  ui32[4];
+			uint16  ui16[8];
+			uint8   ui8[16];
 		};
 	};
 
+
+
+
 #if ATMA_COMPILER_MSVC
+
+#define ADDR_CAST(type, x) reinterpret_cast<type*>(x)
+#define VALUE_CAST(type, x) reinterpret_cast<type&>(x)
 
 	namespace detail
 	{
-		template <typename T, size_t S = sizeof(T)> struct interlocked_t;
+		template <typename D, typename S, size_t Sz = sizeof(D)>
+		struct interlocked_impl_t;
 
-		template <typename T>
-		struct interlocked_t<T, 1>
+		template <typename D, typename S>
+		struct interlocked_impl_t<D, S, 1>
 		{
-			static auto exchange(void* addr, T x) -> T
+			static auto exchange(D* addr, S x) -> D
 			{
-				auto sx = *reinterpret_cast<CHAR*>(&x);
-				return InterlockedExchange8((CHAR*)addr, sx);
+				return reinterpret_cast<D>(InterlockedExchange8((CHAR*)addr, reinterpret_cast<CHAR const&>(x)));
 			}
 
-			static auto bit_or(T* addr, T x) -> T
+			static auto bit_or(D* addr, S x) -> D
 			{
 				return InterlockedOr8((LONG*)addr, x);
 			}
 		};
 
-		template <typename T>
-		struct interlocked_t<T, 2>
+		template <typename D, typename S>
+		struct interlocked_impl_t<D, S, 2>
 		{
-			static auto exchange(void* addr, T x) -> T
+			static auto pre_inc(void volatile* addr) -> D
+			{
+				auto v = InterlockedIncrement16((SHORT*)addr);
+				return *reinterpret_cast<D*>(&v);
+			}
+
+			static auto post_inc(void volatile* addr) -> D
+			{
+				auto v = InterlockedIncrement16((SHORT*)addr) - 1;
+				return *reinterpret_cast<D*>(&v);
+			}
+
+			static auto pre_dec(void volatile* addr) -> D
+			{
+				auto v = InterlockedDecrement16((SHORT*)addr);
+				return *reinterpret_cast<D*>(&v);
+			}
+
+			static auto post_dec(void volatile* addr) -> D
+			{
+				auto v = InterlockedDecrement16((SHORT*)addr) - 1;
+				return *reinterpret_cast<D*>(&v);
+			}
+
+			static auto exchange(void* addr, D x) -> D
 			{
 				auto sx = *reinterpret_cast<SHORT*>(&x);
 				return InterlockedExchange16((SHORT*)addr, sx);
 			}
-		};
 
-		template <typename T>
-		struct interlocked_t<T, 4>
-		{
-			static auto pre_inc(void volatile* addr) -> T
+			static auto compare_exchange(D volatile* addr, D const& c, S const& x, D* outc) -> bool
 			{
-				auto v = InterlockedIncrement((LONG*)addr);
-				return *reinterpret_cast<T*>(&v);
-			}
+				*ADDR_CAST(SHORT, outc) = InterlockedCompareExchange16(
+					ADDR_CAST(SHORT volatile, addr),
+					VALUE_CAST(SHORT const, x),
+					VALUE_CAST(SHORT const, c));
 
-			static auto post_inc(void volatile* addr) -> T
-			{
-				auto v = InterlockedIncrement((LONG*)addr) - 1;
-				return *reinterpret_cast<T*>(&v);
-			}
-
-			static auto pre_dec(void volatile* addr) -> T
-			{
-				auto v = InterlockedDecrement((LONG*)addr);
-				return *reinterpret_cast<T*>(&v);
-			}
-
-			static auto post_dec(void volatile* addr) -> T
-			{
-				auto v = InterlockedDecrement((LONG*)addr) - 1;
-				return *reinterpret_cast<T*>(&v);
-			}
-
-			static auto exchange(void* addr, T const& x) -> T
-			{
-				return InterlockedExchange((LONG*)addr, *reinterpret_cast<LONG const*>(&x));
-			}
-
-			static auto compare_exchange(void* addr, T const& c, T const& x, T* outc) -> bool
-			{
-				auto v = InterlockedCompareExchange((LONG*)addr, x, c);
-				bool r = (c == v);
-				*outc = v;
-				return r;
-			}
-		};
-
-		template <typename T>
-		struct interlocked_t<T, 8>
-		{
-			static auto exchange(void* addr, T const& x) -> T
-			{
-				return InterlockedExchange64((LONG64*)addr, *reinterpret_cast<LONG64*>(&x));
-			}
-
-			static auto compare_exchange(void* addr, T const& c, T const& x, T* outc) -> bool
-			{
-				// reinterpret c & x as an atomic128 for convenience
-				*reinterpret_cast<LONG64*>(outc) = InterlockedCompareExchange64((LONG64*)addr, *(LONG64*)&x, *(LONG64*)&c);
 				return *outc == c;
 			}
 		};
 
-		template <typename T>
-		struct interlocked_t<T, 16>
-		{
-			static auto compare_exchange(void* addr, T const& c, T const& x, T* outc) -> bool
-			{
-				// reinterpret c & x as an atomic128 for convenience
-				//auto ac = *reinterpret_cast<atomic128_t const*>(&c);
-				auto const& ax = *reinterpret_cast<atomic128_t const*>(&x);
-				*outc = c;
+		
 
-				return InterlockedCompareExchange128((LONG64*)addr, ax.i64[1], ax.i64[0], (LONG64*)outc) != 0;
+		template <typename D, typename S>
+		struct interlocked_impl_t<D, S, 4>
+		{
+			static auto pre_inc(D volatile* addr) -> D
+			{
+				auto v = InterlockedIncrement(ADDR_CAST(LONG volatile, addr));
+				return VALUE_CAST(D, v);
+			}
+
+			static auto post_inc(D volatile* addr) -> D
+			{
+				auto v = InterlockedIncrement(ADDR_CAST(LONG volatile, addr)) - 1;
+				return VALUE_CAST(D, v);
+			}
+
+			static auto pre_dec(D volatile* addr) -> D
+			{
+				auto v = InterlockedDecrement(ADDR_CAST(LONG volatile, addr));
+				return VALUE_CAST(D, v);
+			}
+
+			static auto post_dec(D volatile* addr) -> D
+			{
+				auto v = InterlockedDecrement(ADDR_CAST(LONG volatile, addr)) - 1;
+				return VALUE_CAST(D, v);
+			}
+
+			static auto exchange(D volatile* addr, S const& x) -> D
+			{
+				auto r = InterlockedExchange(
+					ADDR_CAST(LONG volatile, addr),
+					VALUE_CAST(LONG const, x));
+
+				return VALUE_CAST(D, r);
+			}
+
+			static auto compare_exchange(D volatile* addr, D const& c, S const& x, D* outc) -> bool
+			{
+				*ADDR_CAST(LONG, outc) = InterlockedCompareExchange(
+					ADDR_CAST(LONG volatile, addr),
+					VALUE_CAST(LONG const, x),
+					VALUE_CAST(LONG const, c));
+
+				return *outc == c;
 			}
 		};
+
+		template <typename D, typename S>
+		struct interlocked_impl_t<D, S, 8>
+		{
+			static auto exchange(D volatile* addr, S const& x) -> D
+			{
+				auto v = InterlockedExchange64(
+					ADDR_CAST(LONG64 volatile, addr),
+					VALUE_CAST(LONG64 const, x));
+
+				return VALUE_CAST(D, v);
+			}
+
+			static auto compare_exchange(D volatile* addr, D const& c, S const& x, D* outc) -> bool
+			{
+				*ADDR_CAST(LONG64, outc) = InterlockedCompareExchange64(
+					ADDR_CAST(LONG64 volatile, addr),
+					VALUE_CAST(LONG64 const, x),
+					VALUE_CAST(LONG64 const, c));
+
+				return *outc == c;
+			}
+		};
+
+		template <typename D, typename S>
+		struct interlocked_impl_t<D, S, 16>
+		{
+			static auto exchange(D volatile* addr, S const& x) -> D
+			{
+				atomic128_t r;
+				while (!compare_exchange(addr, (D&)*addr, x, &r));
+				return VALUE_CAST(D, r);
+			}
+
+			static auto compare_exchange(D volatile* addr, D const& c, S const& x, D* outc) -> bool
+			{
+				// the 128-vit version of InterlockedCompareExchange in/outs the comparison/dest value
+				*outc = c;
+
+				auto const& ax = VALUE_CAST(atomic128_t const, x);
+
+				return InterlockedCompareExchange128(
+					ADDR_CAST(LONG64 volatile, addr),
+					ax.i64[1], ax.i64[0],
+					ADDR_CAST(LONG64, outc)) != 0;
+			}
+		};
+
+
+		template <typename D, typename S = D>
+		struct interlocked_t : interlocked_impl_t<D, S, sizeof(D)>
+		{
+			static_assert(sizeof(D) == sizeof(S), "bad sizes!");
+		};
 	}
+
+#undef ADDR_CAST
+#undef VALUE_CAST
 
 #endif
 
@@ -144,33 +224,39 @@ namespace atma
 	template <typename T> inline auto atomic_pre_decrement(T* addr) -> T { return detail::interlocked_t<T>::pre_dec(addr); }
 	template <typename T> inline auto atomic_post_decrement(T* addr) -> T { return detail::interlocked_t<T>::post_dec(addr); }
 
-	template <typename T>
-	inline auto atomic_bitwise_or(T* addr, T x) -> T {
-		return detail::interlocked_t<T>::bit_or(addr, x);
+	template <typename D, typename S>
+	inline auto atomic_bitwise_or(D volatile* dest, S x) -> D {
+		return detail::interlocked_t<D, S>::bit_or(dest, x);
 	}
 
-	template <typename T>
-	inline auto atomic_exchange(void* addr, T const& x) -> T {
-		return detail::interlocked_t<T>::exchange(addr, x);
+	template <typename D, typename S>
+	inline auto atomic_exchange(D volatile* addr, S const& x) -> D {
+		return detail::interlocked_t<D, S>::exchange(addr, x);
 	}
 
-	template <typename T>
-	inline auto atomic_compare_exchange(void* addr, T const& c, T const& x) -> bool
+	//template <typename T>
+	//inline auto atomic_store(void* addr, T const& x) -> void {
+	//	atomic_exchange(addr, x);
+	//}
+
+	template <typename D, typename S>
+	inline auto atomic_compare_exchange(D volatile* addr, D const& c, S const& x) -> bool
 	{
 		static atomic128_t d;
-		return detail::interlocked_t<T>::compare_exchange(addr, c, x, reinterpret_cast<T*>(&d));
+		return detail::interlocked_t<D, S>::compare_exchange(addr, c, x, reinterpret_cast<D*>(&d));
 	}
 
-	template <typename T>
-	inline auto atomic_compare_exchange(void* addr, T const& c, T const& x, T* outc) -> bool
+	template <typename D, typename S>
+	inline auto atomic_compare_exchange(D volatile* addr, D const& c, S const& x, D* outc) -> bool
 	{
-		return detail::interlocked_t<T>::compare_exchange(addr, c, x, outc);
+		return detail::interlocked_t<D, S>::compare_exchange(addr, c, x, outc);
 	}
 
-	inline auto atomic_load_128(void* dest, void* src) -> void
+	template <typename D, typename S>
+	inline auto atomic_load_128(D* dest, S volatile* src) -> void
 	{
 		static const atomic128_t t;
-		atomic_compare_exchange(src, t, t, reinterpret_cast<atomic128_t*>(dest));
+		atomic_compare_exchange<S, D>(src, t, t, reinterpret_cast<atomic128_t*>(dest));
 	}
 
 }
