@@ -236,7 +236,7 @@ namespace atma
 		ATMA_ASSERT(((uint64)(a.buf + a.op)) % 4 == 0);
 
 		// we have already guaranteed that the header does not wrap around our buffer
-		atma::atomic_exchange<uint32>(a.buf + a.op, a.header());
+		atma::atomic_exchange<uint32>(reinterpret_cast<uint32*>(a.buf + a.op), a.header());
 	}
 
 	inline auto base_mpsc_queue_t::consume() -> decoder_t
