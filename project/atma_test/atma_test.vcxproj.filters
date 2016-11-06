@@ -23,5 +23,8 @@
     <ClCompile Include="..\..\source\atma_test\bind_and_function.cpp">
       <Filter>source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\source\atma_test\test_vector.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
