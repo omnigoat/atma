@@ -228,7 +228,7 @@ namespace atma
 						idx = (i << slot_bit_bits) | j;
 
 						// construct now-owned slot
-						p->memory.construct(idx, 1, std::forward<Args>(args)...);
+						p->memory.construct(idx, std::forward<Args>(args)...);
 						goto freeslot_end;
 					}
 
