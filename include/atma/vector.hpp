@@ -2,6 +2,7 @@
 
 #include <atma/memory.hpp>
 #include <atma/unique_memory.hpp>
+#include <atma/assert.hpp>
 
 #include <initializer_list>
 #include <allocators>
@@ -47,6 +48,8 @@ namespace atma
 
 		auto size() const -> size_t;
 		auto capacity() const -> size_t;
+		auto cbegin() const -> T const*;
+		auto cend() const -> T const*;
 		auto begin() const -> T const*;
 		auto end() const -> T const*;
 		auto begin() -> T*;
@@ -112,7 +115,10 @@ namespace atma
 			imem_recapacitize(imem_capsize(capacity)); \
 	} while(0)
 
-
+#define IMEM_ASSERT_ITER(iter) \
+	do { \
+		ATMA_ASSERT(cbegin() <= iter && iter <= cend()); \
+	} while(0)
 
 
 	template <typename T, typename A>
@@ -128,15 +134,16 @@ namespace atma
 		, size_(size)
 	{
 		imem_.allocate(capacity_);
-		imem_.construct(0, size_);
+		imem_.construct_range(0, size_);
 	}
 
 	template <typename T, typename A>
 	inline vector<T,A>::vector(size_t size, T const& d)
-		: capacity_(size), size_(size)
+		: capacity_(size)
+		, size_(size)
 	{
 		imem_.allocate(capacity_);
-		imem_.construct(0, size_, d);
+		imem_.construct_range(0, size_, d);
 	}
 
 	template <typename T, typename A>
@@ -221,6 +228,18 @@ namespace atma
 	inline auto vector<T,A>::size() const -> size_t
 	{
 		return size_;
+	}
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::cbegin() const -> T const*
+	{
+		return imem_.data();
+	}
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::cend() const -> T const*
+	{
+		return imem_.data() + size_;
 	}
 
 	template <typename T, typename A>
@@ -357,7 +376,7 @@ namespace atma
 			imem_.destruct(size, size_ - size);
 		}
 		else if (size_ < size) {
-			imem_.construct(size_, size - size_, x);
+			imem_.construct_range(size_, size - size_, x);
 		}
 
 		IMEM_GUARD_GT(size);
@@ -370,7 +389,7 @@ namespace atma
 	{
 		IMEM_GUARD_LT(size_ + 1);
 
-		imem_.construct(size_, 1, x);
+		imem_.construct(size_, x);
 		++size_;
 	}
 
@@ -379,7 +398,7 @@ namespace atma
 	{
 		IMEM_GUARD_LT(size_ + 1);
 
-		imem_.construct(size_, 1, std::move(x));
+		imem_.construct(size_, std::move(x));
 		++size_;
 	}
 
@@ -389,7 +408,7 @@ namespace atma
 	{
 		IMEM_GUARD_LT(size_ + 1);
 
-		imem_.construct(size_, 1, std::forward<Args>(args)...);
+		imem_.construct(size_, std::forward<Args>(args)...);
 		++size_;
 
 		return imem_[size_ - 1];
@@ -400,30 +419,34 @@ namespace atma
 	inline auto vector<T, A>::assign(H begin, H end) -> void
 	{
 		clear();
-		new (this) vector(begin, end);
+		new (this) vector{begin, end};
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T, A>::insert(const_iterator where, T const& x) -> void
 	{
-		auto offset = where - elements_;
+		IMEM_ASSERT_ITER(where);
+
+		auto const offset = std::distance(cbegin(), where);
 
 		IMEM_GUARD_LT(size_ + 1);
 
-		imem_.move(offset + 2, offset + 1, 1);
-		imem_.construct(offset + 1, 1, x);
+		imem_.memmove(offset + 1, offset, size_ - offset);
+		imem_.construct(offset, x);
 		++size_;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::insert(const_iterator where, T&& x) -> void
 	{
-		auto offset = where - elements_;
+		IMEM_ASSERT_ITER(where);
+
+		auto const offset = std::distance(cbegin(), where);
 
 		IMEM_GUARD_LT(size_ + 1);
 
-		imem_.memmove(offset + 2, offset + 1, 1);
-		imem_.construct(offset + 1, 1, std::move(x));
+		imem_.memmove(offset + 1, offset, size_ - offset);
+		imem_.construct(offset, std::move(x));
 		++size_;
 	}
 
@@ -435,26 +458,32 @@ namespace atma
 
 	template <typename T, typename A>
 	template <typename H>
-	inline auto vector<T,A>::insert(const_iterator where, H begin, H end) -> void
+	inline auto vector<T,A>::insert(const_iterator where, H start, H end) -> void
 	{
-		auto const offset = where - this->begin();
-		auto const rangesize = std::distance(begin, end);
+		IMEM_ASSERT_ITER(where);
+
+		auto const offset = std::distance(cbegin(), where);
+		auto const rangesize = std::distance(start, end);
 
 		IMEM_GUARD_LT(size_ + rangesize);
 
 		imem_.memmove(offset + 1 + rangesize, offset + 1, size_ - offset);
-		imem_.construct_copy_range(offset, begin, end);
+		imem_.construct_copy_range(offset, start, end);
 		size_ += rangesize;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::erase(const_iterator where) -> void
 	{
-		ATMA_ASSERT("things");
-		auto offset = where - begin();
+		IMEM_ASSERT_ITER(where);
+
+		auto offset = std::distance(cbegin(), where);
 
 		imem_.destruct(offset, 1);
-		imem_grow(size_ - 1);
+		imem_.memmove(offset, offset + 1, size_ - offset - 1);
+		--size_;
+
+		IMEM_GUARD_GT(size_);
 	}
 
 	template <typename T, typename A>

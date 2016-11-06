@@ -66,7 +66,6 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 		auto plus_10 = [](int i) { return i + 10; };
 		auto is_gte3 = [](int i) { return i >= 3; };
 
-
 		THEN("filtering mutable (no change) works")
 		{
 			auto result = atma::filter(is_even, numbers);

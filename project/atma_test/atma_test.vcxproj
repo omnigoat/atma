@@ -168,6 +168,7 @@
     <ClCompile Include="..\..\source\atma_test\entrypoint.cpp" />
     <ClCompile Include="..\..\source\atma_test\ranges.cpp" />
     <ClCompile Include="..\..\source\atma_test\string.cpp" />
+    <ClCompile Include="..\..\source\atma_test\test_vector.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
