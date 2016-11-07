@@ -26,9 +26,6 @@
     <Filter Include="include\thread">
       <UniqueIdentifier>{ed4438da-80b5-405f-9b06-d7ee5e25a7bf}</UniqueIdentifier>
     </Filter>
-    <Filter Include="include\unittest">
-      <UniqueIdentifier>{be554768-952a-4324-bc9a-482fbaeb54f8}</UniqueIdentifier>
-    </Filter>
     <Filter Include="include\utf">
       <UniqueIdentifier>{56575bb8-07a7-4c79-9adb-214074d8fee8}</UniqueIdentifier>
     </Filter>
@@ -84,21 +81,6 @@
     </ClInclude>
     <ClInclude Include="..\..\include\atma\utf\utf8_char.hpp">
       <Filter>include\utf</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\atma\unittest\emission.hpp">
-      <Filter>include\unittest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\atma\unittest\unittest.hpp">
-      <Filter>include\unittest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\atma\unittest\run.hpp">
-      <Filter>include\unittest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\atma\unittest\compile.hpp">
-      <Filter>include\unittest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\atma\unittest\ennumerate.hpp">
-      <Filter>include\unittest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\atma\math\intersection.hpp">
       <Filter>include\math</Filter>

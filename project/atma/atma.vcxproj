@@ -67,11 +67,6 @@
     <ClInclude Include="..\..\include\atma\tuple.hpp" />
     <ClInclude Include="..\..\include\atma\types.hpp" />
     <ClInclude Include="..\..\include\atma\unique_memory.hpp" />
-    <ClInclude Include="..\..\include\atma\unittest\compile.hpp" />
-    <ClInclude Include="..\..\include\atma\unittest\emission.hpp" />
-    <ClInclude Include="..\..\include\atma\unittest\ennumerate.hpp" />
-    <ClInclude Include="..\..\include\atma\unittest\run.hpp" />
-    <ClInclude Include="..\..\include\atma\unittest\unittest.hpp" />
     <ClInclude Include="..\..\include\atma\unit_test.hpp" />
     <ClInclude Include="..\..\include\atma\utf\algorithm.hpp" />
     <ClInclude Include="..\..\include\atma\utf\utf8_char.hpp" />
