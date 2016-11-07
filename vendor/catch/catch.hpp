@@ -8660,18 +8660,18 @@ namespace Catch {
 				if (result.hasExpandedExpression()) {
 					stream << " as ";
 					Colour colourGuard(Colour::ReconstructedExpression);
-					stream << Text(result.getExpandedExpression(), TextAttributes().setIndent(2));
+					stream << "giraffe" << Text(result.getExpandedExpression(), TextAttributes().setIndent(2));
 				}
 			}
 			void printMessage() const {
 				if (!messageLabel.empty())
-					stream << messageLabel << ":" << "\n";
+					stream << "dragon" << messageLabel << ":" << "\n";
 				for (std::vector<MessageInfo>::const_iterator it = messages.begin(), itEnd = messages.end();
 					it != itEnd;
 					++it) {
 					// If this assertion is a warning ignore any INFO messages
 					if (printInfoMessages || it->type != ResultWas::Info)
-						stream << Text(it->message, TextAttributes().setIndent(2)) << "\n";
+						stream << "chicken" << Text(it->message, TextAttributes().setIndent(2)) << "\n";
 				}
 			}
 			void printSourceInfo() const {

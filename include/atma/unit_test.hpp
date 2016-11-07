@@ -17,6 +17,7 @@
 
 // used for canary_t
 #include <boost/preprocessor/tuple/enum.hpp>
+#include <boost/preprocessor/array/elem.hpp>
 #include <map>
 
 #if defined(CATCH_CONFIG_MAIN)
@@ -25,6 +26,7 @@ namespace atma { namespace unit_test {
 
 	using namespace Catch;
 
+	template <bool SectionTrace>
 	struct atma_reporter_t : Catch::StreamingReporterBase
 	{
 		atma_reporter_t(ReporterConfig const& config)
@@ -43,7 +45,7 @@ namespace atma { namespace unit_test {
 			stream
 				<< '\n'
 				<< "========================================================\n"
-				<< "Running tests for " << testRunInfo.name << '\n'
+				<< "Running tests for " << testRunInfo.name.substr(0, testRunInfo.name.find_first_of('.')) << "...\n"
 				<< "========================================================\n"
 				<< std::flush;
 		}
@@ -64,6 +66,17 @@ namespace atma { namespace unit_test {
 		{
 		}
 
+		void printHeaderString(std::string const& _string, std::size_t indent = 0) {
+			std::size_t i = _string.find(": ");
+			if (i != std::string::npos)
+				i += 2;
+			else
+				i = 0;
+			stream << Text(_string, TextAttributes()
+				.setIndent(indent + i)
+				.setInitialIndent(indent)) << "\n";
+		}
+
 		bool assertionEnded(AssertionStats const& stats) override
 		{
 			AssertionResult const& result = stats.assertionResult;
@@ -75,6 +88,15 @@ namespace atma { namespace unit_test {
 				if (result.getResultType() != ResultWas::Warning)
 					return false;
 				printInfoMessages = false;
+			}
+
+			if (SectionTrace && !sections_printed_)
+			{
+				auto it = m_sectionStack.begin() + 1;
+				auto itEnd = m_sectionStack.end();
+				for (; it != itEnd; ++it)
+					printHeaderString(it->name, 2);
+				sections_printed_ = true;
 			}
 
 			assertion_printer_t printer(stream, stats, printInfoMessages);
@@ -89,6 +111,7 @@ namespace atma { namespace unit_test {
 			printTotals(stats.totals);
 			stream << "\n" << std::endl;
 			StreamingReporterBase::testRunEnded(stats);
+			sections_printed_ = false;
 		}
 
 	private:
@@ -194,6 +217,8 @@ namespace atma { namespace unit_test {
 			void printSourceInfo() const
 			{
 				Colour colourGuard(Colour::FileName);
+				if (SectionTrace)
+					stream << '\t';
 				stream << '\t' << result.getSourceInfo() << ":";
 			}
 
@@ -333,10 +358,16 @@ namespace atma { namespace unit_test {
 					<< " with "  << pluralise(totals.assertions.passed, "assertion") << ".";
 			}
 		}
+
+	private:
+		bool sections_printed_ = false;
 	};
 
+	using atma_reporter_concise_t = atma_reporter_t<false>;
+	using atma_reporter_extended_t = atma_reporter_t<true>;
 
-	REGISTER_REPORTER("atma", atma_reporter_t);
+	REGISTER_REPORTER("atma", atma_reporter_concise_t);
+	REGISTER_REPORTER("atma_ex", atma_reporter_extended_t);
 
 }}
 
@@ -351,30 +382,34 @@ namespace atma { namespace unit_test {
 #	define CANARY_STDOUT 0
 #endif
 
+	enum class canary_oper_t : int
+	{
+		unknown = -1,
+		default_constructor,
+		direct_constructor,
+		copy_constructor,
+		move_constructor,
+		destructor,
+	};
+
 	struct canary_t
 	{
-		static int const default_constructor = 0;
-		static int const direct_constructor = 1;
-		static int const copy_constructor = 2;
-		static int const move_constructor = 3;
-		static int const destructor = 4;
-
 		struct event_t
 		{
-			event_t(int instruction)
-				: id(-1), instruction(instruction), payload(-1)
+			event_t(canary_oper_t oper)
+				: id(-1), oper(oper), payload(-1)
 			{}
 
-			event_t(int id, int instruction)
-				: id(id), instruction(instruction), payload(-1)
+			event_t(int id, canary_oper_t oper)
+				: id(id), oper(oper), payload(-1)
 			{}
 
-			event_t(int id, int instruction, int payload)
-				: id(id), instruction(instruction), payload(payload)
+			event_t(int id, canary_oper_t oper, int payload)
+				: id(id), oper(oper), payload(payload)
 			{}
 
 			int id;
-			int instruction;
+			canary_oper_t oper;
 			int payload;
 		};
 
@@ -387,7 +422,7 @@ namespace atma { namespace unit_test {
 
 			~scope_switcher_t()
 			{
-				canary_t::switch_scope_nil();
+				//canary_t::switch_scope_nil();
 			}
 
 			operator bool() const { return true; }
@@ -405,7 +440,7 @@ namespace atma { namespace unit_test {
 #if CANARY_STDOUT
 			std::cout << "[" << scope->first << ':' << id << "] canary_t::default-constructor(" << payload << ')' << std::endl;
 #endif
-			scope->second.second.emplace_back(id, default_constructor, payload);
+			scope->second.second.emplace_back(id, canary_oper_t::default_constructor, payload);
 		}
 
 		canary_t(int payload)
@@ -416,7 +451,7 @@ namespace atma { namespace unit_test {
 #if CANARY_STDOUT
 			std::cout << "[" << scope->first << ':' << id << "] canary_t::direct-constructor(" << payload << ')' << std::endl;
 #endif
-			scope->second.second.emplace_back(id, direct_constructor, payload);
+			scope->second.second.emplace_back(id, canary_oper_t::direct_constructor, payload);
 		}
 
 		canary_t(canary_t const& rhs)
@@ -427,7 +462,7 @@ namespace atma { namespace unit_test {
 #if CANARY_STDOUT
 			std::cout << "[" << scope->first << ':' << id << "] canary_t::copy-constructor(" << payload << ')' << std::endl;
 #endif
-			scope->second.second.emplace_back(id, copy_constructor, payload);
+			scope->second.second.emplace_back(id, canary_oper_t::copy_constructor, payload);
 		}
 
 		canary_t(canary_t&& rhs)
@@ -439,7 +474,7 @@ namespace atma { namespace unit_test {
 #if CANARY_STDOUT
 			std::cout << "[" << scope->first << ':' << id << "] canary_t::move-constructor(" << payload << ')' << std::endl;
 #endif
-			scope->second.second.emplace_back(id, move_constructor, payload);
+			scope->second.second.emplace_back(id, canary_oper_t::move_constructor, payload);
 		}
 
 		~canary_t()
@@ -447,7 +482,7 @@ namespace atma { namespace unit_test {
 #if CANARY_STDOUT
 			std::cout << "[" << scope->first << ':' << id << "] canary_t::destructor(" << payload << ')' << std::endl;
 #endif
-			scope->second.second.emplace_back(id, destructor, payload);
+			scope->second.second.emplace_back(id, canary_oper_t::destructor, payload);
 		}
 
 
@@ -465,7 +500,30 @@ namespace atma { namespace unit_test {
 				if (e->id != -1 && i->id != -1 && e->id != i->id)
 					return false;
 
-				if (e->instruction != -1 && i->instruction != -1 && e->instruction != i->instruction)
+				if (e->oper != canary_oper_t::unknown && i->oper != canary_oper_t::unknown && e->oper != i->oper)
+					return false;
+
+				if (e->payload != -1 && i->payload != -1 && e->payload != i->payload)
+					return false;
+			}
+
+			return true;
+		}
+
+		static auto event_log_matches(std::vector<event_t> r) -> bool
+		{
+			auto const& event_log = current_scope()->second.second; // event_log_handle(name)->second.second;
+
+			if (r.size() != event_log.size())
+				return false;
+
+			auto e = event_log.begin();
+			for (auto i = r.begin(); i != r.end(); ++i, ++e)
+			{
+				if (e->id != -1 && i->id != -1 && e->id != i->id)
+					return false;
+
+				if (e->oper != canary_oper_t::unknown && i->oper != canary_oper_t::unknown && e->oper != i->oper)
 					return false;
 
 				if (e->payload != -1 && i->payload != -1 && e->payload != i->payload)
@@ -508,6 +566,8 @@ namespace atma { namespace unit_test {
 		static auto switch_scope(std::string const& name) -> void
 		{
 			current_scope() = event_log_handle(name);
+			current_scope()->second.second.clear();
+			current_scope()->second.first = 0;
 		}
 
 		static auto switch_scope_nil() -> void
@@ -519,6 +579,30 @@ namespace atma { namespace unit_test {
 		{
 			return ++current_scope()->second.first;
 		}
+	};
+
+	struct canary_event_checker_t
+	{
+		using events_t = std::vector<canary_t::event_t>;
+
+		canary_event_checker_t()
+		{}
+
+		~canary_event_checker_t()
+		{
+			CHECK(canary_t::event_log_matches(events_));
+		}
+
+		operator bool() const { return true; }
+
+		auto default_constructor(int id, int payload = -1) { events_.emplace_back(id, canary_oper_t::default_constructor, payload); }
+		auto direct_constructor(int id, int payload = -1)  { events_.emplace_back(id, canary_oper_t::direct_constructor, payload); }
+		auto copy_constructor(int id, int payload = -1)    { events_.emplace_back(id, canary_oper_t::copy_constructor, payload); }
+		auto move_constructor(int id, int payload = -1)    { events_.emplace_back(id, canary_oper_t::move_constructor, payload); }
+		auto destructor(int id, int payload = -1)          { events_.emplace_back(id, canary_oper_t::destructor, payload); }
+
+	private:
+		events_t events_;
 	};
 
 	inline auto operator == (canary_t const& lhs, int rhs) -> bool
@@ -539,6 +623,34 @@ namespace atma { namespace unit_test {
 
 #define CANARY_SWITCH_SCOPE(name) \
 	if (auto S = ::atma::unit_test::canary_t::scope_switcher_t(name))
+
+#define THEN_CANARY \
+	THEN("canary event log matches") \
+	if (auto& C = ::atma::unit_test::canary_event_checker_t{})
+
+#define GIVEN_CANARY(name) \
+	GIVEN(name) \
+	CANARY_SWITCH_SCOPE(name)
+
+
+
+
+#define CHECK_VECTOR_II_m(r, v, i, elem) \
+	CHECK(BOOST_PP_ARRAY_ELEM(0, v)[i]BOOST_PP_ARRAY_ELEM(1, v) == elem);
+
+#define CHECK_VECTOR_II(v, expr, seq) \
+	BOOST_PP_SEQ_FOR_EACH_I(CHECK_VECTOR_II_m, (2, (v, expr)), seq)
+
+#define CHECK_VECTOR_EX(v, expr, ...) \
+	CHECK_VECTOR_II(v, expr, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+
+#define CHECK_VECTOR(v, ...) \
+	CHECK_VECTOR_EX(v, , __VA_ARGS__)
+
+#define CHECK_WHOLE_VECTOR(v, ...) \
+	CHECK(v.size() == BOOST_PP_VARIADIC_SIZE(__VA_ARGS__)); \
+	CHECK_VECTOR_EX(v, , __VA_ARGS__)
+
 
 }}
 
