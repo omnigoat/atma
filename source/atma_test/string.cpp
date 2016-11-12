@@ -9,9 +9,12 @@ SCENARIO("utf8-strings can be constructed", "[utf8_string_t]")
 	{
 		atma::utf8_string_t s;
 
-		CHECK(s.empty());
-		CHECK(s.begin() == s.end());
-		CHECK(s.raw_begin() == s.raw_end());
+		THEN("it is empty")
+		{
+			CHECK(s.empty());
+			CHECK(s.begin() == s.end());
+			CHECK(s.raw_begin() == s.raw_end());
+		}
 	}
 
 	GIVEN("strings constructed with \"dragon\"")
@@ -49,8 +52,11 @@ SCENARIO("utf8-strings can be constructed", "[utf8_string_t]")
 		// this is s1 when win32 consoles fail to display correct unicode
 		atma::utf8_string_t s2{"├┤, µô┐, Úèî, Ù«¿"};
 
-		CHECK(s1.raw_size() == 17);
-		CHECK(s1 != s2);
+		THEN("they don't equate to the common erroneous encoding {├┤, µô┐, Úèî, Ù«¿}")
+		{
+			CHECK(s1.raw_size() == 17);
+			CHECK(s1 != s2);
+		}
 	}
 
 	GIVEN("a copy-constructed string")
@@ -72,6 +78,7 @@ SCENARIO("utf8-strings can be constructed", "[utf8_string_t]")
 		{
 			auto i = atma::find_first_of(s, "ao");
 			CHECK(i != s.end());
+			CHECK(std::distance(s.begin(), i) == 2);
 			CHECK(*i == 'a');
 		}
 
@@ -80,6 +87,7 @@ SCENARIO("utf8-strings can be constructed", "[utf8_string_t]")
 			auto b = ++++++++s.begin(); // 'g'
 			auto i = atma::find_first_of(s, b, "ao");
 			CHECK(i != s.end());
+			CHECK(std::distance(s.begin(), i) == 4);
 			CHECK(*i == 'o');
 		}
 
