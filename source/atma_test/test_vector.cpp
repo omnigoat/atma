@@ -254,10 +254,6 @@ SCENARIO("vectors can be sized and resized", "[vector]")
 	{
 		atma::vector<int> v;
 
-		CHECK(v.empty());
-		CHECK(v.size() == 0);
-		CHECK(v.capacity() >= 0);
-
 		WHEN("it is resized")
 		{
 			v.resize(10);
@@ -298,19 +294,19 @@ SCENARIO("vectors can be sized and resized", "[vector]")
 
 SCENARIO("vectors can be assigned", "[vector]")
 {
-	GIVEN("an empty vector 'v' and vector v2{1,2,3,4}")
+	GIVEN("an empty vector 'v' and vector 'v2'={1,2,3,4}")
 	{
 		atma::vector<int> v;
 		atma::vector<int> v2{1, 2, 3, 4};
 
-		WHEN("the {1,2,3,4} vector is assigned to the empty-vector")
+		WHEN("v is assigned v2")
 		{
 			v = v2;
 
 			THEN("an exact copy is made")
 			{
 				CHECK(!v.empty());
-				CHECK(v.size() == 4);
+				CHECK_WHOLE_VECTOR(v, 1,2,3,4);
 				CHECK(v == v2);
 			}
 		}
@@ -322,7 +318,6 @@ SCENARIO("vectors can be assigned", "[vector]")
 			THEN("v has the elements")
 			{
 				CHECK(!v.empty());
-				CHECK(v.size() == 4);
 				CHECK_WHOLE_VECTOR(v, 1, 2, 3, 4);
 			}
 
