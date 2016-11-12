@@ -5279,9 +5279,11 @@ namespace Catch {
 		{
 			std::ostringstream oss;
 			oss << sectionInfo.name << "@" << sectionInfo.lineInfo;
-
+			
 			if (!m_testCaseTracker->enterSection(oss.str()))
+			{
 				return false;
+			}
 
 			m_lastAssertionInfo.lineInfo = sectionInfo.lineInfo;
 
