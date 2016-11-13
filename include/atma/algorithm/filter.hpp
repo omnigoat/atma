@@ -238,6 +238,13 @@ namespace atma
 		return filtered_range_t<C, decltype(f)>{std::move(container.source_container()), f};
 	}
 
+	template <typename C, typename M, typename R>
+	inline decltype(auto) filter_by(M C::*m, R&& range)
+	{
+		auto f = atma::bind([](M C::*m, auto&& x) -> bool { return x.*m; }, m, arg1);
+		return filtered_range_t<R, decltype(f)>{std::forward<R>(range), f};
+	}
+
 	template <typename F>
 	inline decltype(auto) filter(F&& predicate)
 	{
