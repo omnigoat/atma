@@ -5,6 +5,7 @@
 #include <atma/thread/engine.hpp>
 
 int square(int x) { return x * x; }
+auto squareL = [](int x) { return x * x; };
 
 struct mathing_t { 
 	int halve(int x) { return x / 2; }
@@ -25,14 +26,25 @@ struct tm_t
 
 SCENARIO("bind works with various things", "[bind]")
 {
+	GIVEN("a binding to a free-function, and one to am equivalent non-closure lambda")
+	{
+		auto a = atma::bind(&square, arg1);
+		auto b = atma::bind(squareL, arg1);
+
+		THEN("they equate")
+		{
+			CHECK(4 == a(2));
+			CHECK(16 == b(4));
+			CHECK(a(3) == b(3));
+		}
+	}
+
 	GIVEN("functions of various flavours")
 	{
 		//atma::thread::inplace_engine_t<true> lulz{4096};
 
 		// regular function & binding a binding
-		auto b1v1 = atma::bind(&square, arg1);
-		auto b1v2 = atma::bind(b1v1, 4);
-
+		
 		// mumber function
 		mathing_t m;
 		mathing_t const m2;
@@ -69,12 +81,6 @@ SCENARIO("bind works with various things", "[bind]")
 			auto tb = atma::bind(&square, 4);
 			atma::basic_function_t<8, int()> tf{buf, tb};
 			tf();
-		}
-
-		THEN("b1s are playing nice.")
-		{
-			CHECK(4 == b1v1(2));
-			CHECK(16 == b1v2());
 		}
 
 		THEN("all b2s match each other")
