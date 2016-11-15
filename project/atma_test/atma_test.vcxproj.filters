@@ -26,5 +26,8 @@
     <ClCompile Include="..\..\source\atma_test\test_vector.cpp">
       <Filter>source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\source\atma_test\queue.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
