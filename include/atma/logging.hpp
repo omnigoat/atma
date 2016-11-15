@@ -99,54 +99,83 @@ namespace atma
 
 		auto connect_replicant(logging_runtime_t* r) -> void
 		{
+			log_queue_.with_allocation(sizeof(command_t) + sizeof(void*), [&](auto& A){
+				A.encode_uint32((uint32)command_t::connect_replicant);
+				A.encode_pointer(r);
+			});
+#if 0
 			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(void*));
 			A.encode_uint32((uint32)command_t::connect_replicant);
 			A.encode_pointer(r);
 			log_queue_.commit(A);
+#endif
 		}
 
 		auto disconnect_replicant(logging_runtime_t* r) -> void
 		{
-			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(void*));
-			A.encode_uint32((uint32)command_t::disconnect_replicant);
-			A.encode_pointer(r);
-			log_queue_.commit(A);
+			uint32 sz = sizeof(command_t) + sizeof(void*);
+			log_queue_.with_allocation(sz, [&](auto& A){
+				A.encode_uint32((uint32)command_t::disconnect_replicant);
+				A.encode_pointer(r);
+			});
 		}
 
 		auto attach_handler(logging_handler_t* h) -> void
 		{
-			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(void*));
-			A.encode_uint32((uint32)command_t::attach_handler);
-			A.encode_pointer(h);
-			log_queue_.commit(A);
+			uint32 sz = sizeof(command_t) + sizeof(void*);
+			log_queue_.with_allocation(sz, [&](auto& A) {
+				A.encode_uint32((uint32)command_t::attach_handler);
+				A.encode_pointer(h);
+			});
 		}
 
 		auto detach_handler(logging_handler_t* h) -> void
 		{
-			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(void*));
-			A.encode_uint32((uint32)command_t::detach_handler);
-			A.encode_pointer(h);
-			log_queue_.commit(A);
+			uint32 sz = sizeof(command_t) + sizeof(void*);
+			log_queue_.with_allocation(sz, [&](auto& A) {
+				A.encode_uint32((uint32)command_t::detach_handler);
+				A.encode_pointer(h);
+			});
 		}
 
 		auto log(log_level_t level, void const* data, uint32 size) -> void
 		{
+			uint32 sz = sizeof(command_t) + sizeof(uint32) + sizeof(log_level_t) + sizeof(uint32) + size;
+			log_queue_.with_allocation(sz, [&](auto& A) {
+				A.encode_uint32((uint32)command_t::send);
+				A.encode_uint32(0u);
+				A.encode_uint32((uint32)level);
+				A.encode_data(data, size);
+			});
+
+#if 0
 			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(uint32) + sizeof(log_level_t) + sizeof(uint32) + size);
 			A.encode_uint32((uint32)command_t::send);
 			A.encode_uint32(0);
 			A.encode_uint32((uint32)level);
 			A.encode_data(data, size);
 			log_queue_.commit(A);
+#endif
 		}
 
 		auto flush() -> void
 		{
+			uint32 sz = sizeof(command_t) + sizeof(bool*);
+			bool blocked = true;
+
+			log_queue_.with_allocation(sz, 4, true, [&](auto& A){
+				A.encode_uint32((uint32)command_t::flush);
+				A.encode_pointer(&blocked);
+			});
+
+#if 0
 			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(byte), 4, true);
 			A.encode_uint32((uint32)command_t::flush);
 			A.encode_byte(0);
 			byte* b = reinterpret_cast<byte*>(A.data()) + 4;
 			log_queue_.commit(A);
-			while (*b == 0)
+#endif
+			while (blocked)
 				;
 		}
 
@@ -210,8 +239,9 @@ namespace atma
 
 						case command_t::flush:
 						{
-							byte* b = reinterpret_cast<byte*>(D.data()) + 4;
-							*b = 1;
+							bool* blocked = nullptr;
+							D.decode_pointer(blocked);
+							*blocked = false;
 							break;
 						}
 					}
