@@ -165,7 +165,7 @@ namespace atma
 	{
 		operator bool() const { return buf != nullptr; }
 
-		auto encode_byte(byte) -> void;
+		auto encode_byte(byte) -> void*;
 		auto encode_uint16(uint16) -> void;
 		auto encode_uint32(uint32) -> void;
 		auto encode_uint64(uint64) -> void;
@@ -472,13 +472,15 @@ namespace atma
 		ATMA_ASSERT(size <= header_size_bitmask);
 	}
 
-	inline auto base_mpsc_queue_t::allocation_t::encode_byte(byte b) -> void
+	inline auto base_mpsc_queue_t::allocation_t::encode_byte(byte b) -> void*
 	{
 		ATMA_ASSERT(p != (op + header_size + raw_size()) % bufsize);
 		ATMA_ASSERT(0 <= p && p < bufsize);
 
 		buf[p] = b;
+		auto r = buf + p;
 		p = (p + 1) % bufsize;
+		return r;
 	}
 
 	inline auto base_mpsc_queue_t::allocation_t::encode_uint16(uint16 i) -> void
@@ -612,17 +614,17 @@ namespace atma
 
 
 	template <bool DynamicGrowth>
-	struct mpsc_queue_t;
+	struct mpsc_queue_ii_t;
 
 	template <>
-	struct mpsc_queue_t<false>
+	struct mpsc_queue_ii_t<false>
 		: base_mpsc_queue_t
 	{
-		mpsc_queue_t(void* buf, uint32 size)
+		mpsc_queue_ii_t(void* buf, uint32 size)
 			: base_mpsc_queue_t{buf, size}
 		{}
 
-		mpsc_queue_t(uint32 size)
+		mpsc_queue_ii_t(uint32 size)
 			: base_mpsc_queue_t{size}
 		{}
 
@@ -686,14 +688,14 @@ namespace atma
 	};
 
 	template <>
-	struct mpsc_queue_t<true>
+	struct mpsc_queue_ii_t<true>
 		: base_mpsc_queue_t
 	{
-		mpsc_queue_t(void* buf, uint32 size)
+		mpsc_queue_ii_t(void* buf, uint32 size)
 			: base_mpsc_queue_t{buf, size}
 		{}
 
-		mpsc_queue_t(uint32 size)
+		mpsc_queue_ii_t(uint32 size)
 			: base_mpsc_queue_t{size}
 		{}
 
@@ -758,6 +760,31 @@ namespace atma
 			starve_unflag(starve_thread_, thread_id);
 
 			return impl_make_allocation(wb, wbs, wp, alloctype_t::normal, alignment, size);
+		}
+	};
+
+
+	template <bool DynamicGrowth>
+	struct mpsc_queue_t : mpsc_queue_ii_t<DynamicGrowth>
+	{
+		mpsc_queue_t(uint32 size)
+			: mpsc_queue_ii_t{size}
+		{}
+
+		template <typename F>
+		auto with_allocation(uint32 size, uint32 alignment, bool contiguous, F&& f) -> void
+		{
+			auto A = allocate(size, alignment, contiguous);
+			f(A);
+			commit(A);
+		}
+
+		template <typename F>
+		auto with_allocation(uint32 size, F&& f) -> void
+		{
+			auto A = allocate(size);
+			f(A);
+			commit(A);
 		}
 	};
 
