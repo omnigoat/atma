@@ -33,6 +33,9 @@ namespace atma
 		auto begin() -> byte*;
 		auto end() -> byte*;
 
+		auto reset(void* mem, size_t size) -> void;
+		auto reset(size_t) -> void;
+
 		auto swap(basic_unique_memory_t&) -> void;
 
 		auto detach_memory() -> backing_t;
@@ -138,6 +141,23 @@ namespace atma
 	inline auto basic_unique_memory_t<A>::end() -> byte*
 	{
 		return memory_.data() + size_;
+	}
+
+	template <typename A>
+	inline auto basic_unique_memory_t<A>::reset(void* mem, size_t size) -> void
+	{
+		memory_.deallocate();
+		memory_.allocate(size);
+		memory_.memcpy(0, mem, size);
+		size_ = size;
+	}
+
+	template <typename A>
+	inline auto basic_unique_memory_t<A>::reset(size_t size) -> void
+	{
+		memory_.deallocate();
+		memory_.allocate(size);
+		size_ = size;
 	}
 
 	template <typename A>
