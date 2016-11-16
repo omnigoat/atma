@@ -59,7 +59,7 @@ static void CALLBACK rose::FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNu
 
 
 runtime_t::runtime_t()
-	: filewatch_engine_{atma::thread::engine_t::defer_start_t{}}
+	: filewatch_engine_{atma::thread::inplace_engine_t<false>::defer_start_t{}, 2048}
 {
 }
 

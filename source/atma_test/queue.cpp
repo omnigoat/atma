@@ -16,5 +16,10 @@ SCENARIO("mpsc_queue is amazin")
 	Q.with_allocation(80, [&](auto&& A) {
 		A.encode_byte('c');
 	});
+
+	Q.with_consumption([&](auto& D) {
+		byte c;
+		D.decode_byte(c);
+	});
 }
 
