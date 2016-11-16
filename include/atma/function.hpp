@@ -86,6 +86,11 @@ namespace atma
 				auto&& fn = reinterpret_cast<FN&>(buf);
 				return &fn;
 			}
+
+			static auto relocate(functor_buf_t<BS>& buf, void*) -> void
+			{
+				// no relocation required for SFO
+			}
 		};
 
 		template <size_t BS, typename FN>
@@ -143,6 +148,14 @@ namespace atma
 				auto&& ptr = reinterpret_cast<FN*&>(buf);
 				return ptr;
 			}
+
+			static auto relocate(functor_buf_t<BS>& buf, void* exbuf) -> void
+			{
+				auto ip = reinterpret_cast<intptr const&>(buf) & ~intptr(1);
+				auto fn = *reinterpret_cast<FN* const&>(ip);
+				destruct(buf);
+				store(buf, exbuf, fn);
+			}
 		};
 	}
 
@@ -159,11 +172,13 @@ namespace atma
 			using copy_fntype     = auto(*)(detail::functor_buf_t<BS>&, detail::functor_buf_t<BS> const&) -> void;
 			using move_fntype     = auto(*)(detail::functor_buf_t<BS>&, detail::functor_buf_t<BS>&&) -> void;
 			using target_fntype   = auto(*)(detail::functor_buf_t<BS>&) -> void*;
+			using relocate_fntype = auto(*)(detail::functor_buf_t<BS>&, void*) -> void;
 
 			destruct_fntype destruct;
 			copy_fntype     copy;
 			move_fntype     move;
 			target_fntype   target;
+			relocate_fntype relocate;
 		};
 
 		template <size_t BS, typename FN, typename R, typename... Params>
@@ -175,6 +190,7 @@ namespace atma
 				&vtable_impl_t<BS, FN>::copy,
 				&vtable_impl_t<BS, FN>::move,
 				&vtable_impl_t<BS, FN>::target,
+				&vtable_impl_t<BS, FN>::relocate
 			};
 
 			return &_;
@@ -443,6 +459,11 @@ namespace atma
 			rhs.wrapper_.move_into(tmp);
 			wrapper_.move_into(rhs.wrapper_);
 			tmp.move_into(wrapper_);
+		}
+
+		auto relocate_external_buffer(void* exbuf) -> void
+		{
+			wrapper_.vtable->relocate(wrapper_.buf, exbuf);
 		}
 
 	private:

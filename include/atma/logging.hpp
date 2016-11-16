@@ -186,7 +186,7 @@ namespace atma
 
 			while (running_)
 			{
-				if (auto D = log_queue_.consume())
+				log_queue_.with_consumption([&](auto& D)
 				{
 					command_t id;
 					D.decode_uint32((uint32&)id);
@@ -245,9 +245,7 @@ namespace atma
 							break;
 						}
 					}
-
-					log_queue_.finalize(D);
-				}
+				});
 			}
 		}
 

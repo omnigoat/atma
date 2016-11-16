@@ -1,7 +1,7 @@
 #pragma once
 
 #include <atma/lockfree/queue.hpp>
-//#include <atma/mpsc_queue.hpp>
+#include <atma/mpsc_queue.hpp>
 #include <atma/function.hpp>
 
 #include <vector>
@@ -135,7 +135,7 @@ namespace atma { namespace thread {
 
 
 
-#if 0
+#if 1
 
 
 namespace atma {
@@ -147,10 +147,16 @@ namespace atma {
 			using signal_t = basic_function_t<sizeof(void*), void()>;
 			using queue_t = mpsc_queue_t<Dynamic>;
 
-			inplace_engine_t(uint32 bufsize);
+			struct defer_start_t {};
+
+			explicit inplace_engine_t(defer_start_t, uint32 bufsize);
+			explicit inplace_engine_t(uint32 bufsize);
 			inplace_engine_t(void* buf, uint32 bufsize);
 			~inplace_engine_t();
 
+			auto is_running() const -> bool;
+
+			auto start() -> void;
 			template <typename F> auto signal(F&&) -> void;
 			template <typename F> auto signal_evergreen(F&&) -> void;
 			auto signal_block() -> void;
@@ -163,6 +169,12 @@ namespace atma {
 			std::atomic<bool> running_;
 		};
 
+
+		template <bool D>
+		inline inplace_engine_t<D>::inplace_engine_t(defer_start_t, uint32 bufsize)
+			: running_{false}
+			, queue_{bufsize}
+		{}
 
 		template <bool D>
 		inline inplace_engine_t<D>::inplace_engine_t(uint32 bufsize)
@@ -197,16 +209,35 @@ namespace atma {
 		}
 
 		template <bool D>
+		inline auto inplace_engine_t<D>::is_running() const -> bool
+		{
+			return running_;
+		}
+
+		template <bool D>
 		inline auto inplace_engine_t<D>::reenter(std::atomic<bool> const& good) -> void
 		{
 			while (good) {
-				if (auto D = queue_.consume()) {
-					signal_t* f;
-					D.decode_pointer(f);
+				atma::unique_memory_t mem;
+				if (queue_.with_consumption([&](auto& D) {
+					D.local_copy(mem);
+				}))
+				{
+					signal_t* f = (signal_t*)mem.begin();
+					//f->relocate_external_buffer(mem.begin() + sizeof(signal_t));
 					(*f)();
-					queue_.finalize(D);
 				}
 			}
+		}
+
+		template <bool D>
+		inline auto inplace_engine_t<D>::start() -> void
+		{
+			running_ = true;
+			handle_ = std::thread([&]
+			{
+				reenter(running_);
+			});
 		}
 
 		template <bool D>
@@ -216,7 +247,7 @@ namespace atma {
 			if (!running_)
 				return;
 
-			auto A = queue_.allocate(sizeof(signal_t) + sizeof(std::decay_t<F>), 1, true);
+			auto A = queue_.allocate(sizeof(signal_t) + sizeof(std::decay_t<F>), 4, true);
 			new (A.data()) signal_t{(char*)A.data() + sizeof(signal_t), std::forward<F>(f)};
 			queue_.commit(A);
 		}

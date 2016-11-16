@@ -194,6 +194,14 @@ namespace atma
 		template <typename T> auto decode_pointer(T*&) -> void;
 		auto decode_data() -> unique_memory_t;
 
+		auto local_copy(unique_memory_t& mem) -> void
+		{
+			//mem.reset(new char[size()], size());
+			mem.reset(size());
+			for (int i = 0; i != size(); ++i)
+				decode_byte(mem.begin()[i]);
+		}
+
 	private:
 		decoder_t();
 		decoder_t(byte* buf, uint32 bufsize, uint32 rp);
@@ -785,6 +793,19 @@ namespace atma
 			auto A = allocate(size);
 			f(A);
 			commit(A);
+		}
+
+		template <typename F>
+		auto with_consumption(F&& f) -> bool
+		{
+			if (auto D = consume())
+			{
+				f(D);
+				finalize(D);
+				return true;
+			}
+
+			return false;
 		}
 	};
 
