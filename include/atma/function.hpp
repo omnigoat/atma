@@ -106,8 +106,10 @@ namespace atma
 			{
 				ATMA_ASSERT(((intptr)exbuf & 1) == 0, "bad pointer for external buffer");
 
-				reinterpret_cast<FN*&>(buf) = reinterpret_cast<FN*&>(exbuf);
-				new (reinterpret_cast<FN*&>(buf)) FN{fn};
+				// buf becomes a pointer, pointing to exbuf, which houses fn
+				FN*& p = reinterpret_cast<FN*&>(buf);
+				p = reinterpret_cast<FN*>(exbuf);
+				new (p) FN{fn};
 				
 				// 1 for external
 				reinterpret_cast<intptr&>(buf) |= 1;
@@ -133,14 +135,18 @@ namespace atma
 				// only delete if we're not in external buffer
 				auto ip = reinterpret_cast<intptr const&>(buf);
 				if (~ip & 1)
-					delete reinterpret_cast<FN*&>(buf);
+				{
+					FN*& p = reinterpret_cast<FN*&>(buf);
+					delete p;
+				}
 			}
 
 			template <typename R, typename... Args>
 			static auto call(functor_buf_t<BS> const& buf, Args... args) -> R
 			{
 				auto ip = reinterpret_cast<intptr const&>(buf) & ~intptr(1);
-				return (*reinterpret_cast<FN* const&>(ip))(std::forward<Args>(args)...);
+				FN* const& p = reinterpret_cast<FN* const&>(ip);
+				return (*p)(std::forward<Args>(args)...);
 			}
 
 			static auto target(functor_buf_t<BS>& buf) -> void*
@@ -151,10 +157,20 @@ namespace atma
 
 			static auto relocate(functor_buf_t<BS>& buf, void* exbuf) -> void
 			{
+				// original external
 				auto ip = reinterpret_cast<intptr const&>(buf) & ~intptr(1);
-				auto fn = *reinterpret_cast<FN* const&>(ip);
-				destruct(buf);
-				store(buf, exbuf, fn);
+				FN*& p = reinterpret_cast<FN*&>(ip);
+				auto& fn = *p;
+
+				// move-construct into new external
+				new (exbuf) FN{fn};
+				reinterpret_cast<FN*&>(buf) = reinterpret_cast<FN*>(exbuf);
+
+				// kill original
+				fn.~FN();
+
+				// 1 for external
+				reinterpret_cast<intptr&>(buf) |= 1;
 			}
 		};
 	}
