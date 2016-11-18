@@ -67,6 +67,7 @@ namespace atma
 		static uint32 const header_alignment_bitsize = 2;
 		static uint32 const header_size_bitsize = 28;
 		static uint32 const header_size = 4;
+		static uint32 const jump_command_size = header_size + sizeof(void*) + sizeof(uint32);
 
 		static uint32 const header_type_bitmask = pow2(header_padflag_bitsize + header_jumpflag_bitsize) - 1;
 		static uint32 const header_alignment_bitmask = pow2(header_alignment_bitsize) - 1;
@@ -321,10 +322,13 @@ namespace atma
 	// we can only allocate up to the end of the new buffer
 	inline auto base_mpsc_queue_t::impl_calculate_available_space(byte* rb, uint32 rp, byte* wb, uint32 wbs, uint32 wp, bool ct) -> uint32
 	{
-		if (wb == rb)
-			return (rp <= wp ? (wbs - wp + (ct ? 0 : rp)) : rp - wp) - header_size;
-		else
-			return wbs - wp - header_size;
+		auto result = (wb == rb) 
+			? (rp <= wp ? (wbs - wp + (ct ? 0 : rp)) : rp - wp)
+			: wbs - wp;
+
+		result -= header_size;
+
+		return result;
 	}
 
 	inline auto base_mpsc_queue_t::impl_perform_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available, uint32 alignment, uint32& size) -> bool
@@ -349,16 +353,14 @@ namespace atma
 			atma::atomic128_t{(uint64)wb, wbs, nwp});
 	}
 
-	inline auto base_mpsc_queue_t::impl_perform_pad_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available) -> bool
+	inline auto base_mpsc_queue_t::impl_perform_pad_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 space) -> bool
 	{
-		ATMA_ASSERT(available >= header_size);
 		ATMA_ASSERT(wp % 4 == 0);
 
-		if (available < 4)
-			return false;
+		// full allocation: header-size + the space it fills
+		auto size = header_size + space;
 
-		uint32 nwp = (wp + available) % wbs;
-		//ATMA_ASSERT((wp + available) % wbs == 0 || (wp + available) % wbs == 0);
+		uint32 nwp = (wp + size) % wbs;
 
 		return atma::atomic_compare_exchange(
 			&write_info_,
@@ -375,7 +377,7 @@ namespace atma
 	{
 		static_assert(sizeof(uint64) >= sizeof(void*), "pointers too large! where are you?");
 
-		uint32 const growcmd_size = header_size + sizeof(uint64) + sizeof(uint32);
+		uint32 const growcmd_size = sizeof(uint64) + sizeof(uint32);
 
 		if (growcmd_size <= available)
 		{
@@ -457,7 +459,9 @@ namespace atma
 	{
 		// size after all alignment shenanigans
 		uint32 ag = alignment();
-		return size_ - ((op + ag) & ~(ag - 1));
+		auto a = ((op + ag) & ~(ag - 1));
+		auto r = size_ - (a - op);
+		return r;
 	}
 
 	inline auto base_mpsc_queue_t::headerer_t::alignment() const -> uint32
@@ -736,14 +740,23 @@ namespace atma
 
 				size = size_orig;
 				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp, contiguous);
+				uint32 ncta = impl_calculate_available_space(rb, rp, wb, wbs, wp, false);
+
+				// we must only pad if there is left-over space for our request.
+				// otherwise, we will issue a jump command immediately
+				bool paddable = size <= ncta - available;
 
 				if (available < size && contiguous)
 				{
-					if (available >= header_size && rp < wp && impl_perform_pad_allocation(wb, wbs, wp, available))
+					if (paddable && impl_perform_pad_allocation(wb, wbs, wp, available))
 					{
 						auto A = impl_make_allocation(wb, wbs, wp, alloctype_t::pad, 4, available - header_size);
 						commit(A);
 						continue;
+					}
+					else
+					{
+						impl_encode_jump(available, wb, wbs, wp);
 					}
 				}
 				else if (impl_perform_allocation(wb, wbs, wp, available, alignment, size))
