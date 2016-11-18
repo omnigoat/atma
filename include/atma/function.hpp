@@ -159,15 +159,14 @@ namespace atma
 			{
 				// original external
 				auto ip = reinterpret_cast<intptr const&>(buf) & ~intptr(1);
-				FN*& p = reinterpret_cast<FN*&>(ip);
-				auto& fn = *p;
+				FN* pfn = reinterpret_cast<FN*&>(ip);
 
 				// move-construct into new external
-				new (exbuf) FN{fn};
+				new (exbuf) FN{std::move(*pfn)};
 				reinterpret_cast<FN*&>(buf) = reinterpret_cast<FN*>(exbuf);
 
 				// kill original
-				fn.~FN();
+				pfn->~FN();
 
 				// 1 for external
 				reinterpret_cast<intptr&>(buf) |= 1;
