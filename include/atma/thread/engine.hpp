@@ -217,18 +217,18 @@ namespace atma {
 		template <bool D>
 		inline auto inplace_engine_t<D>::reenter(std::atomic<bool> const& good) -> void
 		{
-			while (good) {
+			while (good)
+			{
+				// todo: stack-allocated memory for storing signal
 				atma::unique_memory_t mem;
-				if (queue_.with_consumption([&](auto& D) {
-					//signal_t* f = (signal_t*)D.data();
+				if (queue_.with_consumption([&](auto& D)
+				{
 					D.local_copy(mem);
 					signal_t* f = (signal_t*)mem.begin();
 					f->relocate_external_buffer(mem.begin() + sizeof(signal_t));
-					std::cout << "dealloc size: " << D.size() << std::endl;
 				}))
 				{
 					signal_t* f = (signal_t*)mem.begin();
-					//f->relocate_external_buffer(mem.begin() + sizeof(signal_t));
 					(*f)();
 				}
 			}
@@ -252,7 +252,6 @@ namespace atma {
 				return;
 
 			auto A = queue_.allocate(sizeof(signal_t) + sizeof(std::decay_t<F>), 4, true);
-			std::cout << "alloc size: " << A.size() << std::endl;
 			new (A.data()) signal_t{(char*)A.data() + sizeof(signal_t), std::forward<F>(f)};
 			queue_.commit(A);
 		}

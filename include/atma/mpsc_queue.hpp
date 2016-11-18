@@ -67,7 +67,7 @@ namespace atma
 		static uint32 const header_alignment_bitsize = 2;
 		static uint32 const header_size_bitsize = 28;
 		static uint32 const header_size = 4;
-		static uint32 const jump_command_size = header_size + sizeof(void*) + sizeof(uint32);
+		static uint32 const jump_command_body_size = sizeof(void*) + sizeof(uint32);
 
 		static uint32 const header_type_bitmask = pow2(header_padflag_bitsize + header_jumpflag_bitsize) - 1;
 		static uint32 const header_alignment_bitmask = pow2(header_alignment_bitsize) - 1;
@@ -377,9 +377,7 @@ namespace atma
 	{
 		static_assert(sizeof(uint64) >= sizeof(void*), "pointers too large! where are you?");
 
-		uint32 const growcmd_size = sizeof(uint64) + sizeof(uint32);
-
-		if (growcmd_size <= available)
+		if (jump_command_body_size <= available)
 		{
 			// current write-info
 			atma::atomic128_t q_write_info;
@@ -400,14 +398,14 @@ namespace atma
 			{
 				// no other thread can touch the old write-buffer/write-position, so no
 				// need to perform atomic operations anymore
-				auto A = allocation_t{wb, wbs, wp, alloctype_t::jump, 0, growcmd_size};
+				auto A = allocation_t{wb, wbs, wp, alloctype_t::jump, 0, jump_command_body_size};
 				A.encode_uint64(nwi.ui64[0]);
 				A.encode_uint32(nwbs);
 				commit(A);
 			}
 			else
 			{
-				delete[](byte*)nwi.ui64[0];
+				delete[] (byte*)nwi.ui64[0];
 			}
 		}
 	}
@@ -673,7 +671,7 @@ namespace atma
 				{
 					if (available >= header_size && rp < wp && impl_perform_pad_allocation(wb, wbs, wp, available))
 					{
-						auto A = impl_make_allocation(wb, wbs, wp, alloctype_t::pad, 4, available - header_size);
+						auto A = impl_make_allocation(wb, wbs, wp, alloctype_t::pad, 4, available);
 						commit(A);
 						continue;
 					}
@@ -740,34 +738,29 @@ namespace atma
 
 				size = size_orig;
 				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp, contiguous);
-				uint32 ncta = impl_calculate_available_space(rb, rp, wb, wbs, wp, false);
-
-				// we must only pad if there is left-over space for our request.
-				// otherwise, we will issue a jump command immediately
-				bool paddable = size <= ncta - available;
-
+				
 				if (available < size && contiguous)
 				{
+					// we must only pad if there is left-over space for our request.
+					// otherwise, we will issue a jump command immediately.
+					uint32 ncta = impl_calculate_available_space(rb, rp, wb, wbs, wp, false);
+					bool paddable = size <= ncta - available;
+
 					if (paddable && impl_perform_pad_allocation(wb, wbs, wp, available))
 					{
-						auto A = impl_make_allocation(wb, wbs, wp, alloctype_t::pad, 4, available - header_size);
+						auto A = impl_make_allocation(wb, wbs, wp, alloctype_t::pad, 4, available);
 						commit(A);
 						continue;
-					}
-					else
-					{
-						impl_encode_jump(available, wb, wbs, wp);
 					}
 				}
 				else if (impl_perform_allocation(wb, wbs, wp, available, alignment, size))
 				{
 					break;
 				}
-				else
-				{
-					impl_encode_jump(available, wb, wbs, wp);
-				}
 
+				// we neither padded to the beginning of our buffer, nor allocated the
+				// requested amount of space. encode a jump command
+				impl_encode_jump(available, wb, wbs, wp);
 
 				if (contiguous)
 				{
