@@ -41,7 +41,6 @@
     <ClInclude Include="..\..\include\atma\enable_if.hpp" />
     <ClInclude Include="..\..\include\atma\enable_multiple_shared_from_this.hpp" />
     <ClInclude Include="..\..\include\atma\event.hpp" />
-    <ClInclude Include="..\..\include\atma\filesystem\file.hpp" />
     <ClInclude Include="..\..\include\atma\function_traits.hpp" />
     <ClInclude Include="..\..\include\atma\hash.hpp" />
     <ClInclude Include="..\..\include\atma\idxs.hpp" />
