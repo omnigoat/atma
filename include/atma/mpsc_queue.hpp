@@ -76,7 +76,7 @@ namespace atma
 		std::chrono::nanoseconds const starve_timeout{5000};
 
 		auto impl_read_queue_write_info() -> std::tuple<byte*, uint32, uint32>;
-		auto impl_read_queue_read_info() -> std::tuple<byte*, uint32>;
+		auto impl_read_queue_read_info() -> std::tuple<byte*, uint32, uint32>;
 		auto impl_calculate_available_space(byte* rb, uint32 rp, byte* wb, uint32 wbs, uint32 wp, bool ct) -> uint32;
 		auto impl_perform_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available, uint32 alignment, uint32& size) -> bool;
 		auto impl_perform_pad_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available) -> bool;
@@ -86,6 +86,8 @@ namespace atma
 		auto starve_flag(size_t starve_id, size_t thread_id, std::chrono::nanoseconds const& starve_time) -> void;
 		auto starve_unflag(size_t starve_id, size_t thread_id) -> void;
 		auto starve_gate(size_t thread_id) -> size_t;
+
+		auto write_buf_size() { return write_buf_size_; }
 
 	private:
 		union
@@ -111,6 +113,8 @@ namespace atma
 
 			atma::atomic128_t read_info_;
 		};
+
+		uint32 released_position_ = 0;
 
 		union
 		{
@@ -197,7 +201,6 @@ namespace atma
 
 		auto local_copy(unique_memory_t& mem) -> void
 		{
-			//mem.reset(new char[size()], size());
 			mem.reset(size());
 			for (int i = 0; i != size(); ++i)
 				decode_byte(mem.begin()[i]);
@@ -250,7 +253,35 @@ namespace atma
 
 	inline auto base_mpsc_queue_t::consume() -> decoder_t
 	{
-		decoder_t D{read_buf_, read_buf_size_, read_position_};
+		// 1) read the read information, try and move past as fast as possible
+		byte* rb = nullptr;
+		uint32 rbs = 0;
+		uint32 rp = 0;
+		uint32 header = 0;
+		uint32 type = 0;
+		uint32 align = 0;
+		uint32 size = 0;
+
+		for (;;)
+		{
+			std::tie(rb, rbs, rp) = impl_read_queue_read_info();
+
+			header = *reinterpret_cast<uint32*>(rb + rp);
+			type   = header >> (header_size_bitsize + header_alignment_bitsize);
+			align  = (header >> header_size_bitsize) & header_alignment_bitmask;
+			size   = header & header_size_bitmask;
+
+			// if header is zero (nothing allocated), we'll fall-through correctly
+			if (atma::atomic_compare_exchange(&read_info_,
+				atma::atomic128_t{rb, rbs, rp},
+				atma::atomic128_t{rb, rbs, rp + size}))
+			{
+				break;
+			}
+		}
+
+		// 2) we now have exclusive access to our range of memory
+		decoder_t D{rb, rbs, rp};
 
 		switch (D.type())
 		{
@@ -287,6 +318,9 @@ namespace atma
 
 	inline auto base_mpsc_queue_t::finalize(decoder_t& D) -> void
 	{
+		// 1) set header to "release me" state
+		//D.
+
 		// very required
 		auto szH = std::max((read_position_ + header_size + D.raw_size()) - (int64)read_buf_size_, 0ll);
 		auto szT = std::max((read_position_ + header_size + D.raw_size()) % read_buf_size_ - (int64)read_position_, 0ll);
@@ -304,11 +338,11 @@ namespace atma
 		return std::make_tuple((byte*)q_write_info.ui64[0], q_write_info.ui32[2], q_write_info.ui32[3]);
 	}
 
-	inline auto base_mpsc_queue_t::impl_read_queue_read_info() -> std::tuple<byte*, uint32>
+	inline auto base_mpsc_queue_t::impl_read_queue_read_info() -> std::tuple<byte*, uint32, uint32>
 	{
 		atma::atomic128_t q_read_info;
 		atma::atomic_load_128(&q_read_info, &read_info_);
-		return std::make_tuple((byte*)q_read_info.ui64[0], q_read_info.ui32[3]);
+		return std::make_tuple((byte*)q_read_info.ui64[0], q_read_info.ui32[2], q_read_info.ui32[3]);
 	}
 
 	// size of available bytes. subtract one because we must never have
@@ -457,8 +491,8 @@ namespace atma
 	{
 		// size after all alignment shenanigans
 		uint32 ag = alignment();
-		auto a = ((op + ag) & ~(ag - 1));
-		auto r = size_ - (a - op);
+		auto opa = alignby(op, ag);
+		auto r = size_ - (opa - op);
 		return r;
 	}
 
@@ -626,6 +660,7 @@ namespace atma
 	template <bool DynamicGrowth>
 	struct mpsc_queue_ii_t;
 
+#if 0
 	template <>
 	struct mpsc_queue_ii_t<false>
 		: base_mpsc_queue_t
@@ -696,7 +731,9 @@ namespace atma
 			return impl_make_allocation(wb, wbs, wp, alloctype_t::normal, alignment, size);
 		}
 	};
+#endif
 
+#if 1
 	template <>
 	struct mpsc_queue_ii_t<true>
 		: base_mpsc_queue_t
@@ -711,11 +748,10 @@ namespace atma
 
 		auto allocate(uint32 size, uint32 alignment = 1, bool contiguous = false) -> allocation_t
 		{
-			ATMA_ASSERT(alignment > 0);
 			ATMA_ASSERT(is_pow2(alignment));
+			ATMA_ASSERT(size <= write_buf_size(), "queue can not allocate that much");
 
-			auto size_orig = size;
-			ATMA_ASSERT(size <= write_buf_size_, "queue can not allocate that much");
+			alignment = std::min(std::max(alignment, 4u), 32u);
 
 			// write-buffer, write-buffer-size, write-position
 			byte* wb = nullptr;
@@ -724,19 +760,21 @@ namespace atma
 
 			// read-buffer, read-position
 			byte* rb = nullptr;
+			uint32 rbs = 0;
 			uint32 rp = 0;
 
+			// starvation info
 			size_t thread_id = std::hash<std::thread::id>{}(std::this_thread::get_id());
 			std::chrono::nanoseconds starvation{};
+
 			for (;;)
 			{
 				auto time_start = std::chrono::high_resolution_clock::now();
 				auto starve_id = starve_gate(thread_id);
 
 				std::tie(wb, wbs, wp) = impl_read_queue_write_info();
-				std::tie(rb, rp) = impl_read_queue_read_info();
+				std::tie(rb, rbs, rp) = impl_read_queue_read_info();
 
-				size = size_orig;
 				uint32 available = impl_calculate_available_space(rb, rp, wb, wbs, wp, contiguous);
 				
 				if (available < size && contiguous)
@@ -776,7 +814,7 @@ namespace atma
 			return impl_make_allocation(wb, wbs, wp, alloctype_t::normal, alignment, size);
 		}
 	};
-
+#endif
 
 	template <bool DynamicGrowth>
 	struct mpsc_queue_t : mpsc_queue_ii_t<DynamicGrowth>
