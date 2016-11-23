@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
@@ -209,4 +210,216 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+=======
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\include\atma\algorithm.hpp" />
+    <ClInclude Include="..\..\include\atma\algorithm\filter.hpp" />
+    <ClInclude Include="..\..\include\atma\algorithm\map.hpp" />
+    <ClInclude Include="..\..\include\atma\algorithm\zip.hpp" />
+    <ClInclude Include="..\..\include\atma\aligned_allocator.hpp" />
+    <ClInclude Include="..\..\include\atma\atomic.hpp" />
+    <ClInclude Include="..\..\include\atma\call_fn.hpp" />
+    <ClInclude Include="..\..\include\atma\function.hpp" />
+    <ClInclude Include="..\..\include\atma\function_composition.hpp" />
+    <ClInclude Include="..\..\include\atma\handle_table.hpp" />
+    <ClInclude Include="..\..\include\atma\hash_map.hpp" />
+    <ClInclude Include="..\..\include\atma\logging.hpp" />
+    <ClInclude Include="..\..\include\atma\memory.hpp" />
+    <ClInclude Include="..\..\include\atma\assert.hpp" />
+    <ClInclude Include="..\..\include\atma\bind.hpp" />
+    <ClInclude Include="..\..\include\atma\bitmask.hpp" />
+    <ClInclude Include="..\..\include\atma\com_ptr.hpp" />
+    <ClInclude Include="..\..\include\atma\config\platform.hpp" />
+    <ClInclude Include="..\..\include\atma\console.hpp" />
+    <ClInclude Include="..\..\include\atma\enable_if.hpp" />
+    <ClInclude Include="..\..\include\atma\enable_multiple_shared_from_this.hpp" />
+    <ClInclude Include="..\..\include\atma\event.hpp" />
+    <ClInclude Include="..\..\include\atma\function_traits.hpp" />
+    <ClInclude Include="..\..\include\atma\hash.hpp" />
+    <ClInclude Include="..\..\include\atma\idxs.hpp" />
+    <ClInclude Include="..\..\include\atma\intrusive_ptr.hpp" />
+    <ClInclude Include="..\..\include\atma\lockfree\queue.hpp" />
+    <ClInclude Include="..\..\include\atma\math\aabb.hpp" />
+    <ClInclude Include="..\..\include\atma\math\aabc.hpp" />
+    <ClInclude Include="..\..\include\atma\math\constants.hpp" />
+    <ClInclude Include="..\..\include\atma\math\intersection.hpp" />
+    <ClInclude Include="..\..\include\atma\math\matrix4f.hpp" />
+    <ClInclude Include="..\..\include\atma\math\scalar.hpp" />
+    <ClInclude Include="..\..\include\atma\math\triangle.hpp" />
+    <ClInclude Include="..\..\include\atma\math\vector4f.hpp" />
+    <ClInclude Include="..\..\include\atma\math\vector4i.hpp" />
+    <ClInclude Include="..\..\include\atma\mpsc_queue.hpp" />
+    <ClInclude Include="..\..\include\atma\placeholders.hpp" />
+    <ClInclude Include="..\..\include\atma\platform\allocation.hpp" />
+    <ClInclude Include="..\..\include\atma\shared_memory.hpp" />
+    <ClInclude Include="..\..\include\atma\streams.hpp" />
+    <ClInclude Include="..\..\include\atma\string.hpp" />
+    <ClInclude Include="..\..\include\atma\threading.hpp" />
+    <ClInclude Include="..\..\include\atma\thread\engine.hpp" />
+    <ClInclude Include="..\..\include\atma\tuple.hpp" />
+    <ClInclude Include="..\..\include\atma\types.hpp" />
+    <ClInclude Include="..\..\include\atma\unique_memory.hpp" />
+    <ClInclude Include="..\..\include\atma\unit_test.hpp" />
+    <ClInclude Include="..\..\include\atma\utf\algorithm.hpp" />
+    <ClInclude Include="..\..\include\atma\utf\utf8_char.hpp" />
+    <ClInclude Include="..\..\include\atma\utf\utf8_istream.hpp" />
+    <ClInclude Include="..\..\include\atma\utf\utf8_iterator.hpp" />
+    <ClInclude Include="..\..\include\atma\utf\utf8_string_header.hpp" />
+    <ClInclude Include="..\..\include\atma\utf\utf8_string.hpp" />
+    <ClInclude Include="..\..\include\atma\utf\utf8_string_range_header.hpp" />
+    <ClInclude Include="..\..\include\atma\utf\utf8_string_range.hpp" />
+    <ClInclude Include="..\..\include\atma\vector.hpp" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{3301E1FA-9F23-43C6-A5E1-183204867D44}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>atma</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <IncludePath>../vendor;../include;$(IncludePath)</IncludePath>
+    <OutDir>$(SolutionDir)$(ProjectName)\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>$(ProjectDir)..\..\vendor\;$(ProjectDir)..\..\include\;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>$(ProjectDir)..\..\vendor;$(ProjectDir)..\..\include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <IncludePath>../vendor;../include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>ATMA_MATH_USE_SSE;WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableLanguageExtensions>true</DisableLanguageExtensions>
+      <DisableSpecificWarnings>4996</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <Lib>
+      <AdditionalOptions>-D_SCL_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>ATMA_MATH_USE_SSE;WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableLanguageExtensions>true</DisableLanguageExtensions>
+      <DisableSpecificWarnings>4996</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+>>>>>>> be72bb354218b871567d355ca18fb4bed965a7a0
 </Project>
