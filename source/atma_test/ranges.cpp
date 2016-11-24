@@ -2,6 +2,7 @@
 
 #include <atma/algorithm/filter.hpp>
 #include <atma/algorithm/map.hpp>
+#include <atma/mpsc_queue.hpp>
 
 #include <atma/vector.hpp>
 
@@ -57,6 +58,9 @@ template <typename T> decltype(auto) iden(T t) { return t; }
 
 SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 {
+	atma::mpsc_queue_t<true> Q{1024};
+	auto A = Q.allocate(20);
+
 	GIVEN("a vector of numbers")
 	{
 		auto numbers = atma::vector<int>{1, 2, 3, 4};
