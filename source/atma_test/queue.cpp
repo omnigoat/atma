@@ -40,7 +40,7 @@ void read_number(queue_t& Q, numbers_t& ns)
 			//std::cout << "r: " << r << std::endl;
 			++ns[r];
 
-			if (r == maxnum)
+			if (r == maxnum - 1)
 				read_terminate = true;
 		}); 
 	}
@@ -50,10 +50,10 @@ SCENARIO("mpsc_queue is amazin")
 {
 	std::cout << "beginning queue test" << std::endl;
 
-	atma::mpsc_queue_t<false> Q{64};
+	atma::mpsc_queue_t<false> Q{10'000'000};
 
 	uint64 const write_thread_count = 2;
-	uint64 const read_thread_count = 2;
+	uint64 const read_thread_count = 4;
 
 	std::vector<numbers_t> readnums{read_thread_count};
 	std::vector<std::thread> write_threads;
