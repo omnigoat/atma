@@ -49,11 +49,11 @@ namespace atma
 
 	namespace detail
 	{
-		template <typename D, typename S, size_t Sz = sizeof(D)>
+		template <typename D, typename S, size_t Sz = sizeof(D) * 8>
 		struct interlocked_impl_t;
 
 		template <typename D, typename S>
-		struct interlocked_impl_t<D, S, 1>
+		struct interlocked_impl_t<D, S, 8>
 		{
 			static auto exchange(D* addr, S x) -> D
 			{
@@ -67,7 +67,7 @@ namespace atma
 		};
 
 		template <typename D, typename S>
-		struct interlocked_impl_t<D, S, 2>
+		struct interlocked_impl_t<D, S, 16>
 		{
 			static auto pre_inc(void volatile* addr) -> D
 			{
@@ -113,7 +113,7 @@ namespace atma
 		
 
 		template <typename D, typename S>
-		struct interlocked_impl_t<D, S, 4>
+		struct interlocked_impl_t<D, S, 32>
 		{
 			static auto pre_inc(D volatile* addr) -> D
 			{
@@ -139,6 +139,12 @@ namespace atma
 				return VALUE_CAST(D, v);
 			}
 
+			static auto add(D volatile* addr, S const& x) -> D
+			{
+				auto v = InterlockedAdd(ADDR_CAST(LONG volatile, addr), VALUE_CAST(D const, x));
+				return VALUE_CAST(D, v);
+			}
+
 			static auto exchange(D volatile* addr, S const& x) -> D
 			{
 				auto r = InterlockedExchange(
@@ -160,7 +166,7 @@ namespace atma
 		};
 
 		template <typename D, typename S>
-		struct interlocked_impl_t<D, S, 8>
+		struct interlocked_impl_t<D, S, 64>
 		{
 			static auto exchange(D volatile* addr, S const& x) -> D
 			{
@@ -183,7 +189,7 @@ namespace atma
 		};
 
 		template <typename D, typename S>
-		struct interlocked_impl_t<D, S, 16>
+		struct interlocked_impl_t<D, S, 128>
 		{
 			static auto exchange(D volatile* addr, S const& x) -> D
 			{
@@ -208,7 +214,7 @@ namespace atma
 
 
 		template <typename D, typename S = D>
-		struct interlocked_t : interlocked_impl_t<D, S, sizeof(D)>
+		struct interlocked_t : interlocked_impl_t<D, S, sizeof(D) * 8>
 		{
 			static_assert(sizeof(D) == sizeof(S), "bad sizes!");
 		};
@@ -223,6 +229,12 @@ namespace atma
 	template <typename T> inline auto atomic_post_increment(T* addr) -> T { return detail::interlocked_t<T>::post_inc(addr); }
 	template <typename T> inline auto atomic_pre_decrement(T* addr) -> T { return detail::interlocked_t<T>::pre_dec(addr); }
 	template <typename T> inline auto atomic_post_decrement(T* addr) -> T { return detail::interlocked_t<T>::post_dec(addr); }
+
+	template <typename D, typename S>
+	inline auto atomic_add(D volatile* addr, S const& x) -> D
+	{
+		return detail::interlocked_t<D, S>::add(addr, x);
+	}
 
 	template <typename D, typename S>
 	inline auto atomic_bitwise_or(D volatile* dest, S x) -> D {
@@ -256,7 +268,11 @@ namespace atma
 	inline auto atomic_load_128(D* dest, S volatile* src) -> void
 	{
 		static const atomic128_t t;
-		atomic_compare_exchange<S, D>(src, t, t, reinterpret_cast<atomic128_t*>(dest));
+		atomic_compare_exchange<S, D>(
+			src,
+			reinterpret_cast<D const&>(t),
+			reinterpret_cast<S const&>(t),
+			dest);
 	}
 
 }
