@@ -25,7 +25,7 @@ void alloc_number(queue_t& Q)
 		
 		Q.with_allocation(sz, [](auto& A) {
 			//std::cout << "A: " << counter.load() << std::endl;
-			A.encode_uint32(++counter);
+			A.encode_uint32(counter++);
 		});
 	}
 }
@@ -38,9 +38,8 @@ void read_number(queue_t& Q, numbers_t& ns)
 			uint32 r;
 			D.decode_uint32(r);
 			//std::cout << "r: " << r << std::endl;
-			mtx.lock();
 			++ns[r];
-			mtx.unlock();
+
 			if (r == maxnum)
 				read_terminate = true;
 		}); 
@@ -51,10 +50,10 @@ SCENARIO("mpsc_queue is amazin")
 {
 	std::cout << "beginning queue test" << std::endl;
 
-	atma::mpsc_queue_t<false> Q{512};
+	atma::mpsc_queue_t<false> Q{64};
 
 	uint64 const write_thread_count = 2;
-	uint64 const read_thread_count = 1;
+	uint64 const read_thread_count = 2;
 
 	std::vector<numbers_t> readnums{read_thread_count};
 	std::vector<std::thread> write_threads;
@@ -64,7 +63,7 @@ SCENARIO("mpsc_queue is amazin")
 		write_threads.emplace_back(alloc_number, std::ref(Q));
 
 	for (int i = 0; i != read_thread_count; ++i)
-		read_threads.emplace_back(read_number, std::ref(Q), readnums[i]);
+		read_threads.emplace_back(read_number, std::ref(Q), std::ref(readnums[i]));
 
 	for (int i = 0; i != write_thread_count; ++i)
 		write_threads[i].join();
@@ -74,5 +73,21 @@ SCENARIO("mpsc_queue is amazin")
 
 	std::cout << "ended queue alloc/read" << std::endl;
 	std::cout << "beginning verification" << std::endl;
+
+	for (int i = 0; i != maxnum; ++i)
+	{
+		int found = 0;
+		for (auto const& p : readnums)
+		{
+			auto candidate = p.find(i);
+			if (candidate != p.end())
+			{
+				ATMA_ASSERT(candidate->second == 1);
+				++found;
+			}
+		}
+
+		ATMA_ASSERT(found == 1);
+	}
 }
 
