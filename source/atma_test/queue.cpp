@@ -15,34 +15,41 @@ std::atomic<uint32> counter;
 std::atomic<bool> read_terminate{false};
 std::mutex mtx;
 
-uint32 const maxnum = 10000;
+uint32 const maxnum = 100000;
 
-void alloc_number(queue_t& Q)
+void write_number(queue_t& Q)
 {
-	for (; counter < maxnum;)
+	for (;;)
 	{
 		int sz = 8; //std::max(4, rand() % 16);
 		
-		Q.with_allocation(sz, [](auto& A) {
-			//std::cout << "A: " << counter.load() << std::endl;
-			A.encode_uint32(counter++);
+		auto idx = counter++;
+		if (idx >= maxnum)
+			break;
+
+		Q.with_allocation(sz, [idx](auto& A) {
+			A.encode_uint32(idx);
 		});
 	}
 }
 
-void read_number(queue_t& Q, numbers_t& ns)
+void read_number(queue_t& Q, numbers_t& ns, uint32* allread)
 {
-	for (; !read_terminate;)
+	for (; *allread != maxnum;)
 	{
-		Q.with_consumption([&](queue_t::decoder_t& D) {
+		Q.with_consumption([&](queue_t::decoder_t& D)
+		{
 			uint32 r;
 			D.decode_uint32(r);
-			//std::cout << "r: " << r << std::endl;
-			++ns[r];
+			
+			if (++ns[r] > 1)
+				ATMA_HALT("bad things");
 
-			if (r == maxnum - 1)
-				read_terminate = true;
-		}); 
+			if (r % 10000 == 0)
+				std::cout << "r: " << r << std::endl;
+
+			atma::atomic_pre_increment(allread);
+		});
 	}
 }
 
@@ -50,20 +57,21 @@ SCENARIO("mpsc_queue is amazin")
 {
 	std::cout << "beginning queue test" << std::endl;
 
-	atma::mpsc_queue_t<false> Q{10'000'000};
+	atma::mpsc_queue_t<false> Q{512};
 
-	uint64 const write_thread_count = 2;
-	uint64 const read_thread_count = 4;
+	uint64 const write_thread_count = 3;
+	uint64 const read_thread_count = 3;
 
-	std::vector<numbers_t> readnums{read_thread_count};
 	std::vector<std::thread> write_threads;
 	std::vector<std::thread> read_threads;
+	std::vector<numbers_t> readnums{read_thread_count};
+	uint32 allread = 0;
 
 	for (int i = 0; i != write_thread_count; ++i)
-		write_threads.emplace_back(alloc_number, std::ref(Q));
+		write_threads.emplace_back(write_number, std::ref(Q));
 
 	for (int i = 0; i != read_thread_count; ++i)
-		read_threads.emplace_back(read_number, std::ref(Q), std::ref(readnums[i]));
+		read_threads.emplace_back(read_number, std::ref(Q), std::ref(readnums[i]), &allread);
 
 	for (int i = 0; i != write_thread_count; ++i)
 		write_threads[i].join();
@@ -73,7 +81,7 @@ SCENARIO("mpsc_queue is amazin")
 
 	std::cout << "ended queue alloc/read" << std::endl;
 	std::cout << "beginning verification" << std::endl;
-
+#if 1
 	for (int i = 0; i != maxnum; ++i)
 	{
 		int found = 0;
@@ -89,5 +97,6 @@ SCENARIO("mpsc_queue is amazin")
 
 		ATMA_ASSERT(found == 1);
 	}
+#endif
 }
 
