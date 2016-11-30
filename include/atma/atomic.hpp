@@ -115,6 +115,19 @@ namespace atma
 		template <typename D, typename S>
 		struct interlocked_impl_t<D, S, 32>
 		{
+			static auto load(D volatile* dest, S volatile* addr) -> void
+			{
+				// add zero to load I guess
+				*dest = InterlockedAdd(ADDR_CAST(LONG volatile, addr), 0);
+			}
+
+			static auto store(D volatile* addr, S const& x) -> void
+			{
+				InterlockedExchange(
+					ADDR_CAST(LONG volatile, addr),
+					VALUE_CAST(LONG const, x));
+			}
+
 			static auto pre_inc(D volatile* addr) -> D
 			{
 				auto v = InterlockedIncrement(ADDR_CAST(LONG volatile, addr));
@@ -156,12 +169,17 @@ namespace atma
 
 			static auto compare_exchange(D volatile* addr, D const& c, S const& x, D* outc) -> bool
 			{
-				*ADDR_CAST(LONG, outc) = InterlockedCompareExchange(
+				auto v = InterlockedCompareExchange(
 					ADDR_CAST(LONG volatile, addr),
 					VALUE_CAST(LONG const, x),
 					VALUE_CAST(LONG const, c));
 
-				return *outc == c;
+				bool r = v == c;
+
+				if (!r)
+					*outc = v;
+
+				return r;
 			}
 		};
 
@@ -262,6 +280,18 @@ namespace atma
 	inline auto atomic_compare_exchange(D volatile* addr, D const& c, S const& x, D* outc) -> bool
 	{
 		return detail::interlocked_t<D, S>::compare_exchange(addr, c, x, outc);
+	}
+
+	template <typename D, typename S>
+	inline auto atomic_load(D* dest, S volatile* addr) -> void
+	{
+		detail::interlocked_t<D, S>::load(dest, addr);
+	}
+
+	template <typename D, typename S>
+	inline auto atomic_store(D volatile* addr, S const& x) -> void
+	{
+		detail::interlocked_t<D, S>::store(addr, x);
 	}
 
 	template <typename D, typename S>
