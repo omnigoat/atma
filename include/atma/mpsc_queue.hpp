@@ -169,7 +169,6 @@ namespace atma
 			{
 				atma::atomic128_t r;
 				atma::atomic_load_128(&r, &atomic_handle);
-				std::atomic_thread_fence(std::memory_order_acq_rel);
 				return *reinterpret_cast<queue_state_t*>(&r);
 			}
 		};
@@ -312,10 +311,6 @@ namespace atma
 	{
 		ATMA_ASSERT(((uint64)(a.buf_ + a.op_)) % 4 == 0);
 
-		// we have already guaranteed that the header does not wrap around our buffer
-		//new (a.buf_ + a.op_) atomic_uint32_t;
-		//reinterpret_cast<atomic_uint32_t*>(a.buf_ + a.op_)->store(a.header(), std::memory_order_release);
-
 		auto v = atma::atomic_exchange(
 			(uint32*)(a.buf_ + a.op_),
 			a.header());
@@ -367,10 +362,11 @@ namespace atma
 		byte* rb = buf.pointer;
 		
 		// 2) load housekeeping & queue-state
-		std::atomic_thread_fence(std::memory_order_acquire);
 		housekeeping_t* hk = buf_housekeeping(rb);
 		queue_state_t qs = hk->atomic_load_queue();
-		ATMA_ASSERT((qs.wp < qs.ep && (qs.rp <= qs.wp || qs.ep <= qs.rp)) || (qs.wp >= qs.ep));
+		ATMA_ASSERT(qs.rp < qs.ep ? qs.rp <= qs.wp && qs.wp < qs.ep : qs.wp < qs.ep || qs.rp <= qs.wp);
+		
+		
 
 		// 3) decode allocation
 		//
@@ -384,20 +380,18 @@ namespace atma
 			if (qs.rp == qs.wp)
 				return decoder_t{};
 
-			// if header is zero (nothing allocated), we'll bail
-			//auto atom = reinterpret_cast<atomic_uint32_t*>(rb + qs.rp);
-			//uint32 header = atom->load(std::memory_order_acquire);
+			// read header (atomic operation on 4-byte alignment)
 			uint32 header = *reinterpret_cast<uint32*>(rb + qs.rp);
-			if (header == 0)
-				return decoder_t{};
 
-			// check type for validity
+			// allocation-type
 			uint32 type = header >> 28;
 			if (type == 0)
 				return decoder_t{};
 
-			// size of allocation
+			// allocation-size
 			uint32 size = header & header_size_bitmask;
+			if (size == 0)
+				return decoder_t{};
 
 			// update queue
 			auto nqs = qs;
@@ -454,31 +448,23 @@ namespace atma
 
 	inline auto base_mpsc_queue_t::finalize(decoder_t& D) -> void
 	{
-		//std::cout << "[" << std::hex << std::this_thread::get_id() << "] " << "finalizing" << std::endl;
 		// 1) read info
-		
-
-		//  01234567
-		//  --------
-		//    ###       {2,3} : [2,5)
-		//  ##    ##    {6,4} : [0,2)  [6,8)
-		//
 		auto hk = buf_housekeeping(D.buf_);
+		auto bp = (uint32*)(D.buf_ + D.op_);
+		ATMA_ASSERT((uint64)bp % 4 == 0);
 
 		// 2) zero-out memory (very required), except header
+		//  - use acquire/release so that all memsets get visible
 		auto size_wrap   = std::max((D.op_ + header_size + D.raw_size()) - (int64)hk->buffer_size(), 0ll);
-		auto size_middle = std::max(D.raw_size() - size_wrap, 0ll); // std::max((D.op_ + header_size + D.raw_size()) % (int64)rbss, 0ll);
+		auto size_middle = std::max(D.raw_size() - size_wrap, 0ll);
 		ATMA_ASSERT(D.op_ + size_middle <= hk->buffer_size());
 
-		// acquire/release so that all memsets get visible
 		std::atomic_thread_fence(std::memory_order_acquire);
 		memset(D.buf_ + (D.op_ + header_size) % hk->buffer_size(), 0, size_middle);
 		memset(D.buf_, 0, size_wrap);
 		std::atomic_thread_fence(std::memory_order_release);
 
 		// 2.1) atomically set the header to "ready to clear"
-		auto bp = (uint32*)(D.buf_ + D.op_);
-		ATMA_ASSERT((uint64)bp % 4 == 0);
 		auto v = *bp;
 		auto clear_value = 0x10000000 | D.size_;
 		
@@ -487,14 +473,9 @@ namespace atma
 
 		atma::atomic_store(bp, clear_value);
 
+		// 3) move empty-position along
 		auto qs = hk->atomic_load_queue();
 		auto ep = qs.ep;
-
-		// 3) move empty-position along
-		//std::cout << "[" << std::hex << std::this_thread::get_id() << "] ep: " << std::dec << D.op_ << " -> " << ((qs.ep + header_size + D.raw_size()) % hk->buffer_size()) << std::endl;
-		if (qs.rp < qs.ep) ATMA_ASSERT(qs.rp <= qs.wp && qs.wp < qs.ep);
-		else               ATMA_ASSERT(qs.wp < qs.ep || qs.rp <= qs.wp);
-
 
 		for (auto p = D.buf_ + qs.ep;; p = D.buf_ + qs.ep)
 		{
@@ -510,12 +491,13 @@ namespace atma
 			uint32 sz = current_value & 0x00ffffff;
 			ATMA_ASSERT(sz != 0);
 
-
 			// whoever sets the header to zero gets to update ep
 			//if (atma::atomic_compare_exchange((uint32*)p, current_value, 0))
 			if (atomp->compare_exchange_strong(current_value, 0))
 			{
 #if 1
+				// for some reason this is much, much faster than the atomic_exchange.
+				// I think it must be because it's reducing contention.
 				for (;;)
 				{
 					auto nqs = qs;
@@ -526,11 +508,6 @@ namespace atma
 				}
 #else
 				atma::atomic_exchange(&hk->qs.ep, (qs.ep + header_size + sz) % hk->buffer_size());
-				//atma::atomic_add(&hk->qs.ep, header_size + sz);
-				//// atomic access not required here: if we overran the buffer
-				//// size, no other threads will be able to progress
-				//if (hk->qs.ep >= hk->buffer_size())
-				//	hk->qs.ep %= hk->buffer_size();
 #endif
 			}
 			else
@@ -539,13 +516,7 @@ namespace atma
 			}
 		}
 
-		if (qs.rp < qs.ep) ATMA_ASSERT(qs.rp <= qs.wp && qs.wp < qs.ep);
-		else               ATMA_ASSERT(qs.wp < qs.ep || qs.rp <= qs.wp);
-
-		// decrement access-count
-		//ATMA_ASSERT(qs.ac != 0);
-		//atma::atomic_pre_decrement(&qs.ac);
-
+		ATMA_ASSERT(qs.rp < qs.ep ? qs.rp <= qs.wp && qs.wp < qs.ep : qs.wp < qs.ep || qs.rp <= qs.wp);
 
 		D.type_ = 0;
 	}
@@ -601,9 +572,6 @@ namespace atma
 			wqs,
 			nwqs,
 			&wqs);
-
-		std::atomic_thread_fence(std::memory_order_release);
-		std::atomic_thread_fence(std::memory_order_acquire);
 
 		if (r)
 		{
