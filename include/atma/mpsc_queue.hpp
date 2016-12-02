@@ -55,6 +55,26 @@ namespace atma
 		static_assert(sizeof(atomic_uint32_t) == 4, "assumptions");
 		static_assert(alignof(atomic_uint32_t) <= 4, "assumptions");
 
+	protected:
+		// HEADER
+		//
+		//  2 bits: alloc-state {empty, mid_write, full, mid_read}
+		//  2 bits: alloc-type {invalid, normal, jump, pad}
+		//  2 bits: alignment (exponent for 4*2^x, giving us 4, 8, 16, or 32 bytes alignment)
+		// 28-bits: size (allowing up to 64mb allocations)
+		//
+		// state:
+		//  - explicit in alloc-state, except for an empty state with the alloc-type
+		//    set to "jump". this is a mid-clear flag.
+		//
+		enum class allocstate_t : uint32
+		{
+			empty,
+			mid_write,
+			full,
+			mid_read,
+		};
+
 		enum class alloctype_t : uint32
 		{
 			invalid = 0,
@@ -63,25 +83,21 @@ namespace atma
 			pad = 3,
 		};
 
-		// header is {2-bits: alloc-type (invalid, normal, jump, pad), 2-bits: alignment, 28-bits: size}, making the header-size 4 bytes
-		//  - alignment is a two-bit number representing a pow-2 exponent, which is multiplied by 4
-		//      thus: 0b00 -> pow2(0) == 1  ->  1 * 4 ==  4,  4-byte alignment
-		//      thus: 0b01 -> pow2(1) == 2  ->  2 * 4 ==  8,  8-byte alignment
-		//      thus: 0b10 -> pow2(2) == 4  ->  4 * 4 == 16, 16-byte alignment
-		//      thus: 0b11 -> pow2(3) == 8  ->  8 * 4 == 32, 32-byte alignment
-		//
-		//  - jump command with a zero size is waiting for a clear
-		//
-		static uint32 const header_padflag_bitsize = 1;
-		static uint32 const header_jumpflag_bitsize = 1;
-		static uint32 const header_alignment_bitsize = 2;
-		static uint32 const header_size_bitsize = 28;
-		static uint32 const header_size = 4;
-		static uint32 const jump_command_body_size = sizeof(void*) + sizeof(uint32);
+		
+		static constexpr uint32 header_size = 4;
+		static constexpr uint32 header_state_bitsize = 2;
+		static constexpr uint32 header_state_bitshift = 30;
+		static constexpr uint32 header_type_bitsize = 2;
+		static constexpr uint32 header_type_bitshift = 28;
+		static constexpr uint32 header_alignment_bitsize = 2;
+		static constexpr uint32 header_alignment_bitshift = 26;
+		static constexpr uint32 header_size_bitsize = 26;
+		static constexpr uint32 jump_command_body_size = sizeof(void*) + sizeof(uint32);
 
-		static uint32 const header_type_bitmask = pow2(header_padflag_bitsize + header_jumpflag_bitsize) - 1;
-		static uint32 const header_alignment_bitmask = pow2(header_alignment_bitsize) - 1;
-		static uint32 const header_size_bitmask = pow2(header_size_bitsize) - 1;
+		static constexpr uint32 header_state_bitmask = pow2(header_state_bitsize) - 1;
+		static constexpr uint32 header_type_bitmask = pow2(header_type_bitsize) - 1;
+		static constexpr uint32 header_alignment_bitmask = pow2(header_alignment_bitsize) - 1;
+		static constexpr uint32 header_size_bitmask = pow2(header_size_bitsize) - 1;
 
 		static uint32 const invalid_allocation = 0xffffffff;
 
@@ -202,16 +218,17 @@ namespace atma
 		auto data() const -> void*;
 
 	protected:
-		headerer_t(byte* buf, uint32 op, uint32 p, uint32 type, uint32 alignment, uint32 size)
+		headerer_t(byte* buf, uint32 op, uint32 p, uint32 state, uint32 type, uint32 alignment, uint32 size)
 			: buf_{buf}
 			, op_{op}, p_{p}
-			, type_(type), alignment_(alignment), size_(size)
+			, state_{state}, type_{type}, alignment_{alignment}, size_{size}
 		{}
 
 		headerer_t(byte* buf, uint32 op_, uint32 p_, uint32 header)
 			: headerer_t{buf, op_, p_,
-				header >> (header_size_bitsize + header_alignment_bitsize),
-				(header >> header_size_bitsize) & header_alignment_bitmask,
+				(header >> header_state_bitshift) & header_state_bitmask,
+				(header >> header_type_bitshift) & header_type_bitmask,
+				(header >> header_alignment_bitshift) & header_alignment_bitmask,
 				header & header_size_bitmask}
 		{}
 
@@ -227,9 +244,10 @@ namespace atma
 		uint32 op_ = 0, p_ = 0;
 
 		// header
-		uint32 type_      :  2;
-		uint32 alignment_ :  2;
-		uint32 size_      : 28;
+		uint32 state_     : header_state_bitsize;
+		uint32 type_      : header_type_bitsize;
+		uint32 alignment_ : header_alignment_bitsize;
+		uint32 size_      : header_size_bitsize;
 	};
 
 
@@ -246,7 +264,7 @@ namespace atma
 		auto encode_data(void const*, uint32) -> void;
 
 	private:
-		allocation_t(byte* buf, uint32 wp, alloctype_t type, uint32 alignment, uint32 size);
+		allocation_t(byte* buf, uint32 wp, allocstate_t, alloctype_t, uint32 alignment, uint32 size);
 
 		friend struct base_mpsc_queue_t;
 	};
@@ -598,7 +616,7 @@ namespace atma
 
 	inline auto base_mpsc_queue_t::impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t type, uint32 alignment, uint32 size) -> allocation_t
 	{
-		return allocation_t{wb, wp, type, alignment, size};
+		return allocation_t{wb, wp, allocstate_t::full, type, alignment, size};
 	}
 
 	inline auto base_mpsc_queue_t::impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void
@@ -710,8 +728,8 @@ namespace atma
 	}
 
 	// allocation_t
-	inline base_mpsc_queue_t::allocation_t::allocation_t(byte* buf, uint32 wp, alloctype_t type, uint32 alignment, uint32 size)
-		: headerer_t{buf, wp, wp, (uint32)type, alignment, size}
+	inline base_mpsc_queue_t::allocation_t::allocation_t(byte* buf, uint32 wp, allocstate_t state, alloctype_t type, uint32 alignment, uint32 size)
+		: headerer_t{buf, wp, wp, (uint32)state, (uint32)type, alignment, size}
 	{
 		p_ = alignby(p_ + header_size, this->alignment());
 		p_ %= this->buffer_size();
@@ -783,7 +801,7 @@ namespace atma
 	}
 
 	inline base_mpsc_queue_t::decoder_t::decoder_t(decoder_t&& rhs)
-		: headerer_t(rhs.buf_, rhs.op_, rhs.p_, rhs.type_, rhs.alignment_, rhs.size_)
+		: headerer_t(rhs.buf_, rhs.op_, rhs.p_, rhs.state_, rhs.type_, rhs.alignment_, rhs.size_)
 	{
 		memset(&rhs, 0, sizeof(decoder_t));
 	}
