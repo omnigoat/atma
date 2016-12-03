@@ -57,10 +57,10 @@ SCENARIO("mpsc_queue is amazin")
 {
 	std::cout << "beginning queue test" << std::endl;
 
-	atma::mpsc_queue_t<false> Q{512 * 32};
+	atma::mpsc_queue_t<false> Q{16 * 1024};
 
-	uint64 const write_thread_count = 6;
-	uint64 const read_thread_count = 6;
+	uint64 const write_thread_count = 2;
+	uint64 const read_thread_count = 2;
 
 	std::vector<std::thread> write_threads;
 	std::vector<std::thread> read_threads;
