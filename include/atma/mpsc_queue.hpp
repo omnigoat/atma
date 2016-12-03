@@ -77,10 +77,10 @@ namespace atma
 
 		enum class alloctype_t : uint32
 		{
-			invalid = 0,
-			normal = 1,
-			jump = 2,
-			pad = 3,
+			invalid,
+			normal,
+			jump,
+			pad,
 		};
 
 		
@@ -106,7 +106,7 @@ namespace atma
 		auto impl_read_queue_write_info() -> std::tuple<byte*, uint32, uint32>;
 		auto impl_read_queue_read_info() -> std::tuple<byte*, uint32, uint32>;
 		auto impl_calculate_available_space(queue_state_t const& w, uint32 wbs, bool ct) -> uint32;
-		auto impl_perform_allocation(queue_state_t&, uint32 wbs, uint32& size, uint32 alignment, bool ct) -> uint32;
+		auto impl_perform_allocation(byte* wb, uint32 wbs, queue_state_t& wqs, uint32& size, uint32 alignment, bool ct) -> uint32;
 		auto impl_perform_pad_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available) -> bool;
 		auto impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t, uint32 alignment, uint32 size) -> allocation_t;
 		auto impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void;
@@ -122,6 +122,26 @@ namespace atma
 		auto buf_housekeeping(void*) -> housekeeping_t*;
 
 	protected:
+		struct header_t
+		{
+			header_t(uint32 x)
+				: u32{x}
+			{}
+
+			union
+			{
+				uint32 u32;
+
+				struct
+				{
+					uint32       size      : header_size_bitsize;
+					uint32       alignment : header_alignment_bitsize;
+					alloctype_t  type      : header_type_bitsize;
+					allocstate_t state     : header_state_bitsize;
+				};
+			};
+		};
+
 		struct queue_state_t
 		{
 			uint32 wp; // write-position
@@ -232,7 +252,7 @@ namespace atma
 				header & header_size_bitmask}
 		{}
 
-		auto header() const -> uint32 { return (type_ << 30) | (alignment_ << 28) | size_; }
+		auto header() const -> uint32 { return (state_ << header_state_bitshift) | (type_ << header_type_bitshift) | (alignment_ << header_alignment_bitshift) | size_; }
 		auto buffer_size() const -> uint32 { return ((housekeeping_t*)buf_ - 1)->buffer_size(); }
 		auto type() const -> alloctype_t { return (alloctype_t)type_; }
 		auto raw_size() const -> uint32 { return size_; }
@@ -329,11 +349,12 @@ namespace atma
 	{
 		ATMA_ASSERT(((uint64)(a.buf_ + a.op_)) % 4 == 0);
 
-		auto v = atma::atomic_exchange(
-			(uint32*)(a.buf_ + a.op_),
-			a.header());
+		header_t h = a.header();
+		h.state = allocstate_t::full;
 
-		ATMA_ASSERT(v == 0);
+		auto v = atma::atomic_exchange((uint32*)(a.buf_ + a.op_), h.u32);
+
+		ATMA_ASSERT(v == 0x40000000);
 	}
 
 
@@ -383,8 +404,6 @@ namespace atma
 		housekeeping_t* hk = buf_housekeeping(rb);
 		queue_state_t qs = hk->atomic_load_queue();
 		ATMA_ASSERT(qs.rp < qs.ep ? qs.rp <= qs.wp && qs.wp < qs.ep : qs.wp < qs.ep || qs.rp <= qs.wp);
-		
-		
 
 		// 3) decode allocation
 		//
@@ -392,6 +411,8 @@ namespace atma
 		// and write-threads can fill it up, with differently-sized allocations, which
 		// means we may dereference our "header" with a mental value. this is fine, as
 		// we will discard this if rp has moved (and ac has updated)
+		uint32* hp   = nullptr;
+		uint32  size = 0;
 		for (;;)
 		{
 			ATMA_ASSERT(qs.rp % 4 == 0);
@@ -399,28 +420,35 @@ namespace atma
 				return decoder_t{};
 
 			// read header (atomic operation on 4-byte alignment)
-			uint32 header = *reinterpret_cast<uint32*>(rb + qs.rp);
-
-			// allocation-type
-			uint32 type = header >> 28;
-			if (type == 0)
+			hp = reinterpret_cast<uint32*>(rb + qs.rp);
+			header_t h = *hp;
+			if (h.state != allocstate_t::full)
 				return decoder_t{};
 
 			// allocation-size
-			uint32 size = header & header_size_bitmask;
+			size = h.size;
 			if (size == 0)
 				return decoder_t{};
 
-			// update queue
-			auto nqs = qs;
-			nqs.rp = (nqs.rp + header_size + size) % hk->buffer_size();
-			nqs.ac += 1;
-			if (atma::atomic_compare_exchange(&hk->qs, qs, nqs, &qs))
+			// update allocation for mid-read
+			auto nh = h;
+			nh.state = allocstate_t::mid_read;
+			if (atma::atomic_compare_exchange(hp, h.u32, nh.u32))
 				break;
+			else
+			{
+				qs = hk->atomic_load_queue();
+				ATMA_ASSERT(qs.rp < qs.ep ? qs.rp <= qs.wp && qs.wp < qs.ep : qs.wp < qs.ep || qs.rp <= qs.wp);
+			}
 		}
 
+		auto nrp = (qs.rp + header_size + size) % hk->buffer_size();
+		auto orp = atma::atomic_exchange(&hk->qs.rp, nrp);
+		qs = hk->atomic_load_queue();
+		ATMA_ASSERT(qs.rp < qs.ep ? qs.rp <= qs.wp && qs.wp < qs.ep : qs.wp < qs.ep || qs.rp <= qs.wp);
+
 		// 2) we now have exclusive access to our range of memory
-		decoder_t D{rb, qs.rp};
+		decoder_t D{rb, orp};
 
 		switch (D.type())
 		{
@@ -468,8 +496,8 @@ namespace atma
 	{
 		// 1) read info
 		auto hk = buf_housekeeping(D.buf_);
-		auto bp = (uint32*)(D.buf_ + D.op_);
-		ATMA_ASSERT((uint64)bp % 4 == 0);
+		auto hp = (uint32*)(D.buf_ + D.op_);
+		ATMA_ASSERT((uint64)hp % 4 == 0);
 
 		// 2) zero-out memory (very required), except header
 		//  - use acquire/release so that all memsets get visible
@@ -482,50 +510,49 @@ namespace atma
 		memset(D.buf_, 0, size_wrap);
 		std::atomic_thread_fence(std::memory_order_release);
 
-		// 2.1) atomically set the header to "ready to clear"
-		auto v = *bp;
-		auto clear_value = 0x10000000 | D.size_;
-		
-		ATMA_ASSERT(v != clear_value);
-		ATMA_ASSERT(v != 0);
+		// atomically set the header to "ready to clear", which is encoded as an "empty jump"
+		header_t h = *hp;
+		header_t ch = h;
+		ch.state = allocstate_t::empty;
+		ch.type = alloctype_t::jump;
 
-		atma::atomic_store(bp, clear_value);
+		//ATMA_ASSERT(h != clear_value);
+		//ATMA_ASSERT(h != 0);
+
+		atma::atomic_store(hp, ch);
 
 		// 3) move empty-position along
 		auto qs = hk->atomic_load_queue();
-		auto ep = qs.ep;
 
 		for (auto p = D.buf_ + qs.ep;; p = D.buf_ + qs.ep)
 		{
-			auto atomp = reinterpret_cast<atomic_uint32_t*>(p);
-			ATMA_ASSERT(qs.ep % 4 == 0);
+			auto ehp = reinterpret_cast<uint32*>(p);
+			ATMA_ASSERT((uint64)ehp % 4 == 0);
 
 			// atomic load for 4-byte aligned addresses
-			uint32 current_value = atomp->load();
-			
-			if ((current_value & 0xf0000000) != 0x10000000)
+			header_t eh = *ehp;
+			if (eh.state != allocstate_t::empty || eh.type != alloctype_t::jump)
 				break;
 
-			uint32 sz = current_value & 0x00ffffff;
-			ATMA_ASSERT(sz != 0);
+			ATMA_ASSERT(eh.size != 0);
 
 			// whoever sets the header to zero gets to update ep
 			//if (atma::atomic_compare_exchange((uint32*)p, current_value, 0))
-			if (atomp->compare_exchange_strong(current_value, 0))
+			if (atma::atomic_compare_exchange(ehp, eh.u32, 0))
 			{
-#if 1
+#if 0
 				// for some reason this is much, much faster than the atomic_exchange.
 				// I think it must be because it's reducing contention.
 				for (;;)
 				{
 					auto nqs = qs;
 					nqs.ac += 1;
-					nqs.ep = (qs.ep + header_size + sz) % hk->buffer_size();
+					nqs.ep = (qs.ep + header_size + eh.size) % hk->buffer_size();
 					if (atma::atomic_compare_exchange(&hk->qs, qs, nqs, &qs))
 						{ qs = nqs; break; }
 				}
 #else
-				atma::atomic_exchange(&hk->qs.ep, (qs.ep + header_size + sz) % hk->buffer_size());
+				atma::atomic_exchange(&hk->qs.ep, (qs.ep + header_size + eh.size) % hk->buffer_size());
 #endif
 			}
 			else
@@ -565,39 +592,48 @@ namespace atma
 		return result;
 	}
 
-	inline auto base_mpsc_queue_t::impl_perform_allocation(queue_state_t& wqs, uint32 wbs, uint32& size, uint32 alignment, bool ct) -> uint32
+	inline auto base_mpsc_queue_t::impl_perform_allocation(byte* wb, uint32 wbs, queue_state_t& wqs, uint32& size, uint32 alignment, bool ct) -> uint32
 	{
 		ATMA_ASSERT(alignment > 0);
 		ATMA_ASSERT(wqs.wp % 4 == 0);
 
-		// expand size for initial padding required for requested alignment
+		// expand size so that:
+		//  - we pad up to the requested alignment
+		//  - the following allocation is at a 4-byte alignment
 		size += alignby(wqs.wp + header_size, alignment) - wqs.wp - header_size;
-
-		// expand size so that next allocation is 4-byte aligned
 		size = alignby(size, 4);
 
 		if (wqs.available(wbs, ct) < size)
+			return invalid_allocation;
+
+		uint32* hp = (uint32*)(wb + wqs.wp);
+		header_t h = *(uint32*)(wb + wqs.wp);
+		if (h.state == allocstate_t::empty && h.type == alloctype_t::invalid)
+		{
+			auto nh = h;
+			nh.state = allocstate_t::mid_write;
+
+			if (!atma::atomic_compare_exchange(hp, h.u32, nh.u32))
+				return invalid_allocation;
+		}
+		else
 		{
 			return invalid_allocation;
 		}
 
-		auto nwqs = wqs;
-		nwqs.wp = (wqs.wp + header_size + size) % wbs;
-		nwqs.ac += 1;
+		// in theory we can simply atomically exchange wp (I think???)
+		auto nwp = (wqs.wp + header_size + size) % wbs;
+		auto owp = atma::atomic_exchange(&writing_.housekeeping()->qs.wp, nwp);
+		
+		auto qs = writing_.housekeeping()->qs;
+		ATMA_ASSERT(qs.rp < qs.ep ? qs.rp <= qs.wp && qs.wp < qs.ep : qs.wp < qs.ep || qs.rp <= qs.wp);
 
-		bool r = atma::atomic_compare_exchange(
-			&writing_.housekeeping()->qs,
-			wqs,
-			nwqs,
-			&wqs);
+#if ATMA_ENABLE_ASSERTS
+		for (int i = header_size; i != header_size + size; ++i)
+			 ATMA_ASSERT(writing_.pointer[(owp + i) % wbs] == 0);
+#endif
 
-		if (r)
-		{
-			for (int i = 0; i != header_size + size; ++i)
-				 ATMA_ASSERT(writing_.pointer[(wqs.wp + i) % wbs] == 0);
-		}
-
-		return r ? wqs.wp : invalid_allocation;
+		return owp;
 	}
 
 	inline auto base_mpsc_queue_t::impl_perform_pad_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 space) -> bool
@@ -616,7 +652,7 @@ namespace atma
 
 	inline auto base_mpsc_queue_t::impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t type, uint32 alignment, uint32 size) -> allocation_t
 	{
-		return allocation_t{wb, wp, allocstate_t::full, type, alignment, size};
+		return allocation_t{wb, wp, allocstate_t::mid_write, type, alignment, size};
 	}
 
 	inline auto base_mpsc_queue_t::impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void
@@ -924,7 +960,7 @@ namespace atma
 				size = size_orig;
 
 				ATMA_ASSERT((wqs.wp < wqs.ep && (wqs.rp <= wqs.wp || wqs.ep <= wqs.rp)) || (wqs.wp >= wqs.ep));
-				wp = impl_perform_allocation(wqs, wbs, size, alignment, contiguous);
+				wp = impl_perform_allocation(writebuf.pointer, wbs, wqs, size, alignment, contiguous);
 				ATMA_ASSERT((wqs.wp < wqs.ep && (wqs.rp <= wqs.wp || wqs.ep <= wqs.rp)) || (wqs.wp >= wqs.ep));
 
 				if (wp != invalid_allocation)
