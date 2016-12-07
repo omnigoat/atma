@@ -21,7 +21,7 @@ void write_number(queue_t& Q)
 {
 	for (;;)
 	{
-		int sz = 8; //std::max(4, rand() % 16);
+		int sz = std::max(4, rand() % 16);
 		
 		auto idx = counter++;
 		if (idx >= maxnum)
@@ -53,14 +53,14 @@ void read_number(queue_t& Q, numbers_t& ns, uint32* allread)
 	}
 }
 
-SCENARIO("mpsc_queue is amazin")
+SCENARIO("mpsc_queue is amazing")
 {
 	std::cout << "beginning queue test" << std::endl;
 
 	atma::mpsc_queue_t<false> Q{16 * 1024};
 
-	uint64 const write_thread_count = 2;
-	uint64 const read_thread_count = 2;
+	uint64 const write_thread_count = 4;
+	uint64 const read_thread_count = 4;
 
 	std::vector<std::thread> write_threads;
 	std::vector<std::thread> read_threads;
