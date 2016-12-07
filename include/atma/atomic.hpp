@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atma/config/platform.hpp>
+#include <atma/assert.hpp>
 
 namespace atma
 {
@@ -40,12 +41,17 @@ namespace atma
 	};
 
 
+	using memory_order = std::memory_order;
+
 
 
 #if ATMA_COMPILER_MSVC
 
 #define ADDR_CAST(type, x) reinterpret_cast<type*>(x)
 #define VALUE_CAST(type, x) reinterpret_cast<type&>(x)
+
+#define ATMA_ASSERT_32BIT_ALIGNED(addr) ATMA_ASSERT((uint64)addr % 4 == 0, "not aligned to 4-byte boundary")
+#define ATMA_ASSERT_64BIT_ALIGNED(addr) ATMA_ASSERT((uint64)addr % 8 == 0, "not aligned to 8-byte boundary")
 
 	namespace detail
 	{
@@ -115,10 +121,13 @@ namespace atma
 		template <typename D, typename S>
 		struct interlocked_impl_t<D, S, 32>
 		{
-			static auto load(D volatile* dest, S volatile* addr) -> void
+			static auto load(D volatile* dest, S volatile* addr, memory_order order = memory_order::memory_order_seq_cst) -> void
 			{
-				// add zero to load I guess
-				*dest = InterlockedAdd(ADDR_CAST(LONG volatile, addr), 0);
+				ATMA_ASSERT_32BIT_ALIGNED(addr);
+				// loads from 4-byte aligned addresses are atomic on x86/x64
+				*reinterpret_cast<uint32 volatile*>(dest) = *reinterpret_cast<uint32 volatile*>(addr);
+				_ReadWriteBarrier();
+				// no fencing required on x86/x64
 			}
 
 			static auto store(D volatile* addr, S const& x) -> void
@@ -186,6 +195,16 @@ namespace atma
 		template <typename D, typename S>
 		struct interlocked_impl_t<D, S, 64>
 		{
+			static auto load(D volatile* dest, S volatile* addr) -> void
+			{
+				ATMA_ASSERT_64BIT_ALIGNED(addr);
+				// loads from 4-byte aligned addresses are atomic on x86/x64
+				_ReadWriteBarrier(); 
+				*reinterpret_cast<uint64 volatile*>(dest) = *reinterpret_cast<uint64 volatile*>(addr);
+				_ReadWriteBarrier();
+				// no fencing required on x86/x64
+			}
+
 			static auto exchange(D volatile* addr, S const& x) -> D
 			{
 				auto v = InterlockedExchange64(
@@ -197,12 +216,17 @@ namespace atma
 
 			static auto compare_exchange(D volatile* addr, D const& c, S const& x, D* outc) -> bool
 			{
-				*ADDR_CAST(LONG64, outc) = InterlockedCompareExchange64(
+				auto v = InterlockedCompareExchange64(
 					ADDR_CAST(LONG64 volatile, addr),
 					VALUE_CAST(LONG64 const, x),
 					VALUE_CAST(LONG64 const, c));
 
-				return *outc == c;
+				bool r = reinterpret_cast<LONG64&>(v) == reinterpret_cast<LONG64 const&>(c);
+
+				if (!r)
+					*reinterpret_cast<LONG64*>(outc) = v;
+
+				return r;
 			}
 		};
 
@@ -283,7 +307,7 @@ namespace atma
 	}
 
 	template <typename D, typename S>
-	inline auto atomic_load(D* dest, S volatile* addr) -> void
+	inline auto atomic_load(D* dest, S volatile* addr, memory_order = memory_order::memory_order_seq_cst) -> void
 	{
 		detail::interlocked_t<D, S>::load(dest, addr);
 	}
