@@ -27,7 +27,7 @@ void write_number(queue_t& Q)
 		if (idx >= maxnum)
 			break;
 
-		Q.with_allocation(sz, [idx](auto& A) {
+		Q.with_allocation(sz, 4, true, [idx](auto& A) {
 			A.encode_uint32(idx);
 		});
 	}
