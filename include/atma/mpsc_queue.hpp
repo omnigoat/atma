@@ -47,7 +47,6 @@ namespace atma
 
 	protected:
 		struct headerer_t;
-		struct queue_state_t;
 		struct housekeeping_t;
 		
 		using atomic_uint32_t = std::atomic<uint32>;
@@ -83,10 +82,20 @@ namespace atma
 			pad,
 		};
 
+		enum class allocerr_t : uint32
+		{
+			success,
+			invalid,
+			invalid_contiguous,
+		};
+
 		struct allocinfo_t
 		{
 			uint32 p;
-			uint32 sz;
+			allocerr_t err :  2;
+			uint32 sz      : 30;
+
+			operator bool() const { return err == allocerr_t::success; }
 		};
 		
 		static constexpr uint32 header_size = 4;
@@ -104,15 +113,13 @@ namespace atma
 		static constexpr uint32 header_alignment_bitmask = pow2(header_alignment_bitsize) - 1;
 		static constexpr uint32 header_size_bitmask = pow2(header_size_bitsize) - 1;
 
-		static uint32 const invalid_allocation = 0xffffffff;
+		static uint32 const invalid_allocation_mask = 0x80000000;
+		static uint32 const invalid_contiguous_mask = 0x40000000;
 
 		std::chrono::nanoseconds const starve_timeout{5000};
 
 		auto impl_read_queue_write_info() -> std::tuple<byte*, uint32, uint32>;
 		auto impl_read_queue_read_info() -> std::tuple<byte*, uint32, uint32>;
-		auto impl_calculate_available_space(queue_state_t const& w, uint32 wbs, bool ct) -> uint32;
-		auto impl_perform_allocation(byte* wb, uint32 size, uint32 alignment, bool ct) -> allocinfo_t;
-		auto impl_perform_pad_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 available) -> bool;
 		auto impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t, uint32 alignment, uint32 size) -> allocation_t;
 		auto impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void;
 	
@@ -130,15 +137,8 @@ namespace atma
 		{
 			auto result = ep <= wp ? (bufsize - wp + (contiguous ? 0 : ep)) : ep - wp;
 
-			if (result >= header_size + 1)
-			{
-				result -= header_size;
+			if ((wp + result) % bufsize == ep)
 				result -= 1;
-			}
-			else
-			{
-				result = 0;
-			}
 
 			return result;
 		}
@@ -178,10 +178,9 @@ namespace atma
 			uint32 o;
 		};
 
-		struct alignas(64) queue_state_t
-		{
-			
-		};
+		auto impl_allocate_default(housekeeping_t*, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t;
+		auto impl_allocate_pad(housekeeping_t*, cursor_t const& w, cursor_t const& e) -> allocinfo_t;
+		auto impl_allocate(housekeeping_t*, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t;
 
 		struct housekeeping_t
 		{
@@ -191,6 +190,7 @@ namespace atma
 				, starve_info_{}
 			{}
 
+			auto buffer() const -> byte* { return (byte*)reinterpret_cast<byte const*>(this + 1); }
 			auto buffer_size() const -> uint32 { return buffer_size_; }
 			auto requires_delete() const -> bool { return requires_delete_; }
 
@@ -451,8 +451,6 @@ namespace atma
 
 			// allocation-size
 			size = h.size;
-			if (size == 0)
-				return decoder_t{};
 
 			// update read-pointer
 			cursor_t nr{ (r.v + header_size + size) % hk->buffer_size(), r.o + 1 };
@@ -551,7 +549,7 @@ namespace atma
 			if (eh.state != allocstate_t::empty || eh.type != alloctype_t::jump)
 				break;
 
-			ATMA_ASSERT(eh.size != 0);
+			//ATMA_ASSERT(eh.size != 0);
 
 			// whoever sets the header to zero gets to update ep
 			//if (atma::atomic_compare_exchange((uint32*)p, current_value, 0))
@@ -613,15 +611,10 @@ namespace atma
 	}
 #endif
 
-	inline auto base_mpsc_queue_t::impl_perform_allocation(byte* wb, uint32 size, uint32 alignment, bool ct) -> allocinfo_t
+	inline auto base_mpsc_queue_t::impl_allocate_default(housekeeping_t* hk, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t
 	{
 		ATMA_ASSERT(alignment > 0);
 		//ATMA_ASSERT(wqs.wp % 4 == 0);
-
-		// load everything
-		auto hk = buf_housekeeping(wb);
-		auto w  = hk->atomic_load_w();
-		auto e  = hk->atomic_load_e();
 
 		// expand size so that:
 		//  - we pad up to the requested alignment
@@ -629,53 +622,55 @@ namespace atma
 		size += alignby(w.v + header_size, alignment) - w.v - header_size;
 		size  = alignby(size, 4);
 
-		if (available_space(w.v, e.v, hk->buffer_size(), ct) < size)
-			return {invalid_allocation, 0};
+		return impl_allocate(hk, w, e, size, alignment, ct);
+	}
 
+	inline auto base_mpsc_queue_t::impl_allocate_pad(housekeeping_t* hk, cursor_t const& w, cursor_t const& e) -> allocinfo_t
+	{
+		// assume that people won't try to allocate the entirety of the buffer...
+		if (w.v < header_size)
+			return {0, allocerr_t::invalid, 0};
+
+		auto space = hk->buffer_size() - w.v - header_size;
+		if ((w.v + header_size + space) % hk->buffer_size() == e.v)
+			return {0, allocerr_t::invalid, 0};
+
+		return impl_allocate(hk, w, e, space, 1, true);
+	}
+
+	inline auto base_mpsc_queue_t::impl_allocate(housekeeping_t* hk, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t
+	{
+		ATMA_ASSERT(alignment > 0);
+		//ATMA_ASSERT(wqs.wp % 4 == 0);
+
+		// expand size so that:
+		//  - we pad up to the requested alignment
+		//  - the following allocation is at a 4-byte alignment
+		auto available = available_space(w.v, e.v, hk->buffer_size(), ct);
+		if (available < header_size + size)
+			return {0, ct ? allocerr_t::invalid_contiguous : allocerr_t::invalid, 0};
 
 		// move w (allocation happens here)
 		auto nw = cursor_t{ (w.v + header_size + size) % hk->buffer_size(), w.o + 1 };
+		ATMA_ASSERT(nw.v != e.v);
 		if (!atma::atomic_compare_exchange(&hk->w, w, nw))
-			return {invalid_allocation, 0};
-
+			return {0, allocerr_t::invalid, 0};
 
 		// write new header
-		uint32* hp = (uint32*)(wb + w.v);
+		uint32* hp = (uint32*)(hk->buffer() + w.v);
 		header_t h;
 		atma::atomic_load(&h, hp);
 		auto nh = h;
 		nh.state = allocstate_t::mid_write;
-		auto v = atma::atomic_exchange(hp, nh.u32);
-		ATMA_ASSERT(v == 0);
-
-#if 0
-		auto qs = writing_.housekeeping()->qs;
-		ATMA_ASSERT(qs.rp < qs.ep ? qs.rp <= qs.wp && qs.wp < qs.ep : qs.wp < qs.ep || qs.rp <= qs.wp);
+		header_t v = atma::atomic_exchange(hp, nh.u32);
+		ATMA_ASSERT(v.state == allocstate_t::empty);
 
 #if ATMA_ENABLE_ASSERTS
 		for (int i = header_size; i != header_size + size; ++i)
-			 ATMA_ASSERT(writing_.pointer[(owp + i) % wbs] == 0);
+			ATMA_ASSERT(hk->buffer()[(w.v + i) % hk->buffer_size()] == 0);
 #endif
-#endif
 
-		return {w.v, size};
-	}
-
-	inline auto base_mpsc_queue_t::impl_perform_pad_allocation(byte* wb, uint32 wbs, uint32 wp, uint32 space) -> bool
-	{
-#if 0
-		ATMA_ASSERT(wp % 4 == 0);
-
-		// full allocation: header-size + the space it fills
-		auto size = header_size + space;
-
-		uint32 nwp = (wp + size) % wbs;
-
-		return atma::atomic_compare_exchange(
-			&buf_housekeeping(wb)->qs.w,
-			wp, nwp);
-#endif
-		return false;
+		return {w.v, allocerr_t::success, size};
 	}
 
 	inline auto base_mpsc_queue_t::impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t type, uint32 alignment, uint32 size) -> allocation_t
@@ -977,29 +972,22 @@ namespace atma
 				auto time_start = std::chrono::high_resolution_clock::now();
 				auto starve_id = starve_gate(thread_id);
 				
-				// load write-buf, housekeeping, queue-state
-				
-				//ATMA_ASSERT((wqs.wp < wqs.ep && (wqs.rp <= wqs.wp || wqs.ep <= wqs.rp)) || (wqs.wp >= wqs.ep));
-				ai = impl_perform_allocation(writebuf.pointer, size, alignment, contiguous);
-				//ATMA_ASSERT((wqs.wp < wqs.ep && (wqs.rp <= wqs.wp || wqs.ep <= wqs.rp)) || (wqs.wp >= wqs.ep));
-				
-				if (ai.p != invalid_allocation)
+				auto w = whk->atomic_load_w();
+				auto e = whk->atomic_load_e();
+
+				ai = impl_allocate_default(whk, w, e, size, alignment, contiguous);
+				if (ai)
+				{
 					break;
-				
-#if 0
-				wqs = whk->atomic_load_queue();
-				ATMA_ASSERT((wqs.wp < wqs.ep && (wqs.rp <= wqs.wp || wqs.ep <= wqs.rp)) || (wqs.wp >= wqs.ep));
-				else if (
-					contiguous &&
-					wqs.ep < wp &&
-					wqs.available(wbs, contiguous) >= header_size &&
-					impl_perform_pad_allocation(wb, wbs, wp, available)
-				) {
-					auto A = impl_make_allocation(wb, wbs, wp, alloctype_t::pad, 4, available);
-					commit(A);
-					continue;
 				}
-#endif
+				else if (ai.err == allocerr_t::invalid_contiguous && e.v <= w.v)
+				{
+					if (auto pai = impl_allocate_pad(whk, w, e))
+					{
+						auto A = impl_make_allocation(writebuf.pointer, whk->buffer_size(), pai.p, alloctype_t::pad, 4, pai.sz);
+						commit(A);
+					}
+				}
 
 				// contiguous allocations can't flag themselves as starved, otherwise
 				// it may take precedence, and never have space to allocate
