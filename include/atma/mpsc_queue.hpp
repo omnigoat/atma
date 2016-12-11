@@ -4,6 +4,7 @@
 #include <atma/atomic.hpp>
 #include <atma/unique_memory.hpp>
 #include <atma/assert.hpp>
+#include <atma/config/platform.hpp>
 
 #include <chrono>
 #include <thread>
@@ -65,6 +66,9 @@ namespace atma
 		// state:
 		//  - explicit in alloc-state, except for an empty state with the alloc-type
 		//    set to "jump". this is a mid-clear flag.
+		//
+		//  - empty + jump  =>  ready for finalize
+		//  - empty +  pad  =>  ready for commit
 		//
 		enum class allocstate_t : uint32
 		{
@@ -130,8 +134,8 @@ namespace atma
 	private:
 		base_mpsc_queue_t(void*, uint32, bool);
 
-		auto buf_init(void*, uint32, bool) -> void*;
-		auto buf_housekeeping(void*) -> housekeeping_t*;
+		static auto buf_init(void*, uint32, bool) -> void*;
+		static auto buf_housekeeping(void*) -> housekeeping_t*;
 
 		static auto available_space(uint32 wp, uint32 ep, uint32 bufsize, bool contiguous) -> uint32
 		{
@@ -164,7 +168,7 @@ namespace atma
 			};
 		};
 
-		struct cursor_t
+		struct alignas(8) cursor_t
 		{
 			cursor_t()
 				: v{}, o{}
@@ -184,30 +188,43 @@ namespace atma
 
 		struct housekeeping_t
 		{
-			housekeeping_t(uint32 buffer_size, bool requires_delete)
-				: buffer_size_{buffer_size}
+			housekeeping_t(byte* buffer, uint32 buffer_size, bool requires_delete)
+				: buffer_{buffer}
+				, buffer_size_{buffer_size}
 				, requires_delete_{requires_delete}
 				, starve_info_{}
 			{}
 
-			auto buffer() const -> byte* { return (byte*)reinterpret_cast<byte const*>(this + 1); }
+			auto buffer() const -> byte* { return buffer_; }
 			auto buffer_size() const -> uint32 { return buffer_size_; }
 			auto requires_delete() const -> bool { return requires_delete_; }
 
 		private:
+			byte* buffer_ = nullptr;
 			uint32 buffer_size_ = 0;
 			bool requires_delete_ = false;
 
 		public:
-			cursor_t w;
-			char pad0[64 - sizeof(cursor_t)];
-			cursor_t r;
-			char pad1[64 - sizeof(cursor_t)];
-			cursor_t e;
-
+			// each cursor_t is 64 bytes, aligned to 64 bytes, so we avoid false-sharing
+			cache_line_pad_t<> pad0;
+			cursor_t w; // write
+			cache_line_pad_t<sizeof(cursor_t)> pad1;
+			cursor_t f; // full
+			cache_line_pad_t<sizeof(cursor_t)> pad2;
+			cursor_t r; // read
+			cache_line_pad_t<sizeof(cursor_t)> pad3;
+			cursor_t e; // empty
+			cache_line_pad_t<sizeof(cursor_t)> pad4;
+			
 			auto atomic_load_w() -> cursor_t {
 				cursor_t v;
 				atma::atomic_load(&v, &w);
+				return v;
+			}
+
+			auto atomic_load_f() -> cursor_t {
+				cursor_t v;
+				atma::atomic_load(&v, &f);
 				return v;
 			}
 
@@ -239,7 +256,7 @@ namespace atma
 		{
 			buffer_t() {}
 
-			auto housekeeping() -> housekeeping_t* { return (housekeeping_t*)pointer - 1; }
+			auto housekeeping() -> housekeeping_t* { return *((housekeeping_t**)pointer - 1); }
 
 			union
 			{
@@ -279,7 +296,7 @@ namespace atma
 		{}
 
 		auto header() const -> uint32 { return (state_ << header_state_bitshift) | (type_ << header_type_bitshift) | (alignment_ << header_alignment_bitshift) | size_; }
-		auto buffer_size() const -> uint32 { return ((housekeeping_t*)buf_ - 1)->buffer_size(); }
+		auto buffer_size() const -> uint32 { return buf_housekeeping(buf_)->buffer_size(); } //(*((housekeeping_t**)buf_ - 1))->buffer_size(); }
 		auto type() const -> alloctype_t { return (alloctype_t)type_; }
 		auto raw_size() const -> uint32 { return size_; }
 
@@ -369,20 +386,6 @@ namespace atma
 		reading_.pointer = (byte*)nbuf;
 	}
 
-	
-
-	inline auto base_mpsc_queue_t::commit(allocation_t& a) -> void
-	{
-		ATMA_ASSERT(((uint64)(a.buf_ + a.op_)) % 4 == 0);
-
-		header_t h = a.header();
-		h.state = allocstate_t::full;
-
-		auto v = atma::atomic_exchange((uint32*)(a.buf_ + a.op_), h.u32);
-
-		ATMA_ASSERT(v == 0x40000000);
-	}
-
 
 #if 0
 #  define TMPLOG(...) __VA_ARGS__
@@ -392,15 +395,16 @@ namespace atma
 
 	inline auto base_mpsc_queue_t::buf_init(void* buf, uint32 size, bool requires_delete) -> void*
 	{
-		size -= sizeof(housekeeping_t);
-		new (buf) housekeeping_t{size, requires_delete};
+		size -= sizeof(housekeeping_t*);
+		auto addr = (byte*)((housekeeping_t**)buf + 1);
+		*reinterpret_cast<housekeeping_t**>(buf) = new housekeeping_t{addr, size, requires_delete};
 
-		return (housekeeping_t*)buf + 1; // + sizeof(housekeeping_t);
+		return addr;
 	}
 
 	inline auto base_mpsc_queue_t::buf_housekeeping(void* buf) -> housekeeping_t*
 	{
-		return (housekeeping_t*)buf - 1; //((byte*)buf - sizeof(housekeeping_t));
+		return *((housekeeping_t**)buf - 1);
 	}
 
 
@@ -552,25 +556,11 @@ namespace atma
 			//ATMA_ASSERT(eh.size != 0);
 
 			// whoever sets the header to zero gets to update ep
-			//if (atma::atomic_compare_exchange((uint32*)p, current_value, 0))
 			if (atma::atomic_compare_exchange(ehp, eh.u32, 0))
 			{
-#if 0
-				// for some reason this is much, much faster than the atomic_exchange.
-				// I think it must be because it's reducing contention.
-				for (;;)
-				{
-					auto nqs = qs;
-					nqs.ac += 1;
-					nqs.ep = (qs.ep + header_size + eh.size) % hk->buffer_size();
-					if (atma::atomic_compare_exchange(&hk->qs, qs, nqs, &qs))
-						{ qs = nqs; break; }
-				}
-#else
 				auto ne = cursor_t{ (e.v + header_size + eh.size) % hk->buffer_size(), e.o + 1};
 				atma::atomic_exchange(&hk->e, ne);
 				e = ne;
-#endif
 			}
 			else
 			{
@@ -582,34 +572,6 @@ namespace atma
 
 		D.type_ = 0;
 	}
-
-	// size of available bytes. subtract one because we must never have
-	// the write-position and read-position equal the same value if the
-	// buffer is full, because we can't distinguish it from being empty
-	//
-	// if contiguous, then ignore the [begin, read-pointer) area of the
-	// buffer;
-	//
-	// if our buffers are differing (because we are mid-rebase), then
-	// we can only allocate up to the end of the new buffer
-#if 0
-	inline auto base_mpsc_queue_t::impl_calculate_available_space(queue_state_t const& w, uint32 wbs, bool ct) -> uint32
-	{
-		auto result = w.ep <= w.wp ? (wbs - w.wp + (ct ? 0 : w.ep)) : w.ep - w.wp;
-
-		if (result >= header_size + 1)
-		{
-			result -= header_size;
-			result -= 1;
-		}
-		else
-		{
-			result = 0;
-		}
-
-		return result;
-	}
-#endif
 
 	inline auto base_mpsc_queue_t::impl_allocate_default(housekeeping_t* hk, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t
 	{
@@ -672,6 +634,19 @@ namespace atma
 
 		return {w.v, allocerr_t::success, size};
 	}
+
+	inline auto base_mpsc_queue_t::commit(allocation_t& a) -> void
+	{
+		ATMA_ASSERT(((uint64)(a.buf_ + a.op_)) % 4 == 0);
+
+		header_t h = a.header();
+		h.state = allocstate_t::full;
+
+		auto v = atma::atomic_exchange((uint32*)(a.buf_ + a.op_), h.u32);
+
+		ATMA_ASSERT(v == 0x40000000);
+	}
+
 
 	inline auto base_mpsc_queue_t::impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t type, uint32 alignment, uint32 size) -> allocation_t
 	{

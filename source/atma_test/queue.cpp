@@ -59,8 +59,8 @@ SCENARIO("mpsc_queue is amazing")
 
 	atma::mpsc_queue_t<false> Q{16 * 1024};
 
-	uint64 const write_thread_count = 4;
-	uint64 const read_thread_count = 4;
+	uint64 const write_thread_count = 3;
+	uint64 const read_thread_count = 3;
 
 	std::vector<std::thread> write_threads;
 	std::vector<std::thread> read_threads;
@@ -81,6 +81,7 @@ SCENARIO("mpsc_queue is amazing")
 
 	std::cout << "ended queue alloc/read" << std::endl;
 	std::cout << "beginning verification" << std::endl;
+
 #if 1
 	for (int i = 0; i != maxnum; ++i)
 	{
