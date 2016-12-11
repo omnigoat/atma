@@ -26,5 +26,13 @@
 #	define ATMA_COMPILER_MSVC _MSC_VER
 #endif
 
-
+namespace atma
+{
+	template <size_t Bytes = 0>
+	struct cache_line_pad_t
+	{
+	private:
+		char pad[64 - Bytes];
+	};
+}
 
