@@ -15,13 +15,13 @@ std::atomic<uint32> counter;
 std::atomic<bool> read_terminate{false};
 std::mutex mtx;
 
-uint32 const maxnum = 100000;
+uint32 const maxnum = std::numeric_limits<uint32>::max() / 8 + 3; // 1024 * 1024 * 1024; //1000000;
 
 void write_number(queue_t& Q)
 {
 	for (;;)
 	{
-		int sz = std::max(4, rand() % 16);
+		int sz = 4; //std::max(4, rand() % 16);
 		
 		auto idx = counter++;
 		if (idx >= maxnum)
@@ -42,8 +42,8 @@ void read_number(queue_t& Q, numbers_t& ns, uint32* allread)
 			uint32 r;
 			D.decode_uint32(r);
 			
-			if (++ns[r] > 1)
-				ATMA_HALT("bad things");
+			//if (++ns[r] > 1)
+			//	ATMA_HALT("bad things");
 
 			if (r % 10000 == 0)
 				std::cout << "r: " << r << std::endl;
@@ -57,7 +57,7 @@ SCENARIO("mpsc_queue is amazing")
 {
 	std::cout << "beginning queue test" << std::endl;
 
-	atma::mpsc_queue_t<false> Q{16 * 1024};
+	atma::mpsc_queue_t<false> Q{72};
 
 	uint64 const write_thread_count = 3;
 	uint64 const read_thread_count = 3;
@@ -82,7 +82,7 @@ SCENARIO("mpsc_queue is amazing")
 	std::cout << "ended queue alloc/read" << std::endl;
 	std::cout << "beginning verification" << std::endl;
 
-#if 1
+#if 0
 	for (int i = 0; i != maxnum; ++i)
 	{
 		int found = 0;

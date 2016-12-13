@@ -200,4 +200,7 @@
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\..\resources\atma.natvis" />
+  </ItemGroup>
 </Project>

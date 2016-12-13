@@ -77,6 +77,9 @@
     <ClInclude Include="..\..\include\atma\utf\utf8_string_range.hpp" />
     <ClInclude Include="..\..\include\atma\vector.hpp" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\..\resources\atma.natvis" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{3301E1FA-9F23-43C6-A5E1-183204867D44}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
