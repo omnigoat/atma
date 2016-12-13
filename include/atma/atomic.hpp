@@ -125,16 +125,20 @@ namespace atma
 			{
 				ATMA_ASSERT_32BIT_ALIGNED(addr);
 				// loads from 4-byte aligned addresses are atomic on x86/x64
-				*reinterpret_cast<uint32 volatile*>(dest) = *reinterpret_cast<uint32 volatile*>(addr);
+				_ReadWriteBarrier();
+				//*reinterpret_cast<uint32 volatile*>(dest) = *reinterpret_cast<uint32 volatile*>(addr);
+				*ADDR_CAST(LONG volatile, dest) = InterlockedAdd(ADDR_CAST(LONG volatile, addr), 0);
 				_ReadWriteBarrier();
 				// no fencing required on x86/x64
 			}
 
 			static auto store(D volatile* addr, S const& x) -> void
 			{
+				_ReadWriteBarrier();
 				InterlockedExchange(
 					ADDR_CAST(LONG volatile, addr),
 					VALUE_CAST(LONG const, x));
+				_ReadWriteBarrier();
 			}
 
 			static auto pre_inc(D volatile* addr) -> D
@@ -163,25 +167,30 @@ namespace atma
 
 			static auto add(D volatile* addr, S const& x) -> D
 			{
+				_ReadWriteBarrier();
 				auto v = InterlockedAdd(ADDR_CAST(LONG volatile, addr), VALUE_CAST(D const, x));
+				_ReadWriteBarrier();
 				return VALUE_CAST(D, v);
 			}
 
 			static auto exchange(D volatile* addr, S const& x) -> D
 			{
+				_ReadWriteBarrier();
 				auto r = InterlockedExchange(
 					ADDR_CAST(LONG volatile, addr),
 					VALUE_CAST(LONG const, x));
-
+				_ReadWriteBarrier();
 				return VALUE_CAST(D, r);
 			}
 
 			static auto compare_exchange(D volatile* addr, D const& c, S const& x, D* outc) -> bool
 			{
+				_ReadWriteBarrier();
 				auto v = InterlockedCompareExchange(
 					ADDR_CAST(LONG volatile, addr),
 					VALUE_CAST(LONG const, x),
 					VALUE_CAST(LONG const, c));
+				_ReadWriteBarrier();
 
 				bool r = v == c;
 
@@ -199,7 +208,7 @@ namespace atma
 			{
 				ATMA_ASSERT_64BIT_ALIGNED(addr);
 				// loads from 4-byte aligned addresses are atomic on x86/x64
-				_ReadWriteBarrier(); 
+				_ReadWriteBarrier();
 				*reinterpret_cast<uint64 volatile*>(dest) = *reinterpret_cast<uint64 volatile*>(addr);
 				_ReadWriteBarrier();
 				// no fencing required on x86/x64
@@ -312,6 +321,14 @@ namespace atma
 		detail::interlocked_t<D, S>::load(dest, addr);
 	}
 
+	template <typename S>
+	inline auto atomic_load(S volatile* addr, memory_order = memory_order::memory_order_seq_cst) -> S
+	{
+		S r;
+		detail::interlocked_t<S, S>::load(&r, addr);
+		return r;
+	}
+
 	template <typename D, typename S>
 	inline auto atomic_store(D volatile* addr, S const& x) -> void
 	{
@@ -324,9 +341,9 @@ namespace atma
 		static const atomic128_t t;
 		atomic_compare_exchange<S, D>(
 			src,
-			reinterpret_cast<D const&>(t),
 			reinterpret_cast<S const&>(t),
-			dest);
+			reinterpret_cast<D const&>(t),
+			reinterpret_cast<S*>(dest));
 	}
 
 }
