@@ -655,11 +655,6 @@ namespace atma
 		uint32 sz = header_size + size;
 
 		// expand size so that:
-		//  - we pad up to the requested alignment
-		//  - the following allocation is at a 4-byte alignment
-		//auto available = available_space(w, e, hk->buffer_size(), ct);
-		//if (available < sz)
-		//	return {0, ct ? allocerr_t::invalid_contiguous : allocerr_t::invalid, 0};
 		uint32 const bs = hk->buffer_size();
 
 		// move w (allocation happens here)
@@ -671,20 +666,20 @@ namespace atma
 		{
 			op = atma::atomic_load(&hk->w);
 
-		retry:
-			uint32 npm = (op + sz) % bs;
-			if (npm != 0 && npm < header_size + size)
+			for (uint32 npm = (op + sz) % bs;; npm = (op + sz) % bs)
 			{
-				padsize = sz - npm;
-				np = op + padsize + sz;
-				if (!atma::atomic_compare_exchange(&hk->w, op, np, &np))
-					goto retry;
-			}
-			else
-			{
-				np = op + sz;
-				if (!atma::atomic_compare_exchange(&hk->w, op, np, &op))
-					goto retry;
+				if (npm != 0 && npm < header_size + size)
+				{
+					padsize = sz - npm;
+					np = op + padsize + sz;
+				}
+				else
+				{
+					np = op + sz;
+				}
+
+				if (atma::atomic_compare_exchange(&hk->w, op, np, &op))
+					break;
 			}
 		}
 		else
@@ -705,6 +700,7 @@ namespace atma
 				atma::atomic_load(&ep, &hk->e);
 		}
 
+		// write padding allocation
 		if (padsize > 0)
 		{
 			while (ep < op + padsize)
