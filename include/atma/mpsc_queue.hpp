@@ -255,6 +255,20 @@ namespace atma
 			};
 		};
 
+
+		struct horsemen_t {
+			horsemen_t() : a{} {}
+
+			union {
+				atomic128_t a;
+				struct {
+					cursor_t w, f, r, e;
+				} c;
+			};
+		};
+
+
+
 		struct buffer_t
 		{
 			buffer_t() {}
@@ -400,7 +414,8 @@ namespace atma
 	{
 		size -= sizeof(housekeeping_t*);
 		auto addr = (byte*)((housekeeping_t**)buf + 1);
-		*reinterpret_cast<housekeeping_t**>(buf) = new housekeeping_t{addr, size, requires_delete};
+		*reinterpret_cast<housekeeping_t**>(buf) = atma::aligned_allocator_t<housekeeping_t>().allocate(1); //new housekeeping_t{addr, size, requires_delete};
+		new (*reinterpret_cast<housekeeping_t**>(buf)) housekeeping_t{addr, size, requires_delete};
 
 		// set the empty space to the full size of the buffer
 		//buf_housekeeping(addr)->e = size;
@@ -447,27 +462,28 @@ namespace atma
 		// we will discard this if rp has moved (and ac has updated)
 		uint32  size = 0;
 		cursor_t r = hk->atomic_load_r();
-		uint32 fp; // = hk->atomic_load_f();
-		atma::atomic_load(&fp, &hk->f);
+		uint32 ep = hk->atomic_load_e();
+		//atma::atomic_load(&fp, &hk->f);
 
 		for (;;)
 		{
 			ATMA_ASSERT(r % 4 == 0);
 
-			while (fp <= r)
-			{
-				atma::atomic_load(&fp, &hk->f);
-			}
+			while (ep <= r)
+				ep = atma::atomic_load(&hk->e);
 
 			// read header (atomic operation on 4-byte alignment)
-			uint32* hp = reinterpret_cast<uint32*>(rb + r % hk->buffer_size());
-			header_t h;
-			atma::atomic_load(&h, hp);
+			uint32 rp = r % hk->buffer_size();
+			uint32* hp = reinterpret_cast<uint32*>(rb + rp);
+			header_t h = atma::atomic_load(hp);
+			std::atomic_thread_fence(std::memory_order_seq_cst);
 			if (h.state != allocstate_t::full)
 				return decoder_t{};
 
 			// allocation-size
 			size = h.size;
+			if (r + header_size + size >= ep)
+				return decoder_t{};
 
 			// update read-pointer
 			cursor_t nr = (r + header_size + size);
@@ -548,47 +564,70 @@ namespace atma
 		// atomically set the header to "ready to clear", which is encoded as an "empty jump"
 		header_t h = atma::atomic_load(hp);
 		header_t ch = h;
+		header_t oh;
 		ch.state = allocstate_t::empty;
 		ch.type = alloctype_t::jump;
-		header_t oh = atma::atomic_exchange(hp, ch);
-		ATMA_ASSERT(oh.state == allocstate_t::mid_read);
+		auto r = atma::atomic_compare_exchange((header_t*)hp, h, ch, &oh);
+		ATMA_ASSERT(r);
+		//ATMA_ASSERT(oh.state == allocstate_t::mid_read);
 
 		// 3) move empty-position along
 		//auto e = hk->atomic_load_e();
+#if 1
 		uint32 ep = atma::atomic_load(&hk->e);
-		for (auto p = D.buf_ + ep % hk->buffer_size();; p = D.buf_ + ep % hk->buffer_size())
+		uint32 fep = ep;
+		for (uint32 epm = ep % hk->buffer_size();; epm = ep % hk->buffer_size())
 		{
-			struct gah {
-				gah() : a{} {}
-
-				union {
-					atomic128_t a;
-					struct {
-						cursor_t w, f, r, e;
-					} c;
-				};
-			} re;
-
-			atomic_load_128(&re.a, reinterpret_cast<atomic128_t*>(&hk->w));
-			ATMA_ASSERT(re.c.e - re.c.r <= hk->buffer_size());
-
-			auto ehp = reinterpret_cast<uint32*>(p);
+			auto ehp = reinterpret_cast<uint32*>(hk->buffer() + epm);
 			ATMA_ASSERT((uint64)ehp % 4 == 0);
 
-			header_t eh;
-			atma::atomic_load(&eh, ehp);
-			if (eh.state != allocstate_t::empty || eh.type != alloctype_t::jump)
-				break;
+			header_t eh = atma::atomic_load(ehp);
+			eh.state = allocstate_t::empty;
+			eh.type = alloctype_t::jump;
 
 			// whoever sets the header to zero gets to update ep
-			if (atma::atomic_compare_exchange(ehp, eh.u32, 0))
-				ep = atma::atomic_add(&hk->e, header_size + eh.size);
+			uint32 oh;
+#if 1
+			if (atma::atomic_compare_exchange(ehp, eh.u32, 0, &oh))
+			{
+				for (uint32 orig_ep;;)
+				{
+					if (atma::atomic_compare_exchange(&hk->e, ep, ep + header_size + eh.size, &orig_ep))
+					{
+						ep += header_size + eh.size;
+						break;
+					}
+					else if ((orig_ep - ep) % hk->buffer_size() != 0)
+					{
+						atma::atomic_exchange(ehp, eh.u32);
+						ep = atma::atomic_load(&hk->e);
+						break;
+					}
+					else
+					{
+						ep = orig_ep;
+					}
+				}
+			}
 			else
+			{
 				break;
+			}
 
-			
+#else
+			if (atma::atomic_compare_exchange(&hk->e, ep, ep + header_size + eh.size))
+			{
+				//auto r = atma::atomic_compare_exchange(ehp, eh.u32, 0, &oh);
+				//ATMA_ASSERT(r);
+				while (!atma::atomic_compare_exchange(ehp, eh.u32, 0, &oh));
+			}
+			else
+			{
+				break;
+			}
+#endif
 		}
-
+#endif
 
 		D.type_ = 0;
 	}
@@ -635,17 +674,13 @@ namespace atma
 		//	return {0, ct ? allocerr_t::invalid_contiguous : allocerr_t::invalid, 0};
 
 		// move w (allocation happens here)
-#if 0
-		auto nw = cursor_t{ (w + header_size + size) % hk->buffer_size(), w.o + 1 };
-		ATMA_ASSERT(nw != e);
-		if (!atma::atomic_compare_exchange(&hk->w, w, nw))
-			return {0, allocerr_t::invalid, 0};
-		auto p = w;
-#else
 		// load e first, then add size to wp
 		uint32 ep = atma::atomic_load(&hk->e);
 		uint32 np = atma::atomic_add(&hk->w, sz);
 		uint32 op = np - sz;
+		uint32  p = op % hk->buffer_size();
+		uint32* hp = (uint32*)(hk->buffer() + p);
+		header_t h = atma::atomic_load(hp);
 
 		// if we've wrapped, we must wait for ep to wrap as well.
 		if (np < op)
@@ -654,27 +689,41 @@ namespace atma
 				atma::atomic_load(&ep, &hk->e);
 		}
 
+		while (ep < np)
+			ep = atma::atomic_load(&hk->e);
+
+#if 0
 		uint32 bs = hk->buffer_size();
-		uint32 epn = ep / bs;
-		uint32 epr = ep % bs;
-		uint32 npn = np / bs;
-		uint32 npr = np % bs;
-
-		while (ep < np) //epn < npn || (epn == npn && epr <= npr))
+		while (ep < np && h.u32 != 0)
 		{
-			atma::atomic_load(&ep, &hk->e);
-			epn = ep / bs;
-			epr = ep % bs;
-		}
+			uint32 epm = ep % hk->buffer_size();
 
-		uint32 p = op % hk->buffer_size();
+			auto ehp = reinterpret_cast<uint32*>(hk->buffer() + epm);
+			ATMA_ASSERT((uint64)ehp % 4 == 0);
+
+			header_t eh = atma::atomic_load(ehp);
+			eh.state = allocstate_t::empty;
+			eh.type = alloctype_t::jump;
+
+			header_t oh;
+			if (atma::atomic_compare_exchange(ehp, eh.u32, 0, (uint32*)&oh))
+			{
+				ep = atma::atomic_add(&hk->e, header_size + eh.size);
+			}
+			else
+			{
+				//ep += header_size + oh.size;
+				ep = atma::atomic_load(&hk->e);
+			}
+
+			h = atma::atomic_load(hp);
+		}
 #endif
 
-
 		// write new header
-		uint32* hp = (uint32*)(hk->buffer() + p);
-		header_t h;
-		atma::atomic_load(&h, hp);
+		//while (h.state != allocstate_t::empty || h.type != alloctype_t::invalid)
+		//	h = atma::atomic_load(hp);
+
 		auto nh = h;
 		nh.state = allocstate_t::empty;
 		nh.type  = alloctype_t::pad;
@@ -691,20 +740,21 @@ namespace atma
 
 	inline auto base_mpsc_queue_t::commit(allocation_t& a) -> void
 	{
-		ATMA_ASSERT(((uint64)(a.buf_ + a.op_)) % 4 == 0);
+		uint32* ah = (uint32*)(a.buf_ + a.op_);
+
+		ATMA_ASSERT((uint64)ah % 4 == 0);
 
 		header_t h = a.header();
-		h.type  = a.type();
 		ATMA_ASSERT(h.state == allocstate_t::flag_commit);
-		std::atomic_thread_fence(std::memory_order_acq_rel);
-		header_t v = atma::atomic_exchange((uint32*)(a.buf_ + a.op_), h.u32);
-		std::atomic_thread_fence(std::memory_order_acq_rel);
+		h.state = allocstate_t::full;
+		header_t v = atma::atomic_exchange(ah, h.u32);
 		ATMA_ASSERT(v.state == allocstate_t::empty && v.type == alloctype_t::pad);
 
 
 		auto hk = buf_housekeeping(a.buf_);
-
+		//atma::atomic_compare_exchange(a.buf_ + a.op_, fh.u32, nh.u32)
 		// 3) move full-position along
+#if 0
 		uint32 fp = atma::atomic_load(&hk->f);
 
 		for (auto p = a.buf_ + fp % hk->buffer_size();; p = a.buf_ + fp % hk->buffer_size())
@@ -712,17 +762,22 @@ namespace atma
 			auto fhp = reinterpret_cast<uint32*>(p);
 
 			header_t fh = atma::atomic_load(fhp);
-			if (fh.state != allocstate_t::flag_commit)
-				break;
+			fh.state = allocstate_t::flag_commit;
+			//if (fh.state != allocstate_t::flag_commit)
+			//	break;
 
 			// whoever sets the header to zero gets to update fp
 			auto nh = fh;
 			nh.state = allocstate_t::full;
 			if (atma::atomic_compare_exchange(fhp, fh.u32, nh.u32))
-				fp = atma::atomic_add(&hk->f, header_size + fh.size);
+				if (atma::atomic_compare_exchange(&hk->f, fp, fp + header_size + fh.size))
+					fp += header_size + fh.size;
+				else
+					ATMA_HALT("bad things");
 			else
 				break;
 		}
+#endif
 	}
 
 

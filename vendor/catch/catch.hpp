@@ -5793,7 +5793,7 @@ namespace Catch {
 				case RunTests::InRandomOrder:
 				{
 					RandomNumberGenerator rng;
-					std::random_shuffle(matchingTestCases.begin(), matchingTestCases.end(), rng);
+					//std::random_shuffle(matchingTestCases.begin(), matchingTestCases.end(), rng);
 				}
 				break;
 				case RunTests::InDeclarationOrder:
