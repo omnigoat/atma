@@ -1,6 +1,7 @@
 #include <atma/unit_test.hpp>
 
 #include <atma/mpsc_queue.hpp>
+#include <atma/threading.hpp>
 
 #include <string>
 #include <thread>
@@ -19,6 +20,8 @@ uint32 const maxnum = std::numeric_limits<uint32>::max() / 8 + 3; // 1024 * 1024
 
 void write_number(queue_t& Q)
 {
+	atma::this_thread::set_debug_name("write-thread");
+
 	for (;;)
 	{
 		int sz = 4; //std::max(4, rand() % 16);
@@ -35,6 +38,8 @@ void write_number(queue_t& Q)
 
 void read_number(queue_t& Q, numbers_t& ns, uint32* allread)
 {
+	atma::this_thread::set_debug_name("read-thread");
+
 	for (; *allread != maxnum;)
 	{
 		Q.with_consumption([&](queue_t::decoder_t& D)
@@ -57,7 +62,7 @@ SCENARIO("mpsc_queue is amazing")
 {
 	std::cout << "beginning queue test" << std::endl;
 
-	atma::mpsc_queue_t<false> Q{72};
+	atma::mpsc_queue_t<false> Q{8 + 24};
 
 	uint64 const write_thread_count = 3;
 	uint64 const read_thread_count = 3;

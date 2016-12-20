@@ -125,20 +125,16 @@ namespace atma
 			{
 				ATMA_ASSERT_32BIT_ALIGNED(addr);
 				// loads from 4-byte aligned addresses are atomic on x86/x64
-				_ReadWriteBarrier();
-				//*reinterpret_cast<uint32 volatile*>(dest) = *reinterpret_cast<uint32 volatile*>(addr);
-				*ADDR_CAST(LONG volatile, dest) = InterlockedAdd(ADDR_CAST(LONG volatile, addr), 0);
+				*(LONG volatile*)dest = *(LONG volatile*)addr;
 				_ReadWriteBarrier();
 				// no fencing required on x86/x64
 			}
 
 			static auto store(D volatile* addr, S const& x) -> void
 			{
-				_ReadWriteBarrier();
 				InterlockedExchange(
-					ADDR_CAST(LONG volatile, addr),
-					VALUE_CAST(LONG const, x));
-				_ReadWriteBarrier();
+					(LONG volatile*)addr,
+					(LONG const&)x);
 			}
 
 			static auto pre_inc(D volatile* addr) -> D
@@ -167,37 +163,35 @@ namespace atma
 
 			static auto add(D volatile* addr, S const& x) -> D
 			{
-				_ReadWriteBarrier();
-				auto v = InterlockedAdd(ADDR_CAST(LONG volatile, addr), VALUE_CAST(D const, x));
-				_ReadWriteBarrier();
-				return VALUE_CAST(D, v);
+				auto v = InterlockedAdd(
+					(LONG volatile*)addr,
+					(LONG const&)x);
+
+				return (D)v;
 			}
 
 			static auto exchange(D volatile* addr, S const& x) -> D
 			{
-				_ReadWriteBarrier();
 				auto r = InterlockedExchange(
-					ADDR_CAST(LONG volatile, addr),
-					VALUE_CAST(LONG const, x));
-				_ReadWriteBarrier();
-				return VALUE_CAST(D, r);
+					(LONG volatile*)addr,
+					(LONG const&)x);
+				
+				return (D)r;
 			}
 
 			static auto compare_exchange(D volatile* addr, D const& c, S const& x, D* outc) -> bool
 			{
-				_ReadWriteBarrier();
-				auto v = InterlockedCompareExchange(
-					ADDR_CAST(LONG volatile, addr),
-					VALUE_CAST(LONG const, x),
-					VALUE_CAST(LONG const, c));
-				_ReadWriteBarrier();
+				auto prev = InterlockedCompareExchange(
+					(LONG volatile*)addr,
+					(LONG const&)x,
+					(LONG const&)c);
 
-				bool r = v == c;
+				if (prev == (LONG const&)c)
+					return true;
+				else
+					*outc = prev;
 
-				if (!r)
-					*outc = v;
-
-				return r;
+				return false;
 			}
 		};
 
@@ -225,6 +219,7 @@ namespace atma
 
 			static auto compare_exchange(D volatile* addr, D const& c, S const& x, D* outc) -> bool
 			{
+#if 0
 				auto v = InterlockedCompareExchange64(
 					ADDR_CAST(LONG64 volatile, addr),
 					VALUE_CAST(LONG64 const, x),
@@ -236,6 +231,9 @@ namespace atma
 					*reinterpret_cast<LONG64*>(outc) = v;
 
 				return r;
+#endif
+				ATMA_HALT("not yet implemented");
+				return false;
 			}
 		};
 
@@ -249,17 +247,25 @@ namespace atma
 				return VALUE_CAST(D, r);
 			}
 
-			static auto compare_exchange(D volatile* addr, D const& c, S const& x, D* outc) -> bool
+			static auto compare_exchange(D volatile* addr, D const& c, S const& x, D* prev) -> bool
 			{
-				// the 128-vit version of InterlockedCompareExchange in/outs the comparison/dest value
-				*outc = c;
+				// we must ensure addr & prev are different addresses
+				atomic128_t tmp = (atomic128_t const&)c;
 
-				auto const& ax = VALUE_CAST(atomic128_t const, x);
-
-				return InterlockedCompareExchange128(
-					ADDR_CAST(LONG64 volatile, addr),
+				auto const& ax = (atomic128_t const&)x;
+				bool r = InterlockedCompareExchange128(
+					(LONG64 volatile*)addr,
 					ax.i64[1], ax.i64[0],
-					ADDR_CAST(LONG64, outc)) != 0;
+					(LONG64*)&tmp) != 0;
+
+				_ReadWriteBarrier();
+
+				if (r)
+					return true;
+				else
+					*(atomic128_t*)prev = tmp;
+
+				return false;
 			}
 		};
 

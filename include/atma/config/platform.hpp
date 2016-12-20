@@ -29,7 +29,7 @@
 namespace atma
 {
 	template <size_t Bytes = 0>
-	struct cache_line_pad_t
+	struct alignas(64) cache_line_pad_t
 	{
 	private:
 		char pad[64 - Bytes];
