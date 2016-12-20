@@ -107,12 +107,17 @@ namespace atma
 
 			static auto compare_exchange(D volatile* addr, D const& c, S const& x, D* outc) -> bool
 			{
-				*ADDR_CAST(SHORT, outc) = InterlockedCompareExchange16(
+				auto prev = InterlockedCompareExchange16(
 					ADDR_CAST(SHORT volatile, addr),
 					VALUE_CAST(SHORT const, x),
 					VALUE_CAST(SHORT const, c));
 
-				return *outc == c;
+				if (prev == (SHORT const&)c)
+					return true;
+				else
+					*outc = prev;
+
+				return false;
 			}
 		};
 
