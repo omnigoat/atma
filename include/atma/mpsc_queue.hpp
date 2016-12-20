@@ -482,8 +482,8 @@ namespace atma
 
 			// allocation-size
 			size = h.size;
-			if (r + header_size + size >= ep)
-				return decoder_t{};
+			//if (r + header_size + size >= ep)
+			//	return decoder_t{};
 
 			// update read-pointer
 			cursor_t nr = (r + header_size + size);
@@ -573,9 +573,7 @@ namespace atma
 
 		// 3) move empty-position along
 		//auto e = hk->atomic_load_e();
-#if 1
 		uint32 ep = atma::atomic_load(&hk->e);
-		uint32 fep = ep;
 		for (uint32 epm = ep % hk->buffer_size();; epm = ep % hk->buffer_size())
 		{
 			auto ehp = reinterpret_cast<uint32*>(hk->buffer() + epm);
@@ -586,23 +584,27 @@ namespace atma
 			eh.type = alloctype_t::jump;
 
 			// whoever sets the header to zero gets to update ep
-			uint32 oh;
-#if 1
-			if (atma::atomic_compare_exchange(ehp, eh.u32, 0, &oh))
+			if (atma::atomic_compare_exchange(ehp, eh.u32, 0))
 			{
 				for (uint32 orig_ep;;)
 				{
+					// successful moving of ep
 					if (atma::atomic_compare_exchange(&hk->e, ep, ep + header_size + eh.size, &orig_ep))
 					{
 						ep += header_size + eh.size;
 						break;
 					}
+					// very wrong. un-swap and try the whole thing again.
 					else if ((orig_ep - ep) % hk->buffer_size() != 0)
 					{
 						atma::atomic_exchange(ehp, eh.u32);
 						ep = atma::atomic_load(&hk->e);
 						break;
 					}
+					// we are stale but in the same canonical place, so with a buffer-size of
+					// 16, we're at pos 4 (idx 4), but hk->e is actually at pos 20 (idx 4), so
+					// we've swapped a valid header, but are one buffer-size behind. update ep
+					// to the currect hk->e, and try again.
 					else
 					{
 						ep = orig_ep;
@@ -613,21 +615,7 @@ namespace atma
 			{
 				break;
 			}
-
-#else
-			if (atma::atomic_compare_exchange(&hk->e, ep, ep + header_size + eh.size))
-			{
-				//auto r = atma::atomic_compare_exchange(ehp, eh.u32, 0, &oh);
-				//ATMA_ASSERT(r);
-				while (!atma::atomic_compare_exchange(ehp, eh.u32, 0, &oh));
-			}
-			else
-			{
-				break;
-			}
-#endif
 		}
-#endif
 
 		D.type_ = 0;
 	}
@@ -672,57 +660,70 @@ namespace atma
 		//auto available = available_space(w, e, hk->buffer_size(), ct);
 		//if (available < sz)
 		//	return {0, ct ? allocerr_t::invalid_contiguous : allocerr_t::invalid, 0};
+		uint32 const bs = hk->buffer_size();
 
 		// move w (allocation happens here)
 		// load e first, then add size to wp
-		uint32 ep = atma::atomic_load(&hk->e);
-		uint32 np = atma::atomic_add(&hk->w, sz);
-		uint32 op = np - sz;
+		uint32 op;
+		uint32 np;
+		uint32 padsize = 0;
+		if (ct)
+		{
+			op = atma::atomic_load(&hk->w);
+
+		retry:
+			uint32 npm = (op + sz) % bs;
+			if (npm != 0 && npm < header_size + size)
+			{
+				padsize = sz - npm;
+				np = op + padsize + sz;
+				if (!atma::atomic_compare_exchange(&hk->w, op, np, &np))
+					goto retry;
+			}
+			else
+			{
+				np = op + sz;
+				if (!atma::atomic_compare_exchange(&hk->w, op, np, &op))
+					goto retry;
+			}
+		}
+		else
+		{
+			np = atma::atomic_add(&hk->w, sz);
+			op = np - sz;
+		}
+
 		uint32  p = op % hk->buffer_size();
 		uint32* hp = (uint32*)(hk->buffer() + p);
 		header_t h = atma::atomic_load(hp);
 
 		// if we've wrapped, we must wait for ep to wrap as well.
+		uint32 ep = atma::atomic_load(&hk->e);
 		if (np < op)
 		{
 			for (uint32 oep = ep; ep >= oep; )
 				atma::atomic_load(&ep, &hk->e);
 		}
 
-		while (ep < np)
-			ep = atma::atomic_load(&hk->e);
-
-#if 0
-		uint32 bs = hk->buffer_size();
-		while (ep < np && h.u32 != 0)
+		if (padsize > 0)
 		{
-			uint32 epm = ep % hk->buffer_size();
-
-			auto ehp = reinterpret_cast<uint32*>(hk->buffer() + epm);
-			ATMA_ASSERT((uint64)ehp % 4 == 0);
-
-			header_t eh = atma::atomic_load(ehp);
-			eh.state = allocstate_t::empty;
-			eh.type = alloctype_t::jump;
-
-			header_t oh;
-			if (atma::atomic_compare_exchange(ehp, eh.u32, 0, (uint32*)&oh))
-			{
-				ep = atma::atomic_add(&hk->e, header_size + eh.size);
-			}
-			else
-			{
-				//ep += header_size + oh.size;
+			while (ep < op + padsize)
 				ep = atma::atomic_load(&hk->e);
-			}
 
+			header_t padh;
+			padh.state = allocstate_t::full;
+			padh.type = alloctype_t::pad;
+			padh.size = padsize - header_size;
+			header_t padv = atma::atomic_exchange(hp, padh);
+
+			op += padsize;
+			p = op % hk->buffer_size();
+			hp = (uint32*)(hk->buffer() + p);
 			h = atma::atomic_load(hp);
 		}
-#endif
 
-		// write new header
-		//while (h.state != allocstate_t::empty || h.type != alloctype_t::invalid)
-		//	h = atma::atomic_load(hp);
+		while (ep < np)
+			ep = atma::atomic_load(&hk->e);
 
 		auto nh = h;
 		nh.state = allocstate_t::empty;
