@@ -657,11 +657,12 @@ namespace atma
 		// expand size so that:
 		uint32 const bs = hk->buffer_size();
 
-		// move w (allocation happens here)
-		// load e first, then add size to wp
+		// "original position", "new position", "padding size"
 		uint32 op;
 		uint32 np;
-		uint32 padsize = 0;
+		uint32 ps = 0;
+
+		// contiguous allocation requires compare-and-swap
 		if (ct)
 		{
 			op = atma::atomic_load(&hk->w);
@@ -670,8 +671,8 @@ namespace atma
 			{
 				if (npm != 0 && npm < header_size + size)
 				{
-					padsize = sz - npm;
-					np = op + padsize + sz;
+					ps = sz - npm;
+					np = op + ps + sz;
 				}
 				else
 				{
@@ -680,8 +681,11 @@ namespace atma
 
 				if (atma::atomic_compare_exchange(&hk->w, op, np, &op))
 					break;
+				else
+					ps = 0;
 			}
 		}
+		// non-contiguous allocation is fine-and-dandy with an add
 		else
 		{
 			np = atma::atomic_add(&hk->w, sz);
@@ -701,18 +705,18 @@ namespace atma
 		}
 
 		// write padding allocation
-		if (padsize > 0)
+		if (ps > 0)
 		{
-			while (ep < op + padsize)
+			while (ep < op + ps)
 				ep = atma::atomic_load(&hk->e);
 
 			header_t padh;
 			padh.state = allocstate_t::full;
 			padh.type = alloctype_t::pad;
-			padh.size = padsize - header_size;
+			padh.size = ps - header_size;
 			header_t padv = atma::atomic_exchange(hp, padh);
 
-			op += padsize;
+			op += ps;
 			p = op % hk->buffer_size();
 			hp = (uint32*)(hk->buffer() + p);
 			h = atma::atomic_load(hp);
