@@ -30,13 +30,13 @@ void write_number(queue_t& Q)
 
 	for (;;)
 	{
-		int sz = 8; // std::max(4, rand() % 16);
+		int sz = std::max(4, rand() % 32);
 		
 		auto idx = counter++;
 		if (idx >= maxnum)
 			break;
 
-		Q.with_allocation(sz, 4, false, [idx](auto& A) {
+		Q.with_allocation(sz, 4, true, [idx](auto& A) {
 			A.encode_uint32(idx);
 		});
 	}
@@ -92,10 +92,10 @@ SCENARIO("mpsc_queue is amazing")
 	for (int i = 0; i != read_thread_count; ++i)
 		read_threads[i].join();
 
+#if DO_VERIFICATION
 	std::cout << "ended queue alloc/read" << std::endl;
 	std::cout << "beginning verification" << std::endl;
 
-#if DO_VERIFICATION
 	for (int i = 0; i != maxnum; ++i)
 	{
 		int found = 0;
