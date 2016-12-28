@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+<!-- MATH -->
+<Type Name="atma::math::vector4f">
+  <DisplayString>{{ {x}, {y}, {z}, {w} }}</DisplayString>
+  <Expand>
+      <Item Name="x">x</Item>
+      <Item Name="y">y</Item>
+      <Item Name="z">z</Item>
+      <Item Name="w">w</Item>
+  </Expand>
+</Type>
+
+<Type Name="atma::math::vector4i">
+	<DisplayString>{{ {x}, {y}, {z}, {w} }}</DisplayString>
+  <Expand>
+      <Item Name="x">x</Item>
+      <Item Name="y">y</Item>
+      <Item Name="z">z</Item>
+      <Item Name="w">w</Item>
+  </Expand>
+</Type>
+
+<!-- GENERAL -->
+<Type Name="atma::vector&lt;*,*&gt;">
+  <DisplayString>{{ size={size_} }}</DisplayString>
+  <Expand>
+      <Item Name="capacity">capacity_</Item>
+      <Item Name="size">size_</Item>
+      <ArrayItems>
+        <Size>size_</Size>
+        <ValuePointer>imem_.ptr_</ValuePointer>
+      </ArrayItems>
+  </Expand>
+</Type>
+
+<Type Name="atma::base_mpsc_queue_t::housekeeping_t">
+  <DisplayString>{{ buffer-size={buffer_size_} }}</DisplayString>
+  <Expand>
+    <Synthetic Name="r">  
+      <DisplayString>{r} ({r % buffer_size_} : {r / buffer_size_})</DisplayString>
+    </Synthetic>
+		<Synthetic Name="w">
+			<DisplayString>{w} ({w % buffer_size_} : {w / buffer_size_})</DisplayString>
+		</Synthetic>
+		<Synthetic Name="e">
+			<DisplayString>{e} ({e % buffer_size_} : {e / buffer_size_})</DisplayString>
+		</Synthetic>
+		<Synthetic Name="f">
+			<DisplayString>{f} ({f % buffer_size_} : {f / buffer_size_})</DisplayString>
+		</Synthetic>
+  </Expand>
+</Type>
+
+
+
+
+
+</AutoVisualizer>
