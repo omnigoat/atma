@@ -11,6 +11,12 @@
     <Filter Include="include\config">
       <UniqueIdentifier>{24f56b7f-e2dd-40a2-836e-a21f2f8164a9}</UniqueIdentifier>
     </Filter>
+<<<<<<< 511c83568f2dfefb28dd541bae5b4359b5fbb79d
+=======
+    <Filter Include="include\filesystem">
+      <UniqueIdentifier>{51dcc423-2e06-41d9-938b-0b79754dbea3}</UniqueIdentifier>
+    </Filter>
+>>>>>>> atma_test builds with MSVC extensions off
     <Filter Include="include\lockfree">
       <UniqueIdentifier>{145f0927-0d27-44fe-92f1-ab9ad4710a05}</UniqueIdentifier>
     </Filter>
@@ -73,6 +79,12 @@
     <ClInclude Include="..\..\include\atma\platform\allocation.hpp">
       <Filter>include\platform</Filter>
     </ClInclude>
+<<<<<<< 511c83568f2dfefb28dd541bae5b4359b5fbb79d
+=======
+    <ClInclude Include="..\..\include\atma\filesystem\file.hpp">
+      <Filter>include\filesystem</Filter>
+    </ClInclude>
+>>>>>>> atma_test builds with MSVC extensions off
     <ClInclude Include="..\..\include\atma\utf\utf8_char.hpp">
       <Filter>include\utf</Filter>
     </ClInclude>
@@ -200,7 +212,10 @@
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
+<<<<<<< 511c83568f2dfefb28dd541bae5b4359b5fbb79d
   <ItemGroup>
     <Natvis Include="..\..\resources\atma.natvis" />
   </ItemGroup>
+=======
+>>>>>>> atma_test builds with MSVC extensions off
 </Project>

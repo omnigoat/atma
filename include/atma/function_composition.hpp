@@ -64,7 +64,8 @@ namespace atma { namespace detail {
 	{
 		template <typename FF, typename GG>
 		composited_ii_t(FF&& f, GG&& g)
-			: composited_iii_t{std::forward<FF>(f), std::forward<GG>(g)}
+			: composited_iii_t<F, G, typename function_traits<std::decay_t<G>>::tupled_args_type>
+				{std::forward<FF>(f), std::forward<GG>(g)}
 		{}
 	};
 
@@ -83,7 +84,7 @@ namespace atma { namespace detail {
 	{
 		template <typename FF, typename GG>
 		composited_t(FF&& f, GG&& g)
-			: composited_ii_t{std::forward<FF>(f), std::forward<GG>(g)}
+			: composited_ii_t<F, G, is_callable_v<std::decay_t<G>>>{std::forward<FF>(f), std::forward<GG>(g)}
 		{
 		}
 	};
