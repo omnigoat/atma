@@ -223,7 +223,7 @@
 #  define CATCH_NOEXCEPT throw()
 #  define CATCH_NOEXCEPT_IS(x)
 #endif
-
+#include <random>
 namespace Catch {
 
 	class NonCopyable {
@@ -3769,6 +3769,9 @@ namespace Clara {
 
 		// NOTE: std::auto_ptr is deprecated in c++11/c++0x
 		typedef std::unique_ptr<Arg> ArgAutoPtr;
+#else
+		typedef std::unique_ptr<Arg> ArgAutoPtr;
+#endif
 
 		friend void addOptName(Arg& arg, std::string const& optName)
 		{
@@ -5792,8 +5795,8 @@ namespace Catch {
 					break;
 				case RunTests::InRandomOrder:
 				{
-					RandomNumberGenerator rng;
-					//std::random_shuffle(matchingTestCases.begin(), matchingTestCases.end(), rng);
+					std::mt19937 g;
+					std::shuffle(matchingTestCases.begin(), matchingTestCases.end(), g);
 				}
 				break;
 				case RunTests::InDeclarationOrder:
@@ -6072,6 +6075,7 @@ namespace Catch {
 #include <stdexcept>
 #include <cstdio>
 #include <iostream>
+#include <random>
 
 namespace Catch {
 

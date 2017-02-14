@@ -68,10 +68,9 @@ namespace atma { namespace thread {
 	{
 		running_ = true;
 
-		handle_.swap(std::thread([&]
-		{
-			reenter(running_);
-		}));
+		auto t = std::thread([&] { reenter(running_); });
+
+		handle_.swap(t);
 	}
 
 	inline auto engine_t::reenter(std::atomic<bool> const& good) -> void
@@ -138,8 +137,7 @@ namespace atma { namespace thread {
 #if 1
 
 
-namespace atma {
-	namespace thread {
+namespace atma { namespace thread {
 
 		template <bool Dynamic>
 		struct inplace_engine_t
@@ -289,8 +287,7 @@ namespace atma {
 			}
 		}
 
-	}
-}
+} }
 
 
-#endif // 0
+#endif
