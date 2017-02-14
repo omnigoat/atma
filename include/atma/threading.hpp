@@ -5,6 +5,28 @@
 
 namespace atma
 {
+	
+	enum class thread_usage_t
+	{
+		blocking,
+		transient,
+	};
+
+
+	struct thread_pool_t
+	{
+		thread_pool_t(uint threads);
+
+		auto thread_count() const -> uint;
+
+		auto enqueue_work()
+		
+	private:
+		std::vector<std::thread> free_threads_;
+		std::vector<std::thread> working_threads_;
+	};
+
+
 #if ATMA_PLATFORM_WINDOWS
 	namespace detail
 	{

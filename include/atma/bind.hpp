@@ -365,7 +365,8 @@ namespace atma {
 		{
 			template <typename FF, typename BB>
 			bind_ii_t(FF&& f, BB&& b)
-				: bind_iii_t{std::forward<FF>(f), std::forward<BB>(b)}
+				: bind_iii_t<F, BindingsRef, detail::resultant_args_t<detail::bind_fn_args_t<F>, BindingsRef>>
+					{std::forward<FF>(f), std::forward<BB>(b)}
 			{}
 		};
 
@@ -402,7 +403,8 @@ namespace atma {
 	{
 		template <typename FF, typename BB>
 		bind_t(FF&& f, BB&& b)
-			: bind_ii_t{std::forward<FF>(f), std::forward<BB>(b)}
+			: detail::bind_ii_t<F, BindingsRef, is_callable_v<F>>
+				{std::forward<FF>(f), std::forward<BB>(b)}
 		{}
 	};
 
@@ -412,7 +414,8 @@ namespace atma {
 	{
 		template <typename FF, typename BB>
 		bind_t(FF&& f, BB&& b)
-			: bind_ii_t{f.fn(), detail::bind_arguments(f.bindings(), std::forward<BB>(b))}
+			: detail::bind_ii_t<PreF, tuple_map_t<std::decay, detail::bound_arguments_t<PreBindings, NewBindings>>, is_callable_v<PreF>>
+				{f.fn(), detail::bind_arguments(f.bindings(), std::forward<BB>(b))}
 		{}
 	};
 
