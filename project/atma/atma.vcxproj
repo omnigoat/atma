@@ -1,9 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<<<<<<< 511c83568f2dfefb28dd541bae5b4359b5fbb79d
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-=======
-<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
->>>>>>> atma_test builds with MSVC extensions off
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -45,10 +41,7 @@
     <ClInclude Include="..\..\include\atma\enable_if.hpp" />
     <ClInclude Include="..\..\include\atma\enable_multiple_shared_from_this.hpp" />
     <ClInclude Include="..\..\include\atma\event.hpp" />
-<<<<<<< 511c83568f2dfefb28dd541bae5b4359b5fbb79d
-=======
     <ClInclude Include="..\..\include\atma\filesystem\file.hpp" />
->>>>>>> atma_test builds with MSVC extensions off
     <ClInclude Include="..\..\include\atma\function_traits.hpp" />
     <ClInclude Include="..\..\include\atma\hash.hpp" />
     <ClInclude Include="..\..\include\atma\idxs.hpp" />
@@ -85,61 +78,39 @@
     <ClInclude Include="..\..\include\atma\utf\utf8_string_range.hpp" />
     <ClInclude Include="..\..\include\atma\vector.hpp" />
   </ItemGroup>
-<<<<<<< 511c83568f2dfefb28dd541bae5b4359b5fbb79d
   <ItemGroup>
     <Natvis Include="..\..\resources\atma.natvis" />
   </ItemGroup>
-=======
->>>>>>> atma_test builds with MSVC extensions off
   <PropertyGroup Label="Globals">
     <ProjectGuid>{3301E1FA-9F23-43C6-A5E1-183204867D44}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>atma</RootNamespace>
-<<<<<<< 511c83568f2dfefb28dd541bae5b4359b5fbb79d
     <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
-=======
->>>>>>> atma_test builds with MSVC extensions off
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-<<<<<<< 511c83568f2dfefb28dd541bae5b4359b5fbb79d
     <PlatformToolset>v141</PlatformToolset>
-=======
-    <PlatformToolset>v140</PlatformToolset>
->>>>>>> atma_test builds with MSVC extensions off
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-<<<<<<< 511c83568f2dfefb28dd541bae5b4359b5fbb79d
     <PlatformToolset>v141</PlatformToolset>
-=======
-    <PlatformToolset>v140</PlatformToolset>
->>>>>>> atma_test builds with MSVC extensions off
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-<<<<<<< 511c83568f2dfefb28dd541bae5b4359b5fbb79d
     <PlatformToolset>v141</PlatformToolset>
-=======
-    <PlatformToolset>v140</PlatformToolset>
->>>>>>> atma_test builds with MSVC extensions off
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-<<<<<<< 511c83568f2dfefb28dd541bae5b4359b5fbb79d
     <PlatformToolset>v141</PlatformToolset>
-=======
-    <PlatformToolset>v140</PlatformToolset>
->>>>>>> atma_test builds with MSVC extensions off
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
