@@ -626,7 +626,7 @@ namespace atma { namespace unit_test {
 
 #define THEN_CANARY \
 	THEN("canary event log matches") \
-	if (auto& C = ::atma::unit_test::canary_event_checker_t{})
+	if (auto&& C = ::atma::unit_test::canary_event_checker_t{})
 
 #define GIVEN_CANARY(name) \
 	GIVEN(name) \

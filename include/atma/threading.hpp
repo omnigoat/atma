@@ -19,7 +19,7 @@ namespace atma
 
 		auto thread_count() const -> uint;
 
-		auto enqueue_work()
+		//auto enqueue_work()
 		
 	private:
 		std::vector<std::thread> free_threads_;
