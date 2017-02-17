@@ -3767,6 +3767,7 @@ namespace Clara {
 			}
 		};
 
+#if 0
 		// NOTE: std::auto_ptr is deprecated in c++11/c++0x
 		typedef std::unique_ptr<Arg> ArgAutoPtr;
 #else
