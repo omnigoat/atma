@@ -240,20 +240,20 @@ namespace atma
 	template <typename T, typename A>
 	inline auto memory_t<T, A>::allocate(size_t count) -> void
 	{
-		ptr_ = alloc_traits::allocate(allocator(), count);
+		ptr_ = alloc_traits::allocate(this->allocator(), count);
 	}
 
 	template <typename T, typename A>
 	inline auto memory_t<T, A>::deallocate(size_t count) -> void
 	{
-		ptr_ = this->allocator().allocate(capacity);
+		alloc_traits::deallocate(this->allocator(), ptr_, count);
 	}
 
 	template <typename T, typename A>
 	template <typename... Args>
 	inline auto memory_t<T, A>::construct(size_t idx, Args&&... args) -> void
 	{
-		this->allocator().deallocate(ptr_, 0);
+		alloc_traits::construct(this->allocator(), ptr_ + idx, std::forward<Args>(args)...);
 	}
 
 	template <typename T, typename A>
