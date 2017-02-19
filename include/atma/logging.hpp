@@ -103,12 +103,6 @@ namespace atma
 				A.encode_uint32((uint32)command_t::connect_replicant);
 				A.encode_pointer(r);
 			});
-#if 0
-			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(void*));
-			A.encode_uint32((uint32)command_t::connect_replicant);
-			A.encode_pointer(r);
-			log_queue_.commit(A);
-#endif
 		}
 
 		auto disconnect_replicant(logging_runtime_t* r) -> void
@@ -145,17 +139,8 @@ namespace atma
 				A.encode_uint32((uint32)command_t::send);
 				A.encode_uint32(0u);
 				A.encode_uint32((uint32)level);
-				A.encode_data(data, size);
+				A.encode_data(size, data);
 			});
-
-#if 0
-			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(uint32) + sizeof(log_level_t) + sizeof(uint32) + size);
-			A.encode_uint32((uint32)command_t::send);
-			A.encode_uint32(0);
-			A.encode_uint32((uint32)level);
-			A.encode_data(data, size);
-			log_queue_.commit(A);
-#endif
 		}
 
 		auto flush() -> void
@@ -168,13 +153,6 @@ namespace atma
 				A.encode_pointer(&blocked);
 			});
 
-#if 0
-			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(byte), 4, true);
-			A.encode_uint32((uint32)command_t::flush);
-			A.encode_byte(0);
-			byte* b = reinterpret_cast<byte*>(A.data()) + 4;
-			log_queue_.commit(A);
-#endif
 			while (blocked)
 				;
 		}
@@ -302,7 +280,7 @@ namespace atma
 					A.encode_pointer(x);
 				A.encode_pointer(this);
 				A.encode_uint32((uint32)level);
-				A.encode_data(data.begin(), (uint32)data.size());
+				A.encode_data((uint32)data.size(), data.begin());
 				x->log_queue_.commit(A);
 			}
 		}

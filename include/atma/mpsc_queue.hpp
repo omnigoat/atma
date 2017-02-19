@@ -313,7 +313,7 @@ namespace atma
 		{}
 
 		auto header() const -> uint32 { return (state_ << header_state_bitshift) | (type_ << header_type_bitshift) | (alignment_ << header_alignment_bitshift) | size_; }
-		auto buffer_size() const -> uint32 { return buf_housekeeping(buf_)->buffer_size(); } //(*((housekeeping_t**)buf_ - 1))->buffer_size(); }
+		auto buffer_size() const -> uint32 { return buf_housekeeping(buf_)->buffer_size(); }
 		auto type() const -> alloctype_t { return (alloctype_t)type_; }
 		auto raw_size() const -> uint32 { return size_; }
 
@@ -341,7 +341,10 @@ namespace atma
 		auto encode_uint32(uint32) -> void;
 		auto encode_uint64(uint64) -> void;
 		template <typename T> auto encode_pointer(T*) -> void;
-		auto encode_data(void const*, uint32) -> void;
+		auto encode_data(uint32, void const*) -> void;
+
+		// forward-construct. requires contiguous memory.
+		template <typename T> auto encode_struct(T&&) -> bool;
 
 	private:
 		allocation_t(byte* buf, uint32 wp, allocstate_t, alloctype_t, uint32 alignment, uint32 size);
@@ -365,6 +368,9 @@ namespace atma
 		auto decode_uint64(uint64&) -> void;
 		template <typename T> auto decode_pointer(T*&) -> void;
 		auto decode_data() -> unique_memory_t;
+
+		template <typename T> auto decode_struct(T&) -> bool;
+		template <typename T> auto decode_move_struct(T&) -> bool;
 
 		auto local_copy(unique_memory_t& mem) -> void
 		{
@@ -700,7 +706,8 @@ namespace atma
 		uint32 ep = atma::atomic_load(&hk->e);
 		if (np < op)
 		{
-			for (uint32 oep = ep; ep >= oep; )
+			//for (uint32 oep = ep; oep < ep; )
+			while (np < ep && ep < op)
 				atma::atomic_load(&ep, &hk->e);
 		}
 
@@ -946,13 +953,27 @@ namespace atma
 #endif
 	}
 
-	inline auto base_mpsc_queue_t::allocation_t::encode_data(void const* data, uint32 size) -> void
+	inline auto base_mpsc_queue_t::allocation_t::encode_data(uint32 size, void const* data) -> void
 	{
 		static_assert(sizeof(uint64) <= sizeof(uintptr), "pointer is greater than 64 bits??");
 
 		encode_uint32(size);
 		for (uint32 i = 0; i != size; ++i)
 			encode_byte(reinterpret_cast<char const*>(data)[i]);
+	}
+
+	template <typename T>
+	inline auto base_mpsc_queue_t::allocation_t::encode_struct(T&& x) -> bool
+	{
+		// require contiugous
+		if ((p_ + sizeof(x)) % buffer_size() < p_)
+			return false;
+
+		// (copy|move)-construct
+		new (buf_ + p_) T{std::forward<T>(x)};
+
+		p_ = (p_ + sizeof(x)) % buffer_size();
+		return true;
 	}
 
 	// decoder_t
@@ -1064,9 +1085,10 @@ namespace atma
 
 		auto allocate(uint32 size, uint32 alignment = 4, bool contiguous = false) -> allocation_t
 		{
-			ATMA_ASSERT(alignment == 4 || alignment == 8 || alignment == 16 || alignment == 32);
+			alignment = std::max(alignment, 4u);
 
-			//ATMA_ASSERT(size <= write_buf_size_, "queue can not allocate that much");
+			ATMA_ASSERT(alignment == 4 || alignment == 8 || alignment == 16 || alignment == 32);
+			ATMA_ASSERT(size <= write_buf_size(), "queue can not allocate that much");
 
 			size_t thread_id = std::hash<std::thread::id>{}(std::this_thread::get_id());
 			std::chrono::nanoseconds starvation{};

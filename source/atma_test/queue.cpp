@@ -2,6 +2,7 @@
 
 #include <atma/mpsc_queue.hpp>
 #include <atma/threading.hpp>
+#include <atma/function.hpp>
 
 #include <string>
 #include <thread>
@@ -24,20 +25,22 @@ uint32 const maxnum = 100000; //std::numeric_limits<uint32>::max() / 8 + 3; // 1
 uint32 const maxnum = 2'000'000;
 #endif
 
+using fn_t = atma::function<void()>;
+
 void write_number(queue_t& Q)
 {
 	atma::this_thread::set_debug_name("write-thread");
 
 	for (;;)
 	{
-		int sz = std::max(4, rand() % 32);
+		int sz = sizeof(fn_t); //std::max(4, rand() % 32);
 		
 		auto idx = counter++;
 		if (idx >= maxnum)
 			break;
 
-		Q.with_allocation(sz, 4, true, [idx](auto& A) {
-			A.encode_uint32(idx);
+		Q.with_allocation(sz, 0, true, [idx](auto& A) {
+			A.encode_struct(fn_t{[idx]{std::cout << idx << std::endl; }});
 		});
 	}
 }
