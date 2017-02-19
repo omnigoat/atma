@@ -29,7 +29,6 @@ namespace atma
 			{
 			}
 		}
-
 	}
 #endif
 

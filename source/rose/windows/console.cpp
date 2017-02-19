@@ -7,6 +7,7 @@
 using namespace rose;
 using rose::console_t;
 
+
 console_t::console_t()
 {
 	auto hwnd = GetConsoleWindow();
