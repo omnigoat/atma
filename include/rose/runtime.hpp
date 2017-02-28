@@ -55,7 +55,7 @@ namespace rose
 		dir_watchers_t dir_watchers_;
 
 		// placed last for good reason (other thread still using members!)
-		atma::thread::inplace_engine_t<true> filewatch_engine_;
+		atma::thread::inplace_engine_t<false> filewatch_engine_;
 
 		friend VOID CALLBACK FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped);
 	};
