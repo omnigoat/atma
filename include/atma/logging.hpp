@@ -103,12 +103,6 @@ namespace atma
 				A.encode_uint32((uint32)command_t::connect_replicant);
 				A.encode_pointer(r);
 			});
-#if 0
-			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(void*));
-			A.encode_uint32((uint32)command_t::connect_replicant);
-			A.encode_pointer(r);
-			log_queue_.commit(A);
-#endif
 		}
 
 		auto disconnect_replicant(logging_runtime_t* r) -> void
@@ -147,15 +141,6 @@ namespace atma
 				A.encode_uint32((uint32)level);
 				A.encode_data(data, size);
 			});
-
-#if 0
-			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(uint32) + sizeof(log_level_t) + sizeof(uint32) + size);
-			A.encode_uint32((uint32)command_t::send);
-			A.encode_uint32(0);
-			A.encode_uint32((uint32)level);
-			A.encode_data(data, size);
-			log_queue_.commit(A);
-#endif
 		}
 
 		auto flush() -> void
@@ -168,13 +153,6 @@ namespace atma
 				A.encode_pointer(&blocked);
 			});
 
-#if 0
-			auto A = log_queue_.allocate(sizeof(command_t) + sizeof(byte), 4, true);
-			A.encode_uint32((uint32)command_t::flush);
-			A.encode_byte(0);
-			byte* b = reinterpret_cast<byte*>(A.data()) + 4;
-			log_queue_.commit(A);
-#endif
 			while (blocked)
 				;
 		}
@@ -286,24 +264,22 @@ namespace atma
 			if (replicants_.empty())
 				return;
 
+			uint32 sz = (uint32)sizeof(command_t) + sizeof(uint32) +
+				(uint32)sizeof(void*) * (uint32)(visited.size() + 1) +
+				(uint32)sizeof(log_level_t) + sizeof(uint32) + (uint32)data.size();
+
 			for (auto* x : replicants_)
 			{
-				x->log(level, data.begin(), (uint32)data.size());
-				continue;
-
-				auto A = x->log_queue_.allocate(
-					sizeof(command_t) + 
-					sizeof(uint32) + ((uint32)visited.size() + 1) * sizeof(this) + 
-					sizeof(log_level_t) + sizeof(uint32) + (uint32)data.size());
-
-				A.encode_uint32((uint32)command_t::send);
-				A.encode_uint32((uint32)visited.size() + 1);
-				for (auto const* x : visited)
-					A.encode_pointer(x);
-				A.encode_pointer(this);
-				A.encode_uint32((uint32)level);
-				A.encode_data(data.begin(), (uint32)data.size());
-				x->log_queue_.commit(A);
+				x->log_queue_.with_allocation(sz, [&](auto& A) {
+					A.encode_uint32((uint32)command_t::send);
+					A.encode_uint32((uint32)visited.size() + 1);
+					A.encode_uint32((uint32)level);
+					for (auto const* x : visited)
+						A.encode_pointer(x);
+					A.encode_pointer(this);
+					A.encode_uint32((uint32)level);
+					A.encode_data(data.begin(), (uint32)data.size());
+				});
 			}
 		}
 
