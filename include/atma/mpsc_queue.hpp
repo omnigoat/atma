@@ -1088,7 +1088,6 @@ namespace atma
 			alignment = std::max(alignment, 4u);
 
 			ATMA_ASSERT(alignment == 4 || alignment == 8 || alignment == 16 || alignment == 32);
-			ATMA_ASSERT(size <= write_buf_size(), "queue can not allocate that much");
 
 			size_t thread_id = std::hash<std::thread::id>{}(std::this_thread::get_id());
 			std::chrono::nanoseconds starvation{};
@@ -1096,6 +1095,8 @@ namespace atma
 			buffer_t writebuf;
 			atma::atomic_load_128(&writebuf, &writing_);
 			auto whk = writebuf.housekeeping();
+			
+			ATMA_ASSERT(size <= whk->buffer_size(), "queue can not allocate that much");
 
 			allocinfo_t ai;
 			for (;;)
@@ -1225,6 +1226,10 @@ namespace atma
 	{
 		mpsc_queue_t(uint32 size)
 			: mpsc_queue_ii_t{size}
+		{}
+
+		mpsc_queue_t(void* buf, uint32 size)
+			: mpsc_queue_ii_t{buf, size}
 		{}
 
 		template <typename F>
