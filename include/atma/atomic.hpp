@@ -224,21 +224,19 @@ namespace atma
 
 			static auto compare_exchange(D volatile* addr, D const& c, S const& x, D* outc) -> bool
 			{
-#if 0
 				auto v = InterlockedCompareExchange64(
-					ADDR_CAST(LONG64 volatile, addr),
-					VALUE_CAST(LONG64 const, x),
-					VALUE_CAST(LONG64 const, c));
+					(LONG64 volatile*)addr,
+					(LONG64 const&)x,
+					(LONG64 const&)c);
 
 				bool r = reinterpret_cast<LONG64&>(v) == reinterpret_cast<LONG64 const&>(c);
 
 				if (!r)
 					*reinterpret_cast<LONG64*>(outc) = v;
 
+				_ReadWriteBarrier();
+
 				return r;
-#endif
-				ATMA_HALT("not yet implemented");
-				return false;
 			}
 		};
 
