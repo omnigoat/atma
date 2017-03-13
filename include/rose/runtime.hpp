@@ -5,7 +5,7 @@
 
 #include <atma/string.hpp>
 #include <atma/function.hpp>
-#include <atma/thread/engine.hpp>
+#include <atma/threading.hpp>
 #include <atma/vector.hpp>
 
 #include <memory>
@@ -25,6 +25,7 @@ namespace rose
 		using dir_watch_handle_t = intptr_t;
 
 		runtime_t();
+		runtime_t(atma::thread_work_provider_t*);
 		~runtime_t();
 
 		// console
@@ -55,7 +56,9 @@ namespace rose
 		dir_watchers_t dir_watchers_;
 
 		// placed last for good reason (other thread still using members!)
-		atma::thread::inplace_engine_t<true> filewatch_engine_;
+		atma::inplace_engine_t filewatch_engine_;
+		atma::thread_work_provider_t* work_provider_;
+		std::atomic_bool running_ = false;
 
 		friend VOID CALLBACK FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped);
 	};
