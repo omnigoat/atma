@@ -264,24 +264,23 @@ namespace atma
 			if (replicants_.empty())
 				return;
 
+			uint32 sz = (uint32)sizeof(command_t) + sizeof(uint32) +
+				(uint32)sizeof(void*) * (uint32)(visited.size() + 1) +
+				(uint32)sizeof(log_level_t) + sizeof(uint32) + (uint32)data.size();
+
 			for (auto* x : replicants_)
 			{
-				x->log(level, data.begin(), (uint32)data.size());
-				continue;
-
-				auto A = x->log_queue_.allocate(
-					sizeof(command_t) + 
-					sizeof(uint32) + ((uint32)visited.size() + 1) * sizeof(this) + 
-					sizeof(log_level_t) + sizeof(uint32) + (uint32)data.size());
-
-				A.encode_uint32((uint32)command_t::send);
-				A.encode_uint32((uint32)visited.size() + 1);
-				for (auto const* x : visited)
-					A.encode_pointer(x);
-				A.encode_pointer(this);
-				A.encode_uint32((uint32)level);
-				A.encode_data((uint32)data.size(), data.begin());
-				x->log_queue_.commit(A);
+				x->log_queue_.with_allocation(sz, [&](auto& A)
+				{
+					A.encode_uint32((uint32)command_t::send);
+					A.encode_uint32((uint32)visited.size() + 1);
+					A.encode_uint32((uint32)level);
+					for (auto const* x : visited)
+						A.encode_pointer(x);
+					A.encode_pointer(this);
+					A.encode_uint32((uint32)level);
+					A.encode_data((uint32)data.size(), data.begin());
+				});
 			}
 		}
 
