@@ -59,17 +59,22 @@ static void CALLBACK rose::FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNu
 
 
 runtime_t::runtime_t()
-	: filewatch_engine_{atma::thread::inplace_engine_t<true>::defer_start_t{}, 500}
-{
-}
+	: filewatch_engine_{atma::inplace_engine_t::defer_start_t{}, 512}
+	, work_provider_{&filewatch_engine_}
+{}
+
+runtime_t::runtime_t(atma::thread_work_provider_t* wp)
+	: filewatch_engine_{atma::inplace_engine_t::defer_start_t{}, 512}
+	, work_provider_{wp}
+{}
 
 runtime_t::~runtime_t()
 {
+	running_ = false;
 }
 
 auto runtime_t::initialize_console() -> void
-{
-}
+{}
 
 auto runtime_t::get_console() -> console_t&
 {
@@ -83,21 +88,13 @@ auto runtime_t::get_console() -> console_t&
 
 auto runtime_t::initialize_watching() -> void
 {
-	filewatch_engine_.start();
+	work_provider_->ensure_running();
 
-	filewatch_engine_.signal([]
-	{
-		atma::this_thread::set_debug_name("filewatching");
-	});
-
-	filewatch_engine_.signal_evergreen([&]
-	{
+	work_provider_->enqueue_repeat([&] {
 		auto status = WaitForMultipleObjectsEx((DWORD)dir_handles_.size(), dir_handles_.data(), FALSE, 100, TRUE);
-		if (status == WAIT_TIMEOUT)
-			return;
 	});
 
-	filewatch_engine_.signal_evergreen([&]
+	work_provider_->enqueue_repeat([&]
 	{
 		auto now = std::chrono::high_resolution_clock::now();
 
@@ -114,7 +111,7 @@ auto runtime_t::initialize_watching() -> void
 				info.files.clear();
 			}
 		}
-	});
+	});	
 }
 
 auto runtime_t::register_directory_watch(
@@ -123,7 +120,7 @@ auto runtime_t::register_directory_watch(
 	file_change_mask_t changes,
 	file_change_callback_t const& callback) -> void
 {
-	if (!filewatch_engine_.is_running())
+	if (running_.exchange(true) == false)
 		initialize_watching();
 
 	// WIN32 file-notify flags
@@ -138,7 +135,7 @@ auto runtime_t::register_directory_watch(
 		notify |= FILE_NOTIFY_CHANGE_SECURITY;
 
 
-	filewatch_engine_.signal([&, path, recursive, notify, callback]
+	work_provider_->enqueue([&, path, recursive, notify, callback]
 	{
 		auto candidate = dir_watchers_.find(path);
 		if (candidate != dir_watchers_.end())
