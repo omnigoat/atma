@@ -384,7 +384,7 @@ namespace atma
 			init_empty();
 		}
 
-		template <typename FN>
+		template <typename FN, typename = std::enable_if_t<std::is_same_v<R, std::result_of_t<std::decay_t<FN>(Params...)>>>>
 		basic_function_t(FN&& fn)
 		{
 			init_fn(detail::functorize(std::forward<FN>(fn)));
@@ -448,7 +448,7 @@ namespace atma
 
 		operator bool() const
 		{
-			return *target<R(*)(Params...)>() != empty_fn;
+			return *target<R(*)(Params...)>() != empty_fn<R>;
 		}
 
 		auto operator()(Params... args) const -> R
@@ -490,7 +490,7 @@ namespace atma
 
 		auto init_empty() -> void
 		{
-			init_fn(&empty_fn);
+			init_fn(&empty_fn<R>);
 		}
 
 		template <typename FN>
@@ -511,7 +511,10 @@ namespace atma
 		detail::dispatch_fnptr_t<BS, R, Params...>  dispatch_;
 		detail::functor_wrapper_t<BS, R, Params...> wrapper_;
 
-		static auto empty_fn(Params...) -> R { return *reinterpret_cast<R*>(nullptr); }
+		template <typename R2>
+		static auto empty_fn(Params...) -> R2 { return *reinterpret_cast<R2*>(nullptr); }
+		template <>
+		static auto empty_fn<void>(Params...) -> void {}
 	};
 
 
