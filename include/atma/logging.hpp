@@ -274,12 +274,11 @@ namespace atma
 				{
 					A.encode_uint32((uint32)command_t::send);
 					A.encode_uint32((uint32)visited.size() + 1);
-					A.encode_uint32((uint32)level);
 					for (auto const* x : visited)
 						A.encode_pointer(x);
 					A.encode_pointer(this);
 					A.encode_uint32((uint32)level);
-					A.encode_data((uint32)data.size(), data.begin());
+					A.encode_data(data);
 				});
 			}
 		}

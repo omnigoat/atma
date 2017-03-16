@@ -340,8 +340,9 @@ namespace atma
 		auto encode_uint16(uint16) -> void;
 		auto encode_uint32(uint32) -> void;
 		auto encode_uint64(uint64) -> void;
+		auto encode_data(void const*, uint32) -> void;
+		auto encode_data(unique_memory_t const&) -> void;
 		template <typename T> auto encode_pointer(T*) -> void;
-		auto encode_data(uint32, void const*) -> void;
 
 		// forward-construct. requires contiguous memory.
 		template <typename T> auto encode_struct(T&&) -> bool;
@@ -354,7 +355,7 @@ namespace atma
 
 
 	// decoder_t
-	struct base_mpsc_queue_t::decoder_t : base_mpsc_queue_t::headerer_t
+	struct base_mpsc_queue_t::decoder_t : headerer_t
 	{
 		decoder_t(decoder_t const&) = delete;
 		decoder_t(decoder_t&&);
@@ -953,7 +954,7 @@ namespace atma
 #endif
 	}
 
-	inline auto base_mpsc_queue_t::allocation_t::encode_data(uint32 size, void const* data) -> void
+	inline auto base_mpsc_queue_t::allocation_t::encode_data(void const* data, uint32 size) -> void
 	{
 		static_assert(sizeof(uint64) <= sizeof(uintptr), "pointer is greater than 64 bits??");
 
@@ -974,6 +975,15 @@ namespace atma
 
 		p_ = (p_ + sizeof(x)) % buffer_size();
 		return true;
+	}
+
+	inline auto base_mpsc_queue_t::allocation_t::encode_data(unique_memory_t const& data) -> void
+	{
+		static_assert(sizeof(uint64) <= sizeof(uintptr), "pointer is greater than 64 bits??");
+
+		encode_uint32((uint32)data.size());
+		for (byte b : data)
+			encode_byte(b);
 	}
 
 	// decoder_t
