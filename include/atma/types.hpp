@@ -3,26 +3,28 @@
 #include <cstdint>
 #include <type_traits>
 
-typedef unsigned char uchar;
-typedef unsigned short ushort;
-typedef unsigned int uint;
-typedef unsigned long ulong;
-typedef unsigned long long ullong;
+using uchar  = unsigned char;
+using ushort = unsigned short;
+using uint   = unsigned int;
+using ulong  = unsigned long;
+using ullong = unsigned long long;
 
-typedef uchar byte;
+using byte = uchar;
 
-typedef int8_t int8;
-typedef int16_t int16;
-typedef int32_t int32;
-typedef int64_t int64;
+using int8  = int8_t;
+using int16 = int16_t;
+using int32 = int32_t;
+using int64 = int64_t;
 
-typedef uint8_t uint8;
-typedef uint16_t uint16;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
+using uint8  = uint8_t;
+using uint16 = uint16_t;
+using uint32 = uint32_t;
+using uint64 = uint64_t;
 
-typedef intptr_t intptr;
-typedef uintptr_t uintptr;
+using  intptr =  intptr_t;
+using uintptr = uintptr_t;
+
+using size_t = std::size_t;
 
 #define ATMA_PP_CAT_II(a, b) a##b
 #define ATMA_PP_CAT(a, b) ATMA_PP_CAT_II(a, b)
