@@ -139,7 +139,7 @@ namespace atma
 				A.encode_uint32((uint32)command_t::send);
 				A.encode_uint32(0u);
 				A.encode_uint32((uint32)level);
-				A.encode_data(size, data);
+				A.encode_data(data, size);
 			});
 		}
 
