@@ -50,12 +50,14 @@ namespace atma {
 	template <typename T>
 	struct intrusive_ptr
 	{
+		using value_type = T;
+
 		intrusive_ptr()
-		: px()
+			: px()
 		{}
 
 		explicit intrusive_ptr(std::nullptr_t)
-		: px()
+			: px()
 		{}
 
 		explicit intrusive_ptr(T* t)
@@ -66,33 +68,33 @@ namespace atma {
 
 		template <typename Y, typename = std::enable_if_t<std::is_convertible<Y*, T*>::value>>
 		explicit intrusive_ptr(Y* t)
-		: px(t)
+			: px(t)
 		{
 			ref_counted::add_ref(t);
 		}
 
 		intrusive_ptr(intrusive_ptr const& rhs)
-		: px(rhs.px)
+			: px(rhs.px)
 		{
 			ref_counted::add_ref(px);
 		}
 
 		template <typename Y, typename = std::enable_if_t<std::is_convertible<Y*, T*>::value>>
 		intrusive_ptr(intrusive_ptr<Y> const& rhs)
-		: px(rhs.px)
+			: px(rhs.px)
 		{
 			ref_counted::add_ref(px);
 		}
 		
 		intrusive_ptr(intrusive_ptr&& rhs)
-		: px(rhs.px)
+			: px(rhs.px)
 		{
 			rhs.px = nullptr;
 		}
 
 		template <class Y, typename = std::enable_if_t<std::is_convertible<Y*, T*>::value>>
 		intrusive_ptr(intrusive_ptr<Y>&& rhs)
-		: px(rhs.px)
+			: px(rhs.px)
 		{
 			rhs.px = nullptr;
 		}
