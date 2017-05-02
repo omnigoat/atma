@@ -957,73 +957,73 @@ struct spp_hash<T *>
 };
 
 template <>
-struct spp_hash<bool> : public std::unary_function<bool, size_t>
+struct spp_hash<bool>
 {
     SPP_INLINE size_t operator()(bool __v) const SPP_NOEXCEPT {return static_cast<size_t>(__v);}
 };
 
 template <>
-struct spp_hash<char> : public std::unary_function<char, size_t>
+struct spp_hash<char>
 {
     SPP_INLINE size_t operator()(char __v) const SPP_NOEXCEPT {return static_cast<size_t>(__v);}
 };
 
 template <>
-struct spp_hash<signed char> : public std::unary_function<signed char, size_t>
+struct spp_hash<signed char>
 {
     SPP_INLINE size_t operator()(signed char __v) const SPP_NOEXCEPT {return static_cast<size_t>(__v);}
 };
 
 template <>
-struct spp_hash<unsigned char> : public std::unary_function<unsigned char, size_t>
+struct spp_hash<unsigned char>
 {
     SPP_INLINE size_t operator()(unsigned char __v) const SPP_NOEXCEPT {return static_cast<size_t>(__v);}
 };
 
 template <>
-struct spp_hash<wchar_t> : public std::unary_function<wchar_t, size_t>
+struct spp_hash<wchar_t>
 {
     SPP_INLINE size_t operator()(wchar_t __v) const SPP_NOEXCEPT {return static_cast<size_t>(__v);}
 };
 
 template <>
-struct spp_hash<short> : public std::unary_function<short, size_t>
+struct spp_hash<short>
 {
     SPP_INLINE size_t operator()(short __v) const SPP_NOEXCEPT {return static_cast<size_t>(__v);}
 };
 
 template <> 
-struct spp_hash<unsigned short> : public std::unary_function<unsigned short, size_t>
+struct spp_hash<unsigned short>
 {
     SPP_INLINE size_t operator()(unsigned short __v) const SPP_NOEXCEPT {return static_cast<size_t>(__v);}
 };
 
 template <>
-struct spp_hash<int> : public std::unary_function<int, size_t>
+struct spp_hash<int>
 {
     SPP_INLINE size_t operator()(int __v) const SPP_NOEXCEPT {return static_cast<size_t>(__v);}
 };
 
 template <>
-struct spp_hash<unsigned int> : public std::unary_function<unsigned int, size_t>
+struct spp_hash<unsigned int>
 {
     SPP_INLINE size_t operator()(unsigned int __v) const SPP_NOEXCEPT {return static_cast<size_t>(__v);}
 };
 
 template <>
-struct spp_hash<long> : public std::unary_function<long, size_t>
+struct spp_hash<long>
 {
     SPP_INLINE size_t operator()(long __v) const SPP_NOEXCEPT {return static_cast<size_t>(__v);}
 };
 
 template <>
-struct spp_hash<unsigned long> : public std::unary_function<unsigned long, size_t>
+struct spp_hash<unsigned long>
 {
     SPP_INLINE size_t operator()(unsigned long __v) const SPP_NOEXCEPT {return static_cast<size_t>(__v);}
 };
 
 template <>
-struct spp_hash<float> : public std::unary_function<float, size_t>
+struct spp_hash<float>
 {
     SPP_INLINE size_t operator()(float __v) const SPP_NOEXCEPT
     {
@@ -1036,7 +1036,7 @@ struct spp_hash<float> : public std::unary_function<float, size_t>
 #if 0
 // todo: we should not ignore half of the double => see libcxx/include/functional
 template <>
-struct spp_hash<double> : public std::unary_function<double, size_t>
+struct spp_hash<double>
 {
     SPP_INLINE size_t operator()(double __v) const SPP_NOEXCEPT
     {
