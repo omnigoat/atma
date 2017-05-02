@@ -76,10 +76,16 @@ namespace atma
 
 		auto get() const -> T* const& { return x_; }
 
-		auto reset() -> void {
+		auto reset(T* x = nullptr) -> void
+		{
 			if (x_) {
 				x_->Release();
-				x_ = nullptr;
+			}
+			
+			x_ = x;
+
+			if (x_) {
+				x_->AddRef();
 			}
 		}
 
