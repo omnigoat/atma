@@ -8,21 +8,7 @@
 
 namespace atma
 {
-	template <typename T, uint32 A = alignof(T)>
-	struct aligned_allocator_t;
-
-
-	template <uint32 A>
-	struct aligned_allocator_t<void, A>
-	{
-		typedef void* pointer;
-		typedef void const* const_pointer;
-		typedef void value_type;
-
-		template <typename U> struct rebind { typedef aligned_allocator_t<U, A> other; };
-	};
-
-	template <typename T, uint32 A>
+	template <typename T, size_t A = alignof(T)>
 	struct aligned_allocator_t
 	{
 		using size_type       = size_t;
@@ -44,35 +30,44 @@ namespace atma
 		auto deallocate(pointer p, size_type) -> void;
 	};
 
+	template <size_t A>
+	struct aligned_allocator_t<void, A>
+	{
+		using value_type = void;
+		using pointer = value_type*;
+		using const_pointer = value_type const*;
+
+		template <typename U>
+		struct rebind { typedef aligned_allocator_t<U, A> other; };
+	};
 
 
-
-	template <typename T, uint32 A>
+	template <typename T, size_t A>
 	inline auto aligned_allocator_t<T, A>::allocate(size_type n) -> pointer
 	{
-		void* ptr = platform::allocate_aligned_memory(static_cast<size_type>(A), n * sizeof(T));
-		if (ptr == nullptr) {
+		void* ptr = platform::allocate_aligned_memory(A, n * sizeof(T));
+		if (ptr == nullptr)
+		{
 			throw std::bad_alloc();
 		}
 
 		return reinterpret_cast<pointer>(ptr);
 	}
 
-	template <typename T, uint32 A>
-	inline auto aligned_allocator_t<T, A>::deallocate(pointer p, size_type) -> void {
+	template <typename T, size_t A>
+	inline auto aligned_allocator_t<T, A>::deallocate(pointer p, size_type) -> void
+	{
 		platform::deallocate_aligned_memory(p);
 	}
 
 
-
-
-	template <typename T, uint32 TA, typename U, uint32 UA>
+	template <typename T, size_t TA, typename U, size_t UA>
 	inline bool operator == (aligned_allocator_t<T, TA> const&, aligned_allocator_t<U, UA> const&)
 	{
 		return TA == UA;
 	}
 
-	template <typename T, uint32 TA, typename U, uint32 UA>
+	template <typename T, size_t TA, typename U, size_t UA>
 	inline bool operator != (aligned_allocator_t<T, TA> const&, aligned_allocator_t<U, UA> const&)
 	{
 		return TA != UA;
