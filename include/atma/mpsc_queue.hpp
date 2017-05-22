@@ -469,15 +469,14 @@ namespace atma
 		// we will discard this if rp has moved (and ac has updated)
 		uint32  size = 0;
 		cursor_t r = hk->atomic_load_r();
-		uint32 ep = hk->atomic_load_e();
-		//atma::atomic_load(&fp, &hk->f);
+		cursor_t e = hk->atomic_load_e();
 
 		for (;;)
 		{
 			ATMA_ASSERT(r % 4 == 0);
 
-			while (ep <= r)
-				ep = atma::atomic_load(&hk->e);
+			while (e <= r)
+				e = atma::atomic_load(&hk->e);
 
 			// read header (atomic operation on 4-byte alignment)
 			uint32 rp = r % hk->buffer_size();
@@ -487,13 +486,8 @@ namespace atma
 			if (h.state != allocstate_t::full)
 				return decoder_t{};
 
-			// allocation-size
-			size = h.size;
-			//if (r + header_size + size >= ep)
-			//	return decoder_t{};
-
 			// update read-pointer
-			cursor_t nr = (r + header_size + size);
+			cursor_t nr = (r + header_size + h.size);
 			if (atma::atomic_compare_exchange(&hk->r, r, nr, &r))
 			{
 				// update allocation to "mid-read"
@@ -758,35 +752,6 @@ namespace atma
 		h.state = allocstate_t::full;
 		header_t v = atma::atomic_exchange(ah, h.u32);
 		ATMA_ASSERT(v.state == allocstate_t::empty && v.type == alloctype_t::pad);
-
-
-		auto hk = buf_housekeeping(a.buf_);
-		//atma::atomic_compare_exchange(a.buf_ + a.op_, fh.u32, nh.u32)
-		// 3) move full-position along
-#if 0
-		uint32 fp = atma::atomic_load(&hk->f);
-
-		for (auto p = a.buf_ + fp % hk->buffer_size();; p = a.buf_ + fp % hk->buffer_size())
-		{
-			auto fhp = reinterpret_cast<uint32*>(p);
-
-			header_t fh = atma::atomic_load(fhp);
-			fh.state = allocstate_t::flag_commit;
-			//if (fh.state != allocstate_t::flag_commit)
-			//	break;
-
-			// whoever sets the header to zero gets to update fp
-			auto nh = fh;
-			nh.state = allocstate_t::full;
-			if (atma::atomic_compare_exchange(fhp, fh.u32, nh.u32))
-				if (atma::atomic_compare_exchange(&hk->f, fp, fp + header_size + fh.size))
-					fp += header_size + fh.size;
-				else
-					ATMA_HALT("bad things");
-			else
-				break;
-		}
-#endif
 	}
 
 
