@@ -118,9 +118,6 @@
     <ClInclude Include="..\..\include\atma\bitmask.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\call_fn.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\com_ptr.hpp">
       <Filter>include</Filter>
     </ClInclude>
@@ -197,9 +194,6 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\atma\handle_table.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\atma\filesystem\file.hpp">
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
