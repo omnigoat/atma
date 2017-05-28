@@ -4,6 +4,7 @@
 #include <atma/assert.hpp>
 #include <atma/function.hpp>
 
+
 namespace atma
 {
 	template <typename C, typename F> struct filtered_range_t;
@@ -200,7 +201,7 @@ namespace atma
 	{
 		do {
 			++pos_;
-		} while (pos_ != end_ && !call_fn(owner_->predicate(), *pos_));
+		} while (pos_ != end_ && !std::invoke(owner_->predicate(), *pos_));
 
 		return *this;
 	}
