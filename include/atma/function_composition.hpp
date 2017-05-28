@@ -13,8 +13,8 @@
 //    occurs when G has a concrete functor-operator. otherwise, a templated
 //    functor-operator is used.
 //
-namespace atma { namespace detail {
-
+namespace atma::detail
+{
 	template <typename F, typename G> struct composited_t;
 	template <typename F, typename G, bool> struct composited_ii_t;
 	template <typename F, typename G, typename Args> struct composited_iii_t;
@@ -29,9 +29,10 @@ namespace atma { namespace detail {
 			: f(std::forward<FF>(f)), g(std::forward<GG>(g))
 		{}
 
-		decltype(auto) operator ()(Args... args)
+		decltype(auto) operator ()(Args... args) const
 		{
-			return std::forward<F>(f)(std::forward<G>(g)(std::forward<Args>(args)...));
+			auto self = const_cast<composited_iii_t<F, G, std::tuple<Args...>>*>(this);
+			return self->f(self->g(args...));
 		}
 
 	private:
@@ -48,14 +49,14 @@ namespace atma { namespace detail {
 		{}
 
 		template <typename... Args>
-		decltype(auto) operator ()(Args&&... args)
+		decltype(auto) operator ()(Args&&... args) const
 		{
 			return std::forward<F>(f)(std::forward<G>(g)(std::forward<Args>(args)...));
 		}
 
 	private:
-		F f;
-		G g;
+		mutable F f;
+		mutable G g;
 	};
 
 	template <typename F, typename G>
@@ -85,10 +86,9 @@ namespace atma { namespace detail {
 		template <typename FF, typename GG>
 		composited_t(FF&& f, GG&& g)
 			: composited_ii_t<F, G, is_callable_v<std::decay_t<G>>>{std::forward<FF>(f), std::forward<GG>(g)}
-		{
-		}
+		{}
 	};
-} }
+}
 
 namespace atma
 {
@@ -129,7 +129,7 @@ namespace atma
 	//
 	template <typename F, typename A>
 	inline decltype(auto) operator << (F&& f, A&& a) {
-		return call_fn(std::forward<F>(f), std::forward<A>(a));
+		return std::invoke(std::forward<F>(f), std::forward<A>(a));
 	}
 
 #if 0

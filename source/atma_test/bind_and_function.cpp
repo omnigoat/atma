@@ -17,11 +17,11 @@ struct tm_t
 {
 	template <typename A>
 	std::enable_if_t<std::is_same_v<A, int>, int>
-	operator ()(A a) { return a; }
+	operator ()(A a) const { return a; }
 
 	template <typename A>
 	std::enable_if_t<std::is_same<A, float>::value, float>
-	operator ()(A a) { return a * 2.f; }
+	operator ()(A a) const { return a * 2.f; }
 };
 
 SCENARIO("bind works with various things", "[bind]")
@@ -44,7 +44,7 @@ SCENARIO("bind works with various things", "[bind]")
 		//atma::thread::inplace_engine_t<true> lulz{4096};
 
 		// regular function & binding a binding
-		
+
 		// mumber function
 		mathing_t m;
 		mathing_t const m2;

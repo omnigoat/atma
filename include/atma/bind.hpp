@@ -5,7 +5,7 @@
 #include <atma/placeholders.hpp>
 #include <atma/function_traits.hpp>
 #include <atma/function_composition.hpp>
-#include <atma/call_fn.hpp>
+
 
 namespace atma {
 
@@ -50,8 +50,7 @@ namespace atma {
 	namespace detail
 	{
 		template <typename Binding, typename Args>
-		constexpr inline auto select_bound_arg(Binding&& b, Args&&)
-			-> decltype(b)
+		constexpr inline decltype(auto) select_bound_arg(Binding&& b, Args&&)
 		{
 			return std::forward<Binding>(b);
 		}
@@ -297,11 +296,9 @@ namespace atma {
 	namespace detail
 	{
 		template <typename F, typename Bindings, typename Args, size_t... Idxs>
-		inline auto call_fn_bound_tuple_impl(F&& f, Bindings&& bindings, Args&& args, idxs_t<Idxs...>)
-			// SERIOUSLY, there's an MVSC bug preventing decltype(auto) here
-			-> decltype(call_fn(std::forward<F>(f), select_bound_arg(std::get<Idxs>(std::forward<Bindings>(bindings)), std::forward<Args>(args))...))
+		inline decltype(auto) call_fn_bound_tuple_impl(F&& f, Bindings&& bindings, Args&& args, idxs_t<Idxs...>)
 		{
-			return call_fn(std::forward<F>(f), select_bound_arg(std::get<Idxs>(std::forward<Bindings>(bindings)), std::forward<Args>(args))...);
+			return std::invoke(std::forward<F>(f), select_bound_arg(std::get<Idxs>(std::forward<Bindings>(bindings)), std::forward<Args>(args))...);
 		}
 	}
 
@@ -317,7 +314,37 @@ namespace atma {
 			idxs_list_t<binding_size>());
 	}
 
+	namespace detail
+	{
+		template <typename T>
+		decltype(auto) forward_potential_placeholder(T&& t)
+		{
+			return std::forward<T>(t);
+		}
 
+		template <int I>
+		placeholder_t<I> forward_potential_placeholder(placeholder_t<I> const& x)
+		{
+			return x;
+		}
+
+		template <int I>
+		placeholder_t<I> forward_potential_placeholder(placeholder_t<I>&& x)
+		{
+			return x;
+		}
+
+		// just no.
+		template <int I>
+		placeholder_t<I> forward_potential_placeholder(placeholder_t<I>& x);
+
+		template <typename T> struct forward_potential_placeholder_tx { using type = T; };
+		template <int I>      struct forward_potential_placeholder_tx<placeholder_t<I> const&> { using type = placeholder_t<I>; };
+		template <int I>      struct forward_potential_placeholder_tx<placeholder_t<I>&&> { using type = placeholder_t<I>; };
+
+		template <typename T>
+		using forward_potential_placeholder_t = typename forward_potential_placeholder_tx<T>::type;
+	}
 
 
 	//
@@ -344,9 +371,11 @@ namespace atma {
 			{
 			}
 
-			auto operator ()(Args... args) -> decltype(auto)
+			auto operator ()(Args... args) const -> decltype(auto)
 			{
-				return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
+				// we must ignore the const-qualifier because reasons
+				auto self = const_cast<bind_iii_t<F, BindingsRef, std::tuple<Args...>>*>(this);
+				return call_fn_bound_tuple(self->fn_, self->bindings_, std::forward_as_tuple(args...));
 			}
 
 			auto fn() const -> function_t const& { return fn_; }
@@ -384,7 +413,7 @@ namespace atma {
 			}
 
 			template <typename... Args>
-			auto operator ()(Args&&... args) -> decltype(call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...)))
+			auto operator ()(Args&&... args) const -> decltype(call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...)))
 			{
 				return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
 			}
@@ -448,9 +477,9 @@ namespace atma {
 	//    hooray!
 	//
 	template <typename F, typename... Bindings>
-	inline auto bind(F&& f, Bindings&&... bindings) -> bind_t<std::remove_reference_t<F>, std::tuple<Bindings...>>
+	inline auto bind(F&& f, Bindings&&... bindings) -> bind_t<std::remove_reference_t<F>, std::tuple<detail::forward_potential_placeholder_t<Bindings>...>>
 	{
-		return {std::forward<F>(f), std::forward_as_tuple(bindings...)};
+		return {std::forward<F>(f), std::forward_as_tuple(detail::forward_potential_placeholder(bindings)...)};
 	}
 
 
