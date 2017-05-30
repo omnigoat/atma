@@ -97,30 +97,32 @@ namespace atma {
 
 
 	//
-	//  normalize_placeholders_t
+	//  normalizing placeholders
 	//  --------------------------
 	//    sometimes the type of the placeholders in our bindings list is weird, like
 	//    `placeholder_t<0> const`, or `placeholder_t<0> const&`. this normalizes them
 	//
 	namespace detail
 	{
-		template <typename Binding>
-		struct normalize_placeholder_tx {
-			using type = Binding;
-		};
+		template <typename T> struct normalize_placeholder_tx { using type = T; };
+		template <int I> struct normalize_placeholder_tx<placeholder_t<I> const> { using type = placeholder_t<I>; };
+		template <int I> struct normalize_placeholder_tx<placeholder_t<I> const&> { using type = placeholder_t<I>; };
+		template <int I> struct normalize_placeholder_tx<placeholder_t<I>&&> { using type = placeholder_t<I>; };
 
-		template <int I>
-		struct normalize_placeholder_tx<placeholder_t<I> const> { 
-			using type = placeholder_t<I>;
-		};
+		template <typename T> decltype(auto) normalize_placeholder(T&& t) { return std::forward<T>(t); }
+		template <int I> placeholder_t<I> normalize_placeholder(placeholder_t<I> const& x) { return x; }
+		template <int I> placeholder_t<I> normalize_placeholder(placeholder_t<I>&& x) { return x; }
+		template <int I> placeholder_t<I> normalize_placeholder(placeholder_t<I>& x); // not allowed.
 
-		template <int I>
-		struct normalize_placeholder_tx<placeholder_t<I> const&> {
-			using type = placeholder_t<I>;
-		};
 
-		template <typename Bindings>
-		using normalize_placeholders_t = tuple_map_t<normalize_placeholder_tx, Bindings>;
+		template <typename... Bindings>
+		using bindings_tuple_t = std::tuple<typename normalize_placeholder_tx<Bindings>::type...>;
+
+		template <typename... Bindings>
+		inline auto forward_as_bindings(Bindings&&... bindings) -> bindings_tuple_t<Bindings...>
+		{
+			return std::forward_as_tuple(normalize_placeholder(std::forward<Bindings>(bindings))...);
+		}
 	}
 
 
@@ -152,7 +154,7 @@ namespace atma {
 		};
 
 		template <typename Bindings>
-		using valid_bindings_t = typename valid_bindings_tx<0, Bindings, normalize_placeholders_t<Bindings>>::type;
+		using valid_bindings_t = typename valid_bindings_tx<0, Bindings, Bindings>::type;
 	}
 
 
@@ -183,7 +185,7 @@ namespace atma {
 		};
 
 		template <typename Bindings>
-		constexpr int highest_placeholder_v = highest_placeholder_tx<normalize_placeholders_t<Bindings>>::value;
+		constexpr int highest_placeholder_v = highest_placeholder_tx<Bindings>::value;
 	}
 
 
@@ -248,7 +250,7 @@ namespace atma {
 
 		template <typename Args, typename Bindings>
 		using resultant_args_t = typename resultant_args_tx<
-			Args, normalize_placeholders_t<Bindings>,
+			Args, Bindings,
 			0, highest_placeholder_v<Bindings> + 1>::type;
 	}
 
@@ -314,38 +316,6 @@ namespace atma {
 			idxs_list_t<binding_size>());
 	}
 
-	namespace detail
-	{
-		template <typename T>
-		decltype(auto) forward_potential_placeholder(T&& t)
-		{
-			return std::forward<T>(t);
-		}
-
-		template <int I>
-		placeholder_t<I> forward_potential_placeholder(placeholder_t<I> const& x)
-		{
-			return x;
-		}
-
-		template <int I>
-		placeholder_t<I> forward_potential_placeholder(placeholder_t<I>&& x)
-		{
-			return x;
-		}
-
-		// just no.
-		template <int I>
-		placeholder_t<I> forward_potential_placeholder(placeholder_t<I>& x);
-
-		template <typename T> struct forward_potential_placeholder_tx { using type = T; };
-		template <int I>      struct forward_potential_placeholder_tx<placeholder_t<I> const&> { using type = placeholder_t<I>; };
-		template <int I>      struct forward_potential_placeholder_tx<placeholder_t<I>&&> { using type = placeholder_t<I>; };
-
-		template <typename T>
-		using forward_potential_placeholder_t = typename forward_potential_placeholder_tx<T>::type;
-	}
-
 
 	//
 	//  bind
@@ -371,7 +341,7 @@ namespace atma {
 			{
 			}
 
-			auto operator ()(Args... args) const -> decltype(auto)
+			decltype(auto) operator ()(Args... args) const
 			{
 				// we must ignore the const-qualifier because reasons
 				auto self = const_cast<bind_iii_t<F, BindingsRef, std::tuple<Args...>>*>(this);
@@ -409,8 +379,7 @@ namespace atma {
 			bind_ii_t(FF&& fn, BB&& bindings)
 				: fn_(std::forward<FF>(fn))
 				, bindings_(std::forward<BB>(bindings))
-			{
-			}
+			{}
 
 			template <typename... Args>
 			auto operator ()(Args&&... args) const -> decltype(call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...)))
@@ -428,7 +397,8 @@ namespace atma {
 	}
 
 	template <typename F, typename BindingsRef>
-	struct bind_t : detail::bind_ii_t<F, BindingsRef, is_callable_v<F>>
+	struct bind_t
+		: detail::bind_ii_t<F, BindingsRef, is_callable_v<F>>
 	{
 		template <typename FF, typename BB>
 		bind_t(FF&& f, BB&& b)
@@ -477,9 +447,10 @@ namespace atma {
 	//    hooray!
 	//
 	template <typename F, typename... Bindings>
-	inline auto bind(F&& f, Bindings&&... bindings) -> bind_t<std::remove_reference_t<F>, std::tuple<detail::forward_potential_placeholder_t<Bindings>...>>
+	inline auto bind(F&& f, Bindings&&... bindings)
 	{
-		return {std::forward<F>(f), std::forward_as_tuple(detail::forward_potential_placeholder(bindings)...)};
+		return bind_t<std::remove_reference_t<F>, detail::bindings_tuple_t<Bindings...>>
+			{std::forward<F>(f), detail::forward_as_bindings(bindings...)};
 	}
 
 
@@ -493,15 +464,16 @@ namespace atma {
 	//          means you can't curry a templated function/functor. deal with it.
 	//
 	template <typename F, typename... Bindings>
-	inline auto curry(F&& f, Bindings&&... bindings) -> bind_t<F, detail::curried_bindings_t<F, Bindings...>>
+	inline auto curry(F&& f, Bindings&&... bindings)
 	{
 		auto const param_size = function_traits<F>::arity + (size_t)function_traits<F>::is_memfnptr;
 		auto const binding_size = sizeof...(Bindings);
 		auto const rem_args = tuple_placeholder_list_t<param_size - binding_size>();
 
-		auto merged_bindings = std::tuple_cat(std::make_tuple(std::forward<Bindings>(bindings)...), rem_args);
+		auto merged_bindings = std::tuple_cat(detail::forward_as_bindings(bindings...), rem_args);
 
-		return {std::forward<F>(f), std::forward<decltype(merged_bindings)>(merged_bindings)};
+		return bind_t<F, detail::curried_bindings_t<F, Bindings...>>
+			{std::forward<F>(f), merged_bindings};
 	}
 
 
