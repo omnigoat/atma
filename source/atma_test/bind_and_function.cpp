@@ -24,6 +24,8 @@ struct tm_t
 	operator ()(A a) const { return a * 2.f; }
 };
 
+int what() { return 4; }
+
 SCENARIO("bind works with various things", "[bind]")
 {
 	GIVEN("a binding to a free-function, and one to am equivalent non-closure lambda")
@@ -44,7 +46,7 @@ SCENARIO("bind works with various things", "[bind]")
 		//atma::thread::inplace_engine_t<true> lulz{4096};
 
 		// regular function & binding a binding
-
+		
 		// mumber function
 		mathing_t m;
 		mathing_t const m2;
@@ -79,7 +81,7 @@ SCENARIO("bind works with various things", "[bind]")
 		{
 			char buf[128];
 			auto tb = atma::bind(&square, 4);
-			atma::basic_function_t<8, int()> tf{buf, tb};
+			atma::basic_function_t<8, int()> tf{tb, buf};
 			tf();
 		}
 

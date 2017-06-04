@@ -624,7 +624,7 @@ namespace atma
 	inline auto base_mpsc_queue_t::impl_allocate_default(housekeeping_t* hk, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t
 	{
 		ATMA_ASSERT(alignment > 0);
-		//ATMA_ASSERT(wqs.wp % 4 == 0);
+		ATMA_ASSERT(w % 4 == 0);
 
 		// expand size so that:
 		//  - we pad up to the requested alignment
@@ -701,7 +701,6 @@ namespace atma
 		uint32 ep = atma::atomic_load(&hk->e);
 		if (np < op)
 		{
-			//for (uint32 oep = ep; oep < ep; )
 			while (np < ep && ep < op)
 				atma::atomic_load(&ep, &hk->e);
 		}
@@ -1037,6 +1036,22 @@ namespace atma
 		return std::move(um);
 	}
 
+	template <typename T>
+	inline auto base_mpsc_queue_t::decoder_t::decode_struct(T& x) -> bool
+	{
+		//if (op_ + size_ < buffer_size())
+		//{
+		//	
+		//}
+		//else
+		{
+			auto const size = (uint32)sizeof(T);
+			for (uint32 i = 0; i != size; ++i)
+				decode_byte(reinterpret_cast<byte*>(&x)[i]);
+		}
+
+		return true;
+	}
 
 
 
