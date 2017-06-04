@@ -91,6 +91,12 @@ namespace atma
 			{
 				// no relocation required for SFO
 			}
+
+			static auto external_size() -> size_t
+			{
+				// SFO has no external allocations
+				return 0u;
+			}
 		};
 
 		template <size_t BS, typename FN>
@@ -139,6 +145,12 @@ namespace atma
 					FN*& p = reinterpret_cast<FN*&>(buf);
 					delete p;
 				}
+				// we still need to destruct though
+				else
+				{
+					FN* p = reinterpret_cast<FN*>(ip & ~intptr(1));
+					p->~FN();
+				}
 			}
 
 			template <typename R, typename... Args>
@@ -163,13 +175,18 @@ namespace atma
 
 				// move-construct into new external
 				new (exbuf) FN{std::move(*pfn)};
+
+				// destruct original
+				destruct(buf);
+
+				// assign external buffer to us
 				reinterpret_cast<FN*&>(buf) = reinterpret_cast<FN*>(exbuf);
-
-				// kill original
-				pfn->~FN();
-
-				// 1 for external
 				reinterpret_cast<intptr&>(buf) |= 1;
+			}
+
+			static auto external_size() -> size_t
+			{
+				return sizeof(FN);
 			}
 		};
 	}
@@ -188,12 +205,14 @@ namespace atma
 			using move_fntype     = auto(*)(detail::functor_buf_t<BS>&, detail::functor_buf_t<BS>&&) -> void;
 			using target_fntype   = auto(*)(detail::functor_buf_t<BS>&) -> void*;
 			using relocate_fntype = auto(*)(detail::functor_buf_t<BS>&, void*) -> void;
+			using size_fntype     = auto(*)() -> size_t;
 
 			destruct_fntype destruct;
 			copy_fntype     copy;
 			move_fntype     move;
 			target_fntype   target;
 			relocate_fntype relocate;
+			size_fntype     external_size;
 		};
 
 		template <size_t BS, typename FN, typename R, typename... Params>
@@ -205,7 +224,8 @@ namespace atma
 				&vtable_impl_t<BS, FN>::copy,
 				&vtable_impl_t<BS, FN>::move,
 				&vtable_impl_t<BS, FN>::target,
-				&vtable_impl_t<BS, FN>::relocate
+				&vtable_impl_t<BS, FN>::relocate,
+				&vtable_impl_t<BS, FN>::external_size
 			};
 
 			return &_;
@@ -288,7 +308,6 @@ namespace atma
 			{
 				vtable->move(rhs.buf, std::move(buf));
 				rhs.vtable = vtable;
-
 				vtable->destruct(buf);
 			}
 
@@ -391,9 +410,9 @@ namespace atma
 		}
 
 		template <typename FN>
-		explicit basic_function_t(void* exbuf, FN&& fn)
+		explicit basic_function_t(FN&& fn, void* exbuf)
 		{
-			init_fn(exbuf, detail::functorize(std::forward<FN>(fn)));
+			init_fn(detail::functorize(std::forward<FN>(fn)), exbuf);
 		}
 
 		basic_function_t(basic_function_t const& rhs)
@@ -481,6 +500,11 @@ namespace atma
 			wrapper_.vtable->relocate(wrapper_.buf, exbuf);
 		}
 
+		auto external_buffer_size() const -> size_t
+		{
+			return wrapper_.vtable->external_size();
+		}
+
 	private:
 		auto reset() -> void
 		{
@@ -501,7 +525,7 @@ namespace atma
 		}
 
 		template <typename FN>
-		auto init_fn(void* exbuf, FN&& fn) -> void
+		auto init_fn(FN&& fn, void* exbuf) -> void
 		{
 			dispatch_ = &detail::vtable_impl_t<BS, std::decay_t<FN>>::template call<R, Params...>;
 			new (&wrapper_) detail::functor_wrapper_t<BS, R, Params...>{exbuf, std::forward<FN>(fn)};

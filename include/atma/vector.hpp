@@ -69,7 +69,8 @@ namespace atma
 		auto clear() -> void;
 		auto reserve(size_t) -> void;
 		auto shrink_to_fit() -> void;
-		auto resize(size_t, value_type const& = value_type()) -> void;
+		auto resize(size_t) -> void;
+		auto resize(size_t, value_type const&) -> void;
 
 		auto push_back(T&&) -> void;
 		auto push_back(T const&) -> void;
@@ -365,6 +366,23 @@ namespace atma
 	inline auto vector<T,A>::shrink_to_fit() -> void
 	{
 		imem_recapacitize(size_);
+	}
+
+	template <typename T, typename A>
+	inline auto vector<T,A>::resize(size_t size) -> void
+	{
+		IMEM_GUARD_LT(size);
+
+		if (size < size_) {
+			imem_.destruct(size, size_ - size);
+		}
+		else if (size_ < size) {
+			imem_.construct_range(size_, size - size_);
+		}
+
+		IMEM_GUARD_GT(size);
+
+		size_ = size;
 	}
 
 	template <typename T, typename A>
