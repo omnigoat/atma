@@ -3,6 +3,7 @@
 #include <atma/config/platform.hpp>
 #include <atma/function.hpp>
 #include <atma/mpsc_queue.hpp>
+#include <atma/vector.hpp>
 
 
 // debug, this_thread, etc
@@ -155,16 +156,16 @@ namespace atma
 	{
 		while (good)
 		{
-			// todo: stack-allocated memory for storing signal
-			atma::unique_memory_t mem;
+			atma::vector<char> buf;
+			function_t* f = nullptr;
 			if (queue_.with_consumption([&](auto& D)
 			{
-				D.local_copy(mem);
-				function_t* f = (function_t*)mem.begin();
-				f->relocate_external_buffer(mem.begin() + sizeof(function_t));
+				buf.resize(D.size());
+				f = (function_t*)buf.data();
+				D.decode_struct(*f);
+				f->relocate_external_buffer(buf.data() + sizeof(function_t));
 			}))
 			{
-				function_t* f = (function_t*)mem.begin();
 				(*f)();
 			}
 		}
@@ -187,8 +188,8 @@ namespace atma
 		if (!running_)
 			return;
 
-		auto A = queue_.allocate(sizeof(function_t) + sizeof(function_t), 4, true);
-		new (A.data()) function_t{(char*)A.data() + sizeof(function_t), fn};
+		auto A = queue_.allocate(sizeof(function_t) + (uint32)fn.external_buffer_size(), 4, true);
+		new (A.data()) function_t{fn, (char*)A.data() + sizeof(function_t)};
 		queue_.commit(A);
 	}
 
@@ -197,8 +198,8 @@ namespace atma
 		if (!running_)
 			return;
 
-		auto A = queue_.allocate(sizeof(function_t) + sizeof(function_t), 4, true);
-		new (A.data()) function_t{(char*)A.data() + sizeof(function_t), std::move(fn)};
+		auto A = queue_.allocate(sizeof(function_t) + (uint32)fn.external_buffer_size(), 4, true);
+		new (A.data()) function_t{std::move(fn), (char*)A.data() + sizeof(function_t)};
 		queue_.commit(A);
 	}
 
@@ -288,15 +289,15 @@ namespace atma
 
 	inline auto thread_pool_t::enqueue(function_t const& fn) -> void
 	{
-		queue_.with_allocation(sizeof(function_t) + sizeof(function_t), 4, true, [&fn](auto& A) {
-			new (A.data()) function_t{(char*)A.data() + sizeof(function_t), fn};
+		queue_.with_allocation(sizeof(function_t) + (uint32)fn.external_buffer_size(), 4, true, [&fn](auto& A) {
+			new (A.data()) function_t{fn, (char*)A.data() + sizeof(function_t)};
 		});
 	}
 
 	inline auto thread_pool_t::enqueue(function_t&& fn) -> void
 	{
-		queue_.with_allocation(sizeof(function_t) + sizeof(function_t), 4, true, [&fn](auto& A) {
-			new (A.data()) function_t{(char*)A.data() + sizeof(function_t), std::move(fn)};
+		queue_.with_allocation(sizeof(function_t) + (uint32)fn.external_buffer_size(), 4, true, [&fn](auto& A) {
+			new (A.data()) function_t{std::move(fn), (char*)A.data() + sizeof(function_t)};
 		});
 	}
 
@@ -308,8 +309,8 @@ namespace atma
 			enqueue_repeat(fn);
 		};
 
-		queue_.with_allocation(sizeof(function_t) + sizeof(rfn), 4, true, [&rfn](auto& A) {
-			new (A.data()) function_t{(char*)A.data() + sizeof(function_t), rfn};
+		queue_.with_allocation(sizeof(function_t) + (uint32)rfn.external_buffer_size(), 4, true, [&rfn](auto& A) {
+			new (A.data()) function_t{rfn, (char*)A.data() + sizeof(function_t)};
 		});
 	}
 
@@ -321,8 +322,8 @@ namespace atma
 			enqueue_repeat(std::move(fn));
 		};
 
-		queue_.with_allocation(sizeof(function_t) + sizeof(rfn), 4, true, [&rfn](auto& A) {
-			new (A.data()) function_t{(char*)A.data() + sizeof(function_t), rfn};
+		queue_.with_allocation(sizeof(function_t) + (uint32)rfn.external_buffer_size(), 4, true, [&rfn](auto& A) {
+			new (A.data()) function_t{rfn, (char*)A.data() + sizeof(function_t)};
 		});
 	}
 
