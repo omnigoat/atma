@@ -41,15 +41,15 @@ namespace atma
 		struct functor_vtable_t
 		{
 			using destruct_fntype = auto(*)(functor_buf_t<BS>&) -> void;
-			using copy_fntype     = auto(*)(functor_buf_t<BS>&, functor_buf_t<BS> const&) -> void;
-			using move_fntype     = auto(*)(functor_buf_t<BS>&, functor_vtable_t<BS>*, functor_buf_t<BS>&&, functor_vtable_t<BS>*) -> void;
+			using assign_fntype   = auto(*)(functor_buf_t<BS>&, functor_vtable_t<BS>*, functor_buf_t<BS> const&) -> void;
+			using move_fntype     = auto(*)(functor_buf_t<BS>&, functor_vtable_t<BS>*, functor_buf_t<BS>&&) -> void;
 			using target_fntype   = auto(*)(functor_buf_t<BS>&) -> void*;
 			using relocate_fntype = auto(*)(functor_buf_t<BS>&, void*) -> void;
 			using size_fntype     = auto(*)() -> size_t;
 
 			destruct_fntype destruct;
-			copy_fntype     copy;
-			move_fntype     move;
+			assign_fntype   assign_into;
+			move_fntype     move_into;
 			target_fntype   target;
 			relocate_fntype relocate;
 			size_fntype     external_size;
@@ -91,6 +91,24 @@ namespace atma
 			static auto destruct_rel(functor_buf_t<BS>& fn) -> void
 			{
 				reinterpret_cast<FN&>(fn).~FN();
+			}
+
+			// assign_into
+			static auto assign_into(functor_buf_t<BS>& dest, functor_vtable_t<BS>* dvtable, functor_buf_t<BS> const& src) -> void
+			{
+				auto&& dfn = (FN*)dvtable->target(dest);
+				auto&& sfn = (FN*)target(src);
+				dfn->~FN();
+				new (dfn) FN{*sfn};
+			}
+
+			// move_into
+			static auto move_into(functor_buf_t<BS>& dest, functor_vtable_t<BS>* dvtable, functor_buf_t<BS>&& src) -> void
+			{
+				auto&& dfn = (FN*)dvtable->target(dest);
+				auto&& sfn = (FN*)target(src);
+				dfn->~FN();
+				new (dfn) FN{std::move(*sfn)};
 			}
 
 			template <typename R, typename... Args>
@@ -164,6 +182,50 @@ namespace atma
 				p->~FN();
 			}
 
+			// assign_into
+			static auto assign_into(functor_buf_t<BS>& dest, functor_vtable_t<BS>* dvtable, functor_buf_t<BS> const& src) -> void
+			{
+				auto&& dfn = (FN*)dvtable->target(dest);
+				auto&& sfn = (FN*)target(const_cast<functor_buf_t<BS>&>(src));
+				*dfn = *sfn;
+			}
+
+			static auto assign_into_exbuf(functor_buf_t<BS>& dest, functor_vtable_t<BS>* dvtable, functor_buf_t<BS> const& src) -> void
+			{
+				auto&& dfn = (FN*)dvtable->target(dest);
+				auto&& sfn = (FN*)target_exbuf(src);
+				*dfn = *sfn;
+			}
+
+			static auto assign_into_rel(functor_buf_t<BS>& dest, functor_vtable_t<BS>* dvtable, functor_buf_t<BS> const& src) -> void
+			{
+				auto&& dfn = (FN*)dvtable->target(dest);
+				auto&& sfn = (FN*)target_rel(src);
+				*dfn = *sfn;
+			}
+
+			// move_into
+			static auto move_into(functor_buf_t<BS>& dest, functor_vtable_t<BS>* dvtable, functor_buf_t<BS>&& src) -> void
+			{
+				auto&& dfn = (FN*)dvtable->target(dest);
+				auto&& sfn = (FN*)target(src);
+				*dfn = std::move(*sfn);
+			}
+
+			static auto move_into_exbuf(functor_buf_t<BS>& dest, functor_vtable_t<BS>* dvtable, functor_buf_t<BS>&& src) -> void
+			{
+				auto&& dfn = (FN*)dvtable->target(dest);
+				auto&& sfn = (FN*)target_exbuf(src);
+				*dfn = std::move(*sfn);
+			}
+
+			static auto move_into_rel(functor_buf_t<BS>& dest, functor_vtable_t<BS>* dvtable, functor_buf_t<BS>&& src) -> void
+			{
+				auto&& dfn = (FN*)dvtable->target(dest);
+				auto&& sfn = (FN*)target_rel(src);
+				*dfn = std::move(*sfn);
+			}
+
 			// call
 			template <typename R, typename... Args>
 			static auto call(functor_buf_t<BS> const& buf, Args... args) -> R
@@ -192,7 +254,7 @@ namespace atma
 			// target
 			static auto target(functor_buf_t<BS>& buf) -> void*
 			{
-				auto&& ptr = reinterpret_cast<FN*&>(buf);
+				auto ptr = reinterpret_cast<FN*&>(buf);
 				return ptr;
 			}
 
@@ -246,8 +308,8 @@ namespace atma
 			static auto _ = functor_vtable_t<BS>
 			{
 				&vtable_impl_t<BS, FN>::destruct,
-				&vtable_impl_t<BS, FN>::copy,
-				&vtable_impl_t<BS, FN>::move,
+				&vtable_impl_t<BS, FN>::assign_into,
+				&vtable_impl_t<BS, FN>::move_into,
 				&vtable_impl_t<BS, FN>::target,
 				&vtable_impl_t<BS, FN>::relocate,
 				&vtable_impl_t<BS, FN>::external_size
@@ -262,8 +324,8 @@ namespace atma
 			static auto _ = functor_vtable_t<BS>
 			{
 				&vtable_impl_t<BS, FN>::destruct_exbuf,
-				&vtable_impl_t<BS, FN>::copy,
-				&vtable_impl_t<BS, FN>::move,
+				&vtable_impl_t<BS, FN>::assign_into_exbuf,
+				&vtable_impl_t<BS, FN>::move_into_exbuf,
 				&vtable_impl_t<BS, FN>::target_exbuf,
 				&vtable_impl_t<BS, FN>::relocate,
 				&vtable_impl_t<BS, FN>::external_size
@@ -278,8 +340,8 @@ namespace atma
 			static auto _ = functor_vtable_t<BS>
 			{
 				&vtable_impl_t<BS, FN>::destruct_rel,
-				&vtable_impl_t<BS, FN>::copy,
-				&vtable_impl_t<BS, FN>::move,
+				&vtable_impl_t<BS, FN>::assign_into_rel,
+				&vtable_impl_t<BS, FN>::move_into_rel,
 				&vtable_impl_t<BS, FN>::target_rel,
 				&vtable_impl_t<BS, FN>::relocate,
 				&vtable_impl_t<BS, FN>::external_size
@@ -318,14 +380,14 @@ namespace atma
 				: vtable{rhs.vtable}
 				, buf{}
 			{
-				new (vtable->target(buf)) FN{*rhs.target<FN>()};
+				rhs.vtable->assign_into(buf, vtable, rhs.buf);
 			}
 
 			functor_wrapper_t(functor_wrapper_t&& rhs)
 				: vtable{rhs.vtable}
 				, buf{}
 			{
-				new (vtable->target(buf)) FN{std::move(rhs)};
+				rhs.vtable->move_into(buf, vtable, std::move(rhs.buf));
 			}
 
 			~functor_wrapper_t()
@@ -335,13 +397,13 @@ namespace atma
 
 			auto operator = (functor_wrapper_t const& rhs) -> functor_wrapper_t&
 			{
-				*vtable->target<FN>(buf) = *rhs.target<FN>();
+				rhs.vtable->assign_into(buf, vtable, rhs.buf);
 				return *this;
 			}
 
 			auto operator = (functor_wrapper_t&& rhs) -> functor_wrapper_t&
 			{
-				*vtable->target<FN>(buf) = std::move(*rhs.target<FN>());
+				rhs.vtable->move_into(buf, vtable, std::move(rhs.buf));
 				return *this;
 			}
 
