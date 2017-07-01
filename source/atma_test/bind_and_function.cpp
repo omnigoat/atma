@@ -82,7 +82,7 @@ SCENARIO("bind works with various things", "[bind]")
 			char buf[128];
 			auto tb = atma::bind(&square, 4);
 			atma::basic_function_t<8, int()> tf{tb, buf};
-			tf();
+			auto r = tf();
 		}
 
 		THEN("all b2s match each other")
