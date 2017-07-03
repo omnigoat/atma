@@ -10,9 +10,18 @@
 
 namespace atma
 {
-	template <size_t, typename> struct basic_function_t;
+	enum class functor_storage_t
+	{
+		heap,
+		external,
+		relative,
+	};
+
+
+
+	template <size_t, functor_storage_t, typename> struct basic_function_t;
 	template <typename T>
-	using function = basic_function_t<32, T>;
+	using function = basic_function_t<32, functor_storage_t::heap, T>;
 
 
 
@@ -31,18 +40,14 @@ namespace atma
 			char buf[size];
 		};
 
-		enum class functor_storage_t
-		{
-			heap,
-			external,
-			relative,
-		};
-
 		template <size_t BS, typename FN>
 		constexpr auto enable_SFO() -> bool
 		{
 			return sizeof(FN) <= BS;
 		}
+
+		template <typename R, typename FN, typename... Params>
+		constexpr bool result_matches_v = std::is_same_v<R, std::result_of_t<std::remove_reference_t<FN>(Params...)>>;
 	}
 
 
@@ -165,7 +170,8 @@ namespace atma
 			static auto call(functor_buf_t<BS> const& buf, Params... args) -> R
 			{
 				auto& fn = reinterpret_cast<FN&>(const_cast<functor_buf_t<BS>&>(buf));
-				return fn(std::forward<Params>(args)...);
+				//return fn(std::forward<Params>(args)...);
+				return std::invoke(fn, std::forward<Params>(args)...);
 			}
 
 			static auto relocate(functor_buf_t<BS>& buf, void*) -> void
@@ -504,7 +510,7 @@ namespace atma
 		template <size_t BS, typename R, typename... Params, typename... UParams, typename... RParams>
 		struct dispatcher_iii_t<BS, R, std::tuple<Params...>, std::tuple<UParams...>, std::tuple<RParams...>>
 		{
-			static auto call(dispatch_fnptr_t<BS, R, Params...>, functor_buf_t<BS> const&, UParams...) -> basic_function_t<BS, R(RParams...)>;
+			static auto call(dispatch_fnptr_t<BS, R, Params...>, functor_buf_t<BS> const&, UParams...) -> basic_function_t<BS, functor_storage_t::heap, R(RParams...)>;
 		};
 
 		// superfluous arguments
@@ -515,7 +521,7 @@ namespace atma
 			static auto call(dispatch_fnptr_t<BS, R, Params...>, functor_buf_t<BS> const&, Params..., More&&...) -> R;
 		};
 
-		// partial-basic_function_t
+		// partial-function
 		template <size_t BS, typename R, typename... Params, typename Args, size_t I>
 		struct dispatcher_ii_t<BS, R, std::tuple<Params...>, Args, I, true, false>
 			: dispatcher_iii_t<BS, R, std::tuple<Params...>,
@@ -541,31 +547,154 @@ namespace atma
 
 
 
-	// functorize
-	namespace detail
+
+	template <size_t BS, functor_storage_t Storage, typename R, typename... Params>
+	struct basic_function_t<BS, Storage, R(Params...)>
 	{
+	protected:
+		basic_function_t()
+			: basic_function_t{&empty_fn<R>}
+		{}
+
+		template <typename FN, typename = std::enable_if_t<detail::result_matches_v<R, FN, Params...>>>
+		basic_function_t(FN&& fn)
+			: wrapper_{std::forward<FN>(fn)}
+		{}
+
+		template <typename FN, typename = std::enable_if_t<detail::result_matches_v<R, FN, Params...>>>
+		basic_function_t(FN&& fn, void* exbuf)
+			: wrapper_{exbuf, std::forward<FN>(fn)}
+		{}
+
+		basic_function_t(basic_function_t const& rhs)
+			: wrapper_(rhs.wrapper_)
+		{}
+
+		basic_function_t(basic_function_t&& rhs)
+			: wrapper_{std::move(rhs.wrapper_)}
+		{}
+
+	public:
+		auto operator = (basic_function_t const& rhs) -> basic_function_t&
+		{
+			if (this != &rhs)
+			{
+				reset();
+				//dispatch_ = rhs.dispatch_;
+				wrapper_  = rhs.wrapper_;
+			}
+
+			return *this;
+		}
+
+		auto operator = (basic_function_t&& rhs) -> basic_function_t&
+		{
+			if (this != &rhs)
+			{
+				reset();
+				//dispatch_ = rhs.dispatch_;
+				wrapper_  = std::move(rhs.wrapper_);
+			}
+
+			return *this;
+		}
+
+		template <typename FN>
+		auto operator = (FN&& fn) -> basic_function_t&
+		{
+			wrapper_.~functor_wrapper_t();
+			init_fn(std::forward<FN>(fn));
+			return *this;
+		}
+
+		auto operator = (std::nullptr_t) -> basic_function_t&
+		{
+			wrapper_.~functor_wrapper_t();
+			init_empty();
+			return *this;
+		}
+
+		operator bool() const
+		{
+			return *target<R(*)(Params...)>() != empty_fn<R>;
+		}
+
+		auto operator()(Params... args) const -> R
+		{
+			//return dispatch_(wrapper_.buf, args...);
+			//return wrapper_.vtable->call
+			return wrapper_.vtable->call(wrapper_.buf, args...);
+		}
+
+		template <typename... Args>
+		decltype(auto) operator ()(Args&&... args) const
+		{
+			return detail::dispatcher_t<BS, R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(wrapper_.vtable->call, wrapper_.buf, std::forward<Args>(args)...);
+		}
+
 		template <typename T>
-		auto functorize(T&& t) -> T
+		auto target() const -> T const*
 		{
-			return t;
+			return wrapper_.target<T>();
 		}
 
-		template <typename R, typename C, typename... Params>
-		auto functorize(R(C::*fn)(Params...)) -> decltype(std::mem_fn(fn))
+		auto swap(basic_function_t& rhs) -> void
 		{
-			return std::mem_fn(fn);
+			auto tmp = detail::functor_wrapper_t{};
+			rhs.wrapper_.move_into(tmp);
+			wrapper_.move_into(rhs.wrapper_);
+			tmp.move_into(wrapper_);
 		}
 
-		template <typename R, typename C, typename... Params>
-		auto functorize(R(C::*fn)(Params...) const) -> decltype(std::mem_fn(fn))
+		auto relocate_external_buffer(void* exbuf) -> void
 		{
-			return std::mem_fn(fn);
+			wrapper_.vtable->relocate(wrapper_.buf, exbuf);
+			//wrapper_.vtable->call = detail::vtable_impl_t<
 		}
-	}
+
+		auto external_buffer_size() const -> size_t
+		{
+			return wrapper_.vtable->external_size();
+		}
+
+	private:
+		auto reset() -> void
+		{
+			//dispatch_ = nullptr;
+			wrapper_.~functor_wrapper_t();
+		}
+
+		auto init_empty() -> void
+		{
+			init_fn(&empty_fn<R>);
+		}
+
+		template <typename FN>
+		auto init_fn(FN&& fn) -> void
+		{
+			//dispatch_ = &detail::vtable_impl_t<detail::functor_storage_t::heap, BS, std::decay_t<FN>>::template call<R, Params...>;
+			new (&wrapper_) detail::functor_wrapper_t<BS, R, Params...>{std::forward<FN>(fn)};
+		}
+
+		template <typename FN>
+		auto init_fn(FN&& fn, void* exbuf) -> void
+		{
+			//dispatch_ = &detail::vtable_impl_t<detail::functor_storage_t::external, BS, std::decay_t<FN>>::template call<R, Params...>;
+			new (&wrapper_) detail::functor_wrapper_t<BS, R, Params...>{exbuf, std::forward<FN>(fn)};
+		}
+
+	private:
+		//detail::dispatch_fnptr_t<BS, R, Params...>  dispatch_;
+		detail::functor_wrapper_t<BS, R, Params...> wrapper_;
+
+		template <typename R2>
+		static auto empty_fn(Params...) -> R2 { return std::declval<R2>(); }
+		template <>
+		static auto empty_fn<void>(Params...) -> void {}
+	};
 
 
-
-
+#if 0
 	template <size_t BS, typename R, typename... Params>
 	struct basic_function_t<BS, R(Params...)>
 	{
@@ -581,7 +710,7 @@ namespace atma
 		template <typename FN, typename = std::enable_if_t<std::is_same_v<R, std::result_of_t<std::decay_t<FN>(Params...)>>>>
 		basic_function_t(FN&& fn)
 			: //dispatch_{&detail::vtable_impl_t<detail::functor_storage_t::heap, BS, std::decay_t<FN>>::template call<R, Params...>}
-			//,
+			  //,
 			wrapper_{std::forward<FN>(fn)}
 		{}
 
@@ -593,7 +722,7 @@ namespace atma
 		template <typename FN>
 		basic_function_t(FN&& fn, void* exbuf)
 			: //dispatch_{&detail::vtable_impl_t<detail::functor_storage_t::heap, BS, std::decay_t<FN>>::template call<R, Params...>}
-			//,
+			  //,
 			wrapper_{exbuf, std::forward<FN>(fn)}
 		{}
 
@@ -724,9 +853,7 @@ namespace atma
 		template <>
 		static auto empty_fn<void>(Params...) -> void {}
 	};
-
-
-
+#endif
 	namespace detail
 	{
 		template <size_t BS, typename R, typename... Params, typename Args, size_t I>
@@ -743,9 +870,9 @@ namespace atma
 		}
 
 		template <size_t BS, typename R, typename... Params, typename... UParams, typename... RParams>
-		auto dispatcher_iii_t<BS, R, std::tuple<Params...>, std::tuple<UParams...>, std::tuple<RParams...>>::call(dispatch_fnptr_t<BS, R, Params...> fn, functor_buf_t<BS> const& buf, UParams... params) -> basic_function_t<BS, R(RParams...)>
+		auto dispatcher_iii_t<BS, R, std::tuple<Params...>, std::tuple<UParams...>, std::tuple<RParams...>>::call(dispatch_fnptr_t<BS, R, Params...> fn, functor_buf_t<BS> const& buf, UParams... params) -> basic_function_t<BS, functor_storage_t::heap, R(RParams...)>
 		{
-			return basic_function_t<BS, R(RParams...)>{curry(fn, buf, params...)};
+			return basic_function_t<BS, functor_storage_t::heap, R(RParams...)>{curry(fn, buf, params...)};
 		}
 	}
 
@@ -757,8 +884,8 @@ namespace atma
 	//  -----------------
 	//    specialization for function_traits
 	//
-	template <size_t BS, typename R, typename... Params>
-	struct function_traits_override<basic_function_t<BS, R(Params...)>>
+	template <size_t BS, functor_storage_t S, typename R, typename... Params>
+	struct function_traits_override<basic_function_t<BS, S, R(Params...)>>
 		: function_traits<R(Params...)>
 	{
 	};
