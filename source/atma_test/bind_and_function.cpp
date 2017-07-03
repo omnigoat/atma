@@ -85,6 +85,11 @@ SCENARIO("bind works with various things", "[bind]")
 			auto r = tf();
 		}
 
+		THEN("hooray")
+		{
+			//atma::function<int(int)> tf{&mathing_t::halve};
+		}
+
 		THEN("all b2s match each other")
 		{
 			CHECK(8 == b2v1(16, &m));
