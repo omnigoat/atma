@@ -81,7 +81,10 @@ SCENARIO("bind works with various things", "[bind]")
 		{
 			char buf[128];
 			auto tb = atma::bind(&square, 4);
-			atma::basic_function_t<8, int()> tf{tb, buf};
+			atma::basic_generic_function_t<8, atma::functor_storage_t::heap, int()> tf{tb};
+			atma::basic_generic_function_t<8, atma::functor_storage_t::heap, int()> tf2;
+			tf2 = tf;
+
 			auto r = tf();
 		}
 
