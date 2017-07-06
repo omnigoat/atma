@@ -50,8 +50,8 @@ namespace atma
 {
 	struct thread_work_provider_t
 	{
-		using function_t = basic_function_t<sizeof(void*), void()>;
-		using repeat_function_t = basic_function_t<sizeof(void*), bool()>;
+		using function_t = basic_generic_function_t<sizeof(void*), atma::functor_storage_t::heap, void()>;
+		using repeat_function_t = basic_generic_function_t<sizeof(void*), atma::functor_storage_t::heap, bool()>;
 
 		virtual auto is_running() const -> bool = 0;
 		virtual auto ensure_running() -> void = 0;
