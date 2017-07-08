@@ -8661,9 +8661,8 @@ namespace Catch {
 			}
 			void printReconstructedExpression() const {
 				if (result.hasExpandedExpression()) {
-					stream << " as ";
 					Colour colourGuard(Colour::ReconstructedExpression);
-					stream << "giraffe" << Text(result.getExpandedExpression(), TextAttributes().setIndent(2));
+					stream << Text(result.getExpandedExpression(), TextAttributes().setIndent(2));
 				}
 			}
 			void printMessage() const {
