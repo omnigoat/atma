@@ -4,6 +4,8 @@
 #include <atma/function.hpp>
 #include <atma/thread/engine.hpp>
 
+int add(int a, int b) { return a + b; }
+
 int square(int x) { return x * x; }
 auto squareL = [](int x) { return x * x; };
 
@@ -41,7 +43,7 @@ SCENARIO("bind works with various things", "[bind]")
 		}
 	}
 
-	GIVEN("functions of various flavours")
+	GIVEN("binds of various flavours")
 	{
 		//atma::thread::inplace_engine_t<true> lulz{4096};
 
@@ -65,6 +67,7 @@ SCENARIO("bind works with various things", "[bind]")
 
 		// atma::function object
 		auto F = atma::function<int(char, int, float)>{[](char x, int y, float z){ return x * y + (int)z; }};
+		auto F2 = atma::function<int(char, int, float)>{F};
 		auto b4v1 = atma::curry(F);
 		auto b4v2 = atma::bind(F, arg2, arg3, arg1);
 
@@ -77,7 +80,7 @@ SCENARIO("bind works with various things", "[bind]")
 		tm_t tm;
 		auto b6 = atma::bind(tm, arg1);
 
-		THEN("blam")
+		THEN("we can make a basic function")
 		{
 			char buf[128];
 			auto tb = atma::bind(&square, 4);
@@ -86,11 +89,8 @@ SCENARIO("bind works with various things", "[bind]")
 			tf2 = tf;
 
 			auto r = tf();
-		}
-
-		THEN("hooray")
-		{
-			//atma::function<int(int)> tf{&mathing_t::halve};
+			auto r2 = tf2();
+			auto cr = r + r2;
 		}
 
 		THEN("all b2s match each other")
@@ -126,6 +126,33 @@ SCENARIO("bind works with various things", "[bind]")
 		{
 			CHECK(b6(4) == 4);
 			CHECK(b6(4.f) == 8.f);
+		}
+	}
+}
+
+SCENARIO("functions can be constructed")
+{
+	GIVEN("a default-constructed basic_function")
+	{
+		atma::function<int(int, int)> f;
+
+		THEN("it is empty")
+		{
+			CHECK(!(bool)f);
+			CHECK(f.target<int(*)(int, int)>() == nullptr);
+		}
+	}
+
+	GIVEN("a directly-constructed basic_function")
+	{
+		atma::function<int(int, int)> f{&add};
+
+		THEN("it is filled with our function")
+		{
+			CHECK((bool)f);
+			auto t = f.target<int(*)(int, int)>();
+			CHECK(t != nullptr);
+			CHECK(*t == &add);
 		}
 	}
 }
