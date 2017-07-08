@@ -42,6 +42,15 @@ namespace atma
 			static size_t const size = Bytes;
 			static_assert(size >= sizeof(void*), "basic_generic_function_t-buf needs to be at least the size of a pointer");
 			char buf[size];
+
+			functor_buf_t()
+				: buf{}
+			{}
+
+			functor_buf_t(functor_buf_t<Bytes> const& rhs)
+			{
+				memcpy(buf, rhs.buf, Bytes);
+			}
 		};
 
 		template <size_t BS, typename FN>
@@ -66,6 +75,7 @@ namespace atma
 			using move_fntype      = auto(*)(functor_buf_t<BS>&, functor_vtable_t<BS, R, Params...> const*, functor_buf_t<BS>&&) -> void;
 			using exsize_fntype    = auto(*)() -> size_t;
 			using target_fntype    = auto(*)(functor_buf_t<BS>&) -> void*;
+			using type_info_fntype = auto(*)() -> std::type_info const&;
 			using call_fntype      = auto(*)(functor_buf_t<BS> const&, Params...) -> R;
 			using relocate_fntype  = auto(*)(functor_buf_t<BS>&, void*) -> void;
 			using mk_vtable_fntype = auto(*)(functor_storage_t) -> functor_vtable_t*;
@@ -75,12 +85,13 @@ namespace atma
 			move_fntype      move_into;
 			exsize_fntype    external_size;
 			target_fntype    target;
+			type_info_fntype type_info;
 			call_fntype      call;
 			relocate_fntype  relocate;
 			mk_vtable_fntype mk_vtable;
 		};
 
-		template <size_t BS, typename FN, typename R, typename... Params>
+		template <size_t BS, functor_storage_t, typename FN, typename R, typename... Params>
 		auto generate_vtable() -> functor_vtable_t<BS, R, Params...>*;
 	}
 
@@ -91,9 +102,10 @@ namespace atma
 		template <size_t BS, typename FN, bool = enable_SFO<BS, FN>()>
 		struct constructing_t
 		{
-			static auto construct(functor_buf_t<BS>& buf, FN const& fn) -> void
+			template <typename RFN>
+			static auto construct(functor_buf_t<BS>& buf, RFN&& fn) -> void
 			{
-				new (&buf) FN{ fn };
+				new (&buf) FN{std::forward<RFN>(fn)};
 			}
 
 			static auto construct(functor_buf_t<BS>& buf, void* exbuf, FN const& fn) -> void
@@ -110,9 +122,10 @@ namespace atma
 		template <size_t BS, typename FN>
 		struct constructing_t<BS, FN, false>
 		{
-			static auto construct(functor_buf_t<BS>& buf, FN const& fn) -> void
+			template <typename RFN>
+			static auto construct(functor_buf_t<BS>& buf, RFN&& fn) -> void
 			{
-				reinterpret_cast<FN*&>(buf) = new FN(fn);
+				reinterpret_cast<FN*&>(buf) = new FN{std::forward<RFN>(fn)};
 			}
 
 			static auto construct(functor_buf_t<BS>& buf, void* exbuf, FN const& fn) -> void
@@ -137,7 +150,7 @@ namespace atma
 	// vtable-impl
 	namespace detail
 	{
-		template <functor_storage_t, size_t BS, typename FN, bool, typename R, typename... Params>
+		template <size_t BS, functor_storage_t, typename FN, bool, typename R, typename... Params>
 		struct vtable_impl_t
 		{
 			static auto destruct(functor_buf_t<BS>& fn) -> void
@@ -171,6 +184,11 @@ namespace atma
 				return &fn;
 			}
 
+			static auto type_info() -> std::type_info const&
+			{
+				return typeid(FN);
+			}
+
 			static auto call(functor_buf_t<BS> const& buf, Params... args) -> R
 			{
 				auto& fn = reinterpret_cast<FN&>(const_cast<functor_buf_t<BS>&>(buf));
@@ -185,7 +203,7 @@ namespace atma
 		};
 
 		template <size_t BS, typename FN, typename R, typename... Params>
-		struct vtable_impl_t<functor_storage_t::heap, BS, FN, false, R, Params...>
+		struct vtable_impl_t<BS, functor_storage_t::heap, FN, false, R, Params...>
 		{
 			static auto destruct(functor_buf_t<BS>& buf) -> void
 			{
@@ -227,24 +245,12 @@ namespace atma
 
 			static auto relocate(functor_buf_t<BS>& buf, void* exbuf) -> void
 			{
-				// original external
-				auto ip = reinterpret_cast<intptr const&>(buf) & ~intptr(1);
-				FN* pfn = reinterpret_cast<FN*&>(ip);
-
-				// move-construct into new external
-				new (exbuf) FN{std::move(*pfn)};
-
-				// destruct original
-				destruct(buf);
-
-				// assign external buffer to us
-				reinterpret_cast<FN*&>(buf) = reinterpret_cast<FN*>(exbuf);
-				reinterpret_cast<intptr&>(buf) |= 1;
+				// SERIOUSLY, todo
 			}
 		};
 
 		template <size_t BS, typename FN, typename R, typename... Params>
-		struct vtable_impl_t<functor_storage_t::external, BS, FN, false, R, Params...>
+		struct vtable_impl_t<BS, functor_storage_t::external, FN, false, R, Params...>
 		{
 			static auto destruct(functor_buf_t<BS>& buf) -> void
 			{
@@ -302,7 +308,7 @@ namespace atma
 		};
 
 		template <size_t BS, typename FN, typename R, typename... Params>
-		struct vtable_impl_t<functor_storage_t::relative, BS, FN, false, R, Params...>
+		struct vtable_impl_t<BS, functor_storage_t::relative, FN, false, R, Params...>
 		{
 			static auto destruct(functor_buf_t<BS>& buf) -> void
 			{
@@ -368,12 +374,12 @@ namespace atma
 	namespace detail
 	{
 		template <size_t BS, typename FN, typename R, typename... Params>
-		auto mk_vtable(functor_storage_t s)->functor_vtable_t<BS, R, Params...>*;
+		auto mk_vtable(functor_storage_t s) -> functor_vtable_t<BS, R, Params...>*;
 
-		template <size_t BS, typename FN, typename R, typename... Params>
+		template <size_t BS, functor_storage_t FS, typename FN, typename R, typename... Params>
 		inline auto generate_vtable() -> functor_vtable_t<BS, R, Params...>*
 		{
-			using vtable_t = vtable_impl_t<functor_storage_t::heap, BS, FN, enable_SFO<BS, FN>(), R, Params...>;
+			using vtable_t = vtable_impl_t<BS, FS, FN, enable_SFO<BS, FN>(), R, Params...>;
 
 			static auto _ = functor_vtable_t<BS, R, Params...>
 			{
@@ -382,46 +388,7 @@ namespace atma
 				&vtable_t::move_into,
 				&vtable_t::external_size,
 				&vtable_t::target,
-				&vtable_t::call,
-				&vtable_t::relocate,
-				&mk_vtable<BS, FN, R, Params...>
-			};
-
-			return &_;
-		}
-
-		template <size_t BS, typename FN, typename R, typename... Params>
-		inline auto generate_vtable_exbuf() -> functor_vtable_t<BS, R, Params...>*
-		{
-			using vtable_t = vtable_impl_t<functor_storage_t::external, BS, FN, enable_SFO<BS, FN>(), R, Params...>;
-
-			static auto _ = functor_vtable_t<BS, R, Params...>
-			{
-				&vtable_t::destruct,
-				&vtable_t::assign_into,
-				&vtable_t::move_into,
-				&vtable_t::external_size,
-				&vtable_t::target,
-				&vtable_t::call,
-				&vtable_t::relocate,
-				&mk_vtable<BS, FN, R, Params...>
-			};
-
-			return &_;
-		}
-
-		template <size_t BS, typename FN, typename R, typename... Params>
-		auto generate_vtable_rel() -> functor_vtable_t<BS, R, Params...>*
-		{
-			using vtable_t = vtable_impl_t<functor_storage_t::relative, BS, FN, enable_SFO<BS, FN>(), R, Params...>;
-
-			static auto _ = functor_vtable_t<BS, R, Params...>
-			{
-				&vtable_t::destruct,
-				&vtable_t::assign_into,
-				&vtable_t::move_into,
-				&vtable_t::external_size,
-				&vtable_t::target,
+				[]() -> std::type_info const& { return typeid(FN); },
 				&vtable_t::call,
 				&vtable_t::relocate,
 				&mk_vtable<BS, FN, R, Params...>
@@ -435,86 +402,13 @@ namespace atma
 		{
 			switch (s)
 			{
-			case functor_storage_t::heap: return generate_vtable<BS, FN, R, Params...>();
-			case functor_storage_t::external: return generate_vtable_exbuf<BS, FN, R, Params...>();
-			case functor_storage_t::relative: return generate_vtable_rel<BS, FN, R, Params...>();
-			default: return nullptr;
+				case functor_storage_t::heap: return generate_vtable<BS, functor_storage_t::heap, FN, R, Params...>();
+				case functor_storage_t::external: return generate_vtable<BS, functor_storage_t::external, FN, R, Params...>();
+				case functor_storage_t::relative: return generate_vtable<BS, functor_storage_t::relative, FN, R, Params...>();
+				default: return nullptr;
 			}
 		}
 	}
-
-
-
-
-	// functor-wrapper
-	namespace detail
-	{
-		template <size_t BS, typename R, typename... Params>
-		struct functor_wrapper_t
-		{
-			template <typename FN>
-			explicit functor_wrapper_t(FN&& fn)
-				: vtable{generate_vtable<BS, std::decay_t<FN>, R, Params...>()}
-				, buf{}
-			{
-				constructing_t<BS, std::decay_t<FN>>::construct(buf, fn);
-			}
-
-			template <typename FN>
-			explicit functor_wrapper_t(void* exbuf, FN&& fn)
-				: vtable{generate_vtable_exbuf<BS, std::decay_t<FN>, R, Params...>()}
-				, buf{}
-			{
-				constructing_t<BS, std::decay_t<FN>>::construct(buf, exbuf, fn);
-			}
-
-			functor_wrapper_t(functor_wrapper_t const& rhs)
-				: vtable{rhs.vtable}
-				, buf{}
-			{
-				rhs.vtable->assign_into(buf, vtable, rhs.buf);
-			}
-
-			functor_wrapper_t(functor_wrapper_t&& rhs)
-				: vtable{rhs.vtable}
-				, buf{}
-			{
-				rhs.vtable->move_into(buf, vtable, std::move(rhs.buf));
-			}
-
-			~functor_wrapper_t()
-			{
-				vtable->destruct(buf);
-			}
-
-			auto operator = (functor_wrapper_t const& rhs) -> functor_wrapper_t&
-			{
-				rhs.vtable->assign_into(buf, vtable, rhs.buf);
-				return *this;
-			}
-
-			auto operator = (functor_wrapper_t&& rhs) -> functor_wrapper_t&
-			{
-				rhs.vtable->move_into(buf, vtable, std::move(rhs.buf));
-				return *this;
-			}
-
-			template <typename T>
-			auto target() const -> T const*
-			{
-				return reinterpret_cast<T const*>(vtable->target(const_cast<detail::functor_buf_t<BS>&>(buf)));
-			}
-
-			auto move_into(functor_wrapper_t& rhs) -> void
-			{
-				
-			}
-
-			functor_vtable_t<BS, R, Params...> const* vtable;
-			functor_buf_t<BS> buf;
-		};
-	}
-
 
 
 
@@ -571,52 +465,67 @@ namespace atma
 
 namespace atma {
 
-	template <size_t BS, functor_storage_t Storage, typename R, typename... Params>
-	struct basic_generic_function_t<BS, Storage, R(Params...)>
+	template <size_t BS, functor_storage_t FS, typename R, typename... Params>
+	struct basic_generic_function_t<BS, FS, R(Params...)>
 	{
-		using this_type = basic_generic_function_t<BS, Storage, R(Params...)>;
+		using this_type = basic_generic_function_t<BS, FS, R(Params...)>;
 
 		basic_generic_function_t()
 			: basic_generic_function_t{&empty_fn<R>}
 		{}
 
-		basic_generic_function_t(this_type const& rhs)
-			: wrapper_(rhs.wrapper_)
+		template <size_t RBS, functor_storage_t RS>
+		basic_generic_function_t(basic_generic_function_t<RBS, RS, R(Params...)> const& rhs)
+			: vtable_{rhs.vtable_->mk_vtable<FS>()}
+		{
+			rhs.vtable_->assign_into(buf_, vtable_, rhs.buf_);
+		}
+
+		template <size_t RBS, functor_storage_t RS> // because otherwise FN version is more specialized
+		basic_generic_function_t(basic_generic_function_t<RBS, RS, R(Params...)>& rhs)
+			: basic_generic_function_t(std::as_const(rhs))
 		{}
 
-		basic_generic_function_t(this_type&& rhs)
-			: wrapper_{ std::move(rhs.wrapper_) }
-		{}
+		template <size_t RBS, functor_storage_t RS>
+		basic_generic_function_t(basic_generic_function_t<RBS, RS, R(Params...)>&& rhs)
+			: vtable_{rhs.vtable_->mk_vtable<FS>()}
+		{
+			rhs.vtable_->move_into(buf_, vtable_, rhs.buf_);
+		}
 
 		template <typename FN, typename = std::enable_if_t<detail::result_matches_v<R, FN, Params...>>>
 		basic_generic_function_t(FN&& fn)
-			: wrapper_{std::forward<FN>(fn)}
-		{}
+			: vtable_{detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>()}
+		{
+			detail::constructing_t<BS, std::decay_t<FN>>::construct(buf_, std::forward<FN>(fn));
+		}
 
 		template <typename FN, typename = std::enable_if_t<detail::result_matches_v<R, FN, Params...>>>
 		basic_generic_function_t(FN&& fn, void* exbuf)
-			: wrapper_{exbuf, std::forward<FN>(fn)}
-		{}
+			: vtable_{detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>()}
+		{
+			detail::constructing_t<BS, std::decay_t<FN>>::construct(buf_, exbuf, std::forward<FN>(fn));
+		}
 
-		template <size_t RBS, functor_storage_t RStorage>
-		auto operator = (basic_generic_function_t<RBS, RStorage, R(Params...)> const& rhs) -> this_type&
+		template <size_t RBS, functor_storage_t RFS>
+		auto operator = (basic_generic_function_t<RBS, RFS, R(Params...)> const& rhs) -> this_type&
 		{
 			if (this != &rhs)
 			{
-				wrapper_.vtable = rhs.wrapper_.vtable->mk_vtable<Storage>();
-				rhs.wrapper_.vtable->assign_into(wrapper_.buf, wrapper_.vtable, rhs.wrapper_.buf);
+				vtable_ = rhs.vtable_->mk_vtable<FS>();
+				rhs.vtable_->assign_into(buf_, vtable_, rhs.buf_);
 			}
 
 			return *this;
 		}
 
-		auto operator = (basic_generic_function_t&& rhs) -> basic_generic_function_t&
+		template <size_t RBS, functor_storage_t RFS>
+		auto operator = (basic_generic_function_t<RBS, RFS, R(Params...)>&& rhs) -> this_type&
 		{
 			if (this != &rhs)
 			{
-				reset();
-				//dispatch_ = rhs.dispatch_;
-				wrapper_  = std::move(rhs.wrapper_);
+				vtable_ = rhs.vtable_->mk_vtable<FS>();
+				rhs.vtable_->move_into(buf_, vtable_, rhs.buf_);
 			}
 
 			return *this;
@@ -625,40 +534,52 @@ namespace atma {
 		template <typename FN>
 		auto operator = (FN&& fn) -> basic_generic_function_t&
 		{
-			wrapper_.~functor_wrapper_t();
-			init_fn(std::forward<FN>(fn));
+			vtable_->destruct(buf_);
+			detail::constructing_t<BS, std::decay_t<FN>>::construct(buf_, std::forward<FN>(fn));
+			vtable_ = detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>();
 			return *this;
 		}
 
 		auto operator = (std::nullptr_t) -> basic_generic_function_t&
 		{
-			wrapper_.~functor_wrapper_t();
-			init_empty();
-			return *this;
+			return this->operator = (&empty_fn<R>);
 		}
 
 		operator bool() const
 		{
-			return *target<R(*)(Params...)>() != empty_fn<R>;
+			void* rawt = vtable_->target(const_cast<detail::functor_buf_t<BS>&>(buf_));
+			ATMA_ASSERT(rawt != nullptr, "the null-case for function should be empty_fn, not nullptr");
+
+			return *reinterpret_cast<decltype(&empty_fn<R>)*>(rawt) != &empty_fn<R>;
 		}
 
 		auto operator()(Params... args) const -> R
 		{
-			//return dispatch_(wrapper_.buf, args...);
-			//return wrapper_.vtable->call
-			return wrapper_.vtable->call(wrapper_.buf, args...);
+			return vtable_->call(buf_, args...);
 		}
 
 		template <typename... Args>
 		decltype(auto) operator ()(Args&&... args) const
 		{
-			return detail::dispatcher_t<BS, R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(wrapper_.vtable->call, wrapper_.buf, std::forward<Args>(args)...);
+			return detail::dispatcher_t<BS, R, std::tuple<Params...>, std::tuple<Args...>, sizeof...(Args)>::call(vtable_->call, buf_, std::forward<Args>(args)...);
 		}
 
 		template <typename T>
 		auto target() const -> T const*
 		{
-			return wrapper_.target<T>();
+			void* rawt = vtable_->target(const_cast<detail::functor_buf_t<BS>&>(buf_));
+			ATMA_ASSERT(rawt != nullptr, "the null-case for function should be empty_fn, not nullptr");
+
+			if (*reinterpret_cast<decltype(&empty_fn<R>)*>(rawt) == &empty_fn<R>)
+				return nullptr;
+
+			std::type_info const& vti = vtable_->type_info();
+			std::type_info const& tti = typeid(T);
+
+			if (vti != tti)
+				return nullptr;
+
+			return (T const*)rawt;
 		}
 
 		auto swap(basic_generic_function_t& rhs) -> void
@@ -671,44 +592,17 @@ namespace atma {
 
 		auto relocate_external_buffer(void* exbuf) -> void
 		{
-			wrapper_.vtable->relocate(wrapper_.buf, exbuf);
-			//wrapper_.vtable->call = detail::vtable_impl_t<
+			vtable_->relocate(buf_, exbuf);
 		}
 
 		auto external_buffer_size() const -> size_t
 		{
-			return wrapper_.vtable->external_size();
-		}
-
-	private:
-		auto reset() -> void
-		{
-			//dispatch_ = nullptr;
-			wrapper_.~functor_wrapper_t();
-		}
-
-		auto init_empty() -> void
-		{
-			init_fn(&empty_fn<R>);
-		}
-
-		template <typename FN>
-		auto init_fn(FN&& fn) -> void
-		{
-			//dispatch_ = &detail::vtable_impl_t<detail::functor_storage_t::heap, BS, std::decay_t<FN>>::template call<R, Params...>;
-			new (&wrapper_) detail::functor_wrapper_t<BS, R, Params...>{std::forward<FN>(fn)};
-		}
-
-		template <typename FN>
-		auto init_fn(FN&& fn, void* exbuf) -> void
-		{
-			//dispatch_ = &detail::vtable_impl_t<detail::functor_storage_t::external, BS, std::decay_t<FN>>::template call<R, Params...>;
-			new (&wrapper_) detail::functor_wrapper_t<BS, R, Params...>{exbuf, std::forward<FN>(fn)};
+			return vtable_->external_size();
 		}
 
 	protected:
-		//detail::dispatch_fnptr_t<BS, R, Params...>  dispatch_;
-		detail::functor_wrapper_t<BS, R, Params...> wrapper_;
+		detail::functor_vtable_t<BS, R, Params...> const* vtable_;
+		detail::functor_buf_t<BS> buf_;
 
 		template <typename R2>
 		static auto empty_fn(Params...) -> R2 { return *(R2*)nullptr; }
