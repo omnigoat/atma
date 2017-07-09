@@ -48,7 +48,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>REM $(TargetPath) -r atma_ex</Command>
+      <Command>$(TargetPath) -r atma_ex</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
