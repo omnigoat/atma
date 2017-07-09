@@ -82,7 +82,6 @@ SCENARIO("bind works with various things", "[bind]")
 
 		THEN("we can make a basic function")
 		{
-			char buf[128];
 			auto tb = atma::bind(&square, 4);
 			atma::basic_generic_function_t<8, atma::functor_storage_t::heap, int()> tf{tb};
 			atma::basic_generic_function_t<8, atma::functor_storage_t::heap, int()> tf2;
@@ -154,5 +153,31 @@ SCENARIO("functions can be constructed")
 			CHECK(t != nullptr);
 			CHECK(*t == &add);
 		}
+	}
+
+	GIVEN("a directly-constructed external function with SFO")
+	{
+		char buf[128];
+		atma::basic_generic_function_t<32, atma::functor_storage_t::external, int(int, int)> f{&add, buf};
+	}
+
+	GIVEN("a directly-constructed external function too large for SFO")
+	{
+		char buf[128]{};
+		mathing_t m;
+		atma::basic_generic_function_t<16, atma::functor_storage_t::external, int(int)> f{atma::bind(&mathing_t::halve, &m, arg1), buf};
+		auto r = f(8);
+		auto r2 = r;
+
+		atma::basic_generic_function_t<16, atma::functor_storage_t::heap, int(int)> f2{f};
+		auto h = f2(12);
+		auto h2 = h;
+
+		using rfn = atma::basic_generic_function_t<16, atma::functor_storage_t::relative, int(int)>;
+		char rbuf[128];
+		new (rbuf) rfn{f, rbuf + sizeof(rfn)};
+		rfn* rf = (rfn*)rbuf;
+		auto rfr = (*rf)(18);
+		auto rfr2 = rfr;
 	}
 }
