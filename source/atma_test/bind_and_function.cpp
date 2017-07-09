@@ -167,17 +167,23 @@ SCENARIO("functions can be constructed")
 		mathing_t m;
 		atma::basic_generic_function_t<16, atma::functor_storage_t::external, int(int)> f{atma::bind(&mathing_t::halve, &m, arg1), buf};
 		auto r = f(8);
-		auto r2 = r;
+		CHECK(r == 4);
 
 		atma::basic_generic_function_t<16, atma::functor_storage_t::heap, int(int)> f2{f};
 		auto h = f2(12);
-		auto h2 = h;
+		CHECK(h == 6);
 
-		using rfn = atma::basic_generic_function_t<16, atma::functor_storage_t::relative, int(int)>;
-		char rbuf[128];
+		using rfn = atma::basic_relative_function_t<16, int(int)>;
+		char rbuf[128]{};
 		new (rbuf) rfn{f, rbuf + sizeof(rfn)};
 		rfn* rf = (rfn*)rbuf;
 		auto rfr = (*rf)(18);
-		auto rfr2 = rfr;
+		CHECK(rfr == 9);
+
+		char rbuf2[128];
+		memcpy(rbuf2, rbuf, 128);
+		rfn* fn2 = (rfn*)rbuf2;
+		auto xzrfr = (*fn2)(20);
+		CHECK(xzrfr == 10);
 	}
 }
