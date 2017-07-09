@@ -50,8 +50,13 @@ namespace atma
 {
 	struct thread_work_provider_t
 	{
-		using function_t = basic_generic_function_t<sizeof(void*), atma::functor_storage_t::heap, void()>;
-		using repeat_function_t = basic_generic_function_t<sizeof(void*), atma::functor_storage_t::heap, bool()>;
+	protected:
+		using onfly_function_t        = basic_function_t<sizeof(void*), void()>;
+		using onfly_repeat_function_t = basic_function_t<sizeof(void*), bool()>;
+
+	public:
+		using function_t        = base_function_t<sizeof(void*), void()>;
+		using repeat_function_t = base_function_t<sizeof(void*), bool()>;
 
 		virtual auto is_running() const -> bool = 0;
 		virtual auto ensure_running() -> void = 0;
@@ -63,13 +68,15 @@ namespace atma
 
 		auto enqueue_repeat(function_t const& fn) -> void
 		{
-			enqueue_repeat([fn]() -> bool { fn(); return true; });
+			enqueue_repeat(onfly_repeat_function_t{[fn]() -> bool { fn(); return true; }});
 		}
 
 		auto enqueue_repeat(function_t&& fn) -> void
 		{
-			enqueue_repeat([fn = std::move(fn)]() -> bool { fn(); return true; });
+			enqueue_repeat(onfly_repeat_function_t{[fn = std::move(fn)]() -> bool { fn(); return true; }});
 		}
+
+	
 	};
 }
 
@@ -101,7 +108,8 @@ namespace atma
 
 	private:
 		using queue_t = mpsc_queue_t<false>;
-		
+		using queue_fn_t = basic_relative_function_t<sizeof(void*), void()>;
+
 		auto reenter(std::atomic<bool> const& blocked) -> void;
 
 		std::thread handle_;
@@ -139,9 +147,9 @@ namespace atma
 	{
 		if (running_)
 		{
-			signal([&] {
+			signal(onfly_function_t{[&] {
 				running_ = false;
-			});
+			}});
 
 			handle_.join();
 		}
@@ -154,18 +162,15 @@ namespace atma
 
 	inline auto inplace_engine_t::reenter(std::atomic<bool> const& good) -> void
 	{
+		atma::unique_memory_t mem;
 		while (good)
 		{
-			atma::vector<char> buf;
-			function_t* f = nullptr;
 			if (queue_.with_consumption([&](auto& D)
 			{
-				buf.resize(D.size());
-				f = (function_t*)buf.data();
-				D.decode_struct(*f);
-				f->relocate_external_buffer(buf.data() + sizeof(function_t));
+				D.local_copy(mem);
 			}))
 			{
+				queue_fn_t* f = (queue_fn_t*)mem.begin();
 				(*f)();
 			}
 		}
@@ -188,8 +193,8 @@ namespace atma
 		if (!running_)
 			return;
 
-		auto A = queue_.allocate(sizeof(function_t) + (uint32)fn.external_buffer_size(), 4, true);
-		new (A.data()) function_t{fn, (char*)A.data() + sizeof(function_t)};
+		auto A = queue_.allocate(sizeof(queue_fn_t) + (uint32)fn.external_buffer_size(), 4, true);
+		new (A.data()) queue_fn_t{fn, (char*)A.data() + sizeof(queue_fn_t)};
 		queue_.commit(A);
 	}
 
@@ -198,8 +203,8 @@ namespace atma
 		if (!running_)
 			return;
 
-		auto A = queue_.allocate(sizeof(function_t) + (uint32)fn.external_buffer_size(), 4, true);
-		new (A.data()) function_t{std::move(fn), (char*)A.data() + sizeof(function_t)};
+		auto A = queue_.allocate(sizeof(queue_fn_t) + (uint32)fn.external_buffer_size(), 4, true);
+		new (A.data()) queue_fn_t{std::move(fn), (char*)A.data() + sizeof(queue_fn_t)};
 		queue_.commit(A);
 	}
 
@@ -211,7 +216,7 @@ namespace atma
 			signal_evergreen(fn);
 		};
 
-		signal(sg);
+		signal(onfly_function_t{sg});
 	}
 
 	inline auto inplace_engine_t::signal_block() -> void
@@ -220,7 +225,7 @@ namespace atma
 			return;
 
 		std::atomic<bool> blocked{true};
-		signal([&blocked] { blocked = false; });
+		signal(onfly_function_t{[&blocked] { blocked = false; }});
 
 		// the engine thread can't block itself!
 		if (std::this_thread::get_id() == handle_.get_id())
@@ -241,8 +246,6 @@ namespace atma
 {
 	struct thread_pool_t : thread_work_provider_t
 	{
-		using function_t = basic_function_t<sizeof(void*), void()>;
-
 		thread_pool_t(uint threads);
 		~thread_pool_t();
 
@@ -253,10 +256,13 @@ namespace atma
 
 		auto enqueue(function_t const&) -> void override;
 		auto enqueue(function_t&&) -> void override;
+
 		auto enqueue_repeat(repeat_function_t const&) -> void override;
 		auto enqueue_repeat(repeat_function_t&&) -> void override;
 
 	private:
+		using internal_function_t = basic_relative_function_t<sizeof(void*), void()>;
+
 		static auto worker_thread_runloop(thread_pool_t*, std::atomic_bool&) -> void;
 
 	private:
@@ -289,41 +295,41 @@ namespace atma
 
 	inline auto thread_pool_t::enqueue(function_t const& fn) -> void
 	{
-		queue_.with_allocation(sizeof(function_t) + (uint32)fn.external_buffer_size(), 4, true, [&fn](auto& A) {
-			new (A.data()) function_t{fn, (char*)A.data() + sizeof(function_t)};
+		queue_.with_allocation(sizeof(internal_function_t) + (uint32)fn.external_buffer_size(), 4, true, [&fn](auto& A) {
+			new (A.data()) internal_function_t{fn, (char*)A.data() + sizeof(internal_function_t)};
 		});
 	}
 
 	inline auto thread_pool_t::enqueue(function_t&& fn) -> void
 	{
-		queue_.with_allocation(sizeof(function_t) + (uint32)fn.external_buffer_size(), 4, true, [&fn](auto& A) {
-			new (A.data()) function_t{std::move(fn), (char*)A.data() + sizeof(function_t)};
+		queue_.with_allocation(sizeof(internal_function_t) + (uint32)fn.external_buffer_size(), 4, true, [&fn](auto& A) {
+			new (A.data()) internal_function_t{std::move(fn), (char*)A.data() + sizeof(internal_function_t)};
 		});
 	}
 
 	inline auto thread_pool_t::enqueue_repeat(repeat_function_t const& fn) -> void
 	{
-		function_t rfn = [&, fn]{
+		onfly_function_t rfn = [&, fn]{
 			if (!fn())
 				return;
 			enqueue_repeat(fn);
 		};
 
-		queue_.with_allocation(sizeof(function_t) + (uint32)rfn.external_buffer_size(), 4, true, [&rfn](auto& A) {
-			new (A.data()) function_t{rfn, (char*)A.data() + sizeof(function_t)};
+		queue_.with_allocation(sizeof(internal_function_t) + (uint32)rfn.external_buffer_size(), 4, true, [&rfn](auto& A) {
+			new (A.data()) internal_function_t{rfn, (char*)A.data() + sizeof(internal_function_t)};
 		});
 	}
 
 	inline auto thread_pool_t::enqueue_repeat(repeat_function_t&& fn) -> void
 	{
-		function_t rfn = [&, fn = std::move(fn)]{
+		onfly_function_t rfn = [&, fn = std::move(fn)]{
 			if (!fn())
 				return;
 			enqueue_repeat(std::move(fn));
 		};
 
-		queue_.with_allocation(sizeof(function_t) + (uint32)rfn.external_buffer_size(), 4, true, [&rfn](auto& A) {
-			new (A.data()) function_t{rfn, (char*)A.data() + sizeof(function_t)};
+		queue_.with_allocation(sizeof(internal_function_t) + (uint32)rfn.external_buffer_size(), 4, true, [&rfn](auto& A) {
+			new (A.data()) internal_function_t{rfn, (char*)A.data() + sizeof(internal_function_t)};
 		});
 	}
 
@@ -333,17 +339,17 @@ namespace atma
 		int r = sprintf(buf, "threadpool %#0jx worker", (uintmax_t)pool);
 		atma::this_thread::set_debug_name(buf);
 
+		//using lfn_t = atma::relative_function<
+
 		atma::unique_memory_t mem;
 		while (running)
 		{
 			if (pool->queue_.with_consumption([&](auto& D)
 			{
 				D.local_copy(mem);
-				function_t* f = (function_t*)mem.begin();
-				f->relocate_external_buffer(mem.begin() + sizeof(function_t));
 			}))
 			{
-				function_t* f = (function_t*)mem.begin();
+				internal_function_t* f = (internal_function_t*)mem.begin();
 				(*f)();
 			}
 

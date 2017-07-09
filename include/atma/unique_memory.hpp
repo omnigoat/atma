@@ -155,9 +155,12 @@ namespace atma
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::reset(size_t size) -> void
 	{
-		memory_.deallocate();
-		memory_.allocate(size);
-		size_ = size;
+		if (size != size_)
+		{
+			memory_.deallocate();
+			memory_.allocate(size);
+			size_ = size;
+		}
 	}
 
 	template <typename A>
