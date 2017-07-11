@@ -185,5 +185,9 @@ SCENARIO("functions can be constructed")
 		rfn* fn2 = (rfn*)rbuf2;
 		auto xzrfr = (*fn2)(20);
 		CHECK(xzrfr == 10);
+
+		atma::function<int(int)> lulzf = *fn2;
+		auto lr = lulzf(26);
+		auto lr2 = lr;
 	}
 }
