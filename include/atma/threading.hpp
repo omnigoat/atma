@@ -51,12 +51,12 @@ namespace atma
 	struct thread_work_provider_t
 	{
 	protected:
-		using onfly_function_t        = basic_function_t<sizeof(void*), void()>;
-		using onfly_repeat_function_t = basic_function_t<sizeof(void*), bool()>;
+		using onfly_function_t        = function<void()>;
+		using onfly_repeat_function_t = function<bool()>;
 
 	public:
-		using function_t        = base_function_t<sizeof(void*), void()>;
-		using repeat_function_t = base_function_t<sizeof(void*), bool()>;
+		using function_t        = function<void()>;
+		using repeat_function_t = function<bool()>;
 
 		virtual auto is_running() const -> bool = 0;
 		virtual auto ensure_running() -> void = 0;
@@ -108,7 +108,7 @@ namespace atma
 
 	private:
 		using queue_t = mpsc_queue_t<false>;
-		using queue_fn_t = basic_relative_function_t<sizeof(void*), void()>;
+		using queue_fn_t = basic_relative_function_t<16, void()>;
 
 		auto reenter(std::atomic<bool> const& blocked) -> void;
 
@@ -261,7 +261,7 @@ namespace atma
 		auto enqueue_repeat(repeat_function_t&&) -> void override;
 
 	private:
-		using internal_function_t = basic_relative_function_t<sizeof(void*), void()>;
+		using internal_function_t = basic_relative_function_t<16, void()>;
 
 		static auto worker_thread_runloop(thread_pool_t*, std::atomic_bool&) -> void;
 
