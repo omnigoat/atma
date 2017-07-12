@@ -27,17 +27,17 @@ namespace atma
 	template <size_t, functor_storage_t, typename>
 	struct basic_generic_function_t;
 	
-	template <size_t BS, typename R, typename... Params>
-	struct basic_external_function_t;
+	template <size_t BS, functor_storage_t, typename>
+	struct basic_exrel_function_t;
 
 	template <size_t BufferSize, typename FN>
 	using basic_function_t = basic_generic_function_t<BufferSize, functor_storage_t::heap, FN>;
 
-	//template <size_t BufferSize, typename FN>
-	//using basic_external_function_t = basic_generic_function_t<BufferSize, functor_storage_t::external, FN>;
+	template <size_t BufferSize, typename FN>
+	using basic_external_function_t = basic_exrel_function_t<BufferSize, functor_storage_t::external, FN>;
 
 	template <size_t BufferSize, typename FN>
-	using basic_relative_function_t = basic_generic_function_t<BufferSize, functor_storage_t::relative, FN>;
+	using basic_relative_function_t = basic_exrel_function_t<BufferSize, functor_storage_t::relative, FN>;
 
 	template <typename FN>
 	using function = basic_function_t<32, FN>;
@@ -651,19 +651,15 @@ namespace atma
 
 		operator bool() const
 		{
-			void* rawt = vtable_->target(const_cast<detail::functor_buf_t&>((detail::functor_buf_t&)buf_));
-			//ATMA_ASSERT(rawt != nullptr, "the null-case for function should be empty_fn, not nullptr");
-
-			return rawt != nullptr && *reinterpret_cast<auto(**)(Params...)->R>(rawt) != &empty_fn<R>;
+			void* rawt = vtable_->target(buf_);
+			return rawt != nullptr && *reinterpret_cast<auto(**)(Params...) -> R>(rawt) != &empty_fn<R>;
 		}
 
 		template <typename T>
 		auto target() const -> T const*
 		{
-			void* rawt = vtable_->target(const_cast<detail::functor_buf_t&>((detail::functor_buf_t&)buf_));
-			//ATMA_ASSERT(rawt != nullptr, "the null-case for function should be empty_fn, not nullptr");
-
-			if (rawt != nullptr && *reinterpret_cast<auto(**)(Params...)->R>(rawt) != &empty_fn<R>)
+			void* rawt = vtable_->target(buf_);
+			if (rawt == nullptr || *reinterpret_cast<auto(**)(Params...)->R>(rawt) == &empty_fn<R>)
 				return nullptr;
 
 			std::type_info const& vti = vtable_->type_info();
@@ -689,8 +685,8 @@ namespace atma
 		template <>
 		static auto empty_fn<void>(Params...) -> void {}
 
-		template <size_t OBS, functor_storage_t OFS, typename OSIG>
-		friend struct basic_generic_function_t;
+		template <size_t, functor_storage_t, typename> friend struct basic_generic_function_t;
+		template <size_t, functor_storage_t, typename> friend struct basic_exrel_function_t;
 	};
 }
 
@@ -705,9 +701,8 @@ namespace atma
 
 		basic_generic_function_t()
 			: base_function_t{detail::generate_vtable<BS, FS, decltype(&empty_fn<R>), R, Params...>()}
-			//: basic_generic_function_t{&empty_fn<R>}
 		{
-			detail::constructing_t<BS, FS, decltype(&empty_fn<R>)>::construct(buf_, nullptr, nullptr);
+			detail::constructing_t<BS, FS, decltype(&empty_fn<R>)>::construct(buf_, nullptr, &empty_fn<R>);
 		}
 
 		basic_generic_function_t(basic_generic_function_t const& rhs)
@@ -746,12 +741,17 @@ namespace atma
 			: basic_generic_function_t{(this_type const&)rhs}
 		{}
 
-		template <typename FN, typename = std::enable_if_t<detail::result_matches_v<R, FN, Params...>>>
-		basic_generic_function_t(FN&& fn)
-			: base_function_t{detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>()}
+		template <typename FN>
+		basic_generic_function_t(
+			std::enable_if_t<
+				detail::result_matches_v<R, FN, Params...> && !std::is_convertible_v<FN, base_function_t<BS, R(Params...)>&>>, FN&&> fn)
+			: base_function_t{nullptr} //detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>()}
 		{
+			//static_assert(!std::is_convertible_v<base_function_t<BS, R(Params...)>&, int>, "ho");
+			//decltype(fn) blam;
+			static_assert(!std::is_convertible_v<base_function_t<BS, R(Params...)>&, FN>, "bad");
 			static_assert(FS == functor_storage_t::heap, "only heap-style functions can be initialized without external buffers");
-			detail::constructing_t<BS, FS, std::decay_t<FN>>::construct(buf_, nullptr, std::forward<FN>(fn));
+			//detail::constructing_t<BS, FS, std::decay_t<FN>>::construct(buf_, nullptr, std::forward<FN>(fn));
 		}
 
 		auto operator = (this_type const& rhs) -> this_type&
@@ -832,9 +832,10 @@ namespace atma
 		}
 
 	protected:
+		// bizarrely must be made identical to basic_exrel_function_t due to ambiguities that I don't think are actually standard
 		template <typename FN,
 			typename = std::enable_if_t<detail::result_matches_v<R, FN, Params...>>,
-			typename = std::enable_if_t<!std::is_base_of<base_function_t<BS, R(Params...)>, std::decay_t<FN>>::value, basic_generic_function_t&>>
+			typename = std::enable_if_t<!std::is_base_of<base_function_t<BS, R(Params...)>, std::decay_t<FN>>::value>>
 		basic_generic_function_t(FN&& fn, void* exbuf)
 			: base_function_t{detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>()}
 		{
@@ -842,35 +843,47 @@ namespace atma
 		}
 
 	private:
-		template <size_t OBS, functor_storage_t OFS, typename OSIG>
-		friend struct basic_generic_function_t;
+		template <size_t, functor_storage_t, typename> friend struct basic_generic_function_t;
 	};
 }
 
 
 
-// external function
+// "exrel" function
 namespace atma
 {
-	template <size_t BS, typename R, typename... Params>
-	struct basic_external_function_t<BS, R(Params...)>
-		: basic_generic_function_t<BS, functor_storage_t::external, R(Params...)>
+	template <size_t BS, functor_storage_t FS, typename R, typename... Params>
+	struct basic_exrel_function_t<BS, FS, R(Params...)>
+		: basic_generic_function_t<BS, FS, R(Params...)>
 	{
-		using basic_generic_function_t::basic_generic_function_t;
+		//using basic_generic_function_t::basic_generic_function_t;
+
+		basic_exrel_function_t()
+		{}
+
+		basic_exrel_function_t(basic_exrel_function_t const&) = delete;
+		basic_exrel_function_t(basic_exrel_function_t&&) = delete;
 
 		template <typename FN,
-			typename = std::enable_if_t<detail::result_matches_v<R, FN, Params...>>,
-			typename = std::enable_if_t<!std::is_base_of<base_function_t<BS, R(Params...)>, std::decay_t<FN>>::value, basic_generic_function_t&>>
-		basic_external_function_t(FN&& fn, void* exbuf)
+		  typename = std::enable_if_t<detail::result_matches_v<R, FN, Params...>>,
+		  typename = std::enable_if_t<!std::is_base_of<base_function_t<BS, R(Params...)>, std::decay_t<FN>>::value>>
+		basic_exrel_function_t(FN&& fn, void* exbuf)
 			: basic_generic_function_t{std::forward<FN>(fn), exbuf}
 		{}
 
-		//template <size_t RBS>
-		//basic_generic_function_t(base_function_t<RBS, R(Params...)> const& rhs, void* exbuf)
-		//	: basic_generic_function_t{&empty_fn<R>, exbuf}
-		//{
-		//	rhs.vtable_->assign_into(buf_, vtable_, rhs.buf_);
-		//}
+		template <size_t RBS>
+		basic_exrel_function_t(base_function_t<RBS, R(Params...)> const& rhs, void* exbuf)
+			: basic_generic_function_t{&empty_fn<R>, exbuf}
+		{
+			rhs.vtable_->assign_into(buf_, vtable_, rhs.buf_);
+		}
+
+		template <size_t RBS>
+		basic_exrel_function_t(base_function_t<RBS, R(Params...)>&& rhs, void* exbuf)
+			: basic_generic_function_t{&empty_fn<R>, exbuf}
+		{
+			rhs.vtable_->move_into(buf_, vtable_, rhs.buf_);
+		}
 
 		auto relocate_external_functor_storage(void* exbuf) -> void
 		{
