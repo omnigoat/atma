@@ -135,7 +135,7 @@ SCENARIO("functions can be constructed")
 	GIVEN("a default-constructed function, external_function, and relative_function")
 	{
 		atma::function<int(int, int)> f;
-		atma::basic_external_function_t<8, int(int, int)> ef;
+		//atma::basic_external_function_t<8, int(int, int)> ef;
 		atma::relative_function<int(int, int)> rf;
 
 		THEN("function is empty")
@@ -146,8 +146,8 @@ SCENARIO("functions can be constructed")
 
 		THEN("external_function is empty")
 		{
-			CHECK(!(bool)ef);
-			CHECK(ef.target<int(*)(int, int)>() == nullptr);
+			//CHECK(!(bool)ef);
+			//CHECK(ef.target<int(*)(int, int)>() == nullptr);
 		}
 
 		THEN("relative_function is empty")
@@ -185,16 +185,14 @@ SCENARIO("functions can be constructed")
 	GIVEN("a directly-constructed external function with SFO")
 	{
 		char buf[128];
-		atma::external_function<int(int, int)> f{&add, buf};
-		
-
+		atma::external_function<int(int, int)> f(&add, (void*)buf);
 	}
 
 	GIVEN("a directly-constructed external function too large for SFO")
 	{
 		char buf[128]{};
 		mathing_t m;
-		atma::basic_generic_function_t<16, atma::functor_storage_t::external, int(int)> f{atma::bind(&mathing_t::halve, &m, arg1), buf};
+		atma::basic_external_function_t<16, int(int)> f{atma::bind(&mathing_t::halve, &m, arg1), buf};
 		auto r = f(8);
 		CHECK(r == 4);
 
@@ -219,7 +217,7 @@ SCENARIO("functions can be constructed")
 		auto lr = lulzf(26);
 		CHECK(lr == 13);
 		
-		f = *rf;
+		//f = *rf;
 		CHECK(f(88) == 44);
 	}
 }
