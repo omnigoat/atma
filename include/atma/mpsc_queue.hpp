@@ -61,7 +61,7 @@ namespace atma
 		//  2 bits: alloc-state {empty, flag_commit, full, mid_read}
 		//  2 bits: alloc-type {invalid, normal, jump, pad}
 		//  2 bits: alignment (exponent for 4*2^x, giving us 4, 8, 16, or 32 bytes alignment)
-		// 28-bits: size (allowing up to 64mb allocations)
+		// 28 bits: size (allowing up to 64mb allocations)
 		//
 		// state:
 		//  - explicit in alloc-state, except for an empty state with the alloc-type
@@ -126,10 +126,6 @@ namespace atma
 		auto impl_read_queue_read_info() -> std::tuple<byte*, uint32, uint32>;
 		auto impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t, uint32 alignment, uint32 size) -> allocation_t;
 		auto impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void;
-	
-		auto starve_flag(size_t starve_id, size_t thread_id, std::chrono::nanoseconds const& starve_time) -> void;
-		auto starve_unflag(size_t starve_id, size_t thread_id) -> void;
-		auto starve_gate(size_t thread_id) -> size_t;
 
 	private:
 		base_mpsc_queue_t(void*, uint32, bool);
@@ -137,15 +133,7 @@ namespace atma
 		static auto buf_init(void*, uint32, bool) -> void*;
 		static auto buf_housekeeping(void*) -> housekeeping_t*;
 
-		static auto available_space(uint32 wp, uint32 ep, uint32 bufsize, bool contiguous) -> uint32
-		{
-			auto result = ep <= wp ? (bufsize - wp + (contiguous ? 0 : ep)) : ep - wp;
-
-			if ((wp + result) % bufsize == ep)
-				result -= 1;
-
-			return result;
-		}
+		static auto available_space(uint32 wp, uint32 ep, uint32 bufsize, bool contiguous) -> uint32;
 
 	protected:
 		struct header_t
@@ -168,36 +156,26 @@ namespace atma
 			};
 		};
 
-		//struct alignas(8) cursor_t
-		//{
-		//	cursor_t()
-		//		: v{}, o{}
-		//	{}
-		//
-		//	cursor_t(uint32 v, uint32 o)
-		//		: v{v}, o{o}
-		//	{}
-		//
-		//	uint32 v;
-		//	uint32 o;
-		//};
 		using cursor_t = uint32;
 
 		auto impl_allocate_default(housekeeping_t*, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t;
 		auto impl_allocate_pad(housekeeping_t*, cursor_t const& w, cursor_t const& e) -> allocinfo_t;
 		auto impl_allocate(housekeeping_t*, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t;
 
-		struct housekeeping_t
+		struct alignas(16) housekeeping_t
 		{
 			housekeeping_t(byte* buffer, uint32 buffer_size, bool requires_delete)
 				: buffer_{buffer}
 				, buffer_size_{buffer_size}
 				, requires_delete_{requires_delete}
-				, starve_info_{}
-				, w{}, f{}, r{}
-				, e{buffer_size}
+				, w{}, f{}, r{}, e{buffer_size}
 			{}
 
+			cursor_t w; // write
+			cursor_t f; // full
+			cursor_t r; // read
+			cursor_t e; // empty
+		
 			auto buffer() const -> byte* { return buffer_; }
 			auto buffer_size() const -> uint32 { return buffer_size_; }
 			auto requires_delete() const -> bool { return requires_delete_; }
@@ -206,69 +184,10 @@ namespace atma
 			byte* buffer_ = nullptr;
 			uint32 buffer_size_ = 0;
 			bool requires_delete_ = false;
-
-		public:
-			// each cursor_t is 64 bytes, aligned to 64 bytes, so we avoid false-sharing
-			cache_line_pad_t<> pad0;
-			cursor_t w; // write
-			//cache_line_pad_t<sizeof(cursor_t)> pad1;
-			cursor_t f; // full
-			//cache_line_pad_t<sizeof(cursor_t)> pad2;
-			cursor_t r; // read
-			//cache_line_pad_t<sizeof(cursor_t)> pad3;
-			cursor_t e; // empty
-			//cache_line_pad_t<sizeof(cursor_t)> pad4;
-			
-			auto atomic_load_w() -> cursor_t {
-				cursor_t v;
-				atma::atomic_load(&v, &w);
-				return v;
-			}
-
-			auto atomic_load_f() -> cursor_t {
-				cursor_t v;
-				atma::atomic_load(&v, &f);
-				return v;
-			}
-
-			auto atomic_load_r() -> cursor_t {
-				cursor_t v;
-				atma::atomic_load(&v, &r);
-				return v;
-			}
-
-			auto atomic_load_e() -> cursor_t {
-				cursor_t v;
-				atma::atomic_load(&v, &e);
-				return v;
-			}
-
-			union
-			{
-				atma::atomic128_t starve_info_;
-
-				struct
-				{
-					uint64 starve_thread_;
-					uint64 starve_time_;
-				};
-			};
 		};
 
 
-		struct horsemen_t {
-			horsemen_t() : a{} {}
-
-			union {
-				atomic128_t a;
-				struct {
-					cursor_t w, f, r, e;
-				} c;
-			};
-		};
-
-
-
+	
 		struct buffer_t
 		{
 			buffer_t() {}
@@ -370,8 +289,7 @@ namespace atma
 		template <typename T> auto decode_pointer(T*&) -> void;
 		auto decode_data() -> unique_memory_t;
 
-		template <typename T> auto decode_struct(T&) -> bool;
-		template <typename T> auto decode_move_struct(T&) -> bool;
+		template <typename T> auto decode_struct(T&) -> void;
 
 		auto local_copy(unique_memory_t& mem) -> void
 		{
@@ -410,22 +328,12 @@ namespace atma
 		reading_.pointer = (byte*)nbuf;
 	}
 
-
-#if 0
-#  define TMPLOG(...) __VA_ARGS__
-#else
-#  define TMPLOG(...)
-#endif
-
 	inline auto base_mpsc_queue_t::buf_init(void* buf, uint32 size, bool requires_delete) -> void*
 	{
 		size -= sizeof(housekeeping_t*);
 		auto addr = (byte*)((housekeeping_t**)buf + 1);
 		*reinterpret_cast<housekeeping_t**>(buf) = atma::aligned_allocator_t<housekeeping_t>().allocate(1); //new housekeeping_t{addr, size, requires_delete};
 		new (*reinterpret_cast<housekeeping_t**>(buf)) housekeeping_t{addr, size, requires_delete};
-
-		// set the empty space to the full size of the buffer
-		//buf_housekeeping(addr)->e = size;
 
 		return addr;
 	}
@@ -435,6 +343,15 @@ namespace atma
 		return *((housekeeping_t**)buf - 1);
 	}
 
+	inline auto base_mpsc_queue_t::available_space(uint32 wp, uint32 ep, uint32 bufsize, bool contiguous) -> uint32
+	{
+		auto result = ep <= wp ? (bufsize - wp + (contiguous ? 0 : ep)) : ep - wp;
+
+		if ((wp + result) % bufsize == ep)
+			result -= 1;
+
+		return result;
+	}
 
 	inline auto base_mpsc_queue_t::consume() -> decoder_t
 	{
@@ -468,8 +385,8 @@ namespace atma
 		// means we may dereference our "header" with a mental value. this is fine, as
 		// we will discard this if rp has moved (and ac has updated)
 		uint32  size = 0;
-		cursor_t r = hk->atomic_load_r();
-		cursor_t e = hk->atomic_load_e();
+		cursor_t r = atma::atomic_load(&hk->r);
+		cursor_t e = atma::atomic_load(&hk->e);
 
 		for (;;)
 		{
@@ -573,7 +490,6 @@ namespace atma
 		//ATMA_ASSERT(oh.state == allocstate_t::mid_read);
 
 		// 3) move empty-position along
-		//auto e = hk->atomic_load_e();
 		uint32 ep = atma::atomic_load(&hk->e);
 		for (uint32 epm = ep % hk->buffer_size();; epm = ep % hk->buffer_size())
 		{
@@ -651,7 +567,7 @@ namespace atma
 	inline auto base_mpsc_queue_t::impl_allocate(housekeeping_t* hk, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t
 	{
 		ATMA_ASSERT(alignment > 0);
-		//ATMA_ASSERT(wqs.wp % 4 == 0);
+		ATMA_ASSERT(w % 4 == 0);
 
 		uint32 sz = header_size + size;
 
@@ -797,54 +713,6 @@ namespace atma
 		}
 #endif
 	}
-
-	inline auto base_mpsc_queue_t::starve_gate(size_t thread_id) -> size_t
-	{
-#if 0
-		size_t st = starve_thread_;
-		if (st != 0)
-		{
-			if (st != thread_id)
-				while (starve_thread_ != 0)
-					;
-		}
-
-		return st;
-#endif
-		return 0;
-	}
-
-	inline auto base_mpsc_queue_t::starve_flag(size_t starve_id, size_t thread_id, std::chrono::nanoseconds const& starve_time) -> void
-	{
-#if 0
-		if (starve_time > starve_timeout && (uint64)starve_time.count() > starve_time_)
-		{
-			if (starve_id != thread_id)
-			{
-				while (!atma::atomic_compare_exchange(&starve_thread_, 0ull, thread_id))
-					;
-			}
-
-			starve_time_ = starve_time.count();
-		}
-#endif
-	}
-
-	inline auto base_mpsc_queue_t::starve_unflag(size_t starve_id, size_t thread_id) -> void
-	{
-#if 0
-		if (starve_thread_ == thread_id)
-		{
-			ATMA_ENSURE(atma::atomic_compare_exchange(&starve_thread_, (uint64)thread_id, uint64()), "shouldn't have contention over resetting starvation");
-		}
-#endif
-	}
-
-
-
-
-
-
 
 
 	// headerer_t
@@ -1015,13 +883,7 @@ namespace atma
 	template <typename T>
 	inline auto base_mpsc_queue_t::decoder_t::decode_pointer(T*& p) -> void
 	{
-#if ATMA_POINTER_SIZE == 8
-		decode_uint64((uint64&)p);
-#elif ATMA_POINTER_SIZE == 4
-		decode_uint32((uint32&)p);
-#else
-#  error unknown pointer size??
-#endif
+		decode_struct(p);
 	}
 
 	inline auto base_mpsc_queue_t::decoder_t::decode_data() -> unique_memory_t
@@ -1037,20 +899,11 @@ namespace atma
 	}
 
 	template <typename T>
-	inline auto base_mpsc_queue_t::decoder_t::decode_struct(T& x) -> bool
+	inline auto base_mpsc_queue_t::decoder_t::decode_struct(T& x) -> void
 	{
-		//if (op_ + size_ < buffer_size())
-		//{
-		//	
-		//}
-		//else
-		{
-			auto const size = (uint32)sizeof(T);
-			for (uint32 i = 0; i != size; ++i)
-				decode_byte(reinterpret_cast<byte*>(&x)[i]);
-		}
-
-		return true;
+		auto const size = (uint32)sizeof(T);
+		for (uint32 i = 0; i != size; ++i)
+			decode_byte(reinterpret_cast<byte*>(&x)[i]);
 	}
 
 
@@ -1091,11 +944,8 @@ namespace atma
 			allocinfo_t ai;
 			for (;;)
 			{
-				auto time_start = std::chrono::high_resolution_clock::now();
-				auto starve_id = starve_gate(thread_id);
-				
-				auto w = whk->atomic_load_w();
-				auto e = whk->atomic_load_e();
+				auto w = atma::atomic_load(&whk->w);
+				auto e = atma::atomic_load(&whk->e);
 
 				ai = impl_allocate_default(whk, w, e, size, alignment, contiguous);
 				if (ai)
@@ -1112,18 +962,7 @@ namespace atma
 					}
 				}
 #endif
-
-				// contiguous allocations can't flag themselves as starved, otherwise
-				// it may take precedence, and never have space to allocate
-				if (!contiguous)
-				{
-					auto elapsed = std::chrono::high_resolution_clock::now() - time_start;
-					starvation += elapsed;
-					starve_flag(starve_id, thread_id, starvation);
-				}
 			}
-
-			//starve_unflag(starve_thread_, thread_id);
 
 			return impl_make_allocation(writebuf.pointer, whk->buffer_size(), ai.p, alloctype_t::normal, alignment, ai.sz);
 		}
