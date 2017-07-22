@@ -46,7 +46,7 @@
     <ClInclude Include="..\..\include\atma\math\triangle.hpp" />
     <ClInclude Include="..\..\include\atma\math\vector4f.hpp" />
     <ClInclude Include="..\..\include\atma\math\vector4i.hpp" />
-    <ClInclude Include="..\..\include\atma\mpsc_queue.hpp" />
+    <ClInclude Include="..\..\include\atma\lockfree_queue.hpp" />
     <ClInclude Include="..\..\include\atma\placeholders.hpp" />
     <ClInclude Include="..\..\include\atma\platform\allocation.hpp" />
     <ClInclude Include="..\..\include\atma\shared_memory.hpp" />

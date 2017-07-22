@@ -2,7 +2,7 @@
 
 #include <atma/config/platform.hpp>
 #include <atma/function.hpp>
-#include <atma/mpsc_queue.hpp>
+#include <atma/lockfree_queue.hpp>
 #include <atma/vector.hpp>
 
 
@@ -107,7 +107,7 @@ namespace atma
 		auto enqueue_repeat(repeat_function_t&& fn) -> void override { signal_evergreen(fn); }
 
 	private:
-		using queue_t = mpsc_queue_t<false>;
+		using queue_t = lockfree_queue_t<false>;
 		using queue_fn_t = basic_relative_function_t<16, void()>;
 
 		auto reenter(std::atomic<bool> const& blocked) -> void;
@@ -267,7 +267,7 @@ namespace atma
 
 	private:
 		// queue for work submission
-		mpsc_queue_t<false> queue_;
+		lockfree_queue_t<false> queue_;
 		// threads that pool queue for work
 		std::vector<std::thread> threads_;
 
