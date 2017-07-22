@@ -2,7 +2,7 @@
 
 #include <atma/algorithm/filter.hpp>
 #include <atma/algorithm/map.hpp>
-#include <atma/mpsc_queue.hpp>
+#include <atma/lockfree_queue.hpp>
 
 #include <atma/vector.hpp>
 
