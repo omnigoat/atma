@@ -29,6 +29,8 @@ struct tm_t
 
 int what() { return 4; }
 
+
+
 SCENARIO("bind works with various things", "[bind]")
 {
 	GIVEN("a binding to a free-function, and one to am equivalent non-closure lambda")
@@ -67,7 +69,7 @@ SCENARIO("bind works with various things", "[bind]")
 		auto b3v2 = atma::curry(L);
 
 		// atma::function object
-		auto F = atma::function<int(char, int, float)>{[](char x, int y, float z){ return x * y + (int)z; }};
+		auto F = atma::function<int(char, int, float)>([](char x, int y, float z){ return x * y + (int)z; });
 		auto F2 = atma::function<int(char, int, float)>{F};
 		auto b4v1 = atma::curry(F);
 		auto b4v2 = atma::bind(F, arg2, arg3, arg1);
@@ -132,38 +134,47 @@ SCENARIO("bind works with various things", "[bind]")
 
 SCENARIO("functions can be constructed")
 {
-	GIVEN("a default-constructed function, external_function, and relative_function")
+	GIVEN("a default-constructed function")
 	{
 		atma::function<int(int, int)> f;
-		//atma::basic_external_function_t<8, int(int, int)> ef;
-		atma::relative_function<int(int, int)> rf;
 
 		THEN("function is empty")
 		{
 			CHECK(!(bool)f);
 			CHECK(f.target<int(*)(int, int)>() == nullptr);
 		}
+	}
 
-		THEN("external_function is empty")
-		{
-			//CHECK(!(bool)ef);
-			//CHECK(ef.target<int(*)(int, int)>() == nullptr);
-		}
+	GIVEN("a default-constructed external_function")
+	{
+		atma::external_function<int(int, int)> f;
 
-		THEN("relative_function is empty")
+		THEN("function is empty")
 		{
-			CHECK(!(bool)rf);
-			CHECK(rf.target<int(*)(int, int)>() == nullptr);
+			CHECK(!(bool)f);
+			CHECK(f.target<int(*)(int, int)>() == nullptr);
 		}
 	}
 
-	GIVEN("a directly-constructed heap function")
+	GIVEN("a default-constructed relative_function")
+	{
+		atma::relative_function<int(int, int)> f;
+
+		THEN("function is empty")
+		{
+			CHECK(!(bool)f);
+			CHECK(f.target<int(*)(int, int)>() == nullptr);
+		}
+	}
+
+	GIVEN("a directly-constructed function")
 	{
 		atma::function<int(int, int)> f{&add};
 
 		THEN("it is not empty")
 		{
 			CHECK((bool)f);
+			CHECK(f.target<int(*)(int, int)>() != nullptr);
 		}
 
 		THEN("it is filled with our function")
@@ -174,22 +185,133 @@ SCENARIO("functions can be constructed")
 		}
 	}
 
-/*
-		THEN("it returns the right result")
-		{
-			CHECK(f(4, 5) == 9);
-			CHECK(f(5, 4) == 9);
-		}
-	}*/
-
 	GIVEN("a directly-constructed external function with SFO")
 	{
 		char buf[128];
 		atma::external_function<int(int, int)> f(&add, (void*)buf);
+
+		THEN("it is not empty")
+		{
+			CHECK((bool)f);
+			CHECK(f.target<int(*)(int, int)>() != nullptr);
+		}
+
+		THEN("it is filled with our function")
+		{
+			auto t = f.target<int(*)(int, int)>();
+			CHECK(t != nullptr);
+			CHECK(*t == &add);
+		}
+
+		THEN("external buffer size is zero")
+		{
+			CHECK(f.external_buffer_size() == 0);
+		}
 	}
 
+	GIVEN("a directly-constructed external function *without* SFO (copy-constructor)")
+	{
+		char buf[128];
+		auto b = atma::bind(&add, arg1, arg2);
+		atma::basic_external_function_t<16, int(int, int)> f(b, (void*)buf);
+
+		THEN("it is not empty")
+		{
+			CHECK((bool)f);
+			CHECK(f.target<decltype(b)>() != nullptr);
+		}
+
+		THEN("it is filled with our function")
+		{
+			auto t = f.target<decltype(b)>();
+			CHECK(t != nullptr);
+		}
+
+		THEN("external buffer size is *not* zero")
+		{
+			CHECK(f.external_buffer_size() != 0);
+		}
+	}
+
+	GIVEN("a directly-constructed relative function *without* SFO (move-constructor)")
+	{
+		char buf[128];
+		auto b = atma::bind(&add, arg1, arg2);
+		atma::basic_relative_function_t<16, int(int, int)> f(atma::bind(&add, arg1, arg2), (void*)buf);
+
+		THEN("it is not empty")
+		{
+			CHECK((bool)f);
+			CHECK(f.target<decltype(b)>() != nullptr);
+		}
+
+		THEN("it is filled with our function")
+		{
+			auto t = f.target<decltype(b)>();
+			CHECK(t != nullptr);
+		}
+
+		THEN("external buffer size is *not* zero")
+		{
+			CHECK(f.external_buffer_size() != 0);
+		}
+	}
+
+	GIVEN("a directly-constructed relative function *without* SFO (copy-constructor)")
+	{
+		char buf[128];
+		auto b = atma::bind(&add, arg1, arg2);
+		atma::basic_relative_function_t<16, int(int, int)> f(b, (void*)buf);
+
+		THEN("it is not empty")
+		{
+			CHECK((bool)f);
+			CHECK(f.target<decltype(b)>() != nullptr);
+		}
+
+		THEN("it is filled with our function")
+		{
+			auto t = f.target<decltype(b)>();
+			CHECK(t != nullptr);
+		}
+
+		THEN("relative buffer size is *not* zero")
+		{
+			CHECK(f.external_buffer_size() != 0);
+		}
+	}
+
+	GIVEN("a directly-constructed relative function *without* SFO (move-constructor)")
+	{
+		char buf[128];
+		auto b = atma::bind(&add, arg1, arg2);
+		atma::basic_relative_function_t<16, int(int, int)> f(atma::bind(&add, arg1, arg2), (void*)buf);
+
+		THEN("it is not empty")
+		{
+			CHECK((bool)f);
+			CHECK(f.target<decltype(b)>() != nullptr);
+		}
+
+		THEN("it is filled with our function")
+		{
+			auto t = f.target<decltype(b)>();
+			CHECK(t != nullptr);
+		}
+
+		THEN("relative buffer size is *not* zero")
+		{
+			CHECK(f.external_buffer_size() != 0);
+		}
+	}
+}
+
+SCENARIO("things")
+{
 	GIVEN("a directly-constructed external function too large for SFO")
 	{
+		
+
 		char buf[128]{};
 		mathing_t m;
 		atma::basic_external_function_t<16, int(int)> f{atma::bind(&mathing_t::halve, &m, arg1), buf};
