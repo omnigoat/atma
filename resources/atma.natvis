@@ -43,7 +43,7 @@
     </Expand>
   </Type>
 
-  <Type Name="atma::base_mpsc_queue_t::housekeeping_t">
+  <Type Name="atma::base_lockfree_queue_t::housekeeping_t">
     <DisplayString>{{ buffer-size={buffer_size_} }}</DisplayString>
     <Expand>
       <Synthetic Name="r">

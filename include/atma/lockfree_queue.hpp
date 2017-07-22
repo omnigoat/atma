@@ -34,13 +34,13 @@ namespace atma
 	}
 
 
-	struct base_mpsc_queue_t
+	struct base_lockfree_queue_t
 	{
 		struct allocation_t;
 		struct decoder_t;
 
-		base_mpsc_queue_t(void*, uint32);
-		base_mpsc_queue_t(uint32);
+		base_lockfree_queue_t(void*, uint32);
+		base_lockfree_queue_t(uint32);
 
 		auto commit(allocation_t&) -> void;
 		auto consume() -> decoder_t;
@@ -128,7 +128,7 @@ namespace atma
 		auto impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void;
 
 	private:
-		base_mpsc_queue_t(void*, uint32, bool);
+		base_lockfree_queue_t(void*, uint32, bool);
 
 		static auto buf_init(void*, uint32, bool) -> void*;
 		static auto buf_housekeeping(void*) -> housekeeping_t*;
@@ -210,7 +210,7 @@ namespace atma
 
 
 	// headerer_t
-	struct base_mpsc_queue_t::headerer_t
+	struct base_lockfree_queue_t::headerer_t
 	{
 		auto alignment() const -> uint32;
 		auto size() const -> uint32;
@@ -251,7 +251,7 @@ namespace atma
 
 
 	// allocation_t
-	struct base_mpsc_queue_t::allocation_t : headerer_t
+	struct base_lockfree_queue_t::allocation_t : headerer_t
 	{
 		operator bool() const { return buf_ != nullptr; }
 
@@ -269,12 +269,12 @@ namespace atma
 	private:
 		allocation_t(byte* buf, uint32 wp, allocstate_t, alloctype_t, uint32 alignment, uint32 size);
 
-		friend struct base_mpsc_queue_t;
+		friend struct base_lockfree_queue_t;
 	};
 
 
 	// decoder_t
-	struct base_mpsc_queue_t::decoder_t : headerer_t
+	struct base_lockfree_queue_t::decoder_t : headerer_t
 	{
 		decoder_t(decoder_t const&) = delete;
 		decoder_t(decoder_t&&);
@@ -302,7 +302,7 @@ namespace atma
 		decoder_t();
 		decoder_t(byte* buf, uint32 rp);
 
-		friend struct base_mpsc_queue_t;
+		friend struct base_lockfree_queue_t;
 	};
 
 
@@ -310,15 +310,15 @@ namespace atma
 
 
 
-	inline base_mpsc_queue_t::base_mpsc_queue_t(void* buf, uint32 size)
-		: base_mpsc_queue_t{buf, size, false}
+	inline base_lockfree_queue_t::base_lockfree_queue_t(void* buf, uint32 size)
+		: base_lockfree_queue_t{buf, size, false}
 	{}
 
-	inline base_mpsc_queue_t::base_mpsc_queue_t(uint32 sz)
-		: base_mpsc_queue_t{new byte[sz]{}, sz, true}
+	inline base_lockfree_queue_t::base_lockfree_queue_t(uint32 sz)
+		: base_lockfree_queue_t{new byte[sz]{}, sz, true}
 	{}
 
-	inline base_mpsc_queue_t::base_mpsc_queue_t(void* buf, uint32 size, bool requires_delete)
+	inline base_lockfree_queue_t::base_lockfree_queue_t(void* buf, uint32 size, bool requires_delete)
 	{
 		ATMA_ASSERT(size > sizeof(housekeeping_t*));
 
@@ -328,7 +328,7 @@ namespace atma
 		reading_.pointer = (byte*)nbuf;
 	}
 
-	inline auto base_mpsc_queue_t::buf_init(void* buf, uint32 size, bool requires_delete) -> void*
+	inline auto base_lockfree_queue_t::buf_init(void* buf, uint32 size, bool requires_delete) -> void*
 	{
 		size -= sizeof(housekeeping_t*);
 		auto addr = (byte*)((housekeeping_t**)buf + 1);
@@ -338,12 +338,12 @@ namespace atma
 		return addr;
 	}
 
-	inline auto base_mpsc_queue_t::buf_housekeeping(void* buf) -> housekeeping_t*
+	inline auto base_lockfree_queue_t::buf_housekeeping(void* buf) -> housekeeping_t*
 	{
 		return *((housekeeping_t**)buf - 1);
 	}
 
-	inline auto base_mpsc_queue_t::available_space(uint32 wp, uint32 ep, uint32 bufsize, bool contiguous) -> uint32
+	inline auto base_lockfree_queue_t::available_space(uint32 wp, uint32 ep, uint32 bufsize, bool contiguous) -> uint32
 	{
 		auto result = ep <= wp ? (bufsize - wp + (contiguous ? 0 : ep)) : ep - wp;
 
@@ -353,7 +353,7 @@ namespace atma
 		return result;
 	}
 
-	inline auto base_mpsc_queue_t::consume() -> decoder_t
+	inline auto base_lockfree_queue_t::consume() -> decoder_t
 	{
 		// 1) load read-buffer, and increment use-count
 		buffer_t buf;
@@ -461,7 +461,7 @@ namespace atma
 		return std::move(D);
 	}
 
-	inline auto base_mpsc_queue_t::finalize(decoder_t& D) -> void
+	inline auto base_lockfree_queue_t::finalize(decoder_t& D) -> void
 	{
 		// 1) read info
 		auto hk = buf_housekeeping(D.buf_);
@@ -537,7 +537,7 @@ namespace atma
 		D.type_ = 0;
 	}
 
-	inline auto base_mpsc_queue_t::impl_allocate_default(housekeeping_t* hk, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t
+	inline auto base_lockfree_queue_t::impl_allocate_default(housekeeping_t* hk, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t
 	{
 		ATMA_ASSERT(alignment > 0);
 		ATMA_ASSERT(w % 4 == 0);
@@ -551,7 +551,7 @@ namespace atma
 		return impl_allocate(hk, w, e, size, alignment, ct);
 	}
 
-	inline auto base_mpsc_queue_t::impl_allocate_pad(housekeeping_t* hk, cursor_t const& w, cursor_t const& e) -> allocinfo_t
+	inline auto base_lockfree_queue_t::impl_allocate_pad(housekeeping_t* hk, cursor_t const& w, cursor_t const& e) -> allocinfo_t
 	{
 		// assume that people won't try to allocate the entirety of the buffer...
 		if (w < header_size)
@@ -564,7 +564,7 @@ namespace atma
 		return impl_allocate(hk, w, e, space, 1, true);
 	}
 
-	inline auto base_mpsc_queue_t::impl_allocate(housekeeping_t* hk, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t
+	inline auto base_lockfree_queue_t::impl_allocate(housekeeping_t* hk, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t
 	{
 		ATMA_ASSERT(alignment > 0);
 		ATMA_ASSERT(w % 4 == 0);
@@ -656,7 +656,7 @@ namespace atma
 		return {p, allocerr_t::success, size};
 	}
 
-	inline auto base_mpsc_queue_t::commit(allocation_t& a) -> void
+	inline auto base_lockfree_queue_t::commit(allocation_t& a) -> void
 	{
 		uint32* ah = (uint32*)(a.buf_ + a.op_);
 
@@ -670,12 +670,12 @@ namespace atma
 	}
 
 
-	inline auto base_mpsc_queue_t::impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t type, uint32 alignment, uint32 size) -> allocation_t
+	inline auto base_lockfree_queue_t::impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t type, uint32 alignment, uint32 size) -> allocation_t
 	{
 		return allocation_t{wb, wp, allocstate_t::flag_commit, type, alignment, size};
 	}
 
-	inline auto base_mpsc_queue_t::impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void
+	inline auto base_lockfree_queue_t::impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void
 	{
 		static_assert(sizeof(uint64) >= sizeof(void*), "pointers too large! where are you?");
 
@@ -716,7 +716,7 @@ namespace atma
 
 
 	// headerer_t
-	inline auto base_mpsc_queue_t::headerer_t::size() const -> uint32
+	inline auto base_lockfree_queue_t::headerer_t::size() const -> uint32
 	{
 		// size after all alignment shenanigans
 		uint32 ag = alignment();
@@ -725,18 +725,18 @@ namespace atma
 		return r;
 	}
 
-	inline auto base_mpsc_queue_t::headerer_t::alignment() const -> uint32
+	inline auto base_lockfree_queue_t::headerer_t::alignment() const -> uint32
 	{
 		return 4 * pow2(alignment_);
 	}
 
-	inline auto base_mpsc_queue_t::headerer_t::data() const -> void*
+	inline auto base_lockfree_queue_t::headerer_t::data() const -> void*
 	{
 		return buf_ + (alignby(op_ + header_size, alignment()) % buffer_size());
 	}
 
 	// allocation_t
-	inline base_mpsc_queue_t::allocation_t::allocation_t(byte* buf, uint32 wp, allocstate_t state, alloctype_t type, uint32 alignment, uint32 size)
+	inline base_lockfree_queue_t::allocation_t::allocation_t(byte* buf, uint32 wp, allocstate_t state, alloctype_t type, uint32 alignment, uint32 size)
 		: headerer_t{buf, wp, wp, (uint32)state, (uint32)type, alignment, size}
 	{
 		p_ = alignby(p_ + header_size, this->alignment());
@@ -745,7 +745,7 @@ namespace atma
 		ATMA_ASSERT(size <= header_size_bitmask);
 	}
 
-	inline auto base_mpsc_queue_t::allocation_t::encode_byte(byte b) -> void*
+	inline auto base_lockfree_queue_t::allocation_t::encode_byte(byte b) -> void*
 	{
 		ATMA_ASSERT(p_ != (op_ + header_size + raw_size()) % buffer_size());
 		ATMA_ASSERT(0 <= p_ && p_ < buffer_size());
@@ -756,26 +756,26 @@ namespace atma
 		return r;
 	}
 
-	inline auto base_mpsc_queue_t::allocation_t::encode_uint16(uint16 i) -> void
+	inline auto base_lockfree_queue_t::allocation_t::encode_uint16(uint16 i) -> void
 	{
 		encode_byte(i & 0xff);
 		encode_byte(i >> 8);
 	}
 
-	inline auto base_mpsc_queue_t::allocation_t::encode_uint32(uint32 i) -> void
+	inline auto base_lockfree_queue_t::allocation_t::encode_uint32(uint32 i) -> void
 	{
 		encode_uint16(i & 0xffff);
 		encode_uint16(i >> 16);
 	}
 
-	inline auto base_mpsc_queue_t::allocation_t::encode_uint64(uint64 i) -> void
+	inline auto base_lockfree_queue_t::allocation_t::encode_uint64(uint64 i) -> void
 	{
 		encode_uint32(i & 0xffffffff);
 		encode_uint32(i >> 32);
 	}
 
 	template <typename T>
-	inline auto base_mpsc_queue_t::allocation_t::encode_pointer(T* p) -> void
+	inline auto base_lockfree_queue_t::allocation_t::encode_pointer(T* p) -> void
 	{
 #if ATMA_POINTER_SIZE == 8
 			encode_uint64((uint64)p);
@@ -786,7 +786,7 @@ namespace atma
 #endif
 	}
 
-	inline auto base_mpsc_queue_t::allocation_t::encode_data(void const* data, uint32 size) -> void
+	inline auto base_lockfree_queue_t::allocation_t::encode_data(void const* data, uint32 size) -> void
 	{
 		static_assert(sizeof(uint64) <= sizeof(uintptr), "pointer is greater than 64 bits??");
 
@@ -796,7 +796,7 @@ namespace atma
 	}
 
 	template <typename T>
-	inline auto base_mpsc_queue_t::allocation_t::encode_struct(T&& x) -> bool
+	inline auto base_lockfree_queue_t::allocation_t::encode_struct(T&& x) -> bool
 	{
 		// require contiugous
 		if ((p_ + sizeof(x)) % buffer_size() < p_)
@@ -809,7 +809,7 @@ namespace atma
 		return true;
 	}
 
-	inline auto base_mpsc_queue_t::allocation_t::encode_data(unique_memory_t const& data) -> void
+	inline auto base_lockfree_queue_t::allocation_t::encode_data(unique_memory_t const& data) -> void
 	{
 		static_assert(sizeof(uint64) <= sizeof(uintptr), "pointer is greater than 64 bits??");
 
@@ -819,11 +819,11 @@ namespace atma
 	}
 
 	// decoder_t
-	inline base_mpsc_queue_t::decoder_t::decoder_t()
+	inline base_lockfree_queue_t::decoder_t::decoder_t()
 		: headerer_t(nullptr, 0, 0, 0)
 	{}
 
-	inline base_mpsc_queue_t::decoder_t::decoder_t(byte* buf, uint32 rp)
+	inline base_lockfree_queue_t::decoder_t::decoder_t(byte* buf, uint32 rp)
 		: headerer_t(buf, rp, rp, *(uint32*)(buf + rp))
 	{
 		p_ += header_size;
@@ -831,24 +831,24 @@ namespace atma
 		p_ %= buffer_size();
 	}
 
-	inline base_mpsc_queue_t::decoder_t::decoder_t(decoder_t&& rhs)
+	inline base_lockfree_queue_t::decoder_t::decoder_t(decoder_t&& rhs)
 		: headerer_t(rhs.buf_, rhs.op_, rhs.p_, rhs.state_, rhs.type_, rhs.alignment_, rhs.size_)
 	{
 		memset(&rhs, 0, sizeof(decoder_t));
 	}
 
-	inline base_mpsc_queue_t::decoder_t::~decoder_t()
+	inline base_lockfree_queue_t::decoder_t::~decoder_t()
 	{
 		ATMA_ASSERT(type_ == 0, "decoder not finalized before destructing");
 	}
 
-	inline auto base_mpsc_queue_t::decoder_t::decode_byte(byte& b) -> void
+	inline auto base_lockfree_queue_t::decoder_t::decode_byte(byte& b) -> void
 	{
 		b = buf_[p_];
 		p_ = (p_ + 1) % buffer_size();
 	}
 	
-	inline auto base_mpsc_queue_t::decoder_t::decode_uint16(uint16& i) -> void
+	inline auto base_lockfree_queue_t::decoder_t::decode_uint16(uint16& i) -> void
 	{
 		byte* bs = (byte*)&i;
 
@@ -856,7 +856,7 @@ namespace atma
 		decode_byte(bs[1]);
 	}
 
-	inline auto base_mpsc_queue_t::decoder_t::decode_uint32(uint32& i) -> void
+	inline auto base_lockfree_queue_t::decoder_t::decode_uint32(uint32& i) -> void
 	{
 		byte* bs = (byte*)&i;
 
@@ -866,7 +866,7 @@ namespace atma
 		decode_byte(bs[3]);
 	}
 
-	inline auto base_mpsc_queue_t::decoder_t::decode_uint64(uint64& i) -> void
+	inline auto base_lockfree_queue_t::decoder_t::decode_uint64(uint64& i) -> void
 	{
 		byte* bs = (byte*)&i;
 
@@ -881,12 +881,12 @@ namespace atma
 	}
 
 	template <typename T>
-	inline auto base_mpsc_queue_t::decoder_t::decode_pointer(T*& p) -> void
+	inline auto base_lockfree_queue_t::decoder_t::decode_pointer(T*& p) -> void
 	{
 		decode_struct(p);
 	}
 
-	inline auto base_mpsc_queue_t::decoder_t::decode_data() -> unique_memory_t
+	inline auto base_lockfree_queue_t::decoder_t::decode_data() -> unique_memory_t
 	{
 		uint32 size;
 		decode_uint32(size);
@@ -899,7 +899,7 @@ namespace atma
 	}
 
 	template <typename T>
-	inline auto base_mpsc_queue_t::decoder_t::decode_struct(T& x) -> void
+	inline auto base_lockfree_queue_t::decoder_t::decode_struct(T& x) -> void
 	{
 		auto const size = (uint32)sizeof(T);
 		for (uint32 i = 0; i != size; ++i)
@@ -911,19 +911,19 @@ namespace atma
 
 
 	template <bool DynamicGrowth>
-	struct mpsc_queue_ii_t;
+	struct lockfree_queue_ii_t;
 
 #if 1
 	template <>
-	struct mpsc_queue_ii_t<false>
-		: base_mpsc_queue_t
+	struct lockfree_queue_ii_t<false>
+		: base_lockfree_queue_t
 	{
-		mpsc_queue_ii_t(void* buf, uint32 size)
-			: base_mpsc_queue_t{buf, size}
+		lockfree_queue_ii_t(void* buf, uint32 size)
+			: base_lockfree_queue_t{buf, size}
 		{}
 
-		mpsc_queue_ii_t(uint32 size)
-			: base_mpsc_queue_t{size}
+		lockfree_queue_ii_t(uint32 size)
+			: base_lockfree_queue_t{size}
 		{}
 
 		auto allocate(uint32 size, uint32 alignment = 4, bool contiguous = false) -> allocation_t
@@ -971,15 +971,15 @@ namespace atma
 
 #if 0
 	template <>
-	struct mpsc_queue_ii_t<true>
-		: base_mpsc_queue_t
+	struct lockfree_queue_ii_t<true>
+		: base_lockfree_queue_t
 	{
-		mpsc_queue_ii_t(void* buf, uint32 size)
-			: base_mpsc_queue_t{buf, size}
+		lockfree_queue_ii_t(void* buf, uint32 size)
+			: base_lockfree_queue_t{buf, size}
 		{}
 
-		mpsc_queue_ii_t(uint32 size)
-			: base_mpsc_queue_t{size}
+		lockfree_queue_ii_t(uint32 size)
+			: base_lockfree_queue_t{size}
 		{}
 
 		auto allocate(uint32 size, uint32 alignment = 1, bool contiguous = false) -> allocation_t
@@ -1051,14 +1051,14 @@ namespace atma
 #endif
 
 	template <bool DynamicGrowth>
-	struct mpsc_queue_t : mpsc_queue_ii_t<DynamicGrowth>
+	struct lockfree_queue_t : lockfree_queue_ii_t<DynamicGrowth>
 	{
-		mpsc_queue_t(uint32 size)
-			: mpsc_queue_ii_t{size}
+		lockfree_queue_t(uint32 size)
+			: lockfree_queue_ii_t{size}
 		{}
 
-		mpsc_queue_t(void* buf, uint32 size)
-			: mpsc_queue_ii_t{buf, size}
+		lockfree_queue_t(void* buf, uint32 size)
+			: lockfree_queue_ii_t{buf, size}
 		{}
 
 		template <typename F>

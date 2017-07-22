@@ -1,7 +1,7 @@
 #pragma once
 
 #include <atma/types.hpp>
-#include <atma/mpsc_queue.hpp>
+#include <atma/lockfree_queue.hpp>
 #include <atma/threading.hpp>
 #include <atma/assert.hpp>
 #include <atma/intrusive_ptr.hpp>
@@ -69,7 +69,7 @@ namespace atma
 
 	struct logging_runtime_t
 	{
-		using log_queue_t = mpsc_queue_t<false>;
+		using log_queue_t = lockfree_queue_t<false>;
 		using handlers_t = std::set<logging_handler_t*>;
 		using replicants_t = vector<logging_runtime_t*>;
 		using visited_replicants_t = std::set<logging_runtime_t*>;

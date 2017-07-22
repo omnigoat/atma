@@ -1,6 +1,6 @@
 #include <atma/unit_test.hpp>
 
-#include <atma/mpsc_queue.hpp>
+#include <atma/lockfree_queue.hpp>
 #include <atma/threading.hpp>
 #include <atma/function.hpp>
 
@@ -10,7 +10,7 @@
 #include <mutex>
 
 
-using queue_t = atma::mpsc_queue_t<false>;
+using queue_t = atma::lockfree_queue_t<false>;
 using numbers_t = std::map<uint32, uint32>;
 
 std::atomic<uint32> counter;
@@ -69,13 +69,13 @@ void read_number(queue_t& Q, numbers_t& ns, uint32* allread)
 	}
 }
 
-SCENARIO("mpsc_queue is amazing")
+SCENARIO("lockfree_queue is amazing")
 {
 	return;
 
 	std::cout << "beginning queue test" << std::endl;
 
-	atma::mpsc_queue_t<false> Q{8 + 512};
+	atma::lockfree_queue_t<false> Q{8 + 512};
 
 	uint64 const write_thread_count = 3;
 	uint64 const read_thread_count = 3;
