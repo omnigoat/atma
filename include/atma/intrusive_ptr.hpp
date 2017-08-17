@@ -219,22 +219,33 @@ namespace atma {
 		return intrusive_ptr<Y>(static_cast<Y*>(ptr.get()));
 	}
 
-	struct enable_default_intrusive_ptr_make
+	struct enable_intrusive_ptr_make
 	{
+	private:
+		template <typename T, typename A, typename = std::void_t<>>
+		struct maker {
+			template <typename... Args>
+			static auto make(Args&&... args) -> T*
+			{
+				return new T(std::forward<Args>(args)...);
+			}
+		};
+
+		template <typename T, typename... Args>
+		struct maker<T, std::tuple<Args...>, std::void_t<decltype(T::make(std::declval<Args>()...))>>
+		{
+			template <typename... Args>
+			static auto make(Args&&... args) -> T*
+			{
+				return T::make(std::forward<Args>(args)...);
+			}
+		};
+
+	public:
 		template <typename T, typename... Args>
 		static auto make(Args&&... args) -> T*
 		{
-			return new T(std::forward<Args>(args)...);
-		}
-	};
-
-	template <typename T>
-	struct intrusive_ptr_make
-	{
-		template <typename... Args>
-		static auto make(Args&&... args) -> T*
-		{
-			return enable_default_intrusive_ptr_make::make<T>(std::forward<Args>(args)...);
+			return maker<T, std::tuple<Args...>>::make(std::forward<Args>(args)...);
 		}
 	};
 
@@ -242,7 +253,7 @@ namespace atma {
 	template <typename... Args>
 	inline auto intrusive_ptr<T>::make(Args&&... args) -> intrusive_ptr<T>
 	{
-		return intrusive_ptr{intrusive_ptr_make<T>::make(std::forward<Args>(args)...)};
+		return intrusive_ptr{enable_intrusive_ptr_make::template make<T>(std::forward<Args>(args)...)};
 	}
 
 
