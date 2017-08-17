@@ -190,7 +190,10 @@ namespace atma
 	
 		struct buffer_t
 		{
-			buffer_t() {}
+			buffer_t() 
+				: pointer()
+				, uses()
+			{}
 
 			auto housekeeping() -> housekeeping_t* { return *((housekeeping_t**)pointer - 1); }
 
@@ -677,7 +680,13 @@ namespace atma
 
 	inline auto base_lockfree_queue_t::impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void
 	{
-		static_assert(sizeof(uint64) >= sizeof(void*), "pointers too large! where are you?");
+		//static_assert(sizeof(uint64) >= sizeof(void*), "pointers too large! where are you?");
+		//housekeeping_t* hk;
+		//hkn.bu
+		//auto yay = new char[hk->buffer_size() * 2];
+		//auto hk = new (yay) housekeeping_t{yay + sizeof(housekeeping_t*), hk->buffer_size() * 2, true)};
+		//hk->
+		
 
 #if 0
 		if (jump_command_body_size <= available)
@@ -687,6 +696,8 @@ namespace atma
 			q_write_info.ui64[0] = (uint64)wb;
 			q_write_info.ui32[2] = wbs;
 			q_write_info.ui32[3] = wp;
+
+
 
 			// new-write-info
 			atma::atomic128_t nwi;
