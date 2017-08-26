@@ -103,9 +103,9 @@ auto runtime_t::initialize_watching() -> void
 			auto d = std::chrono::duration_cast<std::chrono::milliseconds>(now - info.trigger);
 			if (info.pending_change && d > std::chrono::milliseconds{100})
 			{
-				for (auto const& file : info.files)
+				for (auto const [path, action] : info.files)
 					for (auto const& c : info.callbacks)
-						c(std::get<0>(file), std::get<1>(file));
+						c(path, action);
 
 				info.pending_change = false;
 				info.files.clear();

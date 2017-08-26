@@ -118,8 +118,8 @@ namespace atma
 	template <typename T>
 	struct handle_table_t<T>::page_t
 	{
-		page_t(uint32 id)
-			: id{id}
+		page_t()
+			: id{page_max}
 			, memory{slot_max}
 			, freefield{}
 		{}
@@ -165,13 +165,13 @@ namespace atma
 			// allocate to pp
 			if (pages_size_ < page_max)
 			{
-				p = new page_t{page_max};
+				p = new page_t;
 
 				// insert page at end of chain, but don't publish it until we've
 				// established there's enough space in the table
 				if (atma::atomic_compare_exchange<page_t*>(pp, nullptr, p))
 				{
-					auto pidx = atma::atomic_post_increment<uint32>(&pages_size_);
+					auto pidx = atma::atomic_post_increment(&pages_size_);
 					if (pidx < page_max)
 					{
 						// use up the first slot so that page/slot (0, 0) can be used as invalid
@@ -184,9 +184,10 @@ namespace atma
 					}
 					else
 					{
-						// unpublish
-						*pp = nullptr;
-						delete p;
+						// at this point we can't safely delete the page, but it will be the
+						// "bookend" page that no one ever bothers with ever again. we should
+						// always reset pages_size_ though
+						atma::atomic_pre_decrement(&pages_size_);
 						goto pages_begin;
 					}
 				}
@@ -261,15 +262,15 @@ namespace atma
 	template <typename T>
 	inline auto handle_table_t<T>::release(handle_t h) -> bool
 	{
-		auto ps = lookup_handle(h);
-		if (ps.first && ps.second)
+		auto [page, slot] = lookup_handle(h);
+		if (page && slot)
 		{
-			ATMA_ASSERT(ps.second->ref_count > 0, "bad ref counts");
+			ATMA_ASSERT(slot->ref_count > 0, "bad ref counts");
 
-			if (--ps.second->ref_count == 0)
+			if (--slot->ref_count == 0)
 			{
-				ps.second->payload.~T();
-				weak_release_impl(ps.first, ps.second, h);
+				slot->payload.~T();
+				weak_release_impl(page, slot, h);
 				return true;
 			}
 		}
