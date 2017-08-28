@@ -45,7 +45,29 @@ namespace atma
 	}
 }
 
-//
+
+namespace atma
+{
+	struct alignas(4) work_token_t
+	{
+		~work_token_t()
+		{
+			// wait until all our tasks are finished
+			while (read_idx != write_idx)
+			{}
+		}
+
+	private:
+		uint16 write_idx = 0;
+		uint16 read_idx = 0;
+
+		friend struct thread_work_provider_t;
+	};
+}
+
+
+
+// thread_work_provider
 namespace atma
 {
 	struct thread_work_provider_t
@@ -66,6 +88,42 @@ namespace atma
 		virtual auto enqueue_repeat(repeat_function_t const&) -> void = 0;
 		virtual auto enqueue_repeat(repeat_function_t&&) -> void = 0;
 
+		template <typename F>
+		auto enqueue_against(work_token_t& tk, F&& f) -> void
+		{
+			// get idx for this piece of work
+			auto idx = atma::atomic_post_increment(&tk.write_idx);
+
+			auto nf = [&tk, idx, f=std::forward<F>(f)]
+			{
+				while (atma::atomic_load(&tk.read_idx) != idx) {}
+				f();
+				ATMA_ENSURE(atma::atomic_compare_exchange(&tk.read_idx, idx, uint16(idx + 1)));
+			};
+
+			enqueue(nf);
+		}
+
+		template <typename F>
+		auto enqueue_repeat_against(work_token_t& tk, F&& f) -> void
+		{
+			auto idx = atma::atomic_post_increment(&tk.write_idx);
+
+			// this lambda mutates itself every time it is called to use a different new index
+			auto nf = [&tk, idx, f=std::forward<F>(f)]() mutable -> bool
+			{
+				while (atma::atomic_load(&tk.read_idx) != idx) {}
+				auto r = f();
+				ATMA_ENSURE(atma::atomic_compare_exchange(&tk.read_idx, idx, uint16(idx + 1)));
+				if (r) {
+					idx = atma::atomic_post_increment(&tk.write_idx);
+				}
+				return r;
+			};
+
+			enqueue_repeat(nf);
+		}
+
 		auto enqueue_repeat(function_t const& fn) -> void
 		{
 			enqueue_repeat(onfly_repeat_function_t{[fn]() -> bool { fn(); return true; }});
@@ -75,8 +133,6 @@ namespace atma
 		{
 			enqueue_repeat(onfly_repeat_function_t{[fn = std::move(fn)]() -> bool { fn(); return true; }});
 		}
-
-	
 	};
 }
 
@@ -87,7 +143,8 @@ namespace atma
 	{
 		struct defer_start_t {};
 
-		explicit inplace_engine_t(defer_start_t, uint32 bufsize);
+		inplace_engine_t();
+		inplace_engine_t(defer_start_t, uint32 bufsize);
 		explicit inplace_engine_t(uint32 bufsize);
 		inplace_engine_t(void* buf, uint32 bufsize);
 		~inplace_engine_t();
@@ -117,6 +174,10 @@ namespace atma
 		std::atomic<bool> running_;
 	};
 
+	inline inplace_engine_t::inplace_engine_t()
+		: running_{false}
+		, queue_{}
+	{}
 
 	inline inplace_engine_t::inplace_engine_t(defer_start_t, uint32 bufsize)
 		: running_{false}

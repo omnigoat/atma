@@ -39,6 +39,7 @@ namespace atma
 		struct allocation_t;
 		struct decoder_t;
 
+		base_lockfree_queue_t();
 		base_lockfree_queue_t(void*, uint32);
 		base_lockfree_queue_t(uint32);
 
@@ -311,7 +312,8 @@ namespace atma
 
 
 
-
+	inline base_lockfree_queue_t::base_lockfree_queue_t()
+	{}
 
 	inline base_lockfree_queue_t::base_lockfree_queue_t(void* buf, uint32 size)
 		: base_lockfree_queue_t{buf, size, false}
@@ -929,6 +931,10 @@ namespace atma
 	struct lockfree_queue_ii_t<false>
 		: base_lockfree_queue_t
 	{
+		lockfree_queue_ii_t()
+			: base_lockfree_queue_t{}
+		{}
+
 		lockfree_queue_ii_t(void* buf, uint32 size)
 			: base_lockfree_queue_t{buf, size}
 		{}
@@ -1064,6 +1070,10 @@ namespace atma
 	template <bool DynamicGrowth>
 	struct lockfree_queue_t : lockfree_queue_ii_t<DynamicGrowth>
 	{
+		lockfree_queue_t()
+			: lockfree_queue_ii_t{}
+		{}
+
 		lockfree_queue_t(uint32 size)
 			: lockfree_queue_ii_t{size}
 		{}
