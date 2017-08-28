@@ -118,8 +118,8 @@ namespace atma
 	template <typename T>
 	struct handle_table_t<T>::page_t
 	{
-		page_t()
-			: id{page_max}
+		page_t(uint32 id)
+			: id{id}
 			, memory{slot_max}
 			, freefield{}
 		{}
@@ -165,50 +165,37 @@ namespace atma
 			// allocate to pp
 			if (pages_size_ < page_max)
 			{
-				p = new page_t;
+				auto pidx = atma::atomic_post_increment(&pages_size_);
 
-				// insert page at end of chain, but don't publish it until we've
-				// established there's enough space in the table
-				if (atma::atomic_compare_exchange<page_t*>(pp, nullptr, p))
+				auto np = new page_t{pidx};
+
+				if (pidx < page_max)
 				{
-					auto pidx = atma::atomic_post_increment(&pages_size_);
-					if (pidx < page_max)
-					{
-						// use up the first slot so that page/slot (0, 0) can be used as invalid
-						if (pidx == 0)
-							p->freefield[0] |= 0x80000000;
+					// use up the first slot so that page/slot (0, 0) can be used as invalid
+					if (pidx == 0)
+						np->freefield[0] |= 0x80000000;
 
-						// publish
-						pages_[pidx] = p;
-						atma::atomic_exchange(&p->id, pidx);
-					}
-					else
+					// publish
+					if (atma::atomic_compare_exchange<page_t*>(pages_ + pidx, nullptr, np))
 					{
-						// at this point we can't safely delete the page, but it will be the
-						// "bookend" page that no one ever bothers with ever again. we should
-						// always reset pages_size_ though
-						atma::atomic_pre_decrement(&pages_size_);
-						goto pages_begin;
+						if (atma::atomic_compare_exchange<page_t*>(pp, p, np))  {
+							p = np;
+							goto slots_begin;
+						}
+						else {
+							ATMA_ENSURE(atma::atomic_compare_exchange(pages_ + pidx, np, nullptr));
+						}
 					}
 				}
-				else
-				{
-					delete p;
-					goto pages_begin;
-				}
+				
+				delete np;
 			}
-			else
-			{
-				goto pages_begin;
-			}
-		}
-		else if (p->id == page_max)
-		{
+
 			goto pages_begin;
 		}
 
-
 		// with supposedly not-full page
+	slots_begin:
 		uint32 idx = slot_max;
 		for (auto i = 0u, ie = std::max(1u, slot_max / 32); i != ie; ++i)
 		{
