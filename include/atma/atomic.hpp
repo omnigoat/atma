@@ -50,6 +50,7 @@ namespace atma
 #define ADDR_CAST(type, x) reinterpret_cast<type*>(x)
 #define VALUE_CAST(type, x) reinterpret_cast<type&>(x)
 
+#define ATMA_ASSERT_16BIT_ALIGNED(addr) ATMA_ASSERT((uint64)addr % 2 == 0, "not aligned to 2-byte boundary")
 #define ATMA_ASSERT_32BIT_ALIGNED(addr) ATMA_ASSERT((uint64)addr % 4 == 0, "not aligned to 4-byte boundary")
 #define ATMA_ASSERT_64BIT_ALIGNED(addr) ATMA_ASSERT((uint64)addr % 8 == 0, "not aligned to 8-byte boundary")
 
@@ -75,6 +76,15 @@ namespace atma
 		template <typename D, typename S>
 		struct interlocked_impl_t<D, S, 16>
 		{
+			static auto load(D volatile* dest, S volatile* addr, memory_order order = memory_order::memory_order_seq_cst) -> void
+			{
+				ATMA_ASSERT_16BIT_ALIGNED(addr);
+				// loads from 2-byte aligned addresses are atomic on x86/x64
+				*(SHORT volatile*)dest = *(SHORT volatile*)addr;
+				_ReadWriteBarrier();
+				// no fencing required on x86/x64
+			}
+
 			static auto pre_inc(void volatile* addr) -> D
 			{
 				auto v = InterlockedIncrement16((SHORT*)addr);

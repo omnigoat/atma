@@ -76,9 +76,9 @@ namespace atma
 
 
 	private:
-		size_t capacity_;
-		size_t size_;
-		char* data_;
+		size_t capacity_ = 0;
+		size_t size_ = 0;
+		char* data_ = 0;
 
 		friend class utf16_string_t;
 	};

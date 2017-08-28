@@ -58,6 +58,7 @@ namespace rose
 		// placed last for good reason (other thread still using members!)
 		atma::inplace_engine_t filewatch_engine_;
 		atma::thread_work_provider_t* work_provider_;
+		atma::work_token_t token_;
 		std::atomic_bool running_ = false;
 
 		friend VOID CALLBACK FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped);

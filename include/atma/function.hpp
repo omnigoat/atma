@@ -62,19 +62,12 @@ namespace atma::detail
 	struct functor_buf_t
 	{
 		template <typename FN = void>
-		auto exbuf_address() -> FN* { return *(FN**)this; }
+		auto exbuf_address() const -> FN* { return *(FN**)this; }
 
 		template <typename FN = void>
-		auto exbuf_address() const -> FN const* { return *(FN const**)this; }
+		auto relative_exbuf_address() const -> FN* { return (FN*)((byte const*)this + *(intptr*)this); }
 
-		template <typename FN = void>
-		auto relative_exbuf_address() -> FN* { return (FN*)((byte*)this + *(intptr*)this); }
-
-		template <typename FN = void>
-		auto relative_exbuf_address() const -> FN const* { return (FN const*)((byte const*)this + *(intptr*)this); }
-
-		template <typename FN = void> auto functor_address() -> FN* { return (FN*)((byte const*)this + sizeof(void*)); }
-		template <typename FN = void> auto functor_address() const -> FN const* { return (FN const*)((byte const*)this + sizeof(void*)); }
+		template <typename FN = void> auto functor_address() const -> FN* { return (FN*)((byte const*)this + sizeof(void*)); }
 
 		auto assign_exbuf(void* p) {
 			if (p != nullptr)

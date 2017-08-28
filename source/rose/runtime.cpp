@@ -64,8 +64,7 @@ runtime_t::runtime_t()
 {}
 
 runtime_t::runtime_t(atma::thread_work_provider_t* wp)
-	: filewatch_engine_{atma::inplace_engine_t::defer_start_t{}, 512}
-	, work_provider_{wp}
+	: work_provider_{wp}
 {}
 
 runtime_t::~runtime_t()
@@ -90,11 +89,12 @@ auto runtime_t::initialize_watching() -> void
 {
 	work_provider_->ensure_running();
 
-	work_provider_->enqueue_repeat([&] {
+	work_provider_->enqueue_repeat_against(token_, [&]() -> bool {
 		auto status = WaitForMultipleObjectsEx((DWORD)dir_handles_.size(), dir_handles_.data(), FALSE, 100, TRUE);
+		return true;
 	});
 
-	work_provider_->enqueue_repeat([&]
+	work_provider_->enqueue_repeat_against(token_, [&]() -> bool
 	{
 		auto now = std::chrono::high_resolution_clock::now();
 
@@ -111,7 +111,9 @@ auto runtime_t::initialize_watching() -> void
 				info.files.clear();
 			}
 		}
-	});	
+
+		return true;
+	});
 }
 
 auto runtime_t::register_directory_watch(
@@ -135,7 +137,7 @@ auto runtime_t::register_directory_watch(
 		notify |= FILE_NOTIFY_CHANGE_SECURITY;
 
 
-	work_provider_->enqueue([&, path, recursive, notify, callback]
+	work_provider_->enqueue_against(token_, [&, path, recursive, notify, callback]
 	{
 		auto candidate = dir_watchers_.find(path);
 		if (candidate != dir_watchers_.end())
