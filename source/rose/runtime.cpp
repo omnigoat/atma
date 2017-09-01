@@ -89,12 +89,11 @@ auto runtime_t::initialize_watching() -> void
 {
 	work_provider_->ensure_running();
 
-	work_provider_->enqueue_repeat_against(token_, [&]() -> bool {
+	work_provider_->enqueue_repeat_against(token_, [&]() -> {
 		auto status = WaitForMultipleObjectsEx((DWORD)dir_handles_.size(), dir_handles_.data(), FALSE, 100, TRUE);
-		return true;
 	});
 
-	work_provider_->enqueue_repeat_against(token_, [&]() -> bool
+	work_provider_->enqueue_repeat_against(token_, [&]()
 	{
 		auto now = std::chrono::high_resolution_clock::now();
 
@@ -111,8 +110,6 @@ auto runtime_t::initialize_watching() -> void
 				info.files.clear();
 			}
 		}
-
-		return true;
 	});
 }
 

@@ -52,16 +52,56 @@ namespace atma
 	{
 		~work_token_t()
 		{
+			flags_ |= 1;
+
 			// wait until all our tasks are finished
 			while (read_idx != write_idx)
 			{}
 		}
 
+		auto valid() const { return (flags_ & 1) != 0; }
+
+		auto generate_idx()           -> uint16 { return atma::atomic_post_increment(&write_idx); }
+		auto wait_for_idx(uint16 idx) -> void   { while (atma::atomic_load(&read_idx) != idx); }
+		auto consume_idx(uint16 idx)  -> void   { ATMA_ENSURE(atma::atomic_compare_exchange(&read_idx, idx, uint16(idx + 1))); }
+
+		template <typename F, typename... Args>
+		auto execute_for_idx(uint16 idx, F&& f, Args&&... args)
+		{
+			using result_type = decltype(std::invoke(std::forward<F>(f), std::forward<Args>(args)...));
+
+			return execute_for_idx_impl(
+				std::conditional_t<std::is_void_v<result_type>, void_tag, nonvoid_tag>{},
+				idx,
+				std::forward<F>(f),
+				std::forward<Args>(args)...);
+		}
+
+	private:
+		struct void_tag {};
+		struct nonvoid_tag {};
+
+		template <typename F, typename... Args>
+		auto execute_for_idx_impl(void_tag, uint16 idx, F&& f, Args&&... args)
+		{
+			wait_for_idx(idx);
+			std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+			consume_idx(idx);
+		}
+
+		template <typename F, typename... Args>
+		auto execute_for_idx_impl(nonvoid_tag, uint16 idx, F&& f, Args&&... args)
+		{
+			wait_for_idx(idx);
+			auto r = std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+			consume_idx(idx);
+			return r;
+		}
+
 	private:
 		uint16 write_idx = 0;
 		uint16 read_idx = 0;
-
-		friend struct thread_work_provider_t;
+		uint32 flags_ = 0;
 	};
 }
 
@@ -88,52 +128,66 @@ namespace atma
 		virtual auto enqueue_repeat(repeat_function_t const&) -> void = 0;
 		virtual auto enqueue_repeat(repeat_function_t&&) -> void = 0;
 
-		template <typename F>
-		auto enqueue_against(work_token_t& tk, F&& f) -> void
-		{
-			// get idx for this piece of work
-			auto idx = atma::atomic_post_increment(&tk.write_idx);
+		// token-based work
+		auto enqueue_against(work_token_t&, function_t const&) -> void;
+		auto enqueue_against(work_token_t&, function_t&&) -> void;
+		auto enqueue_repeat_against(work_token_t& tk, repeat_function_t const& f) -> void;
+		auto enqueue_repeat_against(work_token_t& tk, repeat_function_t&& f) -> void;
 
-			auto nf = [&tk, idx, f=std::forward<F>(f)]
-			{
-				while (atma::atomic_load(&tk.read_idx) != idx) {}
-				f();
-				ATMA_ENSURE(atma::atomic_compare_exchange(&tk.read_idx, idx, uint16(idx + 1)));
-			};
-
-			enqueue(nf);
-		}
-
-		template <typename F>
-		auto enqueue_repeat_against(work_token_t& tk, F&& f) -> void
-		{
-			auto idx = atma::atomic_post_increment(&tk.write_idx);
-
-			// this lambda mutates itself every time it is called to use a different new index
-			auto nf = [&tk, idx, f=std::forward<F>(f)]() mutable -> bool
-			{
-				while (atma::atomic_load(&tk.read_idx) != idx) {}
-				auto r = f();
-				ATMA_ENSURE(atma::atomic_compare_exchange(&tk.read_idx, idx, uint16(idx + 1)));
-				if (r) {
-					idx = atma::atomic_post_increment(&tk.write_idx);
-				}
-				return r;
-			};
-
-			enqueue_repeat(nf);
-		}
-
-		auto enqueue_repeat(function_t const& fn) -> void
-		{
-			enqueue_repeat(onfly_repeat_function_t{[fn]() -> bool { fn(); return true; }});
-		}
-
-		auto enqueue_repeat(function_t&& fn) -> void
-		{
-			enqueue_repeat(onfly_repeat_function_t{[fn = std::move(fn)]() -> bool { fn(); return true; }});
-		}
+		// allow void functions to be repeated forever
+		auto enqueue_repeat(function_t const& fn) -> void { enqueue_repeat([fn]() -> bool { fn(); return true; }); }
+		auto enqueue_repeat(function_t&& fn) -> void { enqueue_repeat([fn = std::move(fn)]() -> bool { fn(); return true; }); }
+		auto enqueue_repeat_against(work_token_t& tk, function_t const& f) -> void { enqueue_repeat_against(tk, [f] { f(); return true; }); }
+		auto enqueue_repeat_against(work_token_t& tk, function_t&& f) -> void { enqueue_repeat_against(tk, [f=std::move(f)] { f(); return true; }); }
 	};
+
+	inline auto thread_work_provider_t::enqueue_against(work_token_t& tk, function_t const& f) -> void
+	{
+		auto nf = [&tk, idx=tk.generate_idx(), f]() {
+			tk.execute_for_idx(idx, f);
+		};
+
+		enqueue(nf);
+	}
+
+	inline auto thread_work_provider_t::enqueue_against(work_token_t& tk, function_t&& f) -> void
+	{
+		auto nf = [&tk, idx=tk.generate_idx(), f=std::move(f)]() {
+			tk.execute_for_idx(idx, f);
+		};
+
+		enqueue(nf);
+	}
+
+	inline auto thread_work_provider_t::enqueue_repeat_against(work_token_t& tk, repeat_function_t const& f) -> void
+	{
+		// this lambda mutates itself every time it is called to use a different token-index
+		auto nf = [&tk, idx=tk.generate_idx(), f]() mutable -> bool
+		{
+			auto r = tk.execute_for_idx(idx, f);
+			auto rr = r && tk.valid();
+			if (rr)
+				idx = tk.generate_idx();
+			return rr;
+		};
+
+		enqueue_repeat(nf);
+	}
+
+	inline auto thread_work_provider_t::enqueue_repeat_against(work_token_t& tk, repeat_function_t&& f) -> void
+	{
+		// this lambda mutates itself every time it is called to use a different token-index
+		auto nf = [&tk, idx=tk.generate_idx(), f=std::move(f)]() mutable -> bool
+		{
+			auto r = tk.execute_for_idx(idx, f);
+			auto rr = r && tk.valid();
+			if (rr)
+				idx = tk.generate_idx();
+			return rr;
+		};
+
+		enqueue_repeat(nf);
+	}
 }
 
 // inplace_engine_t
