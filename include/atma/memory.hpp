@@ -8,49 +8,6 @@
 
 
 //
-//
-//
-namespace atma
-{
-	template <typename T, typename A = aligned_allocator<T>>
-	inline auto memory_construct_default(T* dest, size_t count, A& allocator = A()) -> void
-	{
-		for (auto v = dest; v != dest + count; ++v)
-			allocator.construct(v);
-	}
-
-	template <typename T, typename A = aligned_allocator<T>>
-	inline auto memory_construct_copy(T* dest, T const& x, size_t count, A& allocator = A()) -> void
-	{
-		for (auto v = dest; v != dest + count; ++v)
-			allocator.construct(v, x);
-	}
-
-	template <typename T, typename A = aligned_allocator<T>>
-	inline auto memory_construct_copy_range(T* dest, T const* src, size_t count, A& allocator = A()) -> void
-	{
-		for (auto v = dest; v != dest + count; ++v, ++src)
-			allocator.construct(v, *src);
-	}
-
-	template <typename T, typename A = aligned_allocator<T>>
-	inline auto memory_construct_move(T* dest, T&& x, A& allocator = A()) -> void
-	{
-		allocator.construct(*dest, std::move(x));
-	}
-
-	template <typename T, typename A = aligned_allocator<T>>
-	inline auto memory_destruct(T* dest, size_t count, A& allocator = A()) -> void
-	{
-		for (auto v = dest; v != dest + count; ++v)
-			allocator.destroy(v);
-	}
-}
-
-
-
-
-//
 //  memory_t
 //  -------------
 //
@@ -64,7 +21,11 @@ namespace atma
 //      - this class doesn't manage the lifetime of the memory allocated within it.
 //        it will NOT deallocate on destruction, will not deallocate if assigned 
 //        another instance, and shoot you in your face if you mismanage your memory.
-// 
+//
+//      - this type doesn't handle your array bounds for you. if you allocate N
+//        objects and then access objects at positions N+, you will be in random
+//        memory territory, with no warning.
+//
 namespace atma
 {
 	namespace detail
@@ -128,26 +89,27 @@ namespace atma
 	template <typename T, typename Allocator = atma::aligned_allocator_t<T>>
 	struct memory_t : detail::base_memory_t<T, Allocator>
 	{
-		using alloc_type = Allocator;
 		using value_type = T;
 		using allocator_type = Allocator;
 		using reference = value_type&;
+		using pointer = value_type*;
 
 		explicit memory_t(allocator_type const& = allocator_type());
 		explicit memory_t(value_type* data, allocator_type const& = allocator_type());
 		explicit memory_t(size_t capacity, allocator_type const& = allocator_type());
 		template <typename B> memory_t(memory_t<T, B> const&);
 
+		auto operator = (memory_t<T, Allocator> const&) -> memory_t& = default;
 		auto operator = (value_type*) -> memory_t&;
 		template <typename B> auto operator = (memory_t<T, B> const&) -> memory_t&;
-
-		auto data() const -> value_type* { return ptr_; }
 
 		operator value_type*() const { return ptr_; }
 		operator value_type const*() const { return ptr_; }
 
 		auto operator *  () const -> reference;
 		auto operator [] (intptr) const -> reference;
+		auto operator -> () const -> pointer;
+		auto operator +  (intptr) const -> pointer;
 
 		// allocator interface
 		auto allocate(size_t) -> void;
@@ -159,12 +121,13 @@ namespace atma
 		template <typename... Args>
 		auto construct_range(size_t idx, size_t count, Args&&...) -> void;
 
-		auto construct_copy_range(size_t idx, value_type const* src, size_t count) -> void;
-		auto construct_move_range(size_t idx, value_type* src, size_t count) -> void;
-		auto construct_move_range(size_t idx, memory_t& src, size_t src_idx, size_t count) -> void;
+		// copy-construct from ranges
+		auto copy_construct_range(size_t idx, value_type const* src, size_t count) -> void;
+		template <typename H> auto copy_construct_range(size_t idx, H begin, H end) -> void;
 
-		template <typename H>
-		auto construct_copy_range(size_t idx, H begin, H end) -> void;
+		// move-construct from ranges
+		auto move_construct_range(size_t idx, value_type* src, size_t count) -> void;
+		template <typename H> auto move_construct_range(size_t idx, H begin, H end) -> void;
 
 		auto destruct(size_t idx, size_t count) -> void;
 
@@ -174,9 +137,9 @@ namespace atma
 		auto memcpy(size_t idx, value_type const*, size_t count) -> void;
 
 	private:
-		using alloc_traits = std::allocator_traits<alloc_type>;
+		using alloc_traits = std::allocator_traits<allocator_type>;
 
-		value_type* ptr_;
+		value_type* ptr_ = nullptr;
 	};
 
 
@@ -185,7 +148,6 @@ namespace atma
 	template <typename T, typename A>
 	inline memory_t<T, A>::memory_t(A const& allocator)
 		: detail::base_memory_t<T, A>(allocator)
-		, ptr_()
 	{}
 
 	template <typename T, typename A>
@@ -197,7 +159,6 @@ namespace atma
 	template <typename T, typename A>
 	inline memory_t<T, A>::memory_t(size_t capacity, A const& alloc)
 		: detail::base_memory_t<T, A>(alloc)
-		, ptr_()
 	{
 		allocate(capacity);
 	}
@@ -238,6 +199,18 @@ namespace atma
 	}
 
 	template <typename T, typename A>
+	inline auto memory_t<T, A>::operator -> () const -> pointer
+	{
+		return ptr_;
+	}
+
+	template <typename T, typename A>
+	inline auto memory_t<T, A>::operator + (intptr idx) const -> pointer
+	{
+		return ptr_ + idx;
+	}
+
+	template <typename T, typename A>
 	inline auto memory_t<T, A>::allocate(size_t count) -> void
 	{
 		ptr_ = alloc_traits::allocate(this->allocator(), count);
@@ -260,29 +233,22 @@ namespace atma
 	template <typename... Args>
 	inline auto memory_t<T, A>::construct_range(size_t idx, size_t count, Args&&... args) -> void
 	{
-		for (size_t i = 0, j = idx; i != count; ++i, ++j)
-			alloc_traits::construct(this->allocator(), ptr_ + j, std::forward<Args>(args)...);
+		for (size_t i = idx; count --> 0; ++i)
+			alloc_traits::construct(this->allocator(), ptr_ + i, std::forward<Args>(args)...);
 	}
 
 	template <typename T, typename A>
-	inline auto memory_t<T, A>::construct_copy_range(size_t idx, T const* src, size_t count) -> void
+	inline auto memory_t<T, A>::copy_construct_range(size_t idx, T const* src, size_t count) -> void
 	{
-		for (size_t i = 0, j = idx; i != count; ++i, ++j)
-			alloc_traits::construct(this->allocator(), ptr_ + j, src[i]);
+		for (size_t i = idx; count --> 0; ++i)
+			alloc_traits::construct(this->allocator(), ptr_ + i, src[i]);
 	}
 
 	template <typename T, typename A>
-	inline auto memory_t<T, A>::construct_move_range(size_t idx, T* x, size_t count) -> void
+	inline auto memory_t<T, A>::move_construct_range(size_t idx, T* src, size_t count) -> void
 	{
-		for (size_t i = 0, j = idx; i != count; ++i, ++j)
-			alloc_traits::construct(this->allocator(), ptr_ + j, std::move(x[i]));
-	}
-
-	template <typename T, typename A>
-	inline auto memory_t<T, A>::construct_move_range(size_t idx, memory_t<T, A>& src, size_t src_idx, size_t count) -> void
-	{
-		for (auto i = size_t(), j = idx, k = src_idx; i != count; ++i, ++j, ++k)
-			alloc_traits::construct(this->allocator(), ptr_ + j, std::move(src[k]));
+		for (size_t i = idx; count --> 0; ++i)
+			alloc_traits::construct(this->allocator(), ptr_ + i, std::move(src[i]));
 	}
 
 	template <typename T, typename A>
@@ -306,21 +272,28 @@ namespace atma
 
 	template <typename T, typename A>
 	template <typename H>
-	inline auto memory_t<T, A>::construct_copy_range(size_t idx, H begin, H end) -> void
+	inline auto memory_t<T, A>::copy_construct_range(size_t idx, H begin, H end) -> void
 	{
 		for (size_t i = 0; begin != end; ++i, ++begin)
 			alloc_traits::construct(this->allocator(), ptr_ + idx + i, *begin);
 	}
 
 	template <typename T, typename A>
-	inline auto operator + (memory_t<T,A> const& lhs, int64 x) -> memory_t<T,A>
+	template <typename H>
+	inline auto memory_t<T, A>::move_construct_range(size_t idx, H begin, H end) -> void
 	{
-		return memory_t<T,A>{lhs.data() + x, lhs.allocator()};
+		for (size_t i = 0; begin != end; ++i, ++begin)
+			alloc_traits::construct(this->allocator(), ptr_ + idx + i, std::move(*begin));
 	}
 
 
 
 
+	template <typename T, typename A>
+	inline auto operator + (memory_t<T,A> const& lhs, typename memory_t<T,A>::allocator_type::difference_type x) -> memory_t<T,A>
+	{
+		return lhs.data() + x;
+	}
 
 }
 

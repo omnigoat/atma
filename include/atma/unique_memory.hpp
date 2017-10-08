@@ -13,6 +13,7 @@ namespace atma
 	template <typename Alloc>
 	struct basic_unique_memory_t
 	{
+		using allocator_type = Alloc;
 		using backing_t = atma::memory_t<byte, Alloc>;
 
 		basic_unique_memory_t();
@@ -122,25 +123,25 @@ namespace atma
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::begin() const -> byte const*
 	{
-		return memory_.data();
+		return memory_;
 	}
 
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::end() const -> byte const*
 	{
-		return memory_.data() + size_;
+		return memory_ + size_;
 	}
 
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::begin() -> byte*
 	{
-		return memory_.data();
+		return memory_;
 	}
 
 	template <typename A>
 	inline auto basic_unique_memory_t<A>::end() -> byte*
 	{
-		return memory_.data() + size_;
+		return memory_ + size_;
 	}
 
 	template <typename A>
@@ -203,9 +204,9 @@ namespace atma
 			, end_(end)
 		{}
 
+		auto size() const -> size_t { return end_ - begin_; }
 		auto begin() const -> E* { return begin_; }
 		auto end() const -> E* { return end_; }
-		auto size() const -> size_t { return end() - begin(); }
 
 		auto operator [](size_t idx) const -> E&
 		{
