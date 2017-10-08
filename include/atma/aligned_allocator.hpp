@@ -3,8 +3,6 @@
 #include <atma/types.hpp>
 #include <atma/platform/allocation.hpp>
 
-#include <cstdint>
-
 
 namespace atma
 {
@@ -17,17 +15,17 @@ namespace atma
 		using pointer         = value_type*;
 		using const_pointer   = value_type const*;
 
-		// must provide rebind because of non-type template paramter A
+		// must provide rebind because of non-type template parameter A
 		template <typename U>
-		struct rebind { typedef aligned_allocator_t<U, A> other; };
+		struct rebind { using other = aligned_allocator_t<U, A>; };
 
 		aligned_allocator_t() {}
 
 		template <typename U>
 		aligned_allocator_t(aligned_allocator_t<U, A> const&) {}
 
-		auto allocate(size_type n) -> pointer;
-		auto deallocate(pointer p, size_type) -> void;
+		auto allocate(size_type) -> pointer;
+		auto deallocate(pointer, size_type) -> void;
 	};
 
 	template <size_t A>
@@ -38,7 +36,7 @@ namespace atma
 		using const_pointer = value_type const*;
 
 		template <typename U>
-		struct rebind { typedef aligned_allocator_t<U, A> other; };
+		struct rebind { using other = aligned_allocator_t<U, A>; };
 	};
 
 
