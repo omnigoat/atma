@@ -170,7 +170,7 @@ namespace atma
 		, size_(rhs.size_)
 	{
 		imem_.allocate(capacity_);
-		imem_.construct_copy_range(0, rhs.imem_.data(), size_);
+		imem_.copy_construct_range(0, rhs.imem_, size_);
 	}
 
 	template <typename T, typename A>
@@ -234,37 +234,37 @@ namespace atma
 	template <typename T, typename A>
 	inline auto vector<T, A>::cbegin() const -> T const*
 	{
-		return imem_.data();
+		return imem_;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T, A>::cend() const -> T const*
 	{
-		return imem_.data() + size_;
+		return imem_ + size_;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::begin() const -> T const*
 	{
-		return imem_.data();
+		return imem_;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::end() const -> T const*
 	{
-		return imem_.data() + size_;
+		return imem_ + size_;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::begin() -> T*
 	{
-		return imem_.data();
+		return imem_;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T,A>::end() -> T*
 	{
-		return imem_.data() + size_;
+		return imem_ + size_;
 	}
 
 	template <typename T, typename A>
@@ -298,13 +298,13 @@ namespace atma
 	template <typename T, typename A>
 	inline auto vector<T, A>::data() -> T*
 	{
-		return imem_.data();
+		return imem_;
 	}
 
 	template <typename T, typename A>
 	inline auto vector<T, A>::data() const -> T const*
 	{
-		return imem_.data();
+		return imem_;
 	}
 
 	template <typename T, typename A>
@@ -486,7 +486,7 @@ namespace atma
 		IMEM_GUARD_LT(size_ + rangesize);
 
 		imem_.memmove(offset + 1 + rangesize, offset + 1, size_ - offset);
-		imem_.construct_copy_range(offset, start, end);
+		imem_.copy_construct_range(offset, start, end);
 		size_ += rangesize;
 	}
 
@@ -519,13 +519,13 @@ namespace atma
 		{
 			auto tmp = internal_memory_t{std::move(imem_)};
 			imem_.allocate(newcap);
-			imem_.construct_move_range(0, tmp, 0, offset);
-			imem_.construct_move_range(offset, tmp, offset_end, tailsize);
+			imem_.move_construct_range(0, tmp, 0, offset);
+			imem_.move_construct_range(offset, tmp + offset_end, tailsize);
 			tmp.deallocate();
 		}
 		else
 		{
-			imem_.construct_move_range(offset, imem_, offset_end, tailsize);
+			imem_.move_construct_range(offset, imem_, offset_end, tailsize);
 			imem_.destruct(offset_end, tailsize);
 		}
 
@@ -566,7 +566,7 @@ namespace atma
 			}
 			else {
 				imem_.allocate(newcap);
-				imem_.construct_move_range(0, tmp.data(), size_);
+				imem_.move_construct_range(0, tmp, size_);
 			}
 			
 			tmp.destruct(0, size_);

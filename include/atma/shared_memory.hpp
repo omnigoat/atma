@@ -7,16 +7,17 @@ namespace atma
 {
 	struct shared_memory_t
 	{
-		explicit shared_memory_t();
-		explicit shared_memory_t(uint size);
-		shared_memory_t(uint size, void* data);
-		shared_memory_t(uint alignment, uint size);
-		shared_memory_t(uint alignment, uint size, void* data);
+		shared_memory_t() = default;
+		explicit shared_memory_t(size_t size);
+		explicit shared_memory_t(size_t size, void* data);
+		explicit shared_memory_t(size_t alignment, size_t size);
+		explicit shared_memory_t(size_t alignment, size_t size, void* data);
 		shared_memory_t(shared_memory_t const&);
 		shared_memory_t(shared_memory_t&&);
 		~shared_memory_t();
 
 		auto operator = (shared_memory_t const&) -> shared_memory_t&;
+		auto operator = (shared_memory_t&&) -> shared_memory_t&;
 
 		auto size() const -> size_t;
 		auto begin() -> char*;
@@ -25,42 +26,36 @@ namespace atma
 		auto end() const -> char const*;
 
 	private:
+		auto internal_size() -> size_t;
 		auto decrement() -> void;
 		auto increment() -> void;
 
+		auto ref() -> std::atomic_uint32_t&;
+
 	private:
-		char* data_;
-		std::atomic_int32_t* ref_;
+		byte* data_ = nullptr;
 	};
 
 
 
 
-	inline shared_memory_t::shared_memory_t()
-		: data_(), ref_()
-	{
-		
-	}
-
-	inline shared_memory_t::shared_memory_t(uint size)
+	inline shared_memory_t::shared_memory_t(size_t size)
 		: shared_memory_t(4, size)
-	{
-	}
+	{}
 
-	inline shared_memory_t::shared_memory_t(uint size, void* data)
+	inline shared_memory_t::shared_memory_t(size_t size, void* data)
 		: shared_memory_t(4, size, data)
+	{}
+
+	inline shared_memory_t::shared_memory_t(size_t alignment, size_t size)
+		: data_((char*)platform::allocate_aligned_memory(alignment, size + sizeof(std::atomic_size_t)))
 	{
+		new (&ref()) std::atomic_size_t{1};
 	}
 
-	inline shared_memory_t::shared_memory_t(uint alignment, uint size)
-		: data_((char*)platform::allocate_aligned_memory(alignment, size + sizeof(std::atomic_int32_t)))
-		, ref_(new (data_ + size) std::atomic_int32_t{1})
-	{
-	}
-
-	inline shared_memory_t::shared_memory_t(uint alignment, uint size, void* data)
-		: data_((char*)platform::allocate_aligned_memory(alignment, size + sizeof(std::atomic_int32_t)))
-		, ref_(new (data_ + size) std::atomic_int32_t{1})
+	inline shared_memory_t::shared_memory_t(size_t alignment, size_t size, void* data)
+		: data_((char*)platform::allocate_aligned_memory(alignment, size + sizeof(std::atomic_size_t)))
+		, ref_(new (data_ + size) std::atomic_size_t{1})
 	{
 		memcpy(data_, data, size);
 	}
@@ -92,6 +87,16 @@ namespace atma
 		return *this;
 	}
 
+	inline auto shared_memory_t::operator = (shared_memory_t&& rhs) -> shared_memory_t&
+	{
+		std::swap(data_, rhs.data_);
+		std::swap(ref_, rhs.ref_);
+		data_ = rhs.data_;
+		ref_ = rhs.ref_;
+		increment();
+		return *this;
+	}
+
 	inline auto shared_memory_t::size() const -> size_t
 	{
 		return reinterpret_cast<char*>(ref_) - data_;
@@ -115,6 +120,11 @@ namespace atma
 	inline auto shared_memory_t::end() const -> char const*
 	{
 		return reinterpret_cast<char const*>(ref_);
+	}
+
+	inline auto shared_memory_t::internal_size() const -> size_t
+	{
+		return sizeof(size_t) + size() + sizeof(std::atomic_size_t);
 	}
 
 	inline auto shared_memory_t::decrement() -> void
