@@ -166,10 +166,12 @@ namespace atma {
 	namespace detail
 	{
 		template <typename Bindings> struct highest_placeholder_tx;
+		template <typename Bindings> constexpr int highest_placeholder_v = highest_placeholder_tx<Bindings>::value;
 
 		template <int I, typename... Bindings>
 		struct highest_placeholder_tx<std::tuple<placeholder_t<I>, Bindings...>> {
-			static int const value = I > highest_placeholder_v<std::tuple<Bindings...>> ? I : highest_placeholder_tx<std::tuple<Bindings...>>::value;
+			static int const v2 = highest_placeholder_v<std::tuple<Bindings...>>;
+			static int const value = (I > v2) ? I : highest_placeholder_tx<std::tuple<Bindings...>>::value;
 		};
 
 		template <typename X, typename... Bindings>
@@ -184,8 +186,7 @@ namespace atma {
 			static int const value = -1;
 		};
 
-		template <typename Bindings>
-		constexpr int highest_placeholder_v = highest_placeholder_tx<Bindings>::value;
+		
 	}
 
 
@@ -485,7 +486,7 @@ namespace atma {
 	template <typename F>
 	inline auto flip(F&& f) -> bind_t<F, tuple_flip_t<detail::curried_bindings_t<F>>>
 	{
-		return {f, tuple_flip_t<curried_bindings_t<F>>()};
+		return {f, tuple_flip_t<detail::curried_bindings_t<F>>()};
 	}
 
 }

@@ -693,38 +693,39 @@ namespace atma
 	struct basic_generic_function_t<BS, FS, R(Params...)>
 		: base_function_t<BS, R(Params...)>
 	{
+		using super_type = base_function_t<BS, R(Params...)>;
 		using this_type = basic_generic_function_t<BS, FS, R(Params...)>;
 
 		basic_generic_function_t()
-			: base_function_t{detail::generate_vtable<BS, FS, decltype(&empty_fn<R>), R, Params...>()}
+			: super_type{detail::generate_vtable<BS, FS, decltype(&super_type::template empty_fn<R>), R, Params...>()}
 		{
-			detail::constructing_t<BS, FS, decltype(&empty_fn<R>)>::construct(buf_, nullptr, &empty_fn<R>);
+			detail::constructing_t<BS, FS, decltype(&super_type::template empty_fn<R>)>::construct(this->buf_, nullptr, &super_type::template empty_fn<R>);
 		}
 
 		basic_generic_function_t(basic_generic_function_t const& rhs)
-			: base_function_t{rhs.vtable_->mk_vtable(BS, FS)}
+			: super_type{rhs.vtable_->mk_vtable(BS, FS)}
 		{
-			rhs.vtable_->assign_into(buf_, vtable_, rhs.buf_);
+			rhs.vtable_->assign_into(this->buf_, this->vtable_, rhs.buf_);
 		}
 
 		basic_generic_function_t(basic_generic_function_t&& rhs)
-			: base_function_t{rhs.vtable_->mk_vtable(BS, FS)}
+			: super_type{rhs.vtable_->mk_vtable(BS, FS)}
 		{
-			rhs.vtable_->move_into(buf_, vtable_, std::move(rhs.buf_));
+			rhs.vtable_->move_into(this->buf_, this->vtable_, std::move(rhs.buf_));
 		}
 
 		template <size_t RBS, functor_storage_t RS>
 		basic_generic_function_t(basic_generic_function_t<RBS, RS, R(Params...)> const& rhs)
-			: base_function_t{rhs.vtable_->mk_vtable(BS, FS)}
+			: super_type{rhs.vtable_->mk_vtable(BS, FS)}
 		{
-			rhs.vtable_->assign_into(buf_, vtable_, rhs.buf_);
+			rhs.vtable_->assign_into(this->buf_, this->vtable_, rhs.buf_);
 		}
 
 		template <size_t RBS, functor_storage_t RS>
 		basic_generic_function_t(basic_generic_function_t<RBS, RS, R(Params...)>&& rhs)
-			: base_function_t{rhs.vtable_->mk_vtable(BS, FS)}
+			: super_type{rhs.vtable_->mk_vtable(BS, FS)}
 		{
-			rhs.vtable_->move_into(buf_, vtable_, std::move(rhs.buf_));
+			rhs.vtable_->move_into(this->buf_, this->vtable_, std::move(rhs.buf_));
 		}
 
 		template <size_t RBS, functor_storage_t RS>
@@ -741,17 +742,17 @@ namespace atma
 			typename = std::enable_if_t<detail::result_matches_v<R, FN, Params...>>,
 			typename = std::enable_if_t<!std::is_base_of_v<base_function_prime_t, std::decay_t<FN>>>>
 		basic_generic_function_t(FN&& fn)
-			: base_function_t{detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>()}
+			: super_type{detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>()}
 		{
 			static_assert(FS == functor_storage_t::heap, "only heap-style functions can be initialized without external buffers");
-			detail::constructing_t<BS, FS, std::decay_t<FN>>::construct(buf_, nullptr, std::forward<FN>(fn));
+			detail::constructing_t<BS, FS, std::decay_t<FN>>::construct(this->buf_, nullptr, std::forward<FN>(fn));
 		}
 
 		auto operator = (this_type const& rhs) -> this_type&
 		{
 			if (this != &rhs)
 			{
-				rhs.vtable_->assign_into(buf_, vtable_, rhs.buf_);
+				rhs.vtable_->assign_into(this->buf_, this->vtable_, rhs.buf_);
 			}
 
 			return *this;
@@ -761,7 +762,7 @@ namespace atma
 		{
 			if (this != &rhs)
 			{
-				rhs.vtable_->move_into(buf_, vtable_, std::move(rhs.buf_));
+				rhs.vtable_->move_into(this->buf_, this->vtable_, std::move(rhs.buf_));
 			}
 
 			return *this;
@@ -772,7 +773,7 @@ namespace atma
 		{
 			if (this != &rhs)
 			{
-				rhs.vtable_->assign_into(buf_, vtable_, rhs.buf_);
+				rhs.vtable_->assign_into(this->buf_, this->vtable_, rhs.buf_);
 			}
 
 			return *this;
@@ -783,7 +784,7 @@ namespace atma
 		{
 			if (this != &rhs)
 			{
-				rhs.vtable_->move_into(buf_, vtable_, rhs.buf_);
+				rhs.vtable_->move_into(this->buf_, this->vtable_, rhs.buf_);
 			}
 
 			return *this;
@@ -805,15 +806,15 @@ namespace atma
 		auto operator = (FN&& fn)
 		-> std::enable_if_t<!std::is_base_of<base_function_t<BS, R(Params...)>, std::decay_t<FN>>::value, basic_generic_function_t&>
 		{
-			vtable_->destruct(buf_);
-			detail::constructing_t<BS, FS, std::decay_t<FN>>::construct(buf_, std::forward<FN>(fn));
-			vtable_ = detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>();
+			this->vtable_->destruct(this->buf_);
+			detail::constructing_t<BS, FS, std::decay_t<FN>>::construct(this->buf_, std::forward<FN>(fn));
+			this->vtable_ = detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>();
 			return *this;
 		}
 
 		auto operator = (std::nullptr_t) -> basic_generic_function_t&
 		{
-			return this->operator = (&empty_fn<R>);
+			return this->operator = (&super_type::template empty_fn<R>);
 		}
 
 		auto swap(basic_generic_function_t& rhs) -> void
@@ -830,9 +831,9 @@ namespace atma
 			typename = std::enable_if_t<detail::result_matches_v<R, FN, Params...>>,
 			typename = std::enable_if_t<!std::is_base_of<base_function_prime_t, std::decay_t<FN>>::value>>
 		basic_generic_function_t(FN&& fn, void* exbuf)
-			: base_function_t{detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>()}
+			: super_type{detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>()}
 		{
-			detail::constructing_t<BS, FS, std::decay_t<FN>>::construct(buf_, exbuf, std::forward<FN>(fn));
+			detail::constructing_t<BS, FS, std::decay_t<FN>>::construct(this->buf_, exbuf, std::forward<FN>(fn));
 		}
 
 	private:
@@ -849,6 +850,8 @@ namespace atma
 	struct basic_exrel_function_t<BS, FS, R(Params...)>
 		: basic_generic_function_t<BS, FS, R(Params...)>
 	{
+		using super_type = basic_generic_function_t<BS, FS, R(Params...)>;
+
 		basic_exrel_function_t()
 		{}
 
@@ -859,26 +862,26 @@ namespace atma
 		  typename = std::enable_if_t<detail::result_matches_v<R, FN, Params...>>,
 		  typename = std::enable_if_t<!std::is_base_of<base_function_prime_t, std::decay_t<FN>>::value>>
 		basic_exrel_function_t(FN&& fn, void* exbuf)
-			: basic_generic_function_t{std::forward<FN>(fn), exbuf}
+			: super_type{std::forward<FN>(fn), exbuf}
 		{}
 
 		template <size_t RBS>
 		basic_exrel_function_t(base_function_t<RBS, R(Params...)> const& rhs, void* exbuf)
-			: basic_generic_function_t{&empty_fn<R>, exbuf}
+			: super_type{&super_type::template empty_fn<R>, exbuf}
 		{
-			rhs.vtable_->assign_into(buf_, vtable_, rhs.buf_);
+			rhs.vtable_->assign_into(this->buf_, this->vtable_, rhs.buf_);
 		}
 
 		template <size_t RBS>
 		basic_exrel_function_t(base_function_t<RBS, R(Params...)>&& rhs, void* exbuf)
-			: basic_generic_function_t{&empty_fn<R>, exbuf}
+			: super_type{&super_type::template empty_fn<R>, exbuf}
 		{
-			rhs.vtable_->move_into(buf_, vtable_, std::move(rhs.buf_));
+			rhs.vtable_->move_into(this->buf_, this->vtable_, std::move(rhs.buf_));
 		}
 
 		auto relocate_external_functor_storage(void* exbuf) -> void
 		{
-			vtable_->relocate(exbuf);
+			this->vtable_->relocate(exbuf);
 		}
 	};
 }
