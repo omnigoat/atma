@@ -8,7 +8,9 @@
 using namespace rose;
 using rose::runtime_t;
 
-static void CALLBACK rose::FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped)
+//void CALLBACK rose::FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped);
+
+static VOID CALLBACK rose::FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNumberOfBytesTransfered, LPOVERLAPPED lpOverlapped)
 {
 	auto& info = *reinterpret_cast<rose::runtime_t::dir_watch_t*>(lpOverlapped);
 
@@ -52,7 +54,7 @@ static void CALLBACK rose::FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNu
 		info.bufs[info.bufidx], info.bufsize,
 		FALSE, info.notify,
 		nullptr, &info.overlapped,
-		&FileIOCompletionRoutine);
+		&rose::FileIOCompletionRoutine);
 }
 
 
@@ -171,12 +173,14 @@ auto runtime_t::register_directory_watch(
 			info.bufs[info.bufidx], info.bufsize,
 			FALSE, notify,
 			&bytes, &info.overlapped,
-			&FileIOCompletionRoutine);
+			&rose::FileIOCompletionRoutine);
 
 		if (success)
 		{
 			dir_handles_.push_back(dir);
 		}
+
+		//LPOVERLAPPED_COMPLETION_ROUTINE
 
 		dir_watchers_[path] = dir_handles_.size() - 1;
 	});

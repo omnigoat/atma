@@ -11,7 +11,7 @@ namespace atma
 
 		constexpr inline size_t allocation_size(size_t alignment, size_t size)
 		{
-			return header_size < alignment ? alignment - header_size : 0;
+			return header_size + (header_size < alignment ? alignment - header_size : 0) + size;
 		}
 	}
 
@@ -64,14 +64,16 @@ namespace atma
 	inline shared_memory_t::shared_memory_t(size_t alignment, size_t size)
 		: data_((byte*)platform::allocate_aligned_memory(alignment, detail::allocation_size(alignment, size)))
 	{
+		new (data_) size_t{size};
 		new (&ref()) std::atomic_uint32_t{1};
 	}
 
 	inline shared_memory_t::shared_memory_t(size_t alignment, size_t size, void* data)
 		: data_((byte*)platform::allocate_aligned_memory(alignment, detail::allocation_size(alignment, size)))
 	{
+		new (data_) size_t{size};
 		new (&ref()) std::atomic_uint32_t{1};
-		memcpy(data_, data, size);
+		memcpy(begin(), data, size);
 	}
 
 	inline shared_memory_t::shared_memory_t(shared_memory_t const& rhs)
