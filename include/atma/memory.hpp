@@ -109,7 +109,6 @@ namespace atma
 		auto operator *  () const -> reference;
 		auto operator [] (intptr) const -> reference;
 		auto operator -> () const -> pointer;
-		auto operator +  (intptr) const -> pointer;
 
 		// allocator interface
 		auto allocate(size_t) -> void;
@@ -205,12 +204,6 @@ namespace atma
 	}
 
 	template <typename T, typename A>
-	inline auto memory_t<T, A>::operator + (intptr idx) const -> pointer
-	{
-		return ptr_ + idx;
-	}
-
-	template <typename T, typename A>
 	inline auto memory_t<T, A>::allocate(size_t count) -> void
 	{
 		ptr_ = alloc_traits::allocate(this->allocator(), count);
@@ -290,9 +283,9 @@ namespace atma
 
 
 	template <typename T, typename A>
-	inline auto operator + (memory_t<T,A> const& lhs, typename memory_t<T,A>::allocator_type::difference_type x) -> memory_t<T,A>
+	inline auto operator + (memory_t<T,A> const& lhs, typename memory_t<T,A>::allocator_type::difference_type x) -> T*
 	{
-		return lhs.data() + x;
+		return static_cast<T*>(lhs) + x;
 	}
 
 }

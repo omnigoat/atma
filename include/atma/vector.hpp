@@ -519,13 +519,13 @@ namespace atma
 		{
 			auto tmp = internal_memory_t{std::move(imem_)};
 			imem_.allocate(newcap);
-			imem_.move_construct_range(0, tmp, 0, offset);
+			imem_.move_construct_range(0, tmp, offset);
 			imem_.move_construct_range(offset, tmp + offset_end, tailsize);
 			tmp.deallocate();
 		}
 		else
 		{
-			imem_.move_construct_range(offset, imem_, offset_end, tailsize);
+			imem_.move_construct_range(offset, imem_ + offset_end, tailsize);
 			imem_.destruct(offset_end, tailsize);
 		}
 
