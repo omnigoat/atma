@@ -1070,41 +1070,43 @@ namespace atma
 	template <bool DynamicGrowth>
 	struct lockfree_queue_t : lockfree_queue_ii_t<DynamicGrowth>
 	{
+		using super_type = lockfree_queue_ii_t<DynamicGrowth>;
+
 		lockfree_queue_t()
-			: lockfree_queue_ii_t{}
+			: super_type{}
 		{}
 
 		lockfree_queue_t(uint32 size)
-			: lockfree_queue_ii_t{size}
+			: super_type{size}
 		{}
 
 		lockfree_queue_t(void* buf, uint32 size)
-			: lockfree_queue_ii_t{buf, size}
+			: super_type{buf, size}
 		{}
 
 		template <typename F>
 		auto with_allocation(uint32 size, uint32 alignment, bool contiguous, F&& f) -> void
 		{
-			auto A = allocate(size, alignment, contiguous);
+			auto A = this->allocate(size, alignment, contiguous);
 			f(A);
-			commit(A);
+			this->commit(A);
 		}
 
 		template <typename F>
 		auto with_allocation(uint32 size, F&& f) -> void
 		{
-			auto A = allocate(size);
+			auto A = this->allocate(size);
 			f(A);
-			commit(A);
+			this->commit(A);
 		}
 
 		template <typename F>
 		auto with_consumption(F&& f) -> bool
 		{
-			if (auto D = consume())
+			if (auto D = this->consume())
 			{
 				f(D);
-				finalize(D);
+				this->finalize(D);
 				return true;
 			}
 
