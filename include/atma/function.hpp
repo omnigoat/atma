@@ -62,12 +62,18 @@ namespace atma::detail
 	struct functor_buf_t
 	{
 		template <typename FN = void>
-		auto exbuf_address() const -> FN* { return *(FN**)this; }
+		auto exbuf_address() const -> FN* {
+			return *(FN**)this;
+		}
 
 		template <typename FN = void>
-		auto relative_exbuf_address() const -> FN* { return (FN*)((byte const*)this + *(intptr*)this); }
+		auto relative_exbuf_address() const -> FN* {
+			return (FN*)((byte const*)this + *(intptr*)this);
+		}
 
-		template <typename FN = void> auto functor_address() const -> FN* { return (FN*)((byte const*)this + sizeof(void*)); }
+		template <typename FN = void> auto functor_address() const -> FN* {
+			return (FN*)((byte const*)this + sizeof(void*));
+		}
 
 		auto assign_exbuf(void* p) {
 			if (p != nullptr)
@@ -118,6 +124,7 @@ namespace atma::detail
 		using assign_fntype         = auto(*)(functor_buf_t&, functor_vtable_t<R, Params...> const*&, functor_buf_t const&) -> void;
 		using move_fntype           = auto(*)(functor_buf_t&, functor_vtable_t<R, Params...> const*&, functor_buf_t&&) -> void;
 		using functor_store_fntype  = auto(*)() -> functor_storage_t;
+		using functorsize_fntype    = auto(*)() -> size_t;
 		using buffersize_fntype     = auto(*)() -> size_t;
 		using exsize_fntype         = auto(*)() -> size_t;
 		using target_fntype         = auto(*)(functor_buf_t const&) -> void*;
@@ -132,6 +139,7 @@ namespace atma::detail
 		assign_fntype         assign_into;
 		move_fntype           move_into;
 		functor_store_fntype  functor_storage;
+		functorsize_fntype    functor_size;
 		buffersize_fntype     buffer_size;
 		exsize_fntype         external_size;
 		target_fntype         target;
@@ -224,7 +232,15 @@ namespace atma::detail
 namespace atma::detail
 {
 	template <size_t BS, functor_storage_t FS, typename FN, bool, typename R, typename... Params>
-	struct vtable_impl_t
+	struct vtable_impl_tx;
+
+	template <size_t BS, functor_storage_t FS, typename FN, typename R, typename... Params>
+	using vtable_impl_t = vtable_impl_tx<BS, FS, FN, enable_SFO<BS, FN>(), R, Params...>;
+
+
+
+	template <size_t BS, functor_storage_t FS, typename FN, typename R, typename... Params>
+	struct vtable_impl_tx<BS, FS, FN, true, R, Params...>
 	{
 		static auto copy_construct(functor_buf_t& buf, void* exbuf, void const* fnv) -> void
 		{
@@ -287,7 +303,7 @@ namespace atma::detail
 	};
 
 	template <size_t BS, typename FN, typename R, typename... Params>
-	struct vtable_impl_t<BS, functor_storage_t::heap, FN, false, R, Params...>
+	struct vtable_impl_tx<BS, functor_storage_t::heap, FN, false, R, Params...>
 	{
 		static auto copy_construct(functor_buf_t& buf, void*, void const* fnv) -> void
 		{
@@ -346,7 +362,7 @@ namespace atma::detail
 	};
 
 	template <size_t BS, typename FN, typename R, typename... Params>
-	struct vtable_impl_t<BS, functor_storage_t::external, FN, false, R, Params...>
+	struct vtable_impl_tx<BS, functor_storage_t::external, FN, false, R, Params...>
 	{
 		static auto copy_construct(functor_buf_t& buf, void*, void const* fnv) -> void
 		{
@@ -415,7 +431,7 @@ namespace atma::detail
 	};
 
 	template <size_t BS, typename FN, typename R, typename... Params>
-	struct vtable_impl_t<BS, functor_storage_t::relative, FN, false, R, Params...>
+	struct vtable_impl_tx<BS, functor_storage_t::relative, FN, false, R, Params...>
 	{
 		static auto copy_construct(functor_buf_t& buf, void*, void const* fnv) -> void
 		{
@@ -541,7 +557,7 @@ switch (fs)\
 	template <size_t BS, functor_storage_t FS, typename FN, typename R, typename... Params>
 	inline auto generate_vtable() -> functor_vtable_t<R, Params...> const*
 	{
-		using vtable_t = vtable_impl_t<BS, FS, FN, enable_SFO<BS, FN>(), R, Params...>;
+		using vtable_t = vtable_impl_t<BS, FS, FN, R, Params...>;
 
 		static auto const _ = functor_vtable_t<R, Params...>
 		{
@@ -550,6 +566,7 @@ switch (fs)\
 			&vtable_t::destruct,
 			&vtable_t::assign_into,
 			&vtable_t::move_into,
+			[] { return sizeof(FN); },
 			[] { return FS; },
 			[] { return BS; },
 			&vtable_t::external_size,
@@ -673,13 +690,15 @@ namespace atma
 		{}
 
 	protected:
-		detail::sized_functor_buf_t<BS> buf_;
 		detail::functor_vtable_t<R, Params...> const* vtable_;
+		detail::sized_functor_buf_t<BS> buf_;
 
 		template <typename R2>
-		static auto empty_fn(Params...) -> R2 { return *(R2*)nullptr; }
-		template <>
-		static auto empty_fn<void>(Params...) -> void {}
+		static auto empty_fn(Params...) -> R2
+		{
+			if constexpr (!std::is_void_v<R2>)
+				return *(R2*)nullptr;
+		}
 
 		template <size_t, functor_storage_t, typename> friend struct basic_generic_function_t;
 		template <size_t, functor_storage_t, typename> friend struct basic_exrel_function_t;
@@ -689,12 +708,22 @@ namespace atma
 // basic_generic_function_t
 namespace atma
 {
+	namespace detail
+	{
+		template <typename FN, typename R, typename... Params>
+		constexpr bool is_similar_functor_v = detail::result_matches_v<R, FN, Params...> && !std::is_base_of<base_function_prime_t, std::decay_t<FN>>::value;
+
+		template <typename FN, typename R, typename... Params>
+		using allowable_functor_t = std::enable_if_t<is_similar_functor_v<FN, R, Params...>>;
+	}
+
+
 	template <size_t BS, functor_storage_t FS, typename R, typename... Params>
 	struct basic_generic_function_t<BS, FS, R(Params...)>
 		: base_function_t<BS, R(Params...)>
 	{
 		using super_type = base_function_t<BS, R(Params...)>;
-		using this_type = basic_generic_function_t<BS, FS, R(Params...)>;
+		using self_type = basic_generic_function_t<BS, FS, R(Params...)>;
 
 		basic_generic_function_t()
 			: super_type{detail::generate_vtable<BS, FS, decltype(&super_type::template empty_fn<R>), R, Params...>()}
@@ -735,12 +764,10 @@ namespace atma
 
 		template <size_t RBS, functor_storage_t RS>
 		basic_generic_function_t(basic_generic_function_t<RBS, RS, R(Params...)> const&& rhs)
-			: basic_generic_function_t{(this_type const&)rhs}
+			: basic_generic_function_t{(self_type const&)rhs}
 		{}
 
-		template <typename FN,
-			typename = std::enable_if_t<detail::result_matches_v<R, FN, Params...>>,
-			typename = std::enable_if_t<!std::is_base_of_v<base_function_prime_t, std::decay_t<FN>>>>
+		template <typename FN, typename = detail::allowable_functor_t<FN, R, Params...>>
 		basic_generic_function_t(FN&& fn)
 			: super_type{detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>()}
 		{
@@ -748,28 +775,11 @@ namespace atma
 			detail::constructing_t<BS, FS, std::decay_t<FN>>::construct(this->buf_, nullptr, std::forward<FN>(fn));
 		}
 
-		auto operator = (this_type const& rhs) -> this_type&
-		{
-			if (this != &rhs)
-			{
-				rhs.vtable_->assign_into(this->buf_, this->vtable_, rhs.buf_);
-			}
-
-			return *this;
-		}
-
-		auto operator = (this_type&& rhs) -> this_type&
-		{
-			if (this != &rhs)
-			{
-				rhs.vtable_->move_into(this->buf_, this->vtable_, std::move(rhs.buf_));
-			}
-
-			return *this;
-		}
-
+		auto operator = (self_type const& rhs) -> self_type& = delete;
+		auto operator = (self_type&& rhs) -> self_type& = delete;
+		
 		template <size_t RBS>
-		auto operator = (base_function_t<RBS, R(Params...)> const& rhs) -> this_type&
+		auto operator = (base_function_t<RBS, R(Params...)> const& rhs) -> self_type&
 		{
 			if (this != &rhs)
 			{
@@ -780,7 +790,7 @@ namespace atma
 		}
 
 		template <size_t RBS>
-		auto operator = (base_function_t<RBS, R(Params...)>&& rhs) -> this_type&
+		auto operator = (base_function_t<RBS, R(Params...)>&& rhs) -> self_type&
 		{
 			if (this != &rhs)
 			{
@@ -790,21 +800,22 @@ namespace atma
 			return *this;
 		}
 
+#if 0
 		template <size_t RBS>
-		auto operator = (base_function_t<RBS, R(Params...)>& rhs) -> this_type&
+		auto operator = (base_function_t<RBS, R(Params...)>& rhs) -> self_type&
 		{
 			return this->operator = (std::as_const(rhs));
 		}
 
 		template <size_t RBS>
-		auto operator = (base_function_t<RBS, R(Params...)> const&& rhs) -> this_type&
+		auto operator = (base_function_t<RBS, R(Params...)> const&& rhs) -> self_type&
 		{
-			return this->operator = ((this_type const&)rhs);
+			return this->operator = ((self_type const&)rhs);
 		}
+#endif
 
-		template <typename FN>
-		auto operator = (FN&& fn)
-		-> std::enable_if_t<!std::is_base_of<base_function_t<BS, R(Params...)>, std::decay_t<FN>>::value, basic_generic_function_t&>
+		template <typename FN, typename = detail::allowable_functor_t<FN, R, Params...>>
+		auto operator = (FN&& fn) -> self_type&
 		{
 			this->vtable_->destruct(this->buf_);
 			detail::constructing_t<BS, FS, std::decay_t<FN>>::construct(this->buf_, std::forward<FN>(fn));
@@ -812,7 +823,7 @@ namespace atma
 			return *this;
 		}
 
-		auto operator = (std::nullptr_t) -> basic_generic_function_t&
+		auto operator = (std::nullptr_t) -> self_type&
 		{
 			return this->operator = (&super_type::template empty_fn<R>);
 		}
@@ -825,11 +836,41 @@ namespace atma
 			tmp.move_into(wrapper_);
 		}
 
+		template <typename FN, typename = detail::allowable_functor_t<FN, R, Params...>>
+		static constexpr size_t external_buffer_size_for(FN&&)
+		{
+			return detail::vtable_impl_t<BS, FS, FN, R, Params...>::external_size();
+		}
+
+		template <typename FN>
+		static constexpr size_t contiguous_relative_allocation_size_for(FN&& fn)
+		{
+			static_assert(detail::result_matches_v<R, FN, Params...>, "functor makes no sense");
+
+			if constexpr (std::is_base_of_v<base_function_prime_t, std::decay_t<FN>>)
+			{
+				return sizeof(self_type) + fn.functor_size();
+			}
+			else
+			{
+				return sizeof(self_type) + detail::vtable_impl_t<BS, FS, FN, R, Params...>::external_size();
+			}
+		}
+
+		auto functor_size() const -> size_t
+		{
+			return vtable_->functor_size();
+		}
+
+		template <typename FN>
+		static void make_relative(void* dest, FN&& fn)
+		{
+			new (dest) self_type{std::forward<FN>(fn), (byte*)dest + sizeof(self_type)};
+		}
+
 	protected:
 		// bizarrely must be made identical to basic_exrel_function_t due to ambiguities that I don't think are actually standard
-		template <typename FN,
-			typename = std::enable_if_t<detail::result_matches_v<R, FN, Params...>>,
-			typename = std::enable_if_t<!std::is_base_of<base_function_prime_t, std::decay_t<FN>>::value>>
+		template <typename FN, typename = detail::allowable_functor_t<FN, R, Params...>>
 		basic_generic_function_t(FN&& fn, void* exbuf)
 			: super_type{detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>()}
 		{
@@ -852,15 +893,11 @@ namespace atma
 	{
 		using super_type = basic_generic_function_t<BS, FS, R(Params...)>;
 
-		basic_exrel_function_t()
-		{}
-
+		basic_exrel_function_t() = default;
 		basic_exrel_function_t(basic_exrel_function_t const&) = delete;
 		basic_exrel_function_t(basic_exrel_function_t&&) = delete;
 
-		template <typename FN,
-		  typename = std::enable_if_t<detail::result_matches_v<R, FN, Params...>>,
-		  typename = std::enable_if_t<!std::is_base_of<base_function_prime_t, std::decay_t<FN>>::value>>
+		template <typename FN, typename = detail::allowable_functor_t<FN, R, Params...>>
 		basic_exrel_function_t(FN&& fn, void* exbuf)
 			: super_type{std::forward<FN>(fn), exbuf}
 		{}
