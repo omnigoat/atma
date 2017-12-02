@@ -9,8 +9,7 @@
 
 namespace atma { namespace math {
 
-	__declspec(align(16))
-	struct vector4f
+	struct alignas(16) vector4f
 	{
 		vector4f();
 		explicit vector4f(__m128);

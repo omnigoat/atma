@@ -26,8 +26,7 @@ namespace atma { namespace math {
 	//=====================================================================
 	// matrix4f
 	//=====================================================================
-	__declspec(align(64))
-	struct matrix4f
+	struct alignas(64) matrix4f
 	{
 		// constructors
 		matrix4f();
