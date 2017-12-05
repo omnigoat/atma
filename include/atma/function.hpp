@@ -27,17 +27,14 @@ namespace atma
 	template <size_t, functor_storage_t, typename>
 	struct basic_generic_function_t;
 	
-	template <size_t BS, functor_storage_t, typename>
-	struct basic_exrel_function_t;
+	template <size_t BS, typename>
+	struct basic_external_function_t;
 
 	template <size_t BS, typename>
 	struct basic_relative_function_t;
 
 	template <size_t BufferSize, typename FN>
 	using basic_function_t = basic_generic_function_t<BufferSize, functor_storage_t::heap, FN>;
-
-	template <size_t BufferSize, typename FN>
-	using basic_external_function_t = basic_exrel_function_t<BufferSize, functor_storage_t::external, FN>;
 
 	template <typename FN>
 	using function = basic_function_t<32, FN>;
@@ -357,7 +354,7 @@ namespace atma::detail
 
 		static auto relocate(functor_buf_t& buf, void* exbuf) -> void
 		{
-			// SERIOUSLY, todo
+			ATMA_HALT("this was a bad idea");
 		}
 	};
 
@@ -701,7 +698,7 @@ namespace atma
 		}
 
 		template <size_t, functor_storage_t, typename> friend struct basic_generic_function_t;
-		template <size_t, functor_storage_t, typename> friend struct basic_exrel_function_t;
+		template <size_t, typename> friend struct basic_external_function_t;
 		template <size_t, typename> friend struct basic_relative_function_t;
 	};
 }
@@ -829,7 +826,7 @@ namespace atma
 		}
 
 	protected:
-		// bizarrely must be made identical to basic_exrel_function_t due to ambiguities that I don't think are actually standard
+		// bizarrely must be made identical to basic_external_function_t due to ambiguities that I don't think are actually standard
 		template <typename FN, typename = detail::allowable_functor_t<FN, R, Params...>>
 		basic_generic_function_t(FN&& fn, void* exbuf)
 			: super_type{detail::generate_vtable<BS, FS, std::decay_t<FN>, R, Params...>()}
@@ -844,34 +841,34 @@ namespace atma
 
 
 
-// "exrel" function
+// "external" function
 namespace atma
 {
-	template <size_t BS, functor_storage_t FS, typename R, typename... Params>
-	struct basic_exrel_function_t<BS, FS, R(Params...)>
-		: basic_generic_function_t<BS, FS, R(Params...)>
+	template <size_t BS, typename R, typename... Params>
+	struct basic_external_function_t<BS, R(Params...)>
+		: basic_generic_function_t<BS, functor_storage_t::external, R(Params...)>
 	{
-		using self_type = basic_exrel_function_t<BS, FS, R(Params...)>;
-		using super_type = basic_generic_function_t<BS, FS, R(Params...)>;
+		using self_type = basic_external_function_t<BS, R(Params...)>;
+		using super_type = basic_generic_function_t<BS, functor_storage_t::external, R(Params...)>;
 
-		basic_exrel_function_t() = default;
-		basic_exrel_function_t(basic_exrel_function_t const&) = delete;
-		basic_exrel_function_t(basic_exrel_function_t&&) = delete;
+		basic_external_function_t() = default;
+		basic_external_function_t(basic_external_function_t const&) = delete;
+		basic_external_function_t(basic_external_function_t&&) = delete;
 
 		template <typename FN, typename = detail::allowable_functor_t<FN, R, Params...>>
-		basic_exrel_function_t(FN&& fn, void* exbuf)
+		basic_external_function_t(FN&& fn, void* exbuf)
 			: super_type{std::forward<FN>(fn), exbuf}
 		{}
 
 		template <size_t RBS>
-		basic_exrel_function_t(base_function_t<RBS, R(Params...)> const& rhs, void* exbuf)
+		basic_external_function_t(base_function_t<RBS, R(Params...)> const& rhs, void* exbuf)
 			: super_type{&super_type::template empty_fn<R>, exbuf}
 		{
 			rhs.vtable_->assign_into(this->buf_, this->vtable_, rhs.buf_);
 		}
 
 		template <size_t RBS>
-		basic_exrel_function_t(base_function_t<RBS, R(Params...)>&& rhs, void* exbuf)
+		basic_external_function_t(base_function_t<RBS, R(Params...)>&& rhs, void* exbuf)
 			: super_type{&super_type::template empty_fn<R>, exbuf}
 		{
 			rhs.vtable_->move_into(this->buf_, this->vtable_, std::move(rhs.buf_));
@@ -883,7 +880,7 @@ namespace atma
 		}
 
 		template <typename FN>
-		static void make_relative(void* dest, FN&& fn)
+		static void make_external(void* dest, FN&& fn)
 		{
 			new (dest) self_type{std::forward<FN>(fn), (byte*)dest + sizeof(self_type)};
 		}
@@ -929,7 +926,6 @@ namespace atma
 		{
 			rhs.vtable_->move_into(this->buf_, this->vtable_, std::move(rhs.buf_));
 		}
-
 
 		auto relocate_relative_functor_storage(void* exbuf) -> void
 		{
