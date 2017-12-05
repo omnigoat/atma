@@ -308,8 +308,8 @@ namespace atma
 		if (!running_)
 			return;
 
-		auto A = queue_.allocate(sizeof(queue_fn_t) + (uint32)fn.external_buffer_size(), 4, true);
-		new (A.data()) queue_fn_t{fn, (char*)A.data() + sizeof(queue_fn_t)};
+		auto A = queue_.allocate((uint32)queue_fn_t::contiguous_relative_allocation_size_for(fn), 4, true);
+		queue_fn_t::make_contiguous(A.data(), fn);
 		queue_.commit(A);
 	}
 
@@ -318,8 +318,8 @@ namespace atma
 		if (!running_)
 			return;
 
-		auto A = queue_.allocate(sizeof(queue_fn_t) + (uint32)fn.external_buffer_size(), 4, true);
-		new (A.data()) queue_fn_t{std::move(fn), (char*)A.data() + sizeof(queue_fn_t)};
+		auto A = queue_.allocate((uint32)queue_fn_t::contiguous_relative_allocation_size_for(fn), 4, true);
+		queue_fn_t::make_contiguous(A.data(), std::move(fn));
 		queue_.commit(A);
 	}
 

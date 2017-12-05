@@ -285,7 +285,7 @@ SCENARIO("functions can be constructed")
 	{
 		char buf[128];
 		auto b = atma::bind(&add, arg1, arg2);
-		atma::basic_relative_function_t<16, int(int, int)> f(atma::bind(&add, arg1, arg2), (void*)buf);
+		atma::basic_relative_function_t<16, int(int, int)> f(std::move(b), (void*)buf);
 
 		THEN("it is not empty")
 		{
@@ -304,20 +304,39 @@ SCENARIO("functions can be constructed")
 			CHECK(f.external_buffer_size() != 0);
 		}
 	}
+
+	GIVEN("a copy-constructed function")
+	{
+		atma::function<int(int, int)> f{&add};
+		atma::function<int(int, int)> g{f};
+
+		THEN("it is not empty")
+		{
+			CHECK((bool)g);
+			CHECK(g.target<int(*)(int, int)>() != nullptr);
+		}
+
+		THEN("it is targeting the original function")
+		{
+			auto t = g.target<int(*)(int, int)>();
+			CHECK(t != nullptr);
+			CHECK(*t == &add);
+		}
+	}
+
+
 }
 
 SCENARIO("things")
 {
 	GIVEN("a directly-constructed external function too large for SFO")
 	{
-		
-
 		char buf[128]{};
 		mathing_t m;
 		atma::basic_external_function_t<16, int(int)> f{atma::bind(&mathing_t::halve, &m, arg1), buf};
 		auto r = f(8);
 		CHECK(r == 4);
-
+		
 		atma::basic_generic_function_t<16, atma::functor_storage_t::heap, int(int)> f2{f};
 		auto h = f2(12);
 		CHECK(h == 6);
