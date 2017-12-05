@@ -362,9 +362,9 @@ namespace atma
 	{
 		// 1) load read-buffer, and increment use-count
 		buffer_t buf;
+#if 1 // I think we can get away with just the atomic-load of the buffer?
 		atma::atomic_load_128(&buf, &reading_);
-
-#if 0 // I think we can get away with just the atomic-load of the buffer?
+#else
 		for (;;)
 		{
 			if (buf.uses == invalid_use_count)
