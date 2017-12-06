@@ -324,6 +324,24 @@ SCENARIO("functions can be constructed")
 		}
 	}
 
+	GIVEN("a move-constructed function")
+	{
+		atma::function<int(int, int)> f{&add};
+		atma::function<int(int, int)> g{std::move(f)};
+
+		THEN("it is not empty")
+		{
+			CHECK((bool)g);
+			CHECK(g.target<int(*)(int, int)>() != nullptr);
+		}
+
+		THEN("it is targeting the original function")
+		{
+			auto t = g.target<int(*)(int, int)>();
+			CHECK(t != nullptr);
+			CHECK(*t == &add);
+		}
+	}
 
 }
 
