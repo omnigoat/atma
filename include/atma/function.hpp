@@ -739,14 +739,14 @@ namespace atma
 		basic_generic_function_t(basic_generic_function_t<RBS, RS, R(Params...)> const& rhs)
 			: super_type{rhs.vtable_->mk_vtable(BS, FS)}
 		{
-			rhs.vtable_->assign_into(this->buf_, this->vtable_, rhs.buf_);
+			this->vtable_->copy_construct(this->buf_, nullptr, rhs.vtable_->target(rhs.buf_));
 		}
 
 		template <size_t RBS, functor_storage_t RS>
 		basic_generic_function_t(basic_generic_function_t<RBS, RS, R(Params...)>&& rhs)
 			: super_type{rhs.vtable_->mk_vtable(BS, FS)}
 		{
-			rhs.vtable_->move_into(this->buf_, this->vtable_, std::move(rhs.buf_));
+			this->vtable_->move_construct(this->buf_, nullptr, rhs.vtable_->target(rhs.buf_));
 		}
 
 		template <typename FN, typename = detail::allowable_functor_t<FN, R, Params...>>
