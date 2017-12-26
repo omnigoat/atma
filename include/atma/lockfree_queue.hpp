@@ -297,8 +297,9 @@ namespace atma
 
 		auto local_copy(unique_memory_t& mem) -> void
 		{
-			mem.reset(size());
-			for (int i = 0; i != size(); ++i)
+			auto sz = size();
+			mem.reset(sz);
+			for (int i = 0; i != sz; ++i)
 				decode_byte(mem.begin()[i]);
 		}
 
@@ -905,8 +906,18 @@ namespace atma
 		decode_uint32(size);
 		unique_memory_t um{size};
 
-		for (uint32 i = 0; i != size; ++i)
-			decode_byte(um.begin()[i]);
+		bool is_contiguous = (p_ + size) < buffer_size();
+
+		if (is_contiguous)
+		{
+			memcpy(um.begin(), buf_ + p_, size);
+			p_ = (p_ + size) % buffer_size();
+		}
+		else
+		{
+			for (uint32 i = 0; i != size; ++i)
+				decode_byte(um.begin()[i]);
+		}
 
 		return std::move(um);
 	}
