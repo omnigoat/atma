@@ -277,16 +277,14 @@ namespace atma
 
 	inline auto inplace_engine_t::reenter(std::atomic<bool> const& good) -> void
 	{
-		atma::unique_memory_t mem;
 		while (good)
 		{
-			if (queue_.with_consumption([&](auto& D)
+			if (auto D = queue_.consume())
 			{
-				D.local_copy(mem);
-			}))
-			{
-				queue_fn_t* f = (queue_fn_t*)mem.begin();
+				queue_fn_t* f = (queue_fn_t*)D.data();
 				(*f)();
+				f->~queue_fn_t();
+				queue_.finalize(D);
 			}
 		}
 	}
