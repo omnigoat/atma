@@ -100,12 +100,7 @@ namespace atma::detail
 			: buf{}
 		{}
 
-		void clear()
-		{
-			memset(buf, 0, sizeof(buf));
-		}
-
-		static_assert(Bytes >= sizeof(void*), //+ sizeof(&test_fn),
+		static_assert(Bytes >= sizeof(void*) + sizeof(&test_fn),
 			"functor_buf_t needs to be at least the size of a pointer + a function-pointer. in practice this means 16 bytes (x64)");
 	};
 
@@ -172,48 +167,24 @@ namespace atma::detail
 // constructing doesn't require a vtable
 namespace atma::detail
 {
-	template <size_t BS, functor_storage_t FS, typename FN, bool = enable_SFO<BS, FN>()>
-	struct constructing_t;
-
-	template <size_t BS, typename FN, bool SFO>
-	struct constructing_t<BS, functor_storage_t::heap, FN, SFO>
+	template <size_t BS, functor_storage_t FS, typename FN, bool SFO = enable_SFO<BS, FN>()>
+	struct constructing_t
 	{
 		template <typename RFN>
 		static auto construct(functor_buf_t& buf, void* exbuf, RFN&& fn) -> void
 		{
+			if constexpr (FS == functor_storage_t::external)
+				buf.assign_exbuf(exbuf);
+			else if constexpr (FS == functor_storage_t::relative)
+				buf.assign_relative_exbuf(exbuf);
+
 			if constexpr (SFO)
 				new (buf.sfo_functor_address()) FN{std::forward<RFN>(fn)};
-			else
+			else if constexpr (FS == functor_storage_t::heap)
 				buf.assign_exbuf(new FN{std::forward<RFN>(fn)});
-		}
-	};
-
-	template <size_t BS, typename FN, bool SFO>
-	struct constructing_t<BS, functor_storage_t::external, FN, SFO>
-	{
-		template <typename RFN>
-		static auto construct(functor_buf_t& buf, void* exbuf, RFN&& fn) -> void
-		{
-			buf.assign_exbuf(exbuf);
-
-			if constexpr (SFO)
-				new (buf.sfo_functor_address()) FN{std::forward<RFN>(fn)};
-			else
+			else if constexpr (FS == functor_storage_t::external)
 				new (buf.exbuf_address()) FN{std::forward<RFN>(fn)};
-		}
-	};
-
-	template <size_t BS, typename FN, bool SFO>
-	struct constructing_t<BS, functor_storage_t::relative, FN, SFO>
-	{
-		template <typename RFN>
-		static auto construct(functor_buf_t& buf, void* exbuf, RFN&& fn) -> void
-		{
-			buf.assign_relative_exbuf(exbuf);
-			
-			if constexpr (SFO)
-				new (buf.sfo_functor_address()) FN{std::forward<RFN>(fn)};
-			else
+			else if constexpr (FS == functor_storage_t::relative)
 				new (buf.relative_exbuf_address()) FN{std::forward<RFN>(fn)};
 		}
 	};
@@ -470,7 +441,7 @@ namespace atma::detail
 		static auto call(functor_buf_t const& buf, Params... args) -> R
 		{
 			auto fn = buf.relative_exbuf_address<FN>();
-			return std::invoke(std::forward<FN>(*fn), std::forward<Params>(args)...);
+			return std::invoke(*fn, std::forward<Params>(args)...);
 		}
 
 		static auto relocate(functor_buf_t& buf, void* exbuf) -> void
