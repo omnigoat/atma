@@ -57,6 +57,7 @@
     <ClCompile Include="..\..\source\atma_test\queue.cpp" />
     <ClCompile Include="..\..\source\atma_test\ranges.cpp" />
     <ClCompile Include="..\..\source\atma_test\string.cpp" />
+    <ClCompile Include="..\..\source\atma_test\test_events.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_utf8_string.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_vector.cpp" />
   </ItemGroup>
