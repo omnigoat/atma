@@ -343,6 +343,36 @@ SCENARIO("functions can be constructed")
 		}
 	}
 
+	GIVEN("something")
+	{
+		std::function<void()> stdf = [] { std::cout << 4 << std::endl; };
+
+		uint32_t u32a, u32b;
+		uint64_t u64a, u64this;
+
+		auto L = [u64this, u64a, u32a, u32b, stdf]
+		{
+			stdf();
+		};
+
+		char buf[256];
+		char buf2[256];
+		memset(buf, 0, sizeof(buf));
+		memset(buf2, 0, sizeof(buf2));
+
+		atma::function<void()> f = std::move(L);
+
+		using FN = atma::basic_relative_function_t<16, void()>;
+
+		auto sz = FN::contiguous_relative_allocation_size_for(f);
+		FN::make_contiguous(buf, std::move(f));
+
+		memcpy(buf2, buf, sizeof(buf));
+
+		auto g = (FN*)buf2;
+		(*g)();
+	}
+
 }
 
 SCENARIO("things")
