@@ -4,14 +4,15 @@
 #include <atomic>
 #include <type_traits>
 
-namespace atma {
-	
+namespace atma
+{
 	struct ref_counted;
 	template <typename T> struct intrusive_ptr;
+}
 
 
-
-
+namespace atma
+{
 	struct ref_counted
 	{
 		virtual ~ref_counted() {}
@@ -43,10 +44,11 @@ namespace atma {
 
 		template <typename> friend struct intrusive_ptr;
 	};
+}
 
 
-
-
+namespace atma
+{
 	template <typename T>
 	struct intrusive_ptr
 	{
