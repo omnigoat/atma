@@ -72,8 +72,6 @@ namespace atma
 			{
 				return detail::compose_impl_abstract(std::forward<F>(f), std::forward<G>(g));
 			}
-			//return detail::composited_t<F, G>{std::forward<FF>(f), std::forward<GG>(g)};
-			//return [f=std::forward<FF>(f), g=std::forward<GG>(g)](auto&&... args) -> decltype(auto) { return f(g(std::forward<decltype(args)>(args)...)); };
 		}
 	};
 
