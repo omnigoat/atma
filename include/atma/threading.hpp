@@ -70,32 +70,19 @@ namespace atma
 		{
 			using result_type = decltype(std::invoke(std::forward<F>(f), std::forward<Args>(args)...));
 
-			return execute_for_idx_impl(
-				std::conditional_t<std::is_void_v<result_type>, void_tag, nonvoid_tag>{},
-				idx,
-				std::forward<F>(f),
-				std::forward<Args>(args)...);
-		}
-
-	private:
-		struct void_tag {};
-		struct nonvoid_tag {};
-
-		template <typename F, typename... Args>
-		auto execute_for_idx_impl(void_tag, uint16 idx, F&& f, Args&&... args)
-		{
-			wait_for_idx(idx);
-			std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
-			consume_idx(idx);
-		}
-
-		template <typename F, typename... Args>
-		auto execute_for_idx_impl(nonvoid_tag, uint16 idx, F&& f, Args&&... args)
-		{
-			wait_for_idx(idx);
-			auto r = std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
-			consume_idx(idx);
-			return r;
+			if constexpr (std::is_void_v<result_type>)
+			{
+				wait_for_idx(idx);
+				std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+				consume_idx(idx);
+			}
+			else
+			{
+				wait_for_idx(idx);
+				auto r = std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+				consume_idx(idx);
+				return r;
+			}
 		}
 
 	private:
