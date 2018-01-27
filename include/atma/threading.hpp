@@ -131,8 +131,8 @@ namespace atma
 		// token-based work
 		auto enqueue_against(work_token_t&, function_t const&) -> void;
 		auto enqueue_against(work_token_t&, function_t&&) -> void;
-		auto enqueue_repeat_against(work_token_t& tk, repeat_function_t const& f) -> void;
-		auto enqueue_repeat_against(work_token_t& tk, repeat_function_t&& f) -> void;
+		auto enqueue_repeat_against(work_token_t&, repeat_function_t const&) -> void;
+		auto enqueue_repeat_against(work_token_t&, repeat_function_t&&) -> void;
 
 		// allow void functions to be repeated forever
 		auto enqueue_repeat(function_t const& fn) -> void { enqueue_repeat([fn]() -> bool { fn(); return true; }); }
