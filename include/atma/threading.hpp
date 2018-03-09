@@ -43,6 +43,8 @@ namespace atma
 			detail::set_debug_name_impl(-1, name);
 		}
 	}
+
+	using thread_id_t = std::thread::id;
 }
 
 
@@ -92,7 +94,39 @@ namespace atma
 	};
 }
 
+namespace atma
+{
+	inline void enqueue_function_to_queue(lockfree_queue_t& queue, atma::function<void()> const& f)
+	{
+		using internal_function_t = basic_relative_function_t<16, void()>;
 
+		queue.with_allocation(sizeof(std::decay_t<decltype(f)>) + (uint32)f.external_buffer_size(), 4, true, [&f](auto& A) {
+			new (A.data()) internal_function_t(f, (char*)A.data() + sizeof(internal_function_t));
+		});
+	}
+
+	template <typename... Args>
+	inline void enqueue_function_to_queue(lockfree_queue_t& queue, atma::function<void(Args...)> const& f)
+	{
+		using internal_function_t = basic_relative_function_t<16, void(Args...)>;
+
+		queue.with_allocation(sizeof(std::decay_t<decltype(f)>) + (uint32)f.external_buffer_size(), 4, true, [&f](auto& A) {
+			new (A.data()) internal_function_t(f, (char*)A.data() + sizeof(internal_function_t));
+		});
+	}
+
+	template <typename... Args>
+	inline void consume_queue_of_functions(lockfree_queue_t& queue, Args&&... args)
+	{
+		using internal_function_t = basic_relative_function_t<16, void(Args...)>;
+
+		while (queue.with_consumption([](auto& D) {
+			internal_function_t* f = (internal_function_t*)D.data();
+			(*f)(std::forward<Args>(args)...);
+			f->~internal_function_t();
+		}));
+	}
+}
 
 // thread_work_provider
 namespace atma
@@ -205,7 +239,7 @@ namespace atma
 		auto enqueue_repeat(repeat_function_t&& fn) -> void override { signal_evergreen(fn); }
 
 	private:
-		using queue_t = lockfree_queue_t<false>;
+		using queue_t = lockfree_queue_t;
 		using queue_fn_t = basic_relative_function_t<16, void()>;
 
 		auto reenter(std::atomic<bool> const& blocked) -> void;
@@ -367,7 +401,7 @@ namespace atma
 
 	private:
 		// queue for work submission
-		lockfree_queue_t<false> queue_;
+		lockfree_queue_t queue_;
 		// threads that pool queue for work
 		std::vector<std::thread> threads_;
 

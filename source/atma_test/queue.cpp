@@ -10,7 +10,7 @@
 #include <mutex>
 
 
-using queue_t = atma::lockfree_queue_t<false>;
+using queue_t = atma::lockfree_queue_t;
 using numbers_t = std::map<uint32, uint32>;
 
 std::atomic<uint32> counter;
@@ -75,7 +75,7 @@ SCENARIO("lockfree_queue is amazing")
 
 	std::cout << "beginning queue test" << std::endl;
 
-	atma::lockfree_queue_t<false> Q{8 + 512};
+	atma::lockfree_queue_t Q{8 + 512};
 
 	uint64 const write_thread_count = 3;
 	uint64 const read_thread_count = 3;
