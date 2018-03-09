@@ -934,12 +934,7 @@ namespace atma
 
 
 
-	template <bool DynamicGrowth>
-	struct lockfree_queue_ii_t;
-
-#if 1
-	template <>
-	struct lockfree_queue_ii_t<false>
+	struct lockfree_queue_ii_t
 		: base_lockfree_queue_t
 	{
 		lockfree_queue_ii_t()
@@ -995,7 +990,6 @@ namespace atma
 			return impl_make_allocation(writebuf.pointer, whk->buffer_size(), ai.p, alloctype_t::normal, alignment, ai.sz);
 		}
 	};
-#endif
 
 #if 0
 	template <>
@@ -1078,10 +1072,9 @@ namespace atma
 	};
 #endif
 
-	template <bool DynamicGrowth>
-	struct lockfree_queue_t : lockfree_queue_ii_t<DynamicGrowth>
+	struct lockfree_queue_t : lockfree_queue_ii_t
 	{
-		using super_type = lockfree_queue_ii_t<DynamicGrowth>;
+		using super_type = lockfree_queue_ii_t;
 
 		lockfree_queue_t()
 			: super_type{}

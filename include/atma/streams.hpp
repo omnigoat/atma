@@ -256,3 +256,13 @@ namespace atma
 		position_ = 0;
 	}
 }
+
+namespace atma
+{
+	//struct reactive_stream_t : stream_t
+	//{
+	//	
+	//};
+}
+
+
