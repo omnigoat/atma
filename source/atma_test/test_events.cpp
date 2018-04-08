@@ -14,12 +14,25 @@ SCENARIO("events can be constructed", "[event]")
 	{
 		atma::event_system_t es;
 		atma::event_t<int> e;
-		atma::event_binder_t b;
 
-		e += b + f;
+		std::atomic_bool good = true;
+		auto a = std::async([&] {
 
+			e.bind(f);
+			while (good)
+			{
+				es.process_events_for_this_thread();
+			}
+
+		});
+
+		a.wait_for(std::chrono::milliseconds(1000));
+
+		e.bind(atma::detail::default_event_system, atma::detail::default_event_binder, std::this_thread::get_id(), f);
 		e.raise(7);
 
+
+#if 0
 		std::atomic_bool good = true;
 		auto a = std::async([&] {
 
@@ -37,5 +50,6 @@ SCENARIO("events can be constructed", "[event]")
 		e.raise(2);
 		a.wait_for(1s);
 		good = false;
+#endif
 	}
 }
