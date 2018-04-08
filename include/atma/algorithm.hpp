@@ -203,6 +203,15 @@ namespace atma
 			fn(std::forward<LHS>(lhs), *i);
 	}
 
+	//=====================================================================
+	// find_in
+	//=====================================================================
+	template <typename R>
+	inline auto find_in(R&& range, typename std::remove_reference_t<R>::value_type const& x)
+	{
+		return std::find(std::begin(range), std::end(range), x);
+	}
+
 
 	//=====================================================================
 	// foldl
