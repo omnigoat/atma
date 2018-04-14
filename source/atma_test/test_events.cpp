@@ -18,6 +18,8 @@ SCENARIO("events can be constructed", "[event]")
 		std::atomic_bool good = true;
 		auto a = std::async([&] {
 
+			atma::this_thread::set_debug_name("test thread");
+
 			e.bind(f);
 			while (good)
 			{
