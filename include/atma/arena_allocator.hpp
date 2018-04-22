@@ -37,6 +37,7 @@ namespace atma
 		// share the same size, and the @size field is used by various
 		// implementations for purposes.
 		size_t page_size_ = 0;
+		uint32 page_count_ = 0;
 
 		// like above
 		size_t block_size_ = 0;
@@ -56,10 +57,12 @@ namespace atma
 		byte* const memory = nullptr;
 		page_t* next = nullptr;
 
+		auto valid() const -> bool { return memory != nullptr; }
 		auto freemask_size() const -> size_t { return freemask_size_in_shorts() * 2; }
 		auto freemask_size_in_shorts() const -> size_t { return (size + (16 * block_size) - 1) / (16 * block_size); }
-		auto has_space(size_t blocks) const -> emptiness_report_t;
 		auto memory_ptr() const -> byte* { return memory + aml::alignby(freemask_size(), arena_allocator_t::block_alignment); }
+
+		auto has_space(size_t blocks) const -> emptiness_report_t;
 	};
 
 	struct arena_allocator_t::page_t::emptiness_report_t
@@ -73,62 +76,37 @@ namespace atma
 		// the actual short that was in our freemask
 		uint16 freemask_short = 0;
 
+		static constexpr emptiness_report_t const empty;
+
 		auto new_freemask_short() const -> uint16 { return freemask_short | (((1 << requested_blocks) - 1) << bit_idx); }
 		auto block_idx() const { return short_idx * 16 + bit_idx; }
 
-		operator bool() const { return short_idx != 0xffff; }
+		operator bool() const { return requested_blocks != 0; }
 	};
 
 	inline auto arena_allocator_t::page_t::has_space(size_t required_blocks) const -> emptiness_report_t
 	{
 		uint16 short_idx = 0;
 		uint16 bit_idx = 0;
-		
 		uint16 mask = uint16(1 << required_blocks) - 1;
-
 		uint16 freemask_short = 0;
-		for (size_t freemask_shorts = freemask_size_in_shorts(); short_idx != freemask_shorts; ++short_idx)
+
+		for (size_t freemask_shorts = freemask_size_in_shorts(); memory && short_idx != freemask_shorts; ++short_idx)
 		{
 			// 16-bit aligned loads are atomic anyhows
-			freemask_short = memory[short_idx];
+			freemask_short = ((uint16*)memory)[short_idx];
 
 			for (bit_idx = 0; bit_idx != (16 - required_blocks); ++bit_idx)
 			{
 				auto shifted_mask = mask << bit_idx;
 				if (((shifted_mask | freemask_short) ^ freemask_short) == shifted_mask)
 				{
-					goto space_found;
+					return {(uint16)required_blocks, short_idx, bit_idx, freemask_short};
 				}
 			}
 		}
 
-		return {0xffff, 0, 0};
-
-	space_found:
-		return {(uint16)required_blocks, short_idx, bit_idx, freemask_short};
-#if 0
-		for (size_t freemask_shorts = freemask_size_in_shorts(); short_idx != freemask_shorts; ++short_idx)
-		{
-			b = freemask_ptr[short_idx];
-
-			for (bit_idx = 0, length = 0; bit_idx != 16 && length != required_blocks; ++bit_idx)
-			{
-				if ((b & (1 << bit_idx)) == 0)
-				{
-					++length;
-					if (length == required_blocks)
-						break;
-				}
-				else
-				{
-					length = 0;
-				}
-			}
-
-			if (length == required_blocks)
-				break;
-		}
-#endif
+		return emptiness_report_t::empty;
 	}
 
 	inline arena_allocator_t::arena_allocator_t(size_t page_size, size_t block_size, std::pmr::memory_resource* upstream)
@@ -157,56 +135,54 @@ namespace atma
 		page_t* page = atma::atomic_load(&first_page_);
 		page_t::emptiness_report_t report;
 
-		while (page->memory != nullptr && !(report = page->has_space(required_blocks)))
-			page = atma::atomic_load(&page->next);
-
-		if (page->memory == nullptr)
-			goto allocate_new_page;
-		else
-			goto get_page_bit_idx;
-
-	allocate_new_page:
-		while (page->memory == nullptr)
+		// go through valid pages first
+		for (; page->valid(); page = atma::atomic_load(&page->next))
 		{
-			// total-allocation of a page's worth of memory is the size of the freemask
-			size_t total_alloc_size = freemask_size(page_size_ / block_size_);
-			// align it to the block-alignment
-			total_alloc_size = aml::alignby(total_alloc_size, block_alignment);
-			// and add the page-size onto that
-			total_alloc_size += page_size_;
-
-			// allocate new page
-			page_t* new_page = (page_t*)upstream_->allocate(sizeof(page_t));
-			// construct new page with new memory
-			new (new_page) page_t{page_size_, block_size_, (byte*)upstream_->allocate(total_alloc_size, block_alignment), page};
-			// fill freemask with zeroes
-			std::fill(new_page->memory, new_page->memory + freemask_size(page_size_), byte{});
-
-			// if we swapped, we're all good, we have a usable page. assume it's empty enough.
-			if (atma::atomic_compare_exchange(&first_page_, page, new_page, &page))
-			{
-				page = new_page;
-				break;
-			}
-			// else, someone got in our way, and we need to try again afresh
-			else
-			{
-				upstream_->deallocate(new_page->memory, page_size_);
-				upstream_->deallocate(new_page, sizeof(page_t));
-			}
+			if (report = page->has_space(required_blocks))
+				goto get_page_bit_idx;
 		}
 
-		// find bits in the freemask
-		report = page->has_space(required_blocks);
+		// we've already allocated the maximum number of pages, so we simply have to fail
+		if (atma::atomic_post_increment(&page_count_) != 0)
+			return nullptr;
+
+		// total-allocation of a page's worth of memory is the size of the freemask
+		size_t total_alloc_size = freemask_size(page_size_ / block_size_);
+		// align it to the block-alignment
+		total_alloc_size = aml::alignby(total_alloc_size, block_alignment);
+		// and add the page-size onto that
+		total_alloc_size += page_size_;
+
+		// allocate new page
+		page_t* new_page = (page_t*)upstream_->allocate(sizeof(page_t));
+		// construct new page with new memory
+		new (new_page) page_t{page_size_, block_size_, (byte*)upstream_->allocate(total_alloc_size, block_alignment), page};
+		// fill freemask with zeroes
+		std::fill(new_page->memory, new_page->memory + freemask_size(page_size_), byte{});
+
+		// if we swapped, we're all good, we have a usable page. assume it's empty enough.
+		if (atma::atomic_compare_exchange(&first_page_, page, new_page, &page))
+		{
+			page = new_page;
+			if (report = page->has_space(required_blocks); !report)
+				goto get_page;
+		}
+		// else, someone got in our way, and we need to try again afresh
+		else
+		{
+			upstream_->deallocate(new_page->memory, page_size_);
+			upstream_->deallocate(new_page, sizeof(page_t));
+			goto get_page;
+		}
+		
 
 	get_page_bit_idx:
-		if (!report)
-			goto get_page;
+		ATMA_ASSERT(report);
 
 		// now atomically set the new value of the byte for the page's freemask
 		uint16 new_freemask_short = report.new_freemask_short();
 		if (!atma::atomic_compare_exchange((uint16*)page->memory + report.short_idx, report.freemask_short, new_freemask_short))
-			goto get_page_bit_idx;
+			goto get_page;
 
 		// now we have exclusive access to the @length blocks of memory
 		byte* block = page->memory_ptr() + report.block_idx() * block_size_;
