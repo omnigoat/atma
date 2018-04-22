@@ -35,5 +35,8 @@
     <ClCompile Include="..\..\source\atma_test\test_events.cpp">
       <Filter>source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\source\atma_test\test_allocators.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

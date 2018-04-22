@@ -42,6 +42,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4996</DisableSpecificWarnings>
       <LanguageStandard>stdcpplatest</LanguageStandard>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -57,6 +58,7 @@
     <ClCompile Include="..\..\source\atma_test\queue.cpp" />
     <ClCompile Include="..\..\source\atma_test\ranges.cpp" />
     <ClCompile Include="..\..\source\atma_test\string.cpp" />
+    <ClCompile Include="..\..\source\atma_test\test_allocators.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_events.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_utf8_string.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_vector.cpp" />

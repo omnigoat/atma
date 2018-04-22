@@ -202,6 +202,12 @@
     <ClInclude Include="..\..\include\atma\platform\interop.hpp">
       <Filter>include\platform</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\atma\arena_allocator.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\math\functions.hpp">
+      <Filter>include\math</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\resources\atma.natvis" />
