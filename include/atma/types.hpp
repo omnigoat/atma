@@ -9,8 +9,6 @@ using uint   = unsigned int;
 using ulong  = unsigned long;
 using ullong = unsigned long long;
 
-using byte = uchar;
-
 using int8  = int8_t;
 using int16 = int16_t;
 using int32 = int32_t;
@@ -24,6 +22,7 @@ using uint64 = uint64_t;
 using  intptr =  intptr_t;
 using uintptr = uintptr_t;
 
+using byte = uint8;
 using size_t = std::size_t;
 
 #define ATMA_PP_CAT_II(a, b) a##b

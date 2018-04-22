@@ -5,6 +5,7 @@
 #include <atma/unique_memory.hpp>
 #include <atma/assert.hpp>
 #include <atma/config/platform.hpp>
+#include <atma/math/functions.hpp>
 
 #include <chrono>
 #include <thread>
@@ -13,25 +14,7 @@
 
 namespace atma
 {
-	constexpr auto pow2(uint x) -> uint
-	{
-		return (x == 0) ? 1 : 2 * pow2(x - 1);
-	}
-
-	constexpr auto log2(uint x) -> uint
-	{
-		return (x <= 1) ? 0 : 1 + log2(x >> 1);
-	}
-
-	constexpr auto alignby(uint x, uint a) -> uint
-	{
-		return (x + a - 1) & ~(a - 1);
-	}
-
-	constexpr auto is_pow2(uint x) -> bool
-	{
-		return x && (x & (x - 1)) == 0;
-	}
+	
 
 
 	struct base_lockfree_queue_t
@@ -113,10 +96,10 @@ namespace atma
 		static constexpr uint32 header_size_bitsize = 26;
 		static constexpr uint32 jump_command_body_size = sizeof(void*) + sizeof(uint32);
 
-		static constexpr uint32 header_state_bitmask = pow2(header_state_bitsize) - 1;
-		static constexpr uint32 header_type_bitmask = pow2(header_type_bitsize) - 1;
-		static constexpr uint32 header_alignment_bitmask = pow2(header_alignment_bitsize) - 1;
-		static constexpr uint32 header_size_bitmask = pow2(header_size_bitsize) - 1;
+		static constexpr uint32 header_state_bitmask = aml::pow2(header_state_bitsize) - 1;
+		static constexpr uint32 header_type_bitmask = aml::pow2(header_type_bitsize) - 1;
+		static constexpr uint32 header_alignment_bitmask = aml::pow2(header_alignment_bitsize) - 1;
+		static constexpr uint32 header_size_bitmask = aml::pow2(header_size_bitsize) - 1;
 
 		static uint32 const invalid_allocation_mask = 0x80000000;
 		static uint32 const invalid_contiguous_mask = 0x40000000;
@@ -551,8 +534,8 @@ namespace atma
 		// expand size so that:
 		//  - we pad up to the requested alignment
 		//  - the following allocation is at a 4-byte alignment
-		size += alignby(w + header_size, alignment) - w - header_size;
-		size  = alignby(size, 4);
+		size += aml::alignby(w + header_size, alignment) - w - header_size;
+		size  = aml::alignby(size, 4);
 
 		return impl_allocate(hk, w, e, size, alignment, ct);
 	}
@@ -734,26 +717,26 @@ namespace atma
 	{
 		// size after all alignment shenanigans
 		uint32 ag = alignment();
-		auto opa = alignby(op_, ag);
+		auto opa = aml::alignby(op_, ag);
 		auto r = size_ - (opa - op_);
 		return r;
 	}
 
 	inline auto base_lockfree_queue_t::headerer_t::alignment() const -> uint32
 	{
-		return 4 * pow2(alignment_);
+		return 4 * aml::pow2(alignment_);
 	}
 
 	inline auto base_lockfree_queue_t::headerer_t::data() const -> void*
 	{
-		return buf_ + (alignby(op_ + header_size, alignment()) % buffer_size());
+		return buf_ + (aml::alignby(op_ + header_size, alignment()) % buffer_size());
 	}
 
 	// allocation_t
 	inline base_lockfree_queue_t::allocation_t::allocation_t(byte* buf, uint32 wp, allocstate_t state, alloctype_t type, uint32 alignment, uint32 size)
 		: headerer_t{buf, wp, wp, (uint32)state, (uint32)type, alignment, size}
 	{
-		p_ = alignby(p_ + header_size, this->alignment());
+		p_ = aml::alignby(p_ + header_size, this->alignment());
 		p_ %= this->buffer_size();
 
 		ATMA_ASSERT(size <= header_size_bitmask);
@@ -841,7 +824,7 @@ namespace atma
 		: headerer_t(buf, rp, rp, *(uint32*)(buf + rp))
 	{
 		p_ += header_size;
-		p_ = alignby(p_, alignment());
+		p_ = aml::alignby(p_, alignment());
 		p_ %= buffer_size();
 	}
 
