@@ -2,6 +2,8 @@
 
 #include <atma/config/platform.hpp>
 #include <atma/assert.hpp>
+#include <atma/types.hpp>
+
 
 namespace atma
 {
@@ -262,6 +264,8 @@ namespace atma
 
 			static auto compare_exchange(D volatile* addr, D const& c, S const& x, D* prev) -> bool
 			{
+				ATMA_ASSERT_64BIT_ALIGNED(addr);
+
 				// we must ensure addr & prev are different addresses
 				atomic128_t tmp = (atomic128_t const&)c;
 
