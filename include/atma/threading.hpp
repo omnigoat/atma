@@ -13,7 +13,7 @@ namespace atma
 {
 	namespace this_thread
 	{
-		inline auto set_debug_name(char const* name)
+		inline auto set_debug_name(char const* thread_name)
 		{
 #if ATMA_PLATFORM_WINDOWS
 			auto os_thread_name = platform_interop::make_platform_string(thread_name);
