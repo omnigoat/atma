@@ -220,7 +220,7 @@ namespace atma
 				ATMA_ASSERT_64BIT_ALIGNED(addr);
 				// loads from 4-byte aligned addresses are atomic on x86/x64
 				_ReadWriteBarrier();
-				*reinterpret_cast<uint64 volatile*>(dest) = *reinterpret_cast<uint64 volatile*>(addr);
+				*reinterpret_cast<uint64 volatile*>(dest) = *reinterpret_cast<uint64 volatile const*>(addr);
 				_ReadWriteBarrier();
 				// no fencing required on x86/x64
 			}
@@ -345,10 +345,11 @@ namespace atma
 	}
 
 	template <typename S>
-	inline auto atomic_load(S volatile* addr, memory_order = memory_order::memory_order_seq_cst) -> S
+	inline auto atomic_load(S volatile* addr, memory_order = memory_order::memory_order_seq_cst)
 	{
-		S r;
-		detail::interlocked_t<S, S>::load(&r, addr);
+		using R = std::remove_const_t<S>;
+		R r;
+		detail::interlocked_t<std::remove_const_t<S>, S>::load(&r, addr);
 		return r;
 	}
 
