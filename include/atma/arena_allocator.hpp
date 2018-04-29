@@ -127,7 +127,6 @@ namespace atma
 
 		// tricky maths: ceil(bytes / block_size_)
 		size_t required_blocks = (bytes + block_size_ - 1) / block_size_;
-		//if (required_blocks > )
 
 	get_page:
 		page_t* page = atma::atomic_load(&first_page_);
