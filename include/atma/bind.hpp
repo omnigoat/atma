@@ -49,6 +49,12 @@ namespace atma {
 	//
 	namespace detail
 	{
+		template <typename T>
+		constexpr inline bool is_bind_expression()
+		{
+			return std::is_bind_expression_v<T>; // SERIOUSLY, "or atma::is_bind_expression" equivalent
+		}
+
 		template <typename Binding, typename Args>
 		constexpr inline decltype(auto) select_bound_arg(Binding&& b, Args&&)
 		{
@@ -60,6 +66,12 @@ namespace atma {
 			-> typename std::tuple_element<I, Args>::type
 		{
 			return std::get<I>(std::forward<Args>(args));
+		}
+
+		template <typename BindExpr, typename Args, typename = std::enable_if_t<is_bind_expression<std::decay_t<BindExpr>>()>>
+		constexpr inline auto select_bound_arg(BindExpr&& bindexpr, Args&& args)
+		{
+			return std::apply(std::forward<BindExpr>(bindexpr), std::forward<Args>(args));
 		}
 	}
 

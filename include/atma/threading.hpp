@@ -7,6 +7,19 @@
 #include <atma/config/platform.hpp>
 #include <atma/platform/interop.hpp>
 
+#include <boost/preprocessor.hpp>
+
+
+// yep
+#define ATMA_SCOPED_LOCKM(r,d,i,x) \
+	BOOST_PP_COMMA_IF(i) decltype(x)
+
+#define ATMA_SCOPED_LOCK_II(counter, args) \
+	if (::std::scoped_lock<BOOST_PP_SEQ_FOR_EACH_I(ATMA_SCOPED_LOCKM, _, args)> BOOST_PP_CAT(BOOST_PP_CAT(scoped_lock_, counter), {BOOST_PP_SEQ_ENUM(args)}); true)
+
+#define ATMA_SCOPED_LOCK(...) \
+	ATMA_SCOPED_LOCK_II(__COUNTER__, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+
 
 // debug, this_thread, etc
 namespace atma
@@ -17,7 +30,7 @@ namespace atma
 		{
 #if ATMA_PLATFORM_WINDOWS
 			auto os_thread_name = platform_interop::make_platform_string(thread_name);
-			HRESULT hr = SetThreadDescription(GetCurrentThread(), os_thread_name.get());
+			SetThreadDescription(GetCurrentThread(), os_thread_name.get());
 #endif
 		}
 	}
@@ -448,10 +461,8 @@ namespace atma
 	inline auto thread_pool_t::worker_thread_runloop(thread_pool_t* pool, std::atomic_bool& running) -> void
 	{
 		char buf[128];
-		int r = sprintf(buf, "threadpool %#0jx worker", (uintmax_t)pool);
+		sprintf(buf, "threadpool %#0jx worker\0", (uintmax_t)pool);
 		atma::this_thread::set_debug_name(buf);
-
-		//using lfn_t = atma::relative_function<
 
 		atma::unique_memory_t mem;
 		while (running)
