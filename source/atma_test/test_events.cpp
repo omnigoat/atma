@@ -16,7 +16,8 @@ SCENARIO("events can be constructed", "[event]")
 		atma::event_t<int> e;
 
 		std::atomic_bool good = true;
-		auto a = std::async([&] {
+
+		auto thread_fn = [&] {
 
 			atma::this_thread::set_debug_name("test thread");
 
@@ -26,13 +27,23 @@ SCENARIO("events can be constructed", "[event]")
 				es.process_events_for_this_thread();
 			}
 
-		});
+		};
 
-		a.wait_for(std::chrono::milliseconds(1000));
+		auto a = std::thread{thread_fn};
+		auto b = std::thread{thread_fn};
 
-		e.bind(atma::detail::default_event_system, atma::detail::default_event_binder, std::this_thread::get_id(), f);
+		//e.bind(atma::detail::default_event_system, atma::detail::default_event_binder, std::this_thread::get_id(), f);
+		//e.bind(atma::detail::default_event_system, atma::detail::default_event_binder, b.get_id(), f);
+		//e.bind(atma::detail::default_event_system, atma::detail::default_event_binder, a.get_id(), f);
+
 		e.raise(7);
+		e.raise(17);
+		e.raise(27);
+		e.raise(37);
 
+		good = false;
+		a.join();
+		b.join();
 
 #if 0
 		std::atomic_bool good = true;

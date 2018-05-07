@@ -111,7 +111,7 @@ namespace atma::detail
 	}
 
 	template <typename R, typename FN, typename... Params>
-	constexpr bool result_matches_v = std::is_same_v<R, std::result_of_t<std::remove_reference_t<FN>(Params...)>>;
+	constexpr bool result_matches_v = std::is_same_v<R, std::invoke_result_t<std::remove_reference_t<FN>, Params...>>;
 }
 
 

@@ -71,8 +71,7 @@ void read_number(queue_t& Q, numbers_t& ns, uint32* allread)
 
 SCENARIO("lockfree_queue is amazing")
 {
-	return;
-
+#if 0
 	std::cout << "beginning queue test" << std::endl;
 
 	atma::lockfree_queue_t Q{8 + 512};
@@ -116,6 +115,7 @@ SCENARIO("lockfree_queue is amazing")
 
 		ATMA_ASSERT(found == 1);
 	}
+#endif
 #endif
 }
 

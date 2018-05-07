@@ -4,15 +4,35 @@
 #include <atma/math/functions.hpp>
 
 #include <memory_resource>
+#include <atomic>
+
 
 
 namespace atma
 {
-	struct arena_allocator_t : std::pmr::memory_resource
+	// performs the equivalent of ceil(x / y) for integrals
+	template <typename T>
+	auto ceil_div(T x, T y)
+	{
+		return (x + y - 1) / y;
+	}
+
+	struct arena_memory_resource_t : std::pmr::memory_resource
 	{
 		struct page_t;
 
-		arena_allocator_t(size_t page_size, size_t block_size, std::pmr::memory_resource*);
+		arena_memory_resource_t(
+			size_t block_size, size_t block_count, size_t page_count = ~0,
+			// memory-resource for allocating the actual pages of memory
+			std::pmr::memory_resource* = std::pmr::new_delete_resource(),
+			// memory-resource for allocating the page-control-structure
+			std::pmr::memory_resource* = std::pmr::new_delete_resource());
+
+		arena_memory_resource_t(arena_memory_resource_t const&) = delete;
+		arena_memory_resource_t(arena_memory_resource_t&&) = delete;
+
+		auto upstream_resource() const { return page_upstream_; }
+		auto control_upstream_resource() const { return page_control_upstream_.resource(); }
 
 	protected:
 		// implement std::pmr::memory_resource
@@ -20,49 +40,42 @@ namespace atma
 		auto do_deallocate(void* p, size_t bytes, size_t alignment) -> void override;
 		auto do_is_equal(std::pmr::memory_resource const&) const noexcept -> bool override;
 
-		inline auto freemask_size(size_t bytes) -> size_t;
-
 	private:
-		std::pmr::memory_resource* upstream_ = nullptr;
-
+		std::pmr::memory_resource* page_upstream_;
+		std::pmr::polymorphic_allocator<page_t> page_control_upstream_;
 
 		// we split the freemask into uint16s because we must atomically
 		// modify them, and there is no such thing as an 8-bit CAS
-		size_t const freemask_word_size = 2u;
+		static inline size_t const freemask_word_size = 2u;
+		static inline size_t const block_alignment = 16u;
 
-		static size_t const block_alignment = 16u;
-
-		// if set to zero, it means pages can be of different sizes, and
-		// the @size member in page_t is relevant. if non-zero, all pages
-		// share the same size, and the @size field is used by various
-		// implementations for purposes.
-		size_t page_size_ = 0;
-		uint32 page_count_ = 0;
-
-		// like above
 		size_t block_size_ = 0;
 		size_t block_count_ = 0;
+		size_t max_pages_ = 0;
+		size_t page_count_ = 0;
 
-
-		page_t* first_page_ = nullptr;
+		std::atomic<page_t*> first_page_;
 	};
 
-	struct arena_allocator_t::page_t
+	struct arena_memory_resource_t::page_t
 	{
 		struct emptiness_report_t;
 
-		uint32 const size;
-		uint32 const block_count;
+		page_t(byte* memory, page_t* next = nullptr)
+			: memory{memory}
+			, next{next}
+		{}
+
 		byte* const memory;
-		page_t* const next = nullptr;
+		std::atomic<page_t*> const next;
 		uint64 freemask = 0;
 
 		// sentinel-page is going to be null
 		auto valid() const -> bool { return memory != nullptr; }
-		auto has_space(size_t blocks) const -> emptiness_report_t;
+		auto has_space(size_t total_blocks, size_t required_blocks) const -> emptiness_report_t;
 	};
 
-	struct arena_allocator_t::page_t::emptiness_report_t
+	struct arena_memory_resource_t::page_t::emptiness_report_t
 	{
 		// the number of blocks requested
 		uint16 requested_blocks = 0;
@@ -81,13 +94,13 @@ namespace atma
 		operator bool() const { return requested_blocks != 0; }
 	};
 
-	inline auto arena_allocator_t::page_t::has_space(size_t required_blocks) const -> emptiness_report_t
+	inline auto arena_memory_resource_t::page_t::has_space(size_t block_count, size_t required_blocks) const -> emptiness_report_t
 	{
 		uint16 bit_idx = 0;
 		uint16 mask = uint16(1 << required_blocks) - 1;
 		uint16 freemask_short = 0;
 
-		for (uint16 short_idx = 0; memory && bit_idx != block_count - required_blocks; ++bit_idx, short_idx = bit_idx / 16)
+		for (uint16 short_idx = 0; memory && bit_idx <= block_count - required_blocks; ++bit_idx, short_idx = bit_idx / 16)
 		{
 			uint64 shifted_mask = mask << bit_idx;
 
@@ -96,7 +109,7 @@ namespace atma
 			if (((shifted_mask | freemask) ^ freemask) == shifted_mask)
 			{
 				// get short idx
-				uint16 short_idx = bit_idx / 16u;
+				short_idx = bit_idx / 16u;
 				bit_idx = bit_idx % 16;
 
 				return {(uint16)required_blocks, short_idx, bit_idx, freemask_short};
@@ -106,72 +119,77 @@ namespace atma
 		return emptiness_report_t::empty;
 	}
 
-	inline arena_allocator_t::arena_allocator_t(size_t page_size, size_t block_size, std::pmr::memory_resource* upstream)
-		: upstream_{upstream}
-		, page_size_{page_size}
+	inline arena_memory_resource_t::arena_memory_resource_t
+		( size_t block_size
+		, size_t block_count
+		, size_t page_count
+		, std::pmr::memory_resource* page_upstream_resource
+		, std::pmr::memory_resource* page_control_upstream_resource
+		)
+		: page_upstream_{page_upstream_resource}
+		, page_control_upstream_{page_control_upstream_resource}
 		, block_size_{block_size}
-		, block_count_{page_size_ / block_size_}
-		, first_page_{(page_t*)upstream_->allocate(sizeof(page_t))}
+		, block_count_{block_count}
+		, max_pages_{page_count}
 	{
-		ATMA_ASSERT(page_size % block_size == 0, "block-size must fit nicely into page-size");
+		ATMA_ASSERT(page_upstream_resource, "invalid upstream resource");
+		ATMA_ASSERT(block_size_ >= 16, "minimum size is 16 bytes per block");
 
 		// default-construct sentinel page
-		new (first_page_) page_t{};
+		first_page_ = page_control_upstream_.allocate(1);
+		page_control_upstream_.construct(first_page_.load(), nullptr);
 	}
 
-	
-
-	inline auto arena_allocator_t::do_allocate(size_t bytes, size_t alignment) -> void*
+	inline auto arena_memory_resource_t::do_allocate(size_t bytes, size_t alignment) -> void*
 	{
 		ATMA_ASSERT(alignment <= 16, "alignment requirement bigger than 16 bytes. that's really big... the biggest I've seen. and I've been with a lot of guys");
 
-		// tricky maths: ceil(bytes / block_size_)
-		size_t required_blocks = (bytes + block_size_ - 1) / block_size_;
+		size_t required_blocks = ceil_div(bytes, block_size_);
+		page_t* new_page = nullptr;
+		int attempts = 0;
 
 	get_page:
-		page_t* page = atma::atomic_load(&first_page_);
+		// the heuristic is five
+		if (attempts++ == 5)
+			return nullptr;
+
+		page_t* page = first_page_;
 		page_t::emptiness_report_t report;
 
 		// go through valid pages first
-		for (; page->valid(); page = atma::atomic_load(&page->next))
+		for (; page->valid(); page = page->next)
 		{
-			if (report = page->has_space(required_blocks))
+			if (report = page->has_space(block_count_, required_blocks))
 				goto get_page_bit_idx;
 		}
 
-		// we've already allocated the maximum number of pages, so we simply have to fail
-		if (atma::atomic_post_increment(&page_count_) != 0)
-			return nullptr;
+		// we've already allocated the maximum number of pages
+		if (atma::atomic_post_increment(&page_count_) >= max_pages_)
+			goto get_page;
 
-		// total-allocation of a page's worth of memory is the size of the freemask
-		size_t total_alloc_size = freemask_size(page_size_ / block_size_);
-		// align it to the block-alignment
-		total_alloc_size = aml::alignby(total_alloc_size, block_alignment);
-		// and add the page-size onto that
-		total_alloc_size += page_size_;
+		// allocate new page & memory
+		{
+			new_page = page_control_upstream_.allocate(1);
+			auto new_page_memory = (byte*)page_upstream_->allocate(block_size_ * block_count_, block_alignment);
 
-		// allocate new page
-		page_t* new_page = (page_t*)upstream_->allocate(sizeof(page_t));
-		// construct new page with new memory
-		new (new_page) page_t{(uint32)page_size_, (uint32)block_size_, (byte*)upstream_->allocate(total_alloc_size, block_alignment), page};
-		// fill freemask with zeroes
-		std::fill(new_page->memory, new_page->memory + freemask_size(page_size_), byte{});
+			// construct new page with new memory
+			page_control_upstream_.construct(new_page, new_page_memory, page);
+		}
 
 		// if we swapped, we're all good, we have a usable page. assume it's empty enough.
-		if (atma::atomic_compare_exchange(&first_page_, page, new_page, &page))
+		if (first_page_.compare_exchange_strong(page, new_page))
 		{
 			page = new_page;
-			if (report = page->has_space(required_blocks); !report)
+			if (!(report = page->has_space(block_count_, required_blocks)))
 				goto get_page;
 		}
 		// else, someone got in our way, and we need to try again afresh
 		else
 		{
-			upstream_->deallocate(new_page->memory, page_size_);
-			upstream_->deallocate(new_page, sizeof(page_t));
+			page_upstream_->deallocate(new_page->memory, block_size_ * block_count_);
+			page_control_upstream_.deallocate(new_page, 1);
 			goto get_page;
 		}
-		
 
 	get_page_bit_idx:
 		ATMA_ASSERT(report);
@@ -187,12 +205,35 @@ namespace atma
 		return block;
 	}
 
-	inline auto arena_allocator_t::do_deallocate(void* p, size_t bytes, size_t alignment) -> void {}
-	inline auto arena_allocator_t::do_is_equal(std::pmr::memory_resource const&) const noexcept -> bool { return false; }
-
-	inline auto arena_allocator_t::freemask_size(size_t bytes) -> size_t
+	inline auto arena_memory_resource_t::do_deallocate(void* ptr, size_t size, size_t alignment) -> void
 	{
-		return aml::alignby((bytes + 7) / 8, freemask_word_size);
+		// find the page
+		page_t* current_page = first_page_;
+		for (; current_page; current_page = current_page->next)
+		{
+			if (current_page->memory < ptr && ptr < (current_page->memory + block_count_ * block_size_))
+				break;
+		}
+
+		// oh no
+		if (!current_page)
+			return;
+
+		size_t block_idx = ((byte*)ptr - current_page->memory) / block_size_;
+		size_t block_length = ceil_div(size, block_size_);
+
+		// this is the mask of the blocks we're using
+		uint64 mask = ((1 << block_length) - 1) << block_idx;
+
+		// atomically flip it to off
+		uint64 old_mask = current_page->freemask;
+		while (!atomic_compare_exchange(&current_page->freemask, old_mask, old_mask & ~mask, &old_mask))
+			ATMA_ASSERT((old_mask & mask) == mask);
+	}
+
+	inline auto arena_memory_resource_t::do_is_equal(std::pmr::memory_resource const&) const noexcept -> bool
+	{
+		return false;
 	}
 
 }

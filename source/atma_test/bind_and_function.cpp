@@ -93,6 +93,8 @@ SCENARIO("bind works with various things", "[bind]")
 			auto r = tf();
 			auto r2 = tf2();
 			auto cr = r + r2;
+
+			CHECK(cr == 32);
 		}
 
 		THEN("all b2s match each other")
@@ -114,8 +116,8 @@ SCENARIO("bind works with various things", "[bind]")
 
 		THEN("b4s behave")
 		{
-			CHECK(b4v1(1, 2, 3.f) == 5);
-			CHECK(b4v2(4.f, 5, 6) == 34);
+			CHECK(b4v1(char(1), 2, 3.f) == 5);
+			CHECK(b4v2(4.f, char(5), 6) == 34);
 		}
 
 		THEN("b5s play nice")
@@ -364,7 +366,6 @@ SCENARIO("functions can be constructed")
 
 		using FN = atma::basic_relative_function_t<16, void()>;
 
-		auto sz = FN::contiguous_relative_allocation_size_for(f);
 		FN::make_contiguous(buf, std::move(f));
 
 		memcpy(buf2, buf, sizeof(buf));
