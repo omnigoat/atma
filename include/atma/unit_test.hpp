@@ -90,13 +90,16 @@ namespace atma { namespace unit_test {
 				printInfoMessages = false;
 			}
 
-			if (SectionTrace && !sections_printed_)
+			if constexpr (SectionTrace)
 			{
-				auto it = m_sectionStack.begin() + 1;
-				auto itEnd = m_sectionStack.end();
-				for (; it != itEnd; ++it)
-					printHeaderString(it->name, 2);
-				sections_printed_ = true;
+				if (!sections_printed_)
+				{
+					auto it = m_sectionStack.begin() + 1;
+					auto itEnd = m_sectionStack.end();
+					for (; it != itEnd; ++it)
+						printHeaderString(it->name, 2);
+					sections_printed_ = true;
+				}
 			}
 
 			assertion_printer_t printer(stream, stats, printInfoMessages);

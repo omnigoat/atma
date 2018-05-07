@@ -5,6 +5,7 @@
 #include <atma/function.hpp>
 #include <atma/threading.hpp>
 #include <atma/algorithm.hpp>
+#include <atma/arena_allocator.hpp>
 
 #include <functional>
 #include <memory>
@@ -82,6 +83,7 @@ namespace atma::detail
 		: atma::ref_counted
 	{
 		per_system_bindings_list_t bound_systems;
+		std::mutex bound_systems_mutex;
 
 		template <typename... Args, typename F>
 		void bind(event_system_t& event_system, event_binder_t& binder, thread_id_t thread_id, F&& f);
@@ -101,73 +103,104 @@ namespace atma::detail
 		using queues_t = std::map<thread_id_t, lockfree_queue_t>;
 
 		event_system_backend_t()
+			: threaded_args_resource{16, 64, 32}
 		{}
 
 		template <typename... Args, typename F>
 		auto bind(event_backend_ptr const& event_backend, int sys_bind_idx, thread_id_t thread_id, F&& f) -> void
 		{
-			// register the event-backend with us
-			if (auto candidate = atma::find_in(event_backends_, event_backend); candidate == event_backends_.end())
-				event_backends_.push_back(event_backend);
+			ATMA_SCOPED_LOCK(bindings_mutex_)
+			{
+				// register the event-backend with us
+				if (auto candidate = atma::find_in(event_backends_, event_backend); candidate == event_backends_.end())
+					event_backends_.push_back(event_backend);
 
-			// store the new binding
-			auto new_iter = bindings_.insert(bindings_.end(), std::make_unique<binding_info_t<Args...>>(std::forward<F>(f), thread_id));
+				// store the new binding
+				auto new_iter = bindings_.insert(bindings_.end(), std::make_unique<binding_info_t<Args...>>(std::forward<F>(f), thread_id));
 
-			// tell the event-backend which index into our binding 
-			event_backend->bound_systems[sys_bind_idx].binding_iters.push_back(new_iter);
+				// tell the event-backend which index into our binding 
+				ATMA_SCOPED_LOCK(event_backend->bound_systems_mutex)
+				{
+					event_backend->bound_systems[sys_bind_idx].binding_iters.push_back(new_iter);
+				}
+			}
 		}
 
 		template <typename... Args>
 		auto raise(base_binding_iters_t const& iters, thread_id_t thread_id, Args... args) -> void
 		{
+			using tuple_type = std::tuple<Args...>;
+
+			auto this_thread_id = std::this_thread::get_id();
+
 			// no thread specified, free to schedule as normal
 			if (thread_id == thread_id_t{})
 			{
-				std::map<thread_id_t, uint> argument_store;
+				std::map<thread_id_t, tuple_type*> argument_store;
 
+				// first, queue all tethered bindings
 				for (auto&& iter : iters)
 				{
-					base_binding_info_ptr const& bbi = *iter;
-					binding_info_t<Args...> const& binding_info = *static_cast<binding_info_t<Args...>*>(bbi.get());
+					binding_info_t<Args...> const& binding_info = *static_cast<binding_info_t<Args...>*>(iter->get());
+
+					// filter out wandering bindings, and tethered bindings to this thread (they will be executed immediately)
+					if (binding_info.thread_id == thread_id_t{} || binding_info.thread_id == this_thread_id)
+						continue;
+
+					// create a copy of the arguments for the requested thread (if we haven't already)
+					auto candidate = argument_store.find(binding_info.thread_id);
+					if (candidate == argument_store.end())
+					{
+						auto tuple_args_ptr = (tuple_type*)threaded_args_resource.allocate(sizeof(tuple_type));
+						new (tuple_args_ptr) tuple_type{args...};
+						auto [riter, r] = argument_store.insert({binding_info.thread_id, tuple_args_ptr});
+						ATMA_ASSERT(r);
+						candidate = riter;
+					}
+
+					// using the per-thread copy of the arguments, enqueue the command
+					auto& tupled_arguments = *candidate->second;
+					atma::enqueue_function_to_queue(
+						per_thread_queue(binding_info.thread_id),
+						std::function<void()>{[f = binding_info.f, &tupled_arguments]{std::apply(f, tupled_arguments);}});
+				}
+
+				// enqueue the deletion of the per-thread argument copies
+				for (auto const& [arg_thread_id, tuple_args_ptr] : argument_store)
+				{
+					atma::enqueue_function_to_queue(
+						per_thread_queue(arg_thread_id),
+						[&, tuple_args_ptr] { threaded_args_resource.deallocate(tuple_args_ptr, sizeof(tuple_type)); });
+				}
+
+				// execute the rest immediately
+				for (auto&& iter : iters)
+				{
+					binding_info_t<Args...> const& binding_info = *static_cast<binding_info_t<Args...>*>(iter->get());
 					
-					if (binding_info.thread_id == std::this_thread::get_id())
+					if (binding_info.thread_id == thread_id_t{} || binding_info.thread_id == this_thread_id)
 					{
 						std::invoke(binding_info.f, args...);
 					}
-					else
-					{
-						auto& tupled_arguments = per_thread_argument_store(binding_info.thread_id, argument_store[binding_info.thread_id], std::forward<Args>(args)...);
-
-						atma::enqueue_function_to_queue(
-							per_thread_queue(binding_info.thread_id),
-							std::function<void()>{[f=binding_info.f, &tupled_arguments] { std::apply(f, tupled_arguments); }});
-					}
-				}
-
-				// delete the temporary per-thread argument storage
-				for (auto const& [thread_id, idx] : argument_store)
-				{
-					atma::enqueue_function_to_queue(
-						per_thread_queue(thread_id),
-						[&]{ argument_store_[thread_id].ptrs.erase(idx); });
 				}
 			}
-			// thread specified, we need to exclude thread-settled bindings and "move" thread-wandering bindings
+			// thread specified, we need to exclude tethered bindings and "move" thread-wandering bindings
 			else
 			{
 				for (auto&& iter : iters)
 				{
-					base_binding_info_ptr const& bbi = *iter;
-					binding_info_t<Args...> const& binding_info = *static_cast<binding_info_t<Args...>*>(bbi.get());
+					binding_info_t<Args...> const& binding_info = *static_cast<binding_info_t<Args...>*>(iter->get());
 
-					if (binding_info.thread_id == std::this_thread::get_id())
+					// thread-tethered binding for this very thread, run immediately
+					if (binding_info.thread_id == thread_id && thread_id == this_thread_id)
 					{
 						std::invoke(binding_info.f, args...);
 					}
-					else
+					// thread-tethered binding for another thread, or thread-wandering binding, enqueue for the requested thread
+					else if (binding_info.thread_id == thread_id || binding_info.thread_id == thread_id_t{})
 					{
 						atma::enqueue_function_to_queue(
-							per_thread_queue(binding_info.thread_id),
+							per_thread_queue(thread_id),
 							std::function<void()>{atma::bind(binding_info.f, args...)});
 					}
 				}
@@ -184,29 +217,13 @@ namespace atma::detail
 			atma::consume_queue_of_functions<>(candidate->second);
 		}
 
-		template <typename... Args>
-		decltype(auto) per_thread_argument_store(thread_id_t thread_id, uint& idx, Args... args)
-		{
-			if (idx != 0)
-				return *reinterpret_cast<std::tuple<Args...>*>(argument_store_[thread_id].ptrs[idx].get());
-
-			using tuple_type = std::tuple<Args...>;
-
-			auto& store = argument_store_[thread_id];
-			auto& our_store = store.ptrs[store.current_idx++];
-			our_store.reset(new char[sizeof(tuple_type)]);
-			new (our_store.get()) std::tuple<Args...>{args...};
-			return *reinterpret_cast<std::tuple<Args...>*>(our_store.get());
-		}
-	
-
 	private:
 		auto per_thread_queue(thread_id_t id) -> lockfree_queue_t&
 		{
 			auto candidate = queues_.find(id);
 			if (candidate == queues_.end())
 			{
-				auto [iter, success] = queues_.emplace(id, 512);
+				auto [iter, success] = queues_.emplace(id, 2048);
 				ATMA_ASSERT(success);
 				candidate = iter;
 			}
@@ -216,10 +233,12 @@ namespace atma::detail
 
 	private:
 		queues_t queues_;
-		base_binding_infos_t bindings_;
 
-		using per_thread_store_t = struct { uint current_idx = 0; std::map<uint, std::unique_ptr<char[]>> ptrs; };
-		std::map<thread_id_t, per_thread_store_t> argument_store_;
+		base_binding_infos_t bindings_;
+		std::mutex bindings_mutex_;
+
+		// memory-resource for the per-thread argument copies
+		atma::arena_memory_resource_t threaded_args_resource;
 
 		// these are the event-backends that have bindings through us
 		std::vector<event_backend_ptr> event_backends_;

@@ -282,7 +282,7 @@ namespace atma
 		{
 			auto sz = size();
 			mem.reset(sz);
-			for (int i = 0; i != sz; ++i)
+			for (size_t i = 0; i != sz; ++i)
 				decode_byte(mem.begin()[i]);
 		}
 
@@ -373,7 +373,6 @@ namespace atma
 		// and write-threads can fill it up, with differently-sized allocations, which
 		// means we may dereference our "header" with a mental value. this is fine, as
 		// we will discard this if rp has moved (and ac has updated)
-		uint32  size = 0;
 		cursor_t r = atma::atomic_load(&hk->r);
 		cursor_t e = atma::atomic_load(&hk->e);
 
@@ -603,7 +602,7 @@ namespace atma
 		header_t h = atma::atomic_load(hp);
 
 		// if we've wrapped, we must wait for ep to wrap as well.
-		uint32 ep = atma::atomic_load(&hk->e);
+		uint32 ep = e;
 		if (np < op)
 		{
 			while (np < ep && ep < op)
@@ -638,7 +637,7 @@ namespace atma
 		ATMA_ASSERT(v.state == allocstate_t::empty);
 
 #if ATMA_ENABLE_ASSERTS
-		for (int i = header_size; i != header_size + size; ++i)
+		for (uint i = header_size; i != header_size + size; ++i)
 			ATMA_ASSERT(hk->buffer()[(p + i) % hk->buffer_size()] == 0);
 #endif
 
@@ -938,7 +937,6 @@ namespace atma
 
 			ATMA_ASSERT(alignment == 4 || alignment == 8 || alignment == 16 || alignment == 32);
 
-			size_t thread_id = std::hash<std::thread::id>{}(std::this_thread::get_id());
 			std::chrono::nanoseconds starvation{};
 
 			buffer_t writebuf;

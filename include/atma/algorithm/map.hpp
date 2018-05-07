@@ -16,7 +16,7 @@ namespace atma
 		using source_container_t = std::remove_reference_t<C>;
 		using source_iterator_t  = decltype(std::declval<source_container_t>().begin());
 
-		using value_type      = std::result_of_t<F(typename std::remove_reference_t<C>::value_type)>;
+		using value_type      = std::invoke_result_t<F, typename std::remove_reference_t<C>::value_type>;
 		using reference       = value_type;
 		using const_reference = value_type const;
 		using iterator        = std::conditional_t<std::is_const<source_container_t>::value, mapped_range_iterator_t<self_t const>, mapped_range_iterator_t<self_t>>;

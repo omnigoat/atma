@@ -138,7 +138,7 @@ namespace atma
 		template <typename D, typename S>
 		struct interlocked_impl_t<D, S, 32>
 		{
-			static auto load(D volatile* dest, S volatile* addr, memory_order order = memory_order::memory_order_seq_cst) -> void
+			static auto load(D volatile* dest, S volatile* addr, memory_order = memory_order::memory_order_seq_cst) -> void
 			{
 				ATMA_ASSERT_32BIT_ALIGNED(addr);
 				// loads from 4-byte aligned addresses are atomic on x86/x64
@@ -223,6 +223,34 @@ namespace atma
 				*reinterpret_cast<uint64 volatile*>(dest) = *reinterpret_cast<uint64 volatile const*>(addr);
 				_ReadWriteBarrier();
 				// no fencing required on x86/x64
+			}
+
+			static auto pre_inc(D volatile* addr) -> D
+			{
+				ATMA_ASSERT_64BIT_ALIGNED(addr);
+				auto v = InterlockedIncrement64(reinterpret_cast<LONG64 volatile*>(addr));
+				return reinterpret_cast<D&>(v);
+			}
+
+			static auto post_inc(D volatile* addr) -> D
+			{
+				ATMA_ASSERT_64BIT_ALIGNED(addr);
+				auto v = InterlockedIncrement64(reinterpret_cast<LONG64 volatile*>(addr)) - 1;
+				return reinterpret_cast<D&>(v);
+			}
+
+			static auto pre_dec(D volatile* addr) -> D
+			{
+				ATMA_ASSERT_64BIT_ALIGNED(addr);
+				auto v = InterlockedDecrement64(reinterpret_cast<LONG64 volatile*>(addr));
+				return reinterpret_cast<D&>(v);
+			}
+
+			static auto post_dec(D volatile* addr) -> D
+			{
+				ATMA_ASSERT_64BIT_ALIGNED(addr);
+				auto v = InterlockedDecrement64(reinterpret_cast<LONG64 volatile*>(addr)) - 1;
+				return reinterpret_cast<D&>(v);
 			}
 
 			static auto exchange(D volatile* addr, S const& x) -> D
@@ -345,12 +373,12 @@ namespace atma
 	}
 
 	template <typename S>
-	inline auto atomic_load(S volatile* addr, memory_order = memory_order::memory_order_seq_cst)
+	inline auto atomic_load(S volatile* addr, memory_order = memory_order::memory_order_seq_cst) -> std::remove_const_t<S>
 	{
 		using R = std::remove_const_t<S>;
 		R r;
 		detail::interlocked_t<std::remove_const_t<S>, S>::load(&r, addr);
-		return r;
+		return std::move(r);
 	}
 
 	template <typename D, typename S>
