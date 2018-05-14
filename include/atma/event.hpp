@@ -109,6 +109,7 @@ namespace atma::detail
 		template <typename... Args, typename F>
 		auto bind(event_backend_ptr const& event_backend, int sys_bind_idx, thread_id_t thread_id, F&& f) -> void
 		{
+			
 			ATMA_SCOPED_LOCK(bindings_mutex_)
 			{
 				// register the event-backend with us
@@ -253,6 +254,12 @@ namespace atma::detail
 // event-backend implementation
 namespace atma::detail
 {
+	struct bound_systems_t
+	{
+		
+	};
+
+
 	template <typename... Args, typename F>
 	inline void event_backend_t::bind(event_system_t& event_system, event_binder_t& binder, thread_id_t thread_id, F&& f)
 	{
