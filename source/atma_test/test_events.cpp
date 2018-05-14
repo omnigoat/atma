@@ -1,6 +1,7 @@
 #include <atma/unit_test.hpp>
 
 #include <atma/event.hpp>
+#include <atma/lockfree_list.hpp>
 
 #include <future>
 
@@ -9,6 +10,14 @@ using namespace std::chrono_literals;
 SCENARIO("events can be constructed", "[event]")
 {
 	auto f = [](int x) { std::cout << "thread: " << std::this_thread::get_id() << ", x: " << x << std::endl; };
+
+	GIVEN("a lockfree-list")
+	{
+		atma::lockfree_list_t<int> list;
+
+		list.push_back(4);
+		list.erase(list.begin());
+	}
 
 	GIVEN("a default-constructed event")
 	{

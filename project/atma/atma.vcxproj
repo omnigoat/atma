@@ -23,6 +23,7 @@
     <ClInclude Include="..\..\include\atma\function_composition.hpp" />
     <ClInclude Include="..\..\include\atma\handle_table.hpp" />
     <ClInclude Include="..\..\include\atma\hash_map.hpp" />
+    <ClInclude Include="..\..\include\atma\lockfree_list.hpp" />
     <ClInclude Include="..\..\include\atma\logging.hpp" />
     <ClInclude Include="..\..\include\atma\math\functions.hpp" />
     <ClInclude Include="..\..\include\atma\memory.hpp" />
@@ -76,6 +77,14 @@
     <Natvis Include="..\..\resources\atma.natvis">
       <SubType>Designer</SubType>
     </Natvis>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\source\include_guide.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Distribution|x64'">true</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Development|x64'">false</DeploymentContent>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Distribution|x64'">false</DeploymentContent>
+    </ClCompile>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{3301E1FA-9F23-43C6-A5E1-183204867D44}</ProjectGuid>
