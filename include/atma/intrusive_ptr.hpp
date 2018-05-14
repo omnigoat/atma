@@ -30,6 +30,12 @@ namespace atma
 	private:
 		mutable std::atomic_uint32_t ref_count_;
 
+		template <typename, typename> friend struct ref_counted_traits;
+	};
+
+	template <typename T, typename = std::void_t<>>
+	struct ref_counted_traits
+	{
 		static auto add_ref(ref_counted const* t) -> void {
 			t && ++t->ref_count_;
 		}
@@ -41,8 +47,24 @@ namespace atma
 				delete t;
 			}
 		}
+	};
 
-		template <typename> friend struct intrusive_ptr;
+
+	template <typename T>
+	struct ref_counted_traits<T, std::void_t<decltype(&T::increment_refcount), decltype(&T::decrement_refcount)>>
+	{
+		static auto add_ref(T const* t) -> void
+		{
+			t && t->increment_refcount();
+		}
+
+		static auto rm_ref(T const* t) -> void
+		{
+			if (t && t->decrement_refcount() == 0)
+			{
+				delete t;
+			}
+		}
 	};
 }
 
@@ -65,27 +87,27 @@ namespace atma
 		explicit intrusive_ptr(T* t)
 			: px(t)
 		{
-			ref_counted::add_ref(t);
+			ref_counted_traits<T>::add_ref(t);
 		}
 
 		template <typename Y, typename = std::enable_if_t<std::is_convertible<Y*, T*>::value>>
 		explicit intrusive_ptr(Y* t)
 			: px(t)
 		{
-			ref_counted::add_ref(t);
+			ref_counted_traits<T>::add_ref(t);
 		}
 
 		intrusive_ptr(intrusive_ptr const& rhs)
 			: px(rhs.px)
 		{
-			ref_counted::add_ref(px);
+			ref_counted_traits<T>::add_ref(px);
 		}
 
 		template <typename Y, typename = std::enable_if_t<std::is_convertible<Y*, T*>::value>>
 		intrusive_ptr(intrusive_ptr<Y> const& rhs)
 			: px(rhs.px)
 		{
-			ref_counted::add_ref(px);
+			ref_counted_traits<T>::add_ref(px);
 		}
 		
 		intrusive_ptr(intrusive_ptr&& rhs)
@@ -103,14 +125,14 @@ namespace atma
 
 		~intrusive_ptr()
 		{
-			ref_counted::rm_ref(px);
+			ref_counted_traits<T>::rm_ref(px);
 		}
 
 		auto operator = (intrusive_ptr const& rhs) -> intrusive_ptr&
 		{
 			ATMA_ASSERT(this != &rhs);
-			ref_counted::add_ref(rhs.px);
-			ref_counted::rm_ref(px);
+			ref_counted_traits<T>::add_ref(rhs.px);
+			ref_counted_traits<T>::rm_ref(px);
 			px = rhs.px;
 			return *this;
 		}
@@ -118,8 +140,8 @@ namespace atma
 		template <typename Y, typename = std::enable_if_t<std::is_convertible<Y*, T*>>>
 		auto operator = (intrusive_ptr<Y> const& rhs) -> intrusive_ptr&
 		{
-			ref_counted::add_ref(rhs.px);
-			ref_counted::rm_ref(px);
+			ref_counted_traits<T>::add_ref(rhs.px);
+			ref_counted_traits<T>::rm_ref(px);
 			px = rhs.px;
 			return *this;
 		}

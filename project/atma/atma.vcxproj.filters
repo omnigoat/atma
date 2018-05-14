@@ -208,8 +208,14 @@
     <ClInclude Include="..\..\include\atma\math\functions.hpp">
       <Filter>include\math</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\atma\lockfree_list.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\resources\atma.natvis" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\source\include_guide.cpp" />
   </ItemGroup>
 </Project>
