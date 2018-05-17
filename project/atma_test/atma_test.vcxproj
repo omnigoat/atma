@@ -27,11 +27,11 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Test|x64'">
-    <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(ProjectDir)..\..\vendor;$(ProjectDir)..\..\include;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)$(TargetName)\builds\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)$(TargetName)\intermediates\$(Platform)\$(Configuration)\</IntDir>
     <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
+    <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Test|x64'">
     <ClCompile>
@@ -64,6 +64,14 @@
     <ClCompile Include="..\..\source\atma_test\test_events.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_utf8_string.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_vector.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\shiny\project\lion\lion.vcxproj">
+      <Project>{86dfa87f-4570-47f6-9c4c-6c21efb610b7}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\rose\rose.vcxproj">
+      <Project>{58b3d2c1-0ab1-48cf-8b47-60dc3fc9adb6}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -2,7 +2,7 @@
 
 #include <atma/atomic.hpp>
 
-
+#if 0
 // forward-declares
 namespace atma
 {
@@ -38,13 +38,16 @@ namespace atma::detail
 			new (value_buffer) T{std::forward<TT>(value)};
 		}
 
-		// atma::ref_counted interface override
-		auto increment_refcount() const { return atomic_pre_increment(&ref_count); }
-		auto decrement_refcount() const { return atomic_pre_decrement(&ref_count); }
-
 		~lockfree_list_node_t()
 		{
 			// something something
+		}
+
+		
+		// OKAY HERE WE GO
+		auto load_next() -> lockfree_list_node_t<T>*
+		{
+
 		}
 
 		auto value_ref() -> T& { return *(T*)value_buffer; }
@@ -65,7 +68,7 @@ namespace atma::detail
 	template <typename T>
 	struct lockfree_list_iterator_t
 	{
-		// iterator interface
+		// iterator interface 
 		using difference_type_t = std::ptrdiff_t;
 		using value_type = T;
 		using pointer = T*;
@@ -220,3 +223,4 @@ namespace atma
 		return iterator{};
 	}
 }
+#endif

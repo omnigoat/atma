@@ -106,10 +106,10 @@ namespace atma
 	//  (inc % square)(4)
 	//  inc % square << 4
 	//
-	template <typename F, typename A>
-	inline decltype(auto) operator << (F&& f, A&& a) {
-		return std::invoke(std::forward<F>(f), std::forward<A>(a));
-	}
+	//template <typename F, typename A>
+	//inline decltype(auto) operator << (F&& f, A&& a) {
+	//	return std::invoke(std::forward<F>(f), std::forward<A>(a));
+	//}
 
 #if 0
 	// this style of overloads could be used to dramatically restrict composition, but
