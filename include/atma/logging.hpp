@@ -12,6 +12,7 @@
 #include <atomic>
 #include <thread>
 #include <set>
+#include <thread>
 
 
 namespace atma
@@ -326,10 +327,32 @@ namespace atma
 		}
 
 		template <typename... Args>
-		auto encode_all_impl(char const* str, Args&&... args) -> size_t
+		auto encode_all_impl(char const* str, Args const&... args) -> size_t
 		{
 			auto len = strlen(str);
-			return encode_cstr(str, len) + encode_all_impl(std::forward<Args>(args)...);
+			return encode_cstr(str, len) + encode_all_impl(args...);
+		}
+
+		//template <typename... Args, int I>
+		//auto encode_all_impl(char const (&str)[I], Args const&... args) -> size_t
+		//{
+		//	return encode_cstr(str, I) + encode_all_impl(args...);
+		//}
+
+		template <typename... Args>
+		auto encode_all_impl(std::thread::id id, Args const&... args) -> size_t
+		{
+			std::stringstream ss;
+			ss << id;
+			auto str = ss.str();
+			return encode_cstr(str.data(), str.size()) + encode_all_impl(args...);
+		}
+
+		template <typename... Args>
+		auto encode_all_impl(unsigned int const& i, Args const&... args) -> size_t
+		{
+			auto str = std::to_string(i);
+			return encode_cstr(str.data(), str.size()) + encode_all_impl(args...);
 		}
 
 	private:

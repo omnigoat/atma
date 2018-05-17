@@ -6,6 +6,7 @@
 #include <atma/threading.hpp>
 #include <atma/algorithm.hpp>
 #include <atma/arena_allocator.hpp>
+#include <atma/algorithm/filter.hpp>
 
 #include <functional>
 #include <memory>
@@ -107,9 +108,8 @@ namespace atma::detail
 		{}
 
 		template <typename... Args, typename F>
-		auto bind(event_backend_ptr const& event_backend, int sys_bind_idx, thread_id_t thread_id, F&& f) -> void
+		auto bind(event_backend_ptr const& event_backend, base_binding_iters_t& event_backend_bindings, thread_id_t thread_id, F&& f) -> void
 		{
-			
 			ATMA_SCOPED_LOCK(bindings_mutex_)
 			{
 				// register the event-backend with us
@@ -120,10 +120,7 @@ namespace atma::detail
 				auto new_iter = bindings_.insert(bindings_.end(), std::make_unique<binding_info_t<Args...>>(std::forward<F>(f), thread_id));
 
 				// tell the event-backend which index into our binding 
-				ATMA_SCOPED_LOCK(event_backend->bound_systems_mutex)
-				{
-					event_backend->bound_systems[sys_bind_idx].binding_iters.push_back(new_iter);
-				}
+				event_backend_bindings.push_back(new_iter);
 			}
 		}
 
@@ -254,35 +251,32 @@ namespace atma::detail
 // event-backend implementation
 namespace atma::detail
 {
-	struct bound_systems_t
-	{
-		
-	};
-
-
 	template <typename... Args, typename F>
 	inline void event_backend_t::bind(event_system_t& event_system, event_binder_t& binder, thread_id_t thread_id, F&& f)
 	{
 		auto& esb = event_system.backend();
 
-		auto candidate = std::find_if(bound_systems.begin(), bound_systems.end(),
-			[&esb](auto&& x) { return x.event_system_backend == &esb; });
+		ATMA_SCOPED_LOCK(bound_systems_mutex)
+		{
+			auto candidate = std::find_if(bound_systems.begin(), bound_systems.end(),
+				[&esb](auto&& x) { return x.event_system_backend == &esb; });
 
-		if (candidate == bound_systems.end())
-			candidate = bound_systems.emplace(bound_systems.end(), &event_system.backend());
-		
-		esb.bind<Args...>(shared_from_this<event_backend_t>(), (int)std::distance(bound_systems.begin(), candidate), thread_id, std::forward<F>(f));
+			if (candidate == bound_systems.end())
+				candidate = bound_systems.emplace(bound_systems.end(), &event_system.backend());
+
+			esb.bind<Args...>(shared_from_this<event_backend_t>(), candidate->binding_iters, thread_id, std::forward<F>(f));
+		}
 	}
 
 	template <typename... Args>
 	inline void event_backend_t::raise(Args... args)
 	{
-		for (auto&& system : bound_systems)
+		ATMA_SCOPED_LOCK(bound_systems_mutex)
 		{
-			if (!system.event_system_backend)
-				continue;
-
-			system.event_system_backend->raise<Args...>(system.binding_iters, thread_id_t{}, std::forward<Args>(args)...);
+			for (auto&& system : filter_by(&per_system_bindings_t::event_system_backend, bound_systems))
+			{
+				system.event_system_backend->raise<Args...>(system.binding_iters, thread_id_t{}, std::forward<Args>(args)...);
+			}
 		}
 	}
 }
@@ -351,6 +345,11 @@ namespace atma
 	template <typename... Args>
 	struct event_t
 	{
+		event_t()
+		{
+			backend_ = detail::event_backend_ptr::make();
+		}
+
 		template <typename... RArgs>
 		auto raise(RArgs&&... args) -> void
 		{
@@ -363,11 +362,7 @@ namespace atma
 		template <typename F>
 		void bind(event_system_t& event_system, event_binder_t& binder, thread_id_t thread_id, F&& f)
 		{
-			if (!backend_)
-				backend_ = detail::event_backend_ptr::make();
-
 			backend_->bind<Args...>(event_system, binder, thread_id, std::forward<F>(f));
-
 		}
 
 		template <typename F>

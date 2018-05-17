@@ -6,7 +6,7 @@
 
 #include <atma/vector.hpp>
 
-
+#if 0
 
 constexpr struct inc_t {
 	constexpr auto operator ()(int x) const -> int { return x + 1; }
@@ -153,3 +153,5 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 		
 	}
 }
+
+#endif
