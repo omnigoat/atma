@@ -63,28 +63,17 @@ static VOID CALLBACK rose::FileIOCompletionRoutine(DWORD dwErrorCode, DWORD dwNu
 runtime_t::runtime_t()
 	: filewatch_engine_{atma::inplace_engine_t::defer_start_t{}, 512}
 	, work_provider_{&filewatch_engine_}
+	, default_console_log_handler_{console_}
 {}
 
 runtime_t::runtime_t(atma::thread_work_provider_t* wp)
 	: work_provider_{wp}
+	, default_console_log_handler_{console_}
 {}
 
 runtime_t::~runtime_t()
 {
 	running_ = false;
-}
-
-auto runtime_t::initialize_console() -> void
-{}
-
-auto runtime_t::get_console() -> console_t&
-{
-	if (!console_)
-	{
-		console_.reset(new console_t);
-	}
-
-	return *console_;
 }
 
 auto runtime_t::initialize_watching() -> void
@@ -179,8 +168,6 @@ auto runtime_t::register_directory_watch(
 		{
 			dir_handles_.push_back(dir);
 		}
-
-		//LPOVERLAPPED_COMPLETION_ROUTINE
 
 		dir_watchers_[path] = dir_handles_.size() - 1;
 	});

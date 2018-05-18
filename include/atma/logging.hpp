@@ -13,7 +13,7 @@
 #include <thread>
 #include <set>
 #include <thread>
-
+#include <sstream>
 
 namespace atma
 {
@@ -293,6 +293,12 @@ namespace atma
 		replicants_t replicants_;
 		handlers_t handlers_;
 	};
+
+	inline auto get_default_logging_runtime() -> logging_runtime_t*
+	{
+		static logging_runtime_t default_logging_runtime;
+		return &default_logging_runtime;
+	}
 
 
 	struct logging_encoder_t
