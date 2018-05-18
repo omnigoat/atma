@@ -2,6 +2,7 @@
 
 #include <rose/rose_fwd.hpp>
 #include <rose/path.hpp>
+#include <rose/console.hpp>
 
 #include <atma/string.hpp>
 #include <atma/function.hpp>
@@ -16,8 +17,6 @@
 
 namespace rose
 {
-	struct console_t;
-
 	struct runtime_t
 	{
 		using file_change_callback_t = atma::function<void(path_t const&, file_change_t)>;
@@ -29,8 +28,8 @@ namespace rose
 		~runtime_t();
 
 		// console
-		auto initialize_console() -> void;
-		auto get_console() -> console_t&;
+		auto get_console() -> console_t& { return console_; }
+		auto get_console_logging_handler() -> atma::logging_handler_t* { return &default_console_log_handler_; }
 
 		// file-watch
 		auto register_directory_watch(
@@ -38,9 +37,6 @@ namespace rose
 			bool recursive,
 			file_change_mask_t,
 			file_change_callback_t const&) -> void;
-
-	private:
-		std::unique_ptr<console_t> console_;
 
 	private: // directory watching
 		struct dir_watch_t;
@@ -50,7 +46,13 @@ namespace rose
 
 		auto initialize_watching() -> void;
 
+	private:
+		console_t console_;
 
+		// we must provide an easy way to log stuff
+		default_console_log_handler_t default_console_log_handler_;
+
+		// directory watching
 		dir_watch_handles_t dir_handles_;
 		dir_watch_infos_t dir_infos_;
 		dir_watchers_t dir_watchers_;

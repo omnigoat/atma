@@ -13,30 +13,27 @@
 
 using namespace std::chrono_literals;
 
-#define TEST_LOG(level, ...) \
-	::atma::send_log(&LR, \
-		level, nullptr, __FILE__, __LINE__, __VA_ARGS__, "\n")
+#define TEST_LOG(...) \
+	::atma::send_log(::atma::get_default_logging_runtime(), \
+		atma::log_level_t::info, nullptr, __FILE__, __LINE__, __VA_ARGS__, "\n")
 
 
 SCENARIO("events can be constructed", "[event]")
 {
-	atma::logging_runtime_t LR;
-
 	rose::runtime_t RR;
-	lion::console_log_handler_t console_log{RR.get_console()};
-	LR.attach_handler(&console_log);
+	atma::get_default_logging_runtime()->attach_handler(RR.get_console_logging_handler());
 
-	auto f = [&LR](int x)
+	auto f = [&](int x)
 	{
-		TEST_LOG(atma::log_level_t::info, "thread: ", std::this_thread::get_id(), ", x: ", x);
-	}; // std::cout << "thread: " << std::this_thread::get_id() << ", x: " << x << std::endl; };
+		TEST_LOG("thread: ", std::this_thread::get_id(), ", x: ", x);
+	};
 
 	GIVEN("a default-constructed event")
 	{
 		atma::event_system_t es;
 		atma::event_t<int> e;
 
-		std::atomic_int settled;
+		std::atomic_int settled = 0;
 		std::atomic_bool good = true;
 
 		auto thread_fn = [&] {
