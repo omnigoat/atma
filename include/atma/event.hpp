@@ -273,8 +273,11 @@ namespace atma::detail
 	{
 		ATMA_SCOPED_LOCK(bound_systems_mutex)
 		{
-			for (auto&& system : filter_by(&per_system_bindings_t::event_system_backend, bound_systems))
+			for (auto&& system : bound_systems)
 			{
+				if (!system.event_system_backend)
+					continue;
+
 				system.event_system_backend->raise<Args...>(system.binding_iters, thread_id_t{}, std::forward<Args>(args)...);
 			}
 		}

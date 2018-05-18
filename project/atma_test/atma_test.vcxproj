@@ -66,9 +66,6 @@
     <ClCompile Include="..\..\source\atma_test\test_vector.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\shiny\project\lion\lion.vcxproj">
-      <Project>{86dfa87f-4570-47f6-9c4c-6c21efb610b7}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\rose\rose.vcxproj">
       <Project>{58b3d2c1-0ab1-48cf-8b47-60dc3fc9adb6}</Project>
     </ProjectReference>
