@@ -4,6 +4,7 @@
 #include <atma/intrusive_ptr.hpp>
 #include <atma/bitmask.hpp>
 #include <atma/unique_memory.hpp>
+#include <atma/event.hpp>
 
 #include <algorithm>
 
@@ -259,10 +260,25 @@ namespace atma
 
 namespace atma
 {
-	//struct reactive_stream_t : stream_t
-	//{
-	//	
-	//};
+	template <typename FunctionType>
+	struct reactive_stream_t : stream_t
+	{
+		auto subscribe(atma::function<FunctionType> const&) -> void;
+
+	protected:
+		event_t event_;
+	};
+
+	template <typename T>
+	struct generator_stream_t : reactive_stream_t<void(T const&)>
+	{
+		generator_stream_t() = default;
+		generator_stream_t(generator_stream_t const&) = delete;
+
+		auto generate(T t) -> void;
+
+	};
+
 }
 
 
