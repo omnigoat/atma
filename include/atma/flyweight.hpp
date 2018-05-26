@@ -8,6 +8,10 @@ namespace atma
 	template <typename T>
 	struct flyweight_t
 	{
+		flyweight_t()
+			: backend_{new T}
+		{}
+
 		template <typename... Args>
 		flyweight_t(Args&&... args)
 			: backend_{new T{std::forward<Args>(args)...}}
@@ -24,7 +28,9 @@ namespace atma
 		auto weak_backend() const -> std::weak_ptr<T> { return backend_; }
 
 	private:
-		std::shared_ptr<T> backend_;
+		using storage_ptr_t = std::conditional_t<std::is_convertible_v<T*, ref_counted*>, intrusive_ptr<T>, std::shared_ptr<T>>;
+
+		storage_ptr_t backend_;
 	};
 }
 
