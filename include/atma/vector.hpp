@@ -78,10 +78,10 @@ namespace atma
 		auto emplace_back(Args&&... args) -> reference;
 
 		template <typename H> auto assign(H begin, H end) -> void;
-		auto insert(const_iterator, T const&) -> void;
-		auto insert(const_iterator, T&&) -> void;
-		auto insert(const_iterator, std::initializer_list<T>) -> void;
-		template <typename H> auto insert(const_iterator, H begin, H end) -> void;
+		auto insert(const_iterator, T const&) -> iterator;
+		auto insert(const_iterator, T&&) -> iterator;
+		auto insert(const_iterator, std::initializer_list<T>) -> iterator;
+		template <typename H> auto insert(const_iterator, H begin, H end) -> iterator;
 
 		auto erase(const_iterator) -> void;
 		auto erase(const_iterator, const_iterator) -> void;
@@ -440,21 +440,22 @@ namespace atma
 	}
 
 	template <typename T, typename A>
-	inline auto vector<T, A>::insert(const_iterator where, T const& x) -> void
+	inline auto vector<T, A>::insert(const_iterator where, T const& x) -> iterator
 	{
 		IMEM_ASSERT_ITER(where);
 
 		auto const offset = std::distance(cbegin(), where);
-
 		IMEM_GUARD_LT(size_ + 1);
 
 		imem_.memmove(offset + 1, offset, size_ - offset);
 		imem_.construct(offset, x);
 		++size_;
+
+		return imem_ + offset;
 	}
 
 	template <typename T, typename A>
-	inline auto vector<T,A>::insert(const_iterator where, T&& x) -> void
+	inline auto vector<T,A>::insert(const_iterator where, T&& x) -> iterator
 	{
 		IMEM_ASSERT_ITER(where);
 
@@ -465,17 +466,19 @@ namespace atma
 		imem_.memmove(offset + 1, offset, size_ - offset);
 		imem_.construct(offset, std::move(x));
 		++size_;
+
+		return imem_ + offset;
 	}
 
 	template <typename T, typename A>
-	inline auto vector<T, A>::insert(const_iterator where, std::initializer_list<T> list) -> void
+	inline auto vector<T, A>::insert(const_iterator where, std::initializer_list<T> list) -> iterator
 	{
-		insert(where, list.begin(), list.end());
+		return insert(where, list.begin(), list.end());
 	}
 
 	template <typename T, typename A>
 	template <typename H>
-	inline auto vector<T,A>::insert(const_iterator where, H start, H end) -> void
+	inline auto vector<T,A>::insert(const_iterator where, H start, H end) -> iterator
 	{
 		IMEM_ASSERT_ITER(where);
 
@@ -487,6 +490,8 @@ namespace atma
 		imem_.memmove(offset + 1 + rangesize, offset + 1, size_ - offset);
 		imem_.copy_construct_range(offset, start, end);
 		size_ += rangesize;
+
+		return imem_ + offset;
 	}
 
 	template <typename T, typename A>
