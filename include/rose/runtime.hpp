@@ -28,8 +28,8 @@ namespace rose
 		~runtime_t();
 
 		// console
-		auto get_console() -> console_t& { return console_; }
-		auto get_console_logging_handler() -> atma::logging_handler_t* { return &default_console_log_handler_; }
+		auto console() -> console_t& { return console_; }
+		auto console_logging_handler() -> atma::logging_handler_t* { return &default_console_log_handler_; }
 
 		// file-watch
 		auto register_directory_watch(
@@ -88,4 +88,11 @@ namespace rose
 		std::chrono::time_point<std::chrono::high_resolution_clock> trigger;
 		std::set<std::tuple<atma::string, file_change_t>> files;
 	};
+
+	inline auto setup_default_logging_to_console(runtime_t& RR) -> void
+	{
+		atma::default_logging_runtime()->attach_handler(RR.console_logging_handler());
+	}
+
+
 }

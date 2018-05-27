@@ -14,14 +14,14 @@
 using namespace std::chrono_literals;
 
 #define TEST_LOG(...) \
-	::atma::send_log(::atma::get_default_logging_runtime(), \
+	::atma::send_log(::atma::default_logging_runtime(), \
 		atma::log_level_t::info, nullptr, __FILE__, __LINE__, __VA_ARGS__, "\n")
 
 
 SCENARIO("events can be constructed", "[event]")
 {
 	rose::runtime_t RR;
-	atma::get_default_logging_runtime()->attach_handler(RR.get_console_logging_handler());
+	rose::setup_default_logging_to_console(RR);
 
 	auto f = [&](int x)
 	{
@@ -35,6 +35,14 @@ SCENARIO("events can be constructed", "[event]")
 
 		std::atomic_int settled = 0;
 		std::atomic_bool good = true;
+
+		{
+			atma::event_binder_t eb;
+			e.bind(es, eb, std::this_thread::get_id(), f);
+			e.raise(8);
+		}
+		
+		e.raise(8);
 
 		auto thread_fn = [&] {
 
