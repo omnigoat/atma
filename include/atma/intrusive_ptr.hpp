@@ -33,6 +33,15 @@ namespace atma
 		template <typename, typename> friend struct ref_counted_traits;
 	};
 
+	template <typename T>
+	struct ref_counted_of : ref_counted
+	{
+		auto shared_from_this() -> intrusive_ptr<T>
+		{
+			return intrusive_ptr<T>{static_cast<T*>(this)};
+		}
+	};
+
 	template <typename T, typename = std::void_t<>>
 	struct ref_counted_traits
 	{

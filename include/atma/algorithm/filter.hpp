@@ -97,7 +97,7 @@ namespace atma
 	{
 		using owner_t = std::remove_reference_t<C>;
 		using source_iterator_t = typename owner_t::source_iterator_t;
-		//using source_value_type_t = 
+
 		constexpr static bool is_const = std::is_const_v<owner_t> || std::is_const_v<typename owner_t::value_type>;
 
 		using iterator_category = std::forward_iterator_tag;
@@ -110,7 +110,7 @@ namespace atma
 		filtered_range_iterator_t() : owner_() {}
 		filtered_range_iterator_t(owner_t*, source_iterator_t const& begin, source_iterator_t const& end);
 
-		auto operator  *() -> reference;
+		auto operator  *() const -> reference;
 		auto operator ++() -> filtered_range_iterator_t&;
 
 	private:
@@ -191,7 +191,7 @@ namespace atma
 	}
 
 	template <typename C>
-	inline auto filtered_range_iterator_t<C>::operator *() -> reference
+	inline auto filtered_range_iterator_t<C>::operator *() const -> reference
 	{
 		return *pos_;
 	}

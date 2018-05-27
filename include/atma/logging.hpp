@@ -294,7 +294,7 @@ namespace atma
 		handlers_t handlers_;
 	};
 
-	inline auto get_default_logging_runtime() -> logging_runtime_t*
+	inline auto default_logging_runtime() -> logging_runtime_t*
 	{
 		static logging_runtime_t default_logging_runtime;
 		return &default_logging_runtime;
@@ -339,11 +339,11 @@ namespace atma
 			return encode_cstr(str, len) + encode_all_impl(args...);
 		}
 
-		//template <typename... Args, int I>
-		//auto encode_all_impl(char const (&str)[I], Args const&... args) -> size_t
-		//{
-		//	return encode_cstr(str, I) + encode_all_impl(args...);
-		//}
+		template <typename... Args, int I>
+		auto encode_all_impl(char (&str)[I], Args const&... args) -> size_t
+		{
+			return encode_cstr(str, I) + encode_all_impl(args...);
+		}
 
 		template <typename... Args>
 		auto encode_all_impl(std::thread::id id, Args const&... args) -> size_t

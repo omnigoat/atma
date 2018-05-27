@@ -25,17 +25,30 @@ namespace atma
 	struct event_system_t;
 }
 
-
 namespace atma::detail
 {
 	struct event_backend_t;
 	using event_backend_ptr = intrusive_ptr<event_backend_t>;
 
 	struct event_system_backend_t;
+	using event_system_backend_ptr = intrusive_ptr<event_system_backend_t>;
+}
 
+
+// base-binding-info
+namespace atma::detail
+{
 	struct base_binding_info_t
 	{
-		virtual ~base_binding_info_t() {}
+		base_binding_info_t(event_backend_ptr const& eb, thread_id_t id)
+			: event_backend{eb}
+			, thread_id{id}
+		{}
+
+		virtual ~base_binding_info_t() = default;
+
+		event_backend_ptr event_backend;
+		thread_id_t thread_id;
 	};
 
 	using base_binding_info_ptr = std::unique_ptr<base_binding_info_t>;
@@ -45,15 +58,14 @@ namespace atma::detail
 	struct binding_info_t : base_binding_info_t
 	{
 		template <typename F>
-		binding_info_t(F&& f, thread_id_t id)
-			: f{std::forward<F>(f)}
-			, thread_id{id}
+		binding_info_t(event_backend_ptr const& eb, F&& f, thread_id_t id)
+			: base_binding_info_t{eb, id}
+			, f{std::forward<F>(f)}
 		{}
 
 		~binding_info_t() override = default;
 
 		atma::function<void(Args...)> f;
-		thread_id_t thread_id;
 	};
 	
 	template <typename... Args>
@@ -61,44 +73,11 @@ namespace atma::detail
 
 }
 
-// event-backend
-namespace atma::detail
-{
-	using base_binding_iters_t = std::vector<base_binding_infos_t::iterator>;
-
-	struct per_system_bindings_t
-	{
-		per_system_bindings_t(event_system_backend_t* event_system_backend)
-			: event_system_backend{event_system_backend}
-		{}
-
-		event_system_backend_t* event_system_backend = nullptr;
-		base_binding_iters_t binding_iters;
-	};
-
-	using per_system_bindings_list_t = std::vector<per_system_bindings_t>;
-
-
-	struct event_backend_t
-		: atma::ref_counted
-	{
-		per_system_bindings_list_t bound_systems;
-		std::mutex bound_systems_mutex;
-
-		template <typename... Args, typename F>
-		void bind(event_system_t& event_system, event_binder_t& binder, thread_id_t thread_id, F&& f);
-
-		template <typename... Args>
-		void raise(Args...);
-	};
-
-}
-
 
 // event-system-backend
 namespace atma::detail
 {
-	struct event_system_backend_t
+	struct event_system_backend_t : atma::ref_counted
 	{
 		using queues_t = std::map<thread_id_t, lockfree_queue_t>;
 
@@ -106,10 +85,12 @@ namespace atma::detail
 		event_system_backend_t(event_system_backend_t const&) = delete;
 
 		template <typename... Args, typename F>
-		auto bind(event_backend_ptr const& event_backend, base_binding_iters_t& event_backend_bindings, thread_id_t thread_id, F&& f) -> void;
+		auto bind(event_backend_ptr const& event_backend, event_binder_t& binder, thread_id_t thread_id, F&& f) -> void;
+
+		auto unbind(event_backend_ptr const&, base_binding_infos_t::iterator const&) -> void;
 
 		template <typename... Args>
-		auto raise(base_binding_iters_t const& iters, thread_id_t thread_id, Args... args) -> void;
+		auto raise(event_backend_t const*, thread_id_t thread_id, Args... args) -> void;
 
 		auto process_events_for(thread_id_t thread_id) -> void;
 
@@ -126,68 +107,170 @@ namespace atma::detail
 		atma::arena_memory_resource_t threaded_args_resource;
 
 		// these are the event-backends that have bindings through us
-		std::vector<event_backend_ptr> event_backends_;
+		std::vector<std::tuple<event_backend_ptr, int>> event_backends_;
 
-		friend struct event_backend_t;
+		friend struct ::atma::detail::event_backend_t;
+	};
+}
+
+
+// event-backend
+namespace atma::detail
+{
+	struct event_backend_t : ref_counted_of<event_backend_t>
+	{
+		vector<event_system_backend_ptr> event_systems;
+		std::mutex bound_systems_mutex;
+
+		event_backend_t() = default;
+		event_backend_t(event_backend_t const&) = delete;
+
+		template <typename... Args, typename F>
+		void bind(event_system_t& event_system, event_binder_t& binder, thread_id_t thread_id, F&& f);
+
+		template <typename... Args>
+		void raise(Args...);
 	};
 
-
 }
+
+// event-system
+namespace atma
+{
+	struct event_system_t : flyweight_t<detail::event_system_backend_t>
+	{
+		using flyweight_t<detail::event_system_backend_t>::backend;
+		using flyweight_t<detail::event_system_backend_t>::backend_ptr;
+
+		// bind
+		template <typename F, typename... Args>
+		auto bind(event_t<Args...>& e, event_binder_t& b, F&& f) -> void;
+
+		template <typename F, typename... Args>
+		auto bind(event_t<Args...>& e, event_binder_t& b, thread_id_t thread_id, F&& f) -> void;
+
+		// raise
+		template <typename... EArgs>
+		auto raise(event_t<EArgs...>& e, EArgs... args) -> void;
+
+		auto process_events_for_this_thread() -> void;
+	};
+}
+
+
+// SERIOUSLY, event goes here
+
+
+// event-binder
+namespace atma
+{
+	struct event_binder_t
+	{
+		event_binder_t() = default;
+		event_binder_t(event_binder_t const&) = delete;
+
+		~event_binder_t()
+		{
+			if (event_backend_)
+			{
+				ATMA_SCOPED_LOCK(event_backend_->bound_systems_mutex)
+				{
+					event_system_backend_->unbind(event_backend_, binding_handle_);
+				}
+			}
+		}
+
+		auto is_bound() const -> bool { return !!event_backend_; }
+
+	private:
+		detail::event_backend_ptr event_backend_;
+		detail::event_system_backend_ptr event_system_backend_;
+		detail::base_binding_infos_t::iterator binding_handle_;
+
+		friend struct ::atma::detail::event_system_backend_t;
+	};
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 // event-system-backend implementation
 namespace atma::detail
 {
+	template <typename Range>
+	inline auto find_event_backend(Range&& range, event_backend_ptr const& eb)
+	{
+		return std::find_if(std::begin(range), std::end(range),
+			[&eb](auto&& x) { return std::get<0>(x) == eb; });
+	}
+
 	inline event_system_backend_t::event_system_backend_t()
 		: threaded_args_resource{16, 64, 32}
 	{}
 
 	template <typename... Args, typename F>
-	inline auto event_system_backend_t::bind(event_backend_ptr const& event_backend, base_binding_iters_t& event_backend_bindings, thread_id_t thread_id, F&& f) -> void
+	inline auto event_system_backend_t::bind(event_backend_ptr const& event_backend, event_binder_t& binder, thread_id_t thread_id, F&& f) -> void
 	{
 		ATMA_SCOPED_LOCK(bindings_mutex_)
 		{
 			// register the event-backend with us
-			if (auto candidate = atma::find_in(event_backends_, event_backend); candidate == event_backends_.end())
-				event_backends_.push_back(event_backend);
+			if (auto candidate = find_event_backend(event_backends_, event_backend); candidate == event_backends_.end())
+				event_backends_.emplace_back(event_backend, 1);
+			else
+				++std::get<1>(*candidate);
 
 			// store the new binding
-			auto new_iter = bindings_.insert(bindings_.end(), std::make_unique<binding_info_t<Args...>>(std::forward<F>(f), thread_id));
+			auto binding_handle = bindings_.insert(bindings_.end(), std::make_unique<binding_info_t<Args...>>(event_backend, std::forward<F>(f), thread_id));
 
-			// tell the event-backend which index into our binding 
-			event_backend_bindings.push_back(new_iter);
+			// put iter in binder
+			binder.event_backend_ = event_backend;
+			binder.event_system_backend_ = shared_from_this<event_system_backend_t>();
+			binder.binding_handle_ = binding_handle;
 		}
 	}
 
 	template <typename... Args>
-	inline auto event_system_backend_t::raise(base_binding_iters_t const& iters, thread_id_t thread_id, Args... args) -> void
+	inline auto event_system_backend_t::raise(event_backend_t const* eb, thread_id_t thread_id, Args... args) -> void
 	{
 		using tuple_type = std::tuple<Args...>;
 
 		auto this_thread_id = std::this_thread::get_id();
+
+		auto is_event = [&](auto&& x) { return x->event_backend == eb; };
+		auto is_remote_event = [&](auto&& x) { return is_event(x) && x->thread_id != thread_id_t{} && x->thread_id != this_thread_id; };
+		auto is_immediate_event = [&](auto&& x) { return is_event(x) && (x->thread_id == thread_id_t{} || x->thread_id == this_thread_id); };
+		auto cast = [](auto&& x) -> binding_info_t<Args...>& { return *static_cast<binding_info_t<Args...>*>(x.get()); };
 
 		// no thread specified, free to schedule as normal
 		if (thread_id == thread_id_t{})
 		{
 			std::map<thread_id_t, tuple_type*> argument_store;
 
-			// first, queue all tethered bindings
-			for (auto&& iter : iters)
+			// first, queue all tethered (to other thread) bindings
+			for (auto&& binding : map(cast, filter(is_remote_event, bindings_)))
 			{
-				binding_info_t<Args...> const& binding_info = *static_cast<binding_info_t<Args...>*>(iter->get());
-
-				// filter out wandering bindings, and tethered bindings to this thread (they will be executed immediately)
-				if (binding_info.thread_id == thread_id_t{} || binding_info.thread_id == this_thread_id)
-					continue;
-
 				// create a copy of the arguments for the requested thread (if we haven't already)
-				auto candidate = argument_store.find(binding_info.thread_id);
+				auto candidate = argument_store.find(binding.thread_id);
 				if (candidate == argument_store.end())
 				{
 					auto tuple_args_ptr = (tuple_type*)threaded_args_resource.allocate(sizeof(tuple_type));
 					new (tuple_args_ptr) tuple_type{args...};
-					auto[riter, r] = argument_store.insert({binding_info.thread_id, tuple_args_ptr});
+					auto[riter, r] = argument_store.insert({binding.thread_id, tuple_args_ptr});
 					ATMA_ASSERT(r);
 					candidate = riter;
 				}
@@ -195,8 +278,8 @@ namespace atma::detail
 				// using the per-thread copy of the arguments, enqueue the command
 				auto& tupled_arguments = *candidate->second;
 				atma::enqueue_function_to_queue(
-					per_thread_queue(binding_info.thread_id),
-					std::function<void()>{[f = binding_info.f, &tupled_arguments]{std::apply(f, tupled_arguments); }});
+					per_thread_queue(binding.thread_id),
+					std::function<void()>{[f = binding.f, &tupled_arguments]{std::apply(f, tupled_arguments); }});
 			}
 
 			// enqueue the deletion of the per-thread argument copies
@@ -208,38 +291,43 @@ namespace atma::detail
 			}
 
 			// execute the rest immediately
-			for (auto&& iter : iters)
+			for (auto&& binding : map(cast, filter(is_immediate_event, bindings_)))
 			{
-				binding_info_t<Args...> const& binding_info = *static_cast<binding_info_t<Args...>*>(iter->get());
-
-				if (binding_info.thread_id == thread_id_t{} || binding_info.thread_id == this_thread_id)
-				{
-					std::invoke(binding_info.f, args...);
-				}
+				std::invoke(binding.f, args...);
 			}
 		}
 		// thread specified, we need to exclude tethered bindings and "move" thread-wandering bindings
 		else
 		{
-			for (auto&& iter : iters)
+			for (auto&& binding : map(cast, filter(is_event, bindings_)))
 			{
-				binding_info_t<Args...> const& binding_info = *static_cast<binding_info_t<Args...>*>(iter->get());
-
 				// thread-tethered binding for this very thread, run immediately
-				if (binding_info.thread_id == thread_id && thread_id == this_thread_id)
+				if (binding.thread_id == thread_id && thread_id == this_thread_id)
 				{
-					std::invoke(binding_info.f, args...);
+					std::invoke(binding.f, args...);
 				}
 				// thread-tethered binding for another thread, or thread-wandering binding, enqueue for the requested thread
-				else if (binding_info.thread_id == thread_id || binding_info.thread_id == thread_id_t{})
+				else if (binding.thread_id == thread_id || binding.thread_id == thread_id_t{})
 				{
 					atma::enqueue_function_to_queue(
 						per_thread_queue(thread_id),
-						std::function<void()>{atma::bind(binding_info.f, args...)});
+						std::function<void()>{atma::bind(binding.f, args...)});
 				}
 			}
 		}
 
+	}
+
+	inline auto event_system_backend_t::unbind(event_backend_ptr const& eb, base_binding_infos_t::iterator const& x) -> void
+	{
+		ATMA_SCOPED_LOCK(bindings_mutex_)
+		{
+			bindings_.erase(x);
+
+			if (auto candidate = find_event_backend(event_backends_, eb); candidate != event_backends_.end())
+				if (--std::get<1>(*candidate) == 0)
+					event_backends_.erase(candidate);
+		}
 	}
 
 	inline auto event_system_backend_t::process_events_for(thread_id_t thread_id) -> void
@@ -266,24 +354,21 @@ namespace atma::detail
 }
 
 
-
 // event-backend implementation
 namespace atma::detail
 {
 	template <typename... Args, typename F>
 	inline void event_backend_t::bind(event_system_t& event_system, event_binder_t& binder, thread_id_t thread_id, F&& f)
 	{
-		auto& esb = event_system.backend();
+		auto const& esbp = event_system.backend_ptr();
 
 		ATMA_SCOPED_LOCK(bound_systems_mutex)
 		{
-			auto candidate = std::find_if(bound_systems.begin(), bound_systems.end(),
-				[&esb](auto&& x) { return x.event_system_backend == &esb; });
+			auto candidate = atma::find_in(event_systems, esbp);
+			if (candidate == event_systems.end())
+				candidate = event_systems.insert(event_systems.end(), esbp);
 
-			if (candidate == bound_systems.end())
-				candidate = bound_systems.emplace(bound_systems.end(), &event_system.backend());
-
-			esb.bind<Args...>(shared_from_this<event_backend_t>(), candidate->binding_iters, thread_id, std::forward<F>(f));
+			esbp->bind<Args...>(shared_from_this(), binder, thread_id, std::forward<F>(f));
 		}
 	}
 
@@ -292,70 +377,49 @@ namespace atma::detail
 	{
 		ATMA_SCOPED_LOCK(bound_systems_mutex)
 		{
-			for (auto&& system : bound_systems)
+			for (auto&& system : event_systems)
 			{
-				if (!system.event_system_backend)
+				if (!system)
 					continue;
 
-				system.event_system_backend->raise<Args...>(system.binding_iters, thread_id_t{}, std::forward<Args>(args)...);
+				system->raise<Args...>(this, thread_id_t{}, std::forward<Args>(args)...);
 			}
 		}
 	}
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-namespace atma::detail
-{
-	extern event_system_t default_event_system;
-	extern event_binder_t default_event_binder;
-}
-
+// event-system implementation
 namespace atma
 {
-	struct event_system_t : flyweight_t<detail::event_system_backend_t>
+	template <typename F, typename... Args>
+	inline auto event_system_t::bind(event_t<Args...>& e, event_binder_t& b, F&& f) -> void
 	{
-		template <typename F, typename... Args>
-		auto bind(event_t<Args...>& e, event_binder_t& b, F&& f) -> void
-			{ backend().bind(e, b, std::forward<F>(f), std::this_thread::get_id()); }
+		backend().bind(e, b, std::forward<F>(f), std::this_thread::get_id());
+	}
 
-		template <typename F, typename... Args>
-		auto bind(event_t<Args...>& e, event_binder_t& b, thread_id_t thread_id, F&& f) -> void
-			{ backend().bind(e.backend_, b, thread_id, std::forward<F>(f)); }
+	template <typename F, typename... Args>
+	inline auto event_system_t::bind(event_t<Args...>& e, event_binder_t& b, thread_id_t thread_id, F&& f) -> void
+	{
+		backend().bind(e.backend_, b, thread_id, std::forward<F>(f));
+	}
 
-		template <typename... EArgs>
-		auto raise(event_t<EArgs...>& e, EArgs... args) -> void
-			{ backend().raise(e, args...); }
+	template <typename... EArgs>
+	inline auto event_system_t::raise(event_t<EArgs...>& e, EArgs... args) -> void
+	{
+		backend().raise(e, args...);
+	}
 
-		auto process_events_for_this_thread() -> void
-			{ backend().process_events_for(std::this_thread::get_id()); }
+	inline auto event_system_t::process_events_for_this_thread() -> void
+	{
+		backend().process_events_for(std::this_thread::get_id());
+	}
+}
 
-		friend struct detail::event_backend_t;
-	};
 
+// event
+namespace atma
+{
 	template <typename F>
 	struct bound_event_t
 	{
@@ -365,38 +429,43 @@ namespace atma
 
 
 	template <typename... Args>
-	struct event_t
+	struct event_t  : flyweight_t<detail::event_backend_t>
 	{
-		event_t()
-		{
-			backend_ = detail::event_backend_ptr::make();
-		}
+		event_t() = default;
+		event_t(event_t const&) = default;
 
 		template <typename... RArgs>
 		auto raise(RArgs&&... args) -> void
 		{
-			if (!backend_)
-				return;
-
-			backend_->raise<Args...>(std::forward<RArgs>(args)...);
+			backend().raise<Args...>(std::forward<RArgs>(args)...);
 		}
 
+		// bind, fully-specified
 		template <typename F>
 		void bind(event_system_t& event_system, event_binder_t& binder, thread_id_t thread_id, F&& f)
 		{
-			backend_->bind<Args...>(event_system, binder, thread_id, std::forward<F>(f));
+			backend().bind<Args...>(event_system, binder, thread_id, std::forward<F>(f));
 		}
 
+		// bind, untethered
 		template <typename F>
-		void bind(F&& f)
+		void bind(event_system_t& event_system, event_binder_t& binder, F&& f)
 		{
-			this->bind(detail::default_event_system, detail::default_event_binder, std::this_thread::get_id(), std::forward<F>(f));
+			backend().bind<Args...>(event_system, binder, thread_id_t{}, std::forward<F>(f));
 		}
 
+		// bind, tethered but default
 		template <typename F>
 		void bind(F&& f, thread_id_t id)
 		{
 			detail::default_event_system.bind(*this, detail::default_event_binder, std::forward<F>(f), id);
+		}
+		
+		// bind, fully-unspecified
+		template <typename F>
+		void bind(F&& f)
+		{
+			this->bind(detail::default_event_system, detail::default_event_binder, std::this_thread::get_id(), std::forward<F>(f));
 		}
 
 		template <typename F>
@@ -414,25 +483,11 @@ namespace atma
 		}
 
 	private:
-		detail::event_backend_ptr backend_;
-
 		friend struct ::atma::event_system_t;
 		friend struct ::atma::detail::event_system_backend_t;
 	};
 
-	struct event_binder_t
-	{
-		auto is_bound() const -> bool;
-		
-		template <typename F>
-		auto operator + (F&& f) -> bound_event_t<F>
-		{
-			return {*this, f};
-		}
-
-	private:
-		
-	};
+	
 
 
 }
