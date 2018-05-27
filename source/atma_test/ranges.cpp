@@ -6,8 +6,6 @@
 
 #include <atma/vector.hpp>
 
-#if 0
-
 constexpr struct inc_t {
 	constexpr auto operator ()(int x) const -> int { return x + 1; }
 } const inc;
@@ -122,9 +120,10 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 			CHECK(resultv[1] == 4);
 		}
 
+#if 0
 		THEN("chaining filters is fine and dandy")
 		{
-			auto rgte3 = atma::filter(is_even) % atma::filter(is_even) % atma::filter(is_gte3) << numbers;
+			auto rgte3 = atma::filter(is_even) % atma::filter(is_even) % atma::filter(is_gte3, numbers);
 			auto result = atma::vector<int>{rgte3.begin(), rgte3.end()};
 
 			CHECK(result.size() == 1);
@@ -144,6 +143,7 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 			CHECK(result.size() == 1);
 			CHECK(result[0] == 4);
 		}
+#endif
 
 		THEN("filtering using an interesting predicate compiles")
 		{
@@ -154,4 +154,22 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 	}
 }
 
-#endif
+
+
+SCENARIO("ranges can be mapped", "[ranges/map_t]")
+{
+	GIVEN("a vector of numbers")
+	{
+		auto numbers = atma::vector<int>{1, 2, 3, 4};
+
+		auto plus_10 = [](int i) { return i + 10; };
+		
+
+		THEN("we can map plus 10")
+		{
+			auto yay10 = atma::map(plus_10, numbers);
+			std::vector<int> resultv{yay10.begin(), yay10.end()};
+			CHECK_WHOLE_VECTOR(resultv, 11, 12, 13, 14);
+		}
+	}
+}
