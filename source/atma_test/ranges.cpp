@@ -120,14 +120,16 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 			CHECK(resultv[1] == 4);
 		}
 
-#if 0
 		THEN("chaining filters is fine and dandy")
 		{
-			auto rgte3 = atma::filter(is_even) % atma::filter(is_even) % atma::filter(is_gte3, numbers);
+			auto rgte3 = atma::filter(is_even) % atma::filter(is_gte3, numbers);
 			auto result = atma::vector<int>{rgte3.begin(), rgte3.end()};
+			
+			auto rgte3v2 = atma::filter(is_even, atma::filter(is_gte3, numbers));
+			auto resultv2 = atma::vector<int>{rgte3v2.begin(), rgte3v2.end()};
 
-			CHECK(result.size() == 1);
-			CHECK(result[0] == 4);
+			CHECK_WHOLE_VECTOR(result, 4);
+			CHECK_WHOLE_VECTOR(resultv2, 4);
 		}
 
 		THEN("chaining filters for rvalues is fine and dandy")
@@ -143,7 +145,6 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 			CHECK(result.size() == 1);
 			CHECK(result[0] == 4);
 		}
-#endif
 
 		THEN("filtering using an interesting predicate compiles")
 		{
@@ -170,6 +171,12 @@ SCENARIO("ranges can be mapped", "[ranges/map_t]")
 			auto yay10 = atma::map(plus_10, numbers);
 			std::vector<int> resultv{yay10.begin(), yay10.end()};
 			CHECK_WHOLE_VECTOR(resultv, 11, 12, 13, 14);
+
+			int i = 0;
+			for (auto&& x : atma::map(plus_10, std::vector<int>{1, 2, 3, 4}))
+			{
+				CHECK(x == resultv[i++]);
+			}
 		}
 	}
 }
