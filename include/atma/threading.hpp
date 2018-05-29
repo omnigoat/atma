@@ -52,7 +52,7 @@ namespace atma
 			{}
 		}
 
-		auto valid() const { return (flags_ & 1) != 0; }
+		auto valid() const { return (flags_ & 1) == 0; }
 
 		auto generate_idx()           -> uint16 { return atma::atomic_post_increment(&write_idx); }
 		auto wait_for_idx(uint16 idx) -> void   { while (atma::atomic_load(&read_idx) != idx); }
