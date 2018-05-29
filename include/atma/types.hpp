@@ -54,7 +54,7 @@ namespace atma
 	//    takes T, and if const, transforms M to be const, otherwise just M
 	//
 	template <typename T, typename M>
-	using transfer_const_t = std::conditional_t<std::is_const<T>::value, M const, M>;
+	using transfer_const_t = std::conditional_t<std::is_const_v<T>, M const, M>;
 
 
 	//
@@ -108,4 +108,13 @@ namespace atma
 		is_function_reference_v<T> ||
 		std::is_member_function_pointer_v<T> ||
 		has_functor_operator_v<T>;
+
+	//
+	//  storage_type_t
+	//  ----------------
+	//    takes a type, and if it is an lvalue, keeps it as an lvalue,
+	//    for any other type returns a non-reference type
+	//
+	template <typename T>
+	using storage_type_t = std::conditional_t<std::is_rvalue_reference_v<T>, std::remove_reference_t<T>, T>;
 }
