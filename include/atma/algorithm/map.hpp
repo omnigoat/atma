@@ -17,24 +17,30 @@ namespace atma
 	template <typename R> struct mapped_range_iterator_t;
 
 
+	// C: either a prvalue, or a reference (mutable or const)
 	template <typename C, typename F>
 	struct mapped_range_t
 	{
-		using self_t             = mapped_range_t<C, F>;
-		using source_container_t = std::remove_reference_t<C>;
-		using source_iterator_t  = decltype(std::declval<source_container_t>().begin());
+		using self_t              = mapped_range_t<C, F>;
+		using source_container_t  = std::remove_reference_t<C>;
+		using storage_container_t = storage_type_t<C>;
+		using source_iterator_t   = decltype(std::declval<storage_container_t>().begin());
 
-		using value_type      = std::decay_t<std::invoke_result_t<F, typename std::remove_reference_t<C>::value_type>>;
-		using reference       = value_type;
-		using const_reference = value_type const;
-		using iterator        = std::conditional_t<std::is_const<source_container_t>::value, mapped_range_iterator_t<self_t const>, mapped_range_iterator_t<self_t>>;
+		// the value-type of the what F returns. we must remove references
+		using value_type      = std::remove_reference_t<std::invoke_result_t<F, typename std::remove_reference_t<C>::value_type>>;
+		using reference       = value_type&;
+		using const_reference = value_type const&;
+		using iterator        = mapped_range_iterator_t<transfer_const_t<source_container_t, self_t>>;
 		using const_iterator  = mapped_range_iterator_t<self_t const>;
 		using difference_type = typename source_container_t::difference_type;
 		using size_type       = typename source_container_t::size_type;
 
 
-		template <typename CC, typename FF> mapped_range_t(CC&&, FF&&);
-		mapped_range_t(mapped_range_t const&);
+		mapped_range_t(mapped_range_t const&) = default;
+		mapped_range_t(mapped_range_t&&) = default;
+
+		template <typename CC, typename FF>
+		mapped_range_t(CC&&, FF&&);
 
 		auto source_container() const -> C const& { return container_; }
 		auto f() const -> F const& { return fn_; }
@@ -45,9 +51,9 @@ namespace atma
 		auto end() -> iterator;
 
 	private:
-		C container_;
+		storage_container_t container_;
 		F fn_;
-		source_iterator_t begin_, end_;
+		source_iterator_t okay_;
 	};
 
 
@@ -82,7 +88,7 @@ namespace atma
 		friend auto operator == (mapped_range_iterator_t<C2> const&, mapped_range_iterator_t<C2> const&) -> bool;
 
 		using owner_t           = C;
-		using source_iterator_t = typename owner_t::source_iterator_t;
+		using source_iterator_t = typename std::remove_reference_t<owner_t>::source_iterator_t;
 
 		using iterator_category = std::forward_iterator_tag;
 		using value_type        = typename owner_t::value_type;
@@ -110,36 +116,33 @@ namespace atma
 	template <typename C, typename F>
 	template <typename CC, typename FF>
 	inline mapped_range_t<C, F>::mapped_range_t(CC&& source, FF&& f)
-		: container_(std::forward<CC>(source)), fn_(std::forward<FF>(f)), begin_(container_.begin()), end_(container_.end())
-	{}
-
-	template <typename C, typename F>
-	inline mapped_range_t<C, F>::mapped_range_t(mapped_range_t const& rhs)
-		: container_(rhs.container_), begin_(rhs.begin_), end_(rhs.end_), fn_(rhs.fn_)
+		: container_(std::forward<CC>(source))
+		, fn_(std::forward<FF>(f))
+		, okay_{container_.begin()}
 	{}
 
 	template <typename C, typename F>
 	inline auto mapped_range_t<C, F>::begin() -> iterator
 	{
-		return {this, begin_, end_};
+		return iterator(this, container_.begin(), container_.end());
 	}
 
 	template <typename C, typename F>
 	inline auto mapped_range_t<C, F>::end() -> iterator
 	{
-		return {this, end_, end_};
+		return iterator(this, container_.end(), container_.end());
 	}
 
 	template <typename C, typename F>
 	inline auto mapped_range_t<C, F>::begin() const -> const_iterator
 	{
-		return {this, begin_, end_};
+		return const_iterator{this, container_.begin(), container_.end()};
 	}
 
 	template <typename C, typename F>
 	inline auto mapped_range_t<C, F>::end() const -> const_iterator
 	{
-		return {this, end_, end_};
+		return const_iterator{this, container_.end(), container_.end()};
 	}
 
 
@@ -186,9 +189,9 @@ namespace atma
 	// FUNCTIONS
 	//======================================================================
 	template <typename C, typename F>
-	inline auto map(F&& f, C&& xs) -> mapped_range_t<decltype(xs), F>
+	inline auto map(F&& f, C&& xs)
 	{
-		return {std::forward<C>(xs), std::forward<F>(f)};
+		return mapped_range_t<decltype(xs), F>{std::forward<C>(xs), std::forward<F>(f)};
 	}
 
 	template <typename F>
