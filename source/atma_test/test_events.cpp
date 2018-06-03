@@ -18,14 +18,18 @@ using namespace std::chrono_literals;
 		atma::log_level_t::info, nullptr, __FILE__, __LINE__, __VA_ARGS__, "\n")
 
 
+#if 0
 SCENARIO("events can be constructed", "[event]")
 {
-	rose::runtime_t RR;
-	rose::setup_default_logging_to_console(RR);
+	//rose::runtime_t RR;
+	//rose::setup_default_logging_to_console(RR);
 
+	std::atomic_int fin{};
 	auto f = [&](int x)
 	{
 		TEST_LOG("thread: ", std::this_thread::get_id(), ", x: ", x);
+		if (x == 37)
+			++fin;
 	};
 
 	GIVEN("a default-constructed event")
@@ -73,9 +77,7 @@ SCENARIO("events can be constructed", "[event]")
 		e.raise(27);
 		e.raise(37);
 
-		//good = false;
-		a.join();
-		b.join();
+		while (fin != 2);
 
 #if 0
 		std::atomic_bool good = true;
@@ -98,3 +100,4 @@ SCENARIO("events can be constructed", "[event]")
 #endif
 	}
 }
+#endif

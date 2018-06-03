@@ -94,6 +94,18 @@ namespace atma
 	}
 
 
+	constexpr inline struct as_vector_t
+	{
+		template <typename R>
+		auto operator | (R&& range) const
+		{
+			return atma::vector<typename std::remove_reference_t<R>::value_type>{range.begin(), range.end()};
+		}
+	} as_vector;
+
+
+
+
 	//=====================================================================
 	// all_of
 	//=====================================================================

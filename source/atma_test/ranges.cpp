@@ -1,50 +1,10 @@
 #include <atma/unit_test.hpp>
 
-#include <atma/algorithm/filter.hpp>
-#include <atma/algorithm/map.hpp>
-#include <atma/lockfree_queue.hpp>
-
+#include <atma/algorithm.hpp>
 #include <atma/vector.hpp>
 
-constexpr struct inc_t {
-	constexpr auto operator ()(int x) const -> int { return x + 1; }
-} const inc;
 
-constexpr struct dec_t {
-	auto operator ()(std::string x) const -> int { return 1; }
-	auto operator ()(int x) const -> int { return x - 1; }
-} const dec;
-
-constexpr struct square_t {
-	constexpr auto operator ()(int x) const -> int { return x * x; }
-} const square;
-
-constexpr struct mult_t {
-	constexpr auto operator ()(int x, int y) const -> int { return x * y; }
-} const mult;
-
-struct thing
-{
-	void operator ()(int) {}
-	void operator ()(std::string) {}
-};
-
-template <bool A, bool... R>
-struct all_of_t
-{
-	constexpr static bool const value = A && all_of_t<R...>::value;
-};
-
-template <bool A>
-struct all_of_t<A>
-{
-	constexpr static bool const value = A;
-};
-
-int times2(int x) { return x * 2; }
-
-
-
+// used below
 struct is_3_t {
 	template <typename X>
 	bool operator ()(X x) const {
@@ -52,72 +12,78 @@ struct is_3_t {
 	}
 } const is_3;
 
-template <typename T> decltype(auto) iden(T t) { return t; }
 
 SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 {
-	GIVEN("a vector of numbers")
+	auto is_even = [](int i) { return i % 2 == 0; };
+	auto plus_10 = [](int i) { return i + 10; };
+	auto is_gte3 = [](int i) { return i >= 3; };
+
+	GIVEN("a prvalue vector of numbers")
 	{
-		auto numbers = atma::vector<int>{1, 2, 3, 4};
-		auto const cnumbers = numbers;
+		THEN("ownership is transferred")
+		{
+			auto result = atma::filter(is_even, atma::vector<int>{1, 2, 3, 4});
+			static_assert(std::is_same_v<typename decltype(result)::storage_container_t, atma::vector<int>>);
+		}
 
-		auto is_even = [](int i) { return i % 2 == 0; };
-		auto plus_10 = [](int i) { return i + 10; };
-		auto is_gte3 = [](int i) { return i >= 3; };
+		THEN("basic filtering works")
+		{
+			auto result = atma::as_vector | atma::filter(is_even, atma::vector<int>{1, 2, 3, 4});
+			CHECK_WHOLE_VECTOR(result, 2, 4);
+		}
+	}
 
-		THEN("filtering mutable (no change) works")
+	GIVEN("an const lvalue vector of numbers")
+	{
+		auto const numbers = atma::vector<int>{1, 2, 3, 4};
+
+		THEN("cvrefness is preserved")
 		{
 			auto result = atma::filter(is_even, numbers);
-			auto resultv = atma::vector<int>{result.begin(), result.end()};
-
-			CHECK(resultv.size() == 2);
-			CHECK(resultv[0] == 2);
-			CHECK(resultv[1] == 4);
-			CHECK(numbers[0] == 1); CHECK(numbers[1] == 2); CHECK(numbers[2] == 3); CHECK(numbers[3] == 4);
+			static_assert(std::is_same_v<typename decltype(result)::storage_container_t, atma::vector<int> const&>);
 		}
 
-		THEN("filtering mutable (changing) works")
+		THEN("basic filtering works")
 		{
-			auto lnumbers = numbers;
-			auto result = atma::filter(is_even, lnumbers);
-			for (auto&& x : result)
-				x += 10;
-
-			CHECK(lnumbers[0] == 1); CHECK(lnumbers[1] == 12); CHECK(lnumbers[2] == 3); CHECK(lnumbers[3] == 14);
-		}
-
-		THEN("filtering const works")
-		{
-			auto result = atma::filter(is_even, cnumbers);
-			auto resultv = atma::vector<int>{result.begin(), result.end()};
-
-			CHECK(resultv.size() == 2);
-			CHECK(resultv[0] == 2);
-			CHECK(resultv[1] == 4);
-			CHECK(numbers[0] == 1); CHECK(numbers[1] == 2); CHECK(numbers[2] == 3); CHECK(numbers[3] == 4);
-		}
-
-		THEN("filtering moved data-structures works")
-		{
-			auto N = numbers;
-			auto R = atma::filter(is_even, std::move(N));
-			auto RV = atma::vector<int>{R.begin(), R.end()};
-
-			CHECK(N.empty());
-			CHECK(RV.size() == 2);
-			CHECK(RV[0] == 2);
-			CHECK(RV[1] == 4);
+			auto result = atma::as_vector | atma::filter(is_even, numbers);
+			CHECK_WHOLE_VECTOR(numbers, 1, 2, 3, 4);
+			CHECK_WHOLE_VECTOR(result, 2, 4);
 		}
 
 		THEN("lazy binding filtering works")
 		{
-			auto filter2 = atma::filter(is_even);
-			auto result = filter2(numbers);
-			auto resultv = atma::vector<int>{result.begin(), result.end()};
+			auto partial_filter = atma::filter(is_even);
+			auto filtered = partial_filter(numbers);
+			auto result = atma::as_vector | filtered;
 
-			CHECK(resultv.size() == 2);
-			CHECK(resultv[0] == 2);
-			CHECK(resultv[1] == 4);
+			static_assert(std::is_same_v<typename decltype(filtered)::storage_container_t, atma::vector<int> const&>);
+			CHECK_WHOLE_VECTOR(result, 2, 4);
+		}
+	}
+
+	GIVEN("a non-const lvalue vector of numbers")
+	{
+		auto numbers = atma::vector<int>{1, 2, 3, 4};
+
+		THEN("cvrefness is preserved")
+		{
+			auto result = atma::filter(is_even, numbers);
+			static_assert(std::is_same_v<typename decltype(result)::storage_container_t, atma::vector<int>&>);
+		}
+
+		THEN("basic filtering works")
+		{
+			auto result = atma::as_vector | atma::filter(is_even, numbers);
+			CHECK_WHOLE_VECTOR(numbers, 1, 2, 3, 4);
+			CHECK_WHOLE_VECTOR(result, 2, 4);
+		}
+
+		THEN("mutating filtered elements mutates the original elements")
+		{
+			for (auto&& x : atma::filter(is_even, numbers))
+				x += 10;
+			CHECK_WHOLE_VECTOR(numbers, 1, 12, 3, 14);
 		}
 
 		THEN("chaining filters is fine and dandy")
@@ -151,7 +117,6 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 			auto R = atma::filter(is_3, numbers);
 			R.begin(); R.end();
 		}
-		
 	}
 }
 
@@ -159,24 +124,64 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 
 SCENARIO("ranges can be mapped", "[ranges/map_t]")
 {
-	GIVEN("a vector of numbers")
+	auto plus_10 = [](int i) { return i + 10; };
+
+	GIVEN("a const lvalue vector of numbers")
+	{
+		auto const numbers = atma::vector<int>{1, 2, 3, 4};
+
+		THEN("basic mapping works")
+		{
+			auto numbers_plus10 = atma::as_vector | atma::map(plus_10, numbers);
+			static_assert(std::is_same_v<decltype(numbers_plus10), atma::vector<int>>);
+			static_assert(std::is_same_v<typename decltype(numbers_plus10)::value_type, int>);
+			CHECK_WHOLE_VECTOR(numbers_plus10, 11, 12, 13, 14);
+		}
+	}
+
+	GIVEN("a non-const lvalue vector of numbers")
 	{
 		auto numbers = atma::vector<int>{1, 2, 3, 4};
 
-		auto plus_10 = [](int i) { return i + 10; };
+		THEN("we can map plus10")
+		{
+			auto numbers_plus10 = atma::as_vector | atma::map(plus_10, numbers);
+			CHECK_WHOLE_VECTOR(numbers_plus10, 11, 12, 13, 14);
+		}
+
 		
 
-		THEN("we can map plus 10")
-		{
-			auto yay10 = atma::map(plus_10, numbers);
-			std::vector<int> resultv{yay10.begin(), yay10.end()};
-			CHECK_WHOLE_VECTOR(resultv, 11, 12, 13, 14);
+	}
 
-			int i = 0;
-			for (auto&& x : atma::map(plus_10, std::vector<int>{1, 2, 3, 4}))
-			{
-				CHECK(x == resultv[i++]);
-			}
+	GIVEN("an rvalue vector of numbers")
+	{
+		auto numbers = []() { return atma::vector<int>{1, 2, 3, 4}; };
+
+		THEN("transfer of ownership occurs")
+		{
+			auto result = atma::map(plus_10, numbers());
+			static_assert(std::is_same_v<typename std::remove_reference_t<decltype(result)>::storage_container_t, atma::vector<int>>);
 		}
 	}
+
+	GIVEN("an lvalue vector of dragons")
+	{
+		struct dragon_t { std::string name; int age; };
+
+		auto dragons = atma::vector<dragon_t>{
+			{"henry", 21},
+			{"oliver", 30},
+			{"josephine", 28}
+		};
+
+
+		THEN("a mapping function that returns references behaves appropritately")
+		{
+			auto dragon_name = [](auto&& x) -> std::string& { return x.name; };
+
+			auto result = atma::map(dragon_name, dragons);
+			static_assert(std::is_same_v<decltype(*result.begin()), std::string&>);
+		}
+	}
+
 }

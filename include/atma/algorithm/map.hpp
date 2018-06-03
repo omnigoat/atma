@@ -25,9 +25,10 @@ namespace atma
 		using source_container_t  = std::remove_reference_t<C>;
 		using storage_container_t = storage_type_t<C>;
 		using source_iterator_t   = decltype(std::declval<storage_container_t>().begin());
+		using invoke_result_t     = std::invoke_result_t<F, typename std::remove_reference_t<C>::value_type>;
 
 		// the value-type of the what F returns. we must remove references
-		using value_type      = std::remove_reference_t<std::invoke_result_t<F, typename std::remove_reference_t<C>::value_type>>;
+		using value_type      = std::remove_reference_t<invoke_result_t>;
 		using reference       = value_type&;
 		using const_reference = value_type const&;
 		using iterator        = mapped_range_iterator_t<transfer_const_t<source_container_t, self_t>>;
@@ -89,17 +90,18 @@ namespace atma
 
 		using owner_t           = C;
 		using source_iterator_t = typename std::remove_reference_t<owner_t>::source_iterator_t;
+		using invoke_result_t   = typename owner_t::invoke_result_t;
 
 		using iterator_category = std::forward_iterator_tag;
 		using value_type        = typename owner_t::value_type;
 		using difference_type   = ptrdiff_t;
 		using distance_type     = ptrdiff_t;
 		using pointer           = value_type*;
-		using reference         = value_type;
+		using reference         = typename owner_t::reference;
 
 		mapped_range_iterator_t(C*, source_iterator_t const& begin, source_iterator_t const& end);
 
-		auto operator  *() const -> reference;
+		auto operator  *() const -> invoke_result_t;
 		auto operator ++() -> mapped_range_iterator_t&;
 
 	private:
@@ -158,7 +160,7 @@ namespace atma
 	}
 
 	template <typename C>
-	inline auto mapped_range_iterator_t<C>::operator *() const -> reference
+	inline auto mapped_range_iterator_t<C>::operator *() const -> invoke_result_t
 	{
 		return owner_->f()(*pos_);
 	}
