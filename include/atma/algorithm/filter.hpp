@@ -21,10 +21,11 @@ namespace atma
 	{
 		using source_container_t  = std::remove_reference_t<R>;
 		using source_iterator_t   = decltype(std::begin(std::declval<source_container_t&>()));
+		using storage_container_t = storage_type_t<R>;
 
 		using value_type      = typename source_container_t::value_type;
-		using reference       = value_type&;
-		using const_reference = value_type const&;
+		using reference       = typename source_container_t::reference;
+		using const_reference = typename source_container_t::const_reference;
 		using iterator        = filtered_range_iterator_t<transfer_const_t<source_container_t, filtered_range_t>>;
 		using const_iterator  = filtered_range_iterator_t<filtered_range_t const>;
 		using difference_type = typename source_container_t::difference_type;
@@ -36,8 +37,8 @@ namespace atma
 		template <typename CC, typename FF>
 		filtered_range_t(CC&&, FF&&);
 
-		decltype(auto) source_container()       { return std::forward<decltype(range_)>(range_); }
-		decltype(auto) source_container() const { return std::forward<decltype(range_)>(range_); }
+		decltype(auto) source_container()       { return std::forward<storage_container_t>(range_); }
+		decltype(auto) source_container() const { return std::forward<storage_container_t>(range_); }
 		decltype(auto) predicate() const { return (predicate_); }
 
 		auto begin() const -> const_iterator;
@@ -48,7 +49,7 @@ namespace atma
 	private:
 		// if R is an lvalue, const or otherwise, we too are an lvalue.
 		// otherwise, storage-type is a non-reference type, and we are the owner of the container.
-		storage_type_t<R> range_;
+		storage_container_t range_;
 		F predicate_;
 	};
 }
@@ -98,10 +99,10 @@ namespace atma
 		template <typename R1, typename R2>
 		static decltype(auto) compose(R1&& r1, R2&& r2)
 		{
-			auto b = [f = r1.predicate(), g = r2.predicate()](auto&& x)
-				{ return f(std::forward<decltype(x)>(x)) && g(std::forward<decltype(x)>(x)); };
+			auto predicate = [f = r1.predicate(), g = r2.predicate()](auto&& x)
+				{ return g(std::forward<decltype(x)>(x)) && f(std::forward<decltype(x)>(x)); };
 
-			return filtered_range_t<R, decltype(b)>{r2.source_container(), b};
+			return filtered_range_t<R, decltype(predicate)>{r2.source_container(), predicate};
 		}
 	};
 
@@ -110,20 +111,19 @@ namespace atma
 	struct function_composition_override<partial_filtered_range_t<F>, partial_filtered_range_t<G>>
 	{
 		template <typename FF, typename GG>
-		static decltype(auto) compose(FF&& f, GG&& g)
+		static decltype(auto) compose(FF&& r1, GG&& r2)
 		{
-			auto b = atma::bind(
-				[](auto f, auto g, auto x) { return f(x) && g(x); },
-				f.predicate(), g.predicate(), arg1);
+			auto predicate = [f = r1.predicate(), g = r2.predicate()](auto&& x)
+				{ return g(std::forward<decltype(x)>(x)) && f(std::forward<decltype(x)>(x)); };
 
-			return partial_filtered_range_t<decltype(b)>{b};
+			return partial_filtered_range_t<decltype(predicate)>{predicate};
 		}
 	};
 }
 
 
 //======================================================================
-// filtered-rasnge-iterator
+// filtered-range-iterator
 //======================================================================
 namespace atma
 {
@@ -138,7 +138,6 @@ namespace atma
 		using iterator_category = std::forward_iterator_tag;
 		using value_type        = typename owner_t::value_type;
 		using difference_type   = ptrdiff_t;
-		using distance_type     = ptrdiff_t;
 		using pointer           = value_type*;
 		using reference         = std::conditional_t<is_const, value_type const&, value_type&>;
 
@@ -170,18 +169,9 @@ namespace atma
 		, predicate_(std::forward<FF>(predicate))
 	{}
 
-	template <typename R>
-	inline decltype(auto) transfer(R&& r)
-	{
-		if constexpr (std::is_lvalue_reference_v<R>)
-			return (r);
-		else
-			return std::move(r);
-	}
-
 	template <typename R, typename F>
 	inline filtered_range_t<R, F>::filtered_range_t(filtered_range_t&& rhs)
-		: range_{transfer(rhs.range_)}
+		: range_{std::forward<decltype(rhs.range_)>(rhs.range_)}
 		, predicate_{rhs.predicate_}
 	{}
 
