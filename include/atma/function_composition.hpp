@@ -5,6 +5,65 @@
 
 #include <utility>
 
+// composited_abstract_t
+namespace atma
+{
+	template <typename F, typename G>
+	struct composited_abstract_t
+	{
+		template <typename FF, typename GG>
+		composited_abstract_t(FF&& f, GG&& g)
+			: f_{std::forward<FF>(f)}
+			, g_{std::forward<GG>(g)}
+		{}
+
+		template <typename... Args>
+		decltype(auto) operator()(Args&&... args) const
+		{
+			return f_(g_(std::forward<Args>(args)...));
+		}
+
+	private:
+		F f_;
+		G g_;
+	};
+
+	// deduction guide!
+	template <typename F, typename G>
+	composited_abstract_t(F&& f, G&& g) ->
+		composited_abstract_t<storage_type_t<F>, storage_type_t<G>>;
+}
+
+
+// composited_concrete_t
+namespace atma
+{
+	template <typename F, typename G, typename... Args>
+	struct composited_concrete_t
+	{
+		template <typename FF, typename GG>
+		composited_concrete_t(FF&& f, GG&& g)
+			: f_{std::forward<FF>(f)}
+			, g_{std::forward<GG>(g)}
+		{}
+
+		decltype(auto) operator()(Args... args) const
+		{
+			return f_(g_(args...));
+		}
+
+	private:
+		F f_;
+		G g_;
+	};
+
+	// deduction guide!
+	template <typename... Args, typename F, typename G>
+	composited_concrete_t(F&& f, G&& g) ->
+		composited_concrete_t<storage_type_t<F>, storage_type_t<G>, Args...>;
+}
+
+
 //
 //  compose_impl
 //  --------------
@@ -24,7 +83,7 @@ namespace atma::detail
 		template <typename F, typename G>
 		static decltype(auto) go(F&& f, G&& g)
 		{
-			return [f = std::forward<F>(f), g = std::forward<G>(g)](Args... args) { return f(g(args...)); };
+			return composited_concrete_t<Args...>{std::forward<F>(f), std::forward<G>(g)};
 		}
 	};
 
@@ -44,25 +103,37 @@ namespace atma::detail
 	}
 
 	template <typename F, typename G>
-	inline decltype(auto) compose_impl_abstract(F&& f, G&& g)
+	inline auto compose_impl_abstract(F&& f, G&& g)
 	{
-		return [f = std::forward<F>(f), g = std::forward<G>(g)](auto&&... args) { return f(g(std::forward<decltype(args)>(args)...)); };
+		return composited_abstract_t{std::forward<F>(f), std::forward<G>(g)};
 	}
 }
 
 namespace atma
 {
+	template <typename F>
+	struct functionally_composable;
+
+
+
 	//
-	// function_composition_override
-	// -------------------------------
-	//   allows users to override how function composition between two functions
-	//   is implemented
+	//  function_composition_override
+	//  -------------------------------
+	//    allows users to override how function-composition between two invokables is implemented
 	//
+	//    defining this is all that's required to enable function-composition between the two
+	//    types, even if neither type has been explicitly allowed for general-use composition
+	//
+	template <typename F, typename G, typename = std::void_t<>>
+	struct function_composition_implementation_t {};
+
 	template <typename F, typename G>
-	struct function_composition_override
+	struct function_composition_implementation_t<F, G, std::void_t<
+		decltype(functionally_composable<F>()),
+		decltype(functionally_composable<G>())>>
 	{
 		template <typename FF, typename GG>
-		static decltype(auto) compose(FF&& f, GG&& g)
+		static auto compose(FF&& f, GG&& g)
 		{
 			if constexpr (is_callable_v<std::remove_reference_t<GG>>)
 			{
@@ -77,46 +148,33 @@ namespace atma
 
 
 	//
+	//  function_composition_override
+	//  -------------------------------
+	//    allows users to override how function-composition between two invokables is implemented
+	//
+	//    defining this is all that's required to enable function-composition between the two
+	//    types, even if neither type has been explicitly allowed for general-use composition
+	//
+	template <typename F, typename G>
+	struct function_composition_override : function_composition_implementation_t<F, G>
+	{};
+
+	template <typename F, typename G>
+	struct function_composition_t : function_composition_override<F, G>
+	{};
+
+
+	//
 	// compose
 	// ---------
 	//   takes two callable things and composes them
 	//
 	template <typename F, typename G>
-	inline decltype(auto) compose(F&& f, G&& g) {
-		return function_composition_override<std::remove_reference_t<F> , std::remove_reference_t<G>>
+	inline auto compose(F&& f, G&& g) {
+		return function_composition_t<std::remove_reference_t<F>, std::remove_reference_t<G>>
 			::compose(std::forward<F>(f), std::forward<G>(g));
 	}
 
 
-	//
-	// composition, like the dot-operator in Haskell, if that floats your boat
-	//
-	template <typename F, typename G>
-	inline decltype(auto) operator % (F&& f, G&& g)
-	{
-		//static_assert(is_callable_v<std::remove_reference_t<F>> && is_callable_v<std::remove_reference_t<G>>, "bad callables");
-		return compose(std::forward<F>(f), std::forward<G>(g));
-	}
-
-
-	//
-	// an attempt at a '$' operator like haskell, so we can avoid parens:
-	//
-	//  inc(square(4))
-	//  (inc % square)(4)
-	//  inc % square << 4
-	//
-	//template <typename F, typename A>
-	//inline decltype(auto) operator << (F&& f, A&& a) {
-	//	return std::invoke(std::forward<F>(f), std::forward<A>(a));
-	//}
-
-#if 0
-	// this style of overloads could be used to dramatically restrict composition, but
-	// would require overloads for any functor intended to be composable
-	template <typename F, typename G1, typename G2>
-	inline decltype(auto) operator % (F&& f, detail::composited_t<G1, G2>&& g) {
-		return detail::composited_t<F, decltype(g)>{std::forward<F>(f), std::move(g)}; }
-#endif
 
 }
