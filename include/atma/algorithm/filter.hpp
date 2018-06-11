@@ -9,6 +9,43 @@ namespace atma
 {
 	template <typename R, typename F> struct filtered_range_t;
 	template <typename R> struct filtered_range_iterator_t;
+	template <typename F> struct partial_filtered_range_t;
+
+	namespace detail
+	{
+		template <typename T>
+		struct is_partially_filtered_range
+		{
+			static constexpr bool value = false;
+		};
+
+		template <typename F>
+		struct is_partially_filtered_range<partial_filtered_range_t<F>>
+		{
+			static constexpr bool value = true;
+		};
+
+		template <typename T>
+		inline constexpr bool is_partially_filtered_range_v = is_partially_filtered_range<T>::value;
+	}
+
+	namespace detail
+	{
+		template <typename T>
+		struct is_filtered_range
+		{
+			static constexpr bool value = false;
+		};
+
+		template <typename R, typename F>
+		struct is_filtered_range<filtered_range_t<R, F>>
+		{
+			static constexpr bool value = true;
+		};
+
+		template <typename T>
+		inline constexpr bool is_filtered_range_v = is_filtered_range<T>::value;
+	}
 }
 
 //======================================================================
@@ -34,8 +71,8 @@ namespace atma
 		filtered_range_t(filtered_range_t&&);
 		filtered_range_t(filtered_range_t const&) = delete;
 
-		template <typename CC, typename FF>
-		filtered_range_t(CC&&, FF&&);
+		template <typename RR, typename FF>
+		filtered_range_t(RR&&, FF&&);
 
 		decltype(auto) source_container()       { return std::forward<storage_container_t>(range_); }
 		decltype(auto) source_container() const { return std::forward<storage_container_t>(range_); }
@@ -52,6 +89,9 @@ namespace atma
 		storage_container_t range_;
 		F predicate_;
 	};
+
+	template <typename R, typename F>
+	filtered_range_t(R&& r, F&& f) -> filtered_range_t<R, F>;
 }
 
 
@@ -63,22 +103,137 @@ namespace atma
 	template <typename F>
 	struct partial_filtered_range_t
 	{
+		using storage_functor_t = storage_type_t<F>;
+
 		template <typename FF>
 		partial_filtered_range_t(FF&& f)
 			: fn_(std::forward<FF>(f))
 		{}
 
 		template <typename R>
-		decltype(auto) operator ()(R&& xs) const
+		decltype(auto) operator ()(R&& xs) const &
 		{
-			return filtered_range_t<decltype(xs), F>(std::forward<R>(xs), fn_);
+			return filtered_range_t{std::forward<R>(xs), fn_};
 		}
 
-		decltype(auto) predicate() { return (fn_); }
+		template <typename R>
+		decltype(auto) operator ()(R&& xs) const &&
+		{
+			return filtered_range_t{std::forward<R>(xs), std::forward<storage_functor_t>(fn_)};
+		}
+
+		decltype(auto) predicate() const { return std::forward<storage_functor_t>(fn_); }
+		decltype(auto) predicate()       { return std::forward<storage_functor_t>(fn_); }
 
 	private:
-		F fn_;
+		storage_functor_t fn_;
 	};
+
+	template <typename F>
+	partial_filtered_range_t(F&& f) -> partial_filtered_range_t<F>;
+
+	namespace detail
+	{
+		template <typename T, typename = std::void_t<>>
+		struct is_range_tx
+		{
+			static constexpr bool value = false;
+		};
+
+		template <typename T>
+		struct is_range_tx<T, std::void_t<
+			decltype(std::begin(std::declval<T>())),
+			decltype(std::end(std::declval<T>()))>>
+		{
+			static constexpr bool value = true;
+		};
+
+		template <typename T>
+		inline constexpr bool is_range_v = detail::is_range_tx<T>::value;
+
+		template <typename T, typename = std::void_t<>>
+		struct has_predicate_tx
+		{
+			static constexpr bool value = false;
+		};
+
+		template <typename T>
+		struct has_predicate_tx<T, std::void_t<
+			decltype(std::declval<T>().predicate())>>
+		{
+			static constexpr bool value = true;
+		};
+
+		template <typename T>
+		inline constexpr bool has_predicate_v = has_predicate_tx<T>::value;
+
+		template <typename T>
+		using enable_if_partially_filtered_range_v = std::enable_if_t<is_partially_filtered_range_v<remove_cvref_t<T>>>;
+
+		template <typename T>
+		using enable_if_filtered_range_v = std::enable_if_t<is_filtered_range_v<remove_cvref_t<T>>>;
+
+		template <typename T>
+		using enable_if_range_v = std::enable_if_t<detail::is_range_v<std::remove_reference_t<remove_cvref_t<T>>>>;
+	}
+
+
+#define CONCEPT_REQUIRES_LIST_M(r,d,i,x) BOOST_PP_IF(i, &&,) x
+
+#define CONCEPT_REQUIRES_LIST(...) BOOST_PP_SEQ_FOR_EACH_I(CONCEPT_REQUIRES_LIST_M, _, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+
+#define CONCEPT_REQUIRES_II_(counter, ...)                                                       \
+    int ATMA_PP_CAT(_concept_requires_, counter) = 42,                                           \
+    typename std::enable_if<                                                                     \
+        (ATMA_PP_CAT(_concept_requires_, counter) == 43) || CONCEPT_REQUIRES_LIST(__VA_ARGS__),  \
+        int                                                                                      \
+    >::type = 0                                                                                  \
+    /**/
+
+#define CONCEPT_REQUIRES_(...) CONCEPT_REQUIRES_II_(__COUNTER__, __VA_ARGS__)
+
+#define CONCEPT_REQUIRES(...)                                                       \
+	template<                                                                       \
+		int ATMA_PP_CAT(_concept_requires_, __COUNTER__) = 42,                      \
+		typename std::enable_if<                                                    \
+			(ATMA_PP_CAT(_concept_requires_, __COUNTER__) == 43) || (__VA_ARGS__),  \
+			int                                                                     \
+		>::type = 0                                                                 \
+	>                                                                               \
+	/**/
+
+	template <typename F, typename R,
+		CONCEPT_REQUIRES_(
+			detail::is_partially_filtered_range_v<remove_cvref_t<F>>,
+			detail::is_range_v<remove_cvref_t<R>>)>
+	inline auto operator | (F&& lhs, R&& rhs)
+	{
+		if constexpr (detail::is_filtered_range_v<remove_cvref_t<R>>)
+		{
+			auto predicate = [f = lhs.predicate(), g = rhs.predicate()](auto&& x)
+			{ return g(std::forward<decltype(x)>(x)) && f(std::forward<decltype(x)>(x)); };
+
+			return filtered_range_t{rhs.source_container(), predicate};
+		}
+		else
+		{
+			return filtered_range_t{std::forward<R>(rhs), lhs.predicate()};
+		}
+	}
+
+
+	template <typename F, typename G,
+		CONCEPT_REQUIRES_(
+			detail::is_partially_filtered_range_v<remove_cvref_t<F>> &&
+			detail::is_partially_filtered_range_v<remove_cvref_t<G>>)>
+	inline auto operator | (F&& lhs, G&& rhs)
+	{
+		auto predicate = [f = lhs.predicate(), g = rhs.predicate()](auto&& x)
+		{ return g(std::forward<decltype(x)>(x)) && f(std::forward<decltype(x)>(x)); };
+
+		return partial_filtered_range_t{predicate};
+	}
+
 
 
 	// function composition partial-filter-range against any range
@@ -92,7 +247,6 @@ namespace atma
 		}
 	};
 
-	// optimized function composition for partial-filter-range vs filter-range
 	template <typename F, typename R, typename G>
 	struct function_composition_override<partial_filtered_range_t<F>, filtered_range_t<R, G>>
 	{
@@ -268,15 +422,15 @@ namespace atma
 	// filter: f vs filtered-range<r, g>
 	template <typename F, typename R, typename F2>
 	inline auto filter(F&& predicate, filtered_range_t<R, F2> const& container)
-		{ return partial_filtered_range_t<F>{std::forward<F>(predicate)} % container; }
+		{ return partial_filtered_range_t<F>{std::forward<F>(predicate)} | container; }
 
 	template <typename F, typename R, typename F2>
 	inline auto filter(F&& predicate, filtered_range_t<R, F2>& container)
-		{ return partial_filtered_range_t<F>{std::forward<F>(predicate)} % container; }
+		{ return partial_filtered_range_t<F>{std::forward<F>(predicate)} | container; }
 
 	template <typename F, typename R, typename F2>
 	inline auto filter(F&& predicate, filtered_range_t<R, F2>&& container)
-		{ return partial_filtered_range_t<F>{std::forward<F>(predicate)} % std::move(container); }
+		{ return partial_filtered_range_t<F>{std::forward<F>(predicate)} | std::move(container); }
 
 	// filter: member vs r
 	template <typename M, typename C, typename R>

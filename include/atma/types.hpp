@@ -49,6 +49,19 @@ using size_t = std::size_t;
 namespace atma
 {
 	//
+	//  actually_false
+	//  ----------------
+	//    for static_assert
+	//
+	template <typename...>
+	constexpr bool actually_false = false;
+
+
+	template <typename T>
+	using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
+
+
+	//
 	//  transfer_const_t
 	//  ------------------
 	//    takes T, and if const, transforms M to be const, otherwise just M

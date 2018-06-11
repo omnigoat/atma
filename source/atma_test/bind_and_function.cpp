@@ -74,10 +74,11 @@ SCENARIO("bind works with various things", "[bind]")
 		auto b4v1 = atma::curry(F);
 		auto b4v2 = atma::bind(F, arg2, arg3, arg1);
 
+#if 0
 		// composition object with well-defined arguments
-		auto b5v1 = atma::curry(b2v6 % b2v5);
-		auto b5v2 = atma::bind(b5v1 % b2v2, arg1);
-		auto b5v3 = b5v1 % b2v7;
+		auto b5v1 = atma::curry(b2v6 | b2v5);
+		auto b5v2 = atma::bind(b5v1 | b2v2, arg1);
+		auto b5v3 = b5v1 | b2v7;
 		
 		// composition object with a templated `operator ()`
 		tm_t tm;
@@ -131,7 +132,9 @@ SCENARIO("bind works with various things", "[bind]")
 			CHECK(b6(4) == 4);
 			CHECK(b6(4.f) == 8.f);
 		}
+#endif
 	}
+
 }
 
 SCENARIO("functions can be constructed")
