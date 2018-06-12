@@ -88,14 +88,18 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 
 		THEN("chaining filters is fine and dandy")
 		{
-			auto rgte3 = atma::filter(is_even) | atma::filter(is_gte3, numbers);
-			auto result = atma::vector<int>{rgte3.begin(), rgte3.end()};
-			
-			auto rgte3v2 = atma::filter(is_even, atma::filter(is_gte3, numbers));
-			auto resultv2 = atma::vector<int>{rgte3v2.begin(), rgte3v2.end()};
+			auto result
+				= numbers
+				| atma::filter(is_gte3) * atma::filter(is_even)
+				| atma::as_vector
+				;
+
+			//atma::as_vector |  (atma::filter(is_even) | atma::filter(is_gte3, numbers));
+			//auto result2 = atma::as_vector | (atma::filter(is_even, atma::filter(is_gte3, numbers)) );
+
 
 			CHECK_WHOLE_VECTOR(result, 4);
-			CHECK_WHOLE_VECTOR(resultv2, 4);
+			//CHECK_WHOLE_VECTOR(result2, 4);
 		}
 
 #if 0
