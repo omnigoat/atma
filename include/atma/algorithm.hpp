@@ -2,9 +2,9 @@
 
 #include <atma/function_traits.hpp>
 #include <atma/tuple.hpp>
-#include <atma/algorithm/filter.hpp>
-#include <atma/algorithm/map.hpp>
-#include <atma/algorithm/zip.hpp>
+#include <atma/ranges/filter.hpp>
+#include <atma/ranges/map.hpp>
+#include <atma/ranges/zip.hpp>
 
 #include <algorithm>
 
@@ -103,6 +103,11 @@ namespace atma
 		}
 	} as_vector;
 
+	template <typename R>
+	inline auto operator | (R&& range, as_vector_t const&)
+	{
+		return atma::vector<typename std::remove_reference_t<R>::value_type>{range.begin(), range.end()};
+	}
 
 
 

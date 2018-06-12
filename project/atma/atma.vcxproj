@@ -12,12 +12,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\atma\algorithm.hpp" />
-    <ClInclude Include="..\..\include\atma\algorithm\filter.hpp" />
-    <ClInclude Include="..\..\include\atma\algorithm\map.hpp" />
-    <ClInclude Include="..\..\include\atma\algorithm\zip.hpp" />
     <ClInclude Include="..\..\include\atma\aligned_allocator.hpp" />
     <ClInclude Include="..\..\include\atma\arena_allocator.hpp" />
     <ClInclude Include="..\..\include\atma\atomic.hpp" />
+    <ClInclude Include="..\..\include\atma\concepts.hpp" />
     <ClInclude Include="..\..\include\atma\flyweight.hpp" />
     <ClInclude Include="..\..\include\atma\function.hpp" />
     <ClInclude Include="..\..\include\atma\function_composition.hpp" />
@@ -54,6 +52,10 @@
     <ClInclude Include="..\..\include\atma\placeholders.hpp" />
     <ClInclude Include="..\..\include\atma\platform\allocation.hpp" />
     <ClInclude Include="..\..\include\atma\platform\interop.hpp" />
+    <ClInclude Include="..\..\include\atma\ranges\core.hpp" />
+    <ClInclude Include="..\..\include\atma\ranges\filter.hpp" />
+    <ClInclude Include="..\..\include\atma\ranges\map.hpp" />
+    <ClInclude Include="..\..\include\atma\ranges\zip.hpp" />
     <ClInclude Include="..\..\include\atma\shared_memory.hpp" />
     <ClInclude Include="..\..\include\atma\streams.hpp" />
     <ClInclude Include="..\..\include\atma\string.hpp" />

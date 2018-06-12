@@ -6,7 +6,7 @@
 #include <atma/threading.hpp>
 #include <atma/algorithm.hpp>
 #include <atma/arena_allocator.hpp>
-#include <atma/algorithm/filter.hpp>
+#include <atma/ranges/filter.hpp>
 
 #include <functional>
 #include <memory>
