@@ -5,9 +5,6 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
-    <Filter Include="include\algorithm">
-      <UniqueIdentifier>{d9e4acd0-ccff-486a-91b8-6971087abf08}</UniqueIdentifier>
-    </Filter>
     <Filter Include="include\config">
       <UniqueIdentifier>{24f56b7f-e2dd-40a2-836e-a21f2f8164a9}</UniqueIdentifier>
     </Filter>
@@ -25,6 +22,9 @@
     </Filter>
     <Filter Include="include\utf">
       <UniqueIdentifier>{56575bb8-07a7-4c79-9adb-214074d8fee8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\ranges">
+      <UniqueIdentifier>{28e5fe84-943a-4755-93f4-596a859c63e9}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -82,17 +82,8 @@
     <ClInclude Include="..\..\include\atma\math\aabb.hpp">
       <Filter>include\math</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\algorithm\filter.hpp">
-      <Filter>include\algorithm</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\atma\algorithm\map.hpp">
-      <Filter>include\algorithm</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\math\triangle.hpp">
       <Filter>include\math</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\atma\algorithm\zip.hpp">
-      <Filter>include\algorithm</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\atma\math\aabc.hpp">
       <Filter>include\math</Filter>
@@ -210,6 +201,21 @@
     </ClInclude>
     <ClInclude Include="..\..\include\atma\lockfree_list.hpp">
       <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\ranges\filter.hpp">
+      <Filter>include\ranges</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\ranges\map.hpp">
+      <Filter>include\ranges</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\concepts.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\ranges\zip.hpp">
+      <Filter>include\ranges</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\ranges\core.hpp">
+      <Filter>include\ranges</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
