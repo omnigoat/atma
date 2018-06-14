@@ -3,93 +3,149 @@
 #include <atma/function_traits.hpp>
 #include <atma/function.hpp>
 
-//
-//  mapping in c++ ranges
-//  ------------------------
-//    'mapping' is taken a range of one thing, and generating an on-the-fly range of another thing,
-//    transformed by some function. 
-//
-//
-//
+
+// forward-declares
 namespace atma
 {
-	template <typename C, typename F> struct mapped_range_t;
-	template <typename R> struct mapped_range_iterator_t;
+	template <typename, typename> struct mapped_range_t;
+	template <typename> struct mapped_range_iterator_t;
+	template <typename> struct map_functor_t;
+}
 
 
-	// C: either a prvalue, or a reference (mutable or const)
-	template <typename C, typename F>
+// is_mapped_range
+namespace atma::detail
+{
+	template <typename T>
+	struct is_mapped_range : std::false_type
+	{};
+
+	template <typename R, typename F>
+	struct is_mapped_range<mapped_range_t<R, F>> : std::true_type
+	{};
+
+	template <typename T>
+	inline constexpr bool is_mapped_range_v = is_mapped_range<T>::value;
+}
+
+
+// is_map_functor
+namespace atma::detail
+{
+	template <typename T>
+	struct is_map_functor : std::false_type
+	{};
+
+	template <typename F>
+	struct is_map_functor<map_functor_t<F>> : std::true_type
+	{};
+
+	template <typename T>
+	inline constexpr bool is_map_functor_v = is_map_functor<T>::value;
+}
+
+
+// mapped-range
+namespace atma
+{
+	template <typename T>
+	decltype(auto) fwd(T&& t) { return std::forward<T>(t); }
+
+	// R: either a prvalue, or a reference (mutable or const)
+	template <typename R, typename F>
 	struct mapped_range_t
 	{
-		using self_t              = mapped_range_t<C, F>;
-		using source_container_t  = std::remove_reference_t<C>;
-		using storage_container_t = storage_type_t<C>;
-		using source_iterator_t   = decltype(std::declval<storage_container_t>().begin());
-		using invoke_result_t     = std::invoke_result_t<F, typename std::remove_reference_t<C>::value_type>;
+		using self_t          = mapped_range_t<R, F>;
+		using target_range_t  = std::remove_reference_t<R>;
+
+		using storage_range_t     = storage_type_t<R>;
+		using storage_functor_t   = storage_type_t<F>;
+		using target_iterator_t   = decltype(std::declval<storage_range_t>().begin());
+		using invoke_result_t     = std::invoke_result_t<F, typename target_range_t::value_type>;
 
 		// the value-type of the what F returns. we must remove references
 		using value_type      = std::remove_reference_t<invoke_result_t>;
 		using reference       = value_type&;
 		using const_reference = value_type const&;
-		using iterator        = mapped_range_iterator_t<transfer_const_t<source_container_t, self_t>>;
+		using iterator        = mapped_range_iterator_t<transfer_const_t<target_range_t, self_t>>;
 		using const_iterator  = mapped_range_iterator_t<self_t const>;
-		using difference_type = typename source_container_t::difference_type;
-		using size_type       = typename source_container_t::size_type;
+		using difference_type = typename target_range_t::difference_type;
+		using size_type       = typename target_range_t::size_type;
 
 
 		mapped_range_t(mapped_range_t const&) = default;
 		mapped_range_t(mapped_range_t&&) = default;
 
-		template <typename CC, typename FF>
-		mapped_range_t(CC&&, FF&&);
+		template <typename RR, typename FF>
+		mapped_range_t(RR&&, FF&&);
 
-		auto source_container() const -> C const& { return container_; }
-		auto f() const -> F const& { return fn_; }
-
+		decltype(auto) target_range() &  { return (range_); }
+		decltype(auto) target_range() && { return std::forward<storage_range_t>(range_); }
+		decltype(auto) function() &  { return (fn_); }
+		decltype(auto) function() && { return std::forward<F>(fn_); }
+		
 		auto begin() const -> const_iterator;
 		auto end() const -> const_iterator;
 		auto begin() -> iterator;
 		auto end() -> iterator;
 
 	private:
-		storage_container_t container_;
-		F fn_;
-		source_iterator_t okay_;
+		storage_range_t range_;
+		storage_functor_t fn_;
+
+		template <typename Owner>
+		friend struct mapped_range_iterator_t;
 	};
 
+	template <typename R, typename F>
+	mapped_range_t(R&& r, F&& f) -> mapped_range_t<R, F>;
+}
 
 
-
+// map-functor
+namespace atma
+{
 	template <typename F>
-	struct partial_mapped_range_t
+	struct map_functor_t
 	{
 		template <typename FF>
-		partial_mapped_range_t(FF&& f)
+		map_functor_t(FF&& f)
 			: fn_(std::forward<FF>(f))
-		{
+		{}
+
+		template <typename R>
+		auto operator ()(R&& xs) const& {
+			return mapped_range_t{xs, fn_};
 		}
 
-		template <typename C>
-		inline auto operator ()(C&& xs) -> mapped_range_t<C, F>
-		{
-			return mapped_range_t<C, F>(std::forward<C>(xs), std::forward<F>(fn_));
+		template <typename R>
+		auto operator ()(R&& xs) const&& {
+			return mapped_range_t{std::forward<R>(xs), function()};
 		}
+
+		decltype(auto) function() &  { return (fn_); }
+		decltype(auto) function() && { return std::forward<decltype(fn_)>(fn_); }
 
 	private:
-		F fn_;
+		storage_type_t<F> fn_;
 	};
 
+	template <typename F>
+	map_functor_t(F&& f) -> map_functor_t<F>;
+}
 
 
-
-	template <typename C>
+// mapped-range-iterator
+namespace atma
+{
+	template <typename R>
 	struct mapped_range_iterator_t
 	{
 		template <typename C2>
 		friend auto operator == (mapped_range_iterator_t<C2> const&, mapped_range_iterator_t<C2> const&) -> bool;
 
-		using owner_t           = C;
-		using source_iterator_t = typename std::remove_reference_t<owner_t>::source_iterator_t;
+		using owner_t           = R;
+		using target_iterator_t = typename std::remove_reference_t<owner_t>::target_iterator_t;
 		using invoke_result_t   = typename owner_t::invoke_result_t;
 
 		using iterator_category = std::forward_iterator_tag;
@@ -99,14 +155,14 @@ namespace atma
 		using pointer           = value_type*;
 		using reference         = typename owner_t::reference;
 
-		mapped_range_iterator_t(C*, source_iterator_t const& begin, source_iterator_t const& end);
+		mapped_range_iterator_t(R*, target_iterator_t const& begin, target_iterator_t const& end);
 
 		auto operator  *() const -> invoke_result_t;
 		auto operator ++() -> mapped_range_iterator_t&;
 
 	private:
-		C* owner_;
-		source_iterator_t pos_, end_;
+		R* owner_;
+		target_iterator_t pos_, end_;
 	};
 
 
@@ -115,36 +171,35 @@ namespace atma
 	//======================================================================
 	// RANGE IMPLEMENTATION
 	//======================================================================
-	template <typename C, typename F>
-	template <typename CC, typename FF>
-	inline mapped_range_t<C, F>::mapped_range_t(CC&& source, FF&& f)
-		: container_(std::forward<CC>(source))
+	template <typename R, typename F>
+	template <typename RR, typename FF>
+	inline mapped_range_t<R, F>::mapped_range_t(RR&& target, FF&& f)
+		: range_(std::forward<RR>(target))
 		, fn_(std::forward<FF>(f))
-		, okay_{container_.begin()}
 	{}
 
-	template <typename C, typename F>
-	inline auto mapped_range_t<C, F>::begin() -> iterator
+	template <typename R, typename F>
+	inline auto mapped_range_t<R, F>::begin() -> iterator
 	{
-		return iterator(this, container_.begin(), container_.end());
+		return iterator(this, range_.begin(), range_.end());
 	}
 
-	template <typename C, typename F>
-	inline auto mapped_range_t<C, F>::end() -> iterator
+	template <typename R, typename F>
+	inline auto mapped_range_t<R, F>::end() -> iterator
 	{
-		return iterator(this, container_.end(), container_.end());
+		return iterator(this, range_.end(), range_.end());
 	}
 
-	template <typename C, typename F>
-	inline auto mapped_range_t<C, F>::begin() const -> const_iterator
+	template <typename R, typename F>
+	inline auto mapped_range_t<R, F>::begin() const -> const_iterator
 	{
-		return const_iterator{this, container_.begin(), container_.end()};
+		return const_iterator{this, range_.begin(), range_.end()};
 	}
 
-	template <typename C, typename F>
-	inline auto mapped_range_t<C, F>::end() const -> const_iterator
+	template <typename R, typename F>
+	inline auto mapped_range_t<R, F>::end() const -> const_iterator
 	{
-		return const_iterator{this, container_.end(), container_.end()};
+		return const_iterator{this, range_.end(), range_.end()};
 	}
 
 
@@ -153,60 +208,80 @@ namespace atma
 	//======================================================================
 	// ITERATOR IMPLEMENTATION
 	//======================================================================
-	template <typename C>
-	inline mapped_range_iterator_t<C>::mapped_range_iterator_t(owner_t* owner, source_iterator_t const& begin, source_iterator_t const& end)
+	template <typename R>
+	inline mapped_range_iterator_t<R>::mapped_range_iterator_t(owner_t* owner, target_iterator_t const& begin, target_iterator_t const& end)
 		: owner_(owner), pos_(begin), end_(end)
+	{}
+
+	template <typename R>
+	inline auto mapped_range_iterator_t<R>::operator *() const -> invoke_result_t
 	{
+		return std::invoke(owner_->fn_, *pos_);
 	}
 
-	template <typename C>
-	inline auto mapped_range_iterator_t<C>::operator *() const -> invoke_result_t
-	{
-		return owner_->f()(*pos_);
-	}
-
-	template <typename C>
-	inline auto mapped_range_iterator_t<C>::operator ++() -> mapped_range_iterator_t&
+	template <typename R>
+	inline auto mapped_range_iterator_t<R>::operator ++() -> mapped_range_iterator_t&
 	{
 		++pos_;
 		return *this;
 	}
 
-	template <typename C>
-	inline auto operator == (mapped_range_iterator_t<C> const& lhs, mapped_range_iterator_t<C> const& rhs) -> bool
+	template <typename R>
+	inline auto operator == (mapped_range_iterator_t<R> const& lhs, mapped_range_iterator_t<R> const& rhs) -> bool
 	{
 		ATMA_ASSERT(lhs.owner_ == rhs.owner_);
 		return lhs.pos_ == rhs.pos_;
 	}
 
-	template <typename C>
-	inline auto operator != (mapped_range_iterator_t<C> const& lhs, mapped_range_iterator_t<C> const& rhs) -> bool
+	template <typename R>
+	inline auto operator != (mapped_range_iterator_t<R> const& lhs, mapped_range_iterator_t<R> const& rhs) -> bool
 	{
 		return !operator == (lhs, rhs);
 	}
 
 
+	//======================================================================
+	// operators
+	//======================================================================
+	template <typename R, typename F,
+		CONCEPT_REQUIRES_(
+			is_range_v<remove_cvref_t<R>>,
+			detail::is_map_functor_v<remove_cvref_t<F>>)>
+	inline auto operator | (R&& range, F&& functor)
+	{
+		if constexpr (detail::is_mapped_range_v<remove_cvref_t<R>>)
+		{
+			auto function = [f=std::forward<R>(range).function(), g=std::forward<F>(functor).function()](auto&& x) {
+				return std::invoke(g, std::invoke(f, std::forward<decltype(x)>(x))); };
+
+			return mapped_range_t{std::forward<R>(range).target_range(), function};
+		}
+		else
+		{
+			return mapped_range_t{std::forward<R>(range), std::forward<F>(functor).function()};
+		}
+	}
+
 
 	//======================================================================
 	// FUNCTIONS
 	//======================================================================
-	template <typename C, typename F>
-	inline auto map(F&& f, C&& xs)
+	template <typename R, typename F>
+	inline auto map(F&& f, R&& xs)
 	{
-		return mapped_range_t<decltype(xs), F>{std::forward<C>(xs), std::forward<F>(f)};
+		return mapped_range_t<decltype(xs), F>{std::forward<R>(xs), std::forward<F>(f)};
 	}
 
 	template <typename F>
-	inline auto map(F&& f) -> partial_mapped_range_t<F>
+	inline auto map(F&& f)
 	{
-		return {f};
+		return map_functor_t{std::forward<F>(f)};
 	}
 
-	template <typename R, typename C>
-	inline auto map(R C::*member)
+	template <typename M, typename R>
+	inline auto map(M R::*member)
 	{
-		auto f = [=](auto&& x) { return x.*member; };
-		return partial_mapped_range_t<decltype(f)>{f};
+		return map_functor_t{[member](auto&& x) { return x.*member; }};
 	}
 
 }

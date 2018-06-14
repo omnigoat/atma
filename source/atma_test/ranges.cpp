@@ -13,6 +13,7 @@ struct is_3_t {
 } const is_3;
 
 
+
 SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 {
 	auto is_even = [](int i) { return i % 2 == 0; };
@@ -90,7 +91,8 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 		{
 			auto result
 				= numbers
-				| atma::filter(is_gte3) * atma::filter(is_even)
+				| atma::filter(is_gte3)
+				| atma::filter(is_even)
 				| atma::as_vector
 				;
 
@@ -128,9 +130,20 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 
 
 
-SCENARIO("ranges can be mapped", "[ranges/map_t]")
+SCENARIO("ranges can be mapped", "[ranges/map]")
 {
 	auto plus_10 = [](int i) { return i + 10; };
+	auto mul_2 = [](int x) { return x * 2; };
+
+	struct noncopyable_negate
+	{
+		noncopyable_negate() = default;
+		noncopyable_negate(noncopyable_negate const&) = delete;
+		noncopyable_negate(noncopyable_negate&&) = default;
+
+		int operator ()(int x) const { return -x; }
+	};
+
 
 	GIVEN("a const lvalue vector of numbers")
 	{
@@ -139,9 +152,37 @@ SCENARIO("ranges can be mapped", "[ranges/map_t]")
 		THEN("basic mapping works")
 		{
 			auto numbers_plus10 = atma::as_vector | atma::map(plus_10, numbers);
-			static_assert(std::is_same_v<decltype(numbers_plus10), atma::vector<int>>);
-			static_assert(std::is_same_v<typename decltype(numbers_plus10)::value_type, int>);
+			
 			CHECK_WHOLE_VECTOR(numbers_plus10, 11, 12, 13, 14);
+		}
+
+		THEN("chaining is great")
+		{
+			auto result = numbers | atma::map(plus_10) | atma::map(mul_2) | atma::as_vector;
+			CHECK_WHOLE_VECTOR(result, 22, 24, 26, 28);
+		}
+
+		THEN("functions can be non-copyable")
+		{
+			noncopyable_negate f{};
+			
+			auto transformer_lv = atma::map(f);
+			auto transformer_rv = atma::map(noncopyable_negate{});
+
+			auto transformed_lv_lv = numbers | transformer_lv;
+			auto transformed_lv_rv = numbers | transformer_rv;
+			auto transformed_rv_lv = numbers | atma::map(f);
+			auto transformed_rv_rv = numbers | atma::map(noncopyable_negate{});
+
+			static_assert(std::is_same_v<typename decltype(transformed_lv_lv)::storage_functor_t, noncopyable_negate&>);
+			static_assert(std::is_same_v<typename decltype(transformed_lv_rv)::storage_functor_t, noncopyable_negate&>);
+			static_assert(std::is_same_v<typename decltype(transformed_rv_lv)::storage_functor_t, noncopyable_negate&>);
+			static_assert(std::is_same_v<typename decltype(transformed_rv_rv)::storage_functor_t, noncopyable_negate>);
+
+			CHECK_WHOLE_VECTOR(transformed_lv_lv | atma::as_vector, 9, 8, 7, 6);
+			CHECK_WHOLE_VECTOR(transformed_lv_rv | atma::as_vector, 9, 8, 7, 6);
+			CHECK_WHOLE_VECTOR(transformed_rv_lv | atma::as_vector, 9, 8, 7, 6);
+			CHECK_WHOLE_VECTOR(transformed_rv_rv | atma::as_vector, 9, 8, 7, 6);
 		}
 	}
 
@@ -154,9 +195,6 @@ SCENARIO("ranges can be mapped", "[ranges/map_t]")
 			auto numbers_plus10 = atma::as_vector | atma::map(plus_10, numbers);
 			CHECK_WHOLE_VECTOR(numbers_plus10, 11, 12, 13, 14);
 		}
-
-		
-
 	}
 
 	GIVEN("an rvalue vector of numbers")
@@ -166,7 +204,7 @@ SCENARIO("ranges can be mapped", "[ranges/map_t]")
 		THEN("transfer of ownership occurs")
 		{
 			auto result = atma::map(plus_10, numbers());
-			static_assert(std::is_same_v<typename std::remove_reference_t<decltype(result)>::storage_container_t, atma::vector<int>>);
+			static_assert(std::is_same_v<typename decltype(result)::target_range_t, atma::vector<int>>);
 		}
 	}
 

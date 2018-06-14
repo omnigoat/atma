@@ -256,13 +256,16 @@ namespace atma::detail
 		auto is_immediate_event = [&](auto&& x) { return is_event(x) && (x->thread_id == thread_id_t{} || x->thread_id == this_thread_id); };
 		auto cast = [](auto&& x) -> binding_info_t<Args...>& { return *static_cast<binding_info_t<Args...>*>(x.get()); };
 
+		auto bindings_of = [&](auto&& x) { return bindings_ | filter(x) | map(cast); };
+
+
 		// no thread specified, free to schedule as normal
 		if (thread_id == thread_id_t{})
 		{
 			std::map<thread_id_t, tuple_type*> argument_store;
 
 			// first, queue all tethered (to other thread) bindings
-			for (auto&& binding : map(cast, filter(is_remote_event, bindings_)))
+			for (auto&& binding : bindings_of(is_remote_event)) //map(cast, filter(is_remote_event, bindings_)))
 			{
 				// create a copy of the arguments for the requested thread (if we haven't already)
 				auto candidate = argument_store.find(binding.thread_id);
@@ -270,9 +273,9 @@ namespace atma::detail
 				{
 					auto tuple_args_ptr = (tuple_type*)threaded_args_resource.allocate(sizeof(tuple_type));
 					new (tuple_args_ptr) tuple_type{args...};
-					auto[riter, r] = argument_store.insert({binding.thread_id, tuple_args_ptr});
+					auto [iter, r] = argument_store.insert({binding.thread_id, tuple_args_ptr});
 					ATMA_ASSERT(r);
-					candidate = riter;
+					candidate = iter;
 				}
 
 				// using the per-thread copy of the arguments, enqueue the command
@@ -283,7 +286,7 @@ namespace atma::detail
 			}
 
 			// enqueue the deletion of the per-thread argument copies
-			for (auto const&[arg_thread_id, tuple_args_ptr] : argument_store)
+			for (auto const& [arg_thread_id, tuple_args_ptr] : argument_store)
 			{
 				atma::enqueue_function_to_queue(
 					per_thread_queue(arg_thread_id),
@@ -291,7 +294,7 @@ namespace atma::detail
 			}
 
 			// execute the rest immediately
-			for (auto&& binding : map(cast, filter(is_immediate_event, bindings_)))
+			for (auto&& binding : bindings_of(is_immediate_event))
 			{
 				std::invoke(binding.f, args...);
 			}
@@ -299,7 +302,7 @@ namespace atma::detail
 		// thread specified, we need to exclude tethered bindings and "move" thread-wandering bindings
 		else
 		{
-			for (auto&& binding : map(cast, filter(is_event, bindings_)))
+			for (auto&& binding : bindings_of(is_event))
 			{
 				// thread-tethered binding for this very thread, run immediately
 				if (binding.thread_id == thread_id && thread_id == this_thread_id)
