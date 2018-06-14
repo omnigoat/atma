@@ -25,7 +25,7 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 		THEN("ownership is transferred")
 		{
 			auto result = atma::filter(is_even, atma::vector<int>{1, 2, 3, 4});
-			static_assert(std::is_same_v<typename decltype(result)::storage_container_t, atma::vector<int>>);
+			static_assert(std::is_same_v<typename decltype(result)::storage_range_t, atma::vector<int>>);
 		}
 
 		THEN("basic filtering works")
@@ -42,7 +42,7 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 		THEN("cvrefness is preserved")
 		{
 			auto result = atma::filter(is_even, numbers);
-			static_assert(std::is_same_v<typename decltype(result)::storage_container_t, atma::vector<int> const&>);
+			static_assert(std::is_same_v<typename decltype(result)::storage_range_t, atma::vector<int> const&>);
 		}
 
 		THEN("basic filtering works")
@@ -58,7 +58,7 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 			auto filtered = partial_filter(numbers);
 			auto result = atma::as_vector | filtered;
 
-			static_assert(std::is_same_v<typename decltype(filtered)::storage_container_t, atma::vector<int> const&>);
+			static_assert(std::is_same_v<typename decltype(filtered)::storage_range_t, atma::vector<int> const&>);
 			CHECK_WHOLE_VECTOR(result, 2, 4);
 		}
 	}
@@ -70,7 +70,7 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 		THEN("cvrefness is preserved")
 		{
 			auto result = atma::filter(is_even, numbers);
-			static_assert(std::is_same_v<typename decltype(result)::storage_container_t, atma::vector<int>&>);
+			static_assert(std::is_same_v<typename decltype(result)::storage_range_t, atma::vector<int>&>);
 		}
 
 		THEN("basic filtering works")
@@ -179,10 +179,10 @@ SCENARIO("ranges can be mapped", "[ranges/map]")
 			static_assert(std::is_same_v<typename decltype(transformed_rv_lv)::storage_functor_t, noncopyable_negate&>);
 			static_assert(std::is_same_v<typename decltype(transformed_rv_rv)::storage_functor_t, noncopyable_negate>);
 
-			CHECK_WHOLE_VECTOR(transformed_lv_lv | atma::as_vector, 9, 8, 7, 6);
-			CHECK_WHOLE_VECTOR(transformed_lv_rv | atma::as_vector, 9, 8, 7, 6);
-			CHECK_WHOLE_VECTOR(transformed_rv_lv | atma::as_vector, 9, 8, 7, 6);
-			CHECK_WHOLE_VECTOR(transformed_rv_rv | atma::as_vector, 9, 8, 7, 6);
+			CHECK_WHOLE_VECTOR(transformed_lv_lv | atma::as_vector, -1, -2, -3, -4);
+			CHECK_WHOLE_VECTOR(transformed_lv_rv | atma::as_vector, -1, -2, -3, -4);
+			CHECK_WHOLE_VECTOR(transformed_rv_lv | atma::as_vector, -1, -2, -3, -4);
+			CHECK_WHOLE_VECTOR(transformed_rv_rv | atma::as_vector, -1, -2, -3, -4);
 		}
 	}
 
@@ -228,4 +228,19 @@ SCENARIO("ranges can be mapped", "[ranges/map]")
 		}
 	}
 
+}
+
+
+SCENARIO("ranges can be zipped", "[ranges/zip]")
+{
+	GIVEN("a const lvalue vector of numbers, and a const lvalue vector of strings")
+	{
+		atma::vector<int> numbers{1, 2, 3, 4};
+		atma::vector<std::string> strings{"hello", "mr", "radio", "your", "friendly", "neighbour"};
+
+//		for (auto&& x : atma::zip(numbers, strings))
+//		{
+//
+//		}
+	}
 }

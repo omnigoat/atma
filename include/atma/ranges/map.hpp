@@ -114,17 +114,17 @@ namespace atma
 		{}
 
 		template <typename R>
-		auto operator ()(R&& xs) const& {
-			return mapped_range_t{xs, fn_};
+		auto operator ()(R&& xs) {
+			return mapped_range_t{std::forward<R>(xs), function()};
 		}
 
 		template <typename R>
-		auto operator ()(R&& xs) const&& {
+		auto operator ()(R&& xs) const {
 			return mapped_range_t{std::forward<R>(xs), function()};
 		}
 
 		decltype(auto) function() &  { return (fn_); }
-		decltype(auto) function() && { return std::forward<decltype(fn_)>(fn_); }
+		decltype(auto) function() && { return std::forward<storage_type_t<F>>(fn_); }
 
 	private:
 		storage_type_t<F> fn_;
