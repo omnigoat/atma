@@ -5,6 +5,7 @@
 #include <atma/ranges/core.hpp>
 
 
+// forward-declares
 namespace atma
 {
 	template <typename R, typename F> struct filtered_range_t;
@@ -17,16 +18,12 @@ namespace atma
 namespace atma::detail
 {
 	template <typename T>
-	struct is_filtered_range
-	{
-		static constexpr bool value = false;
-	};
+	struct is_filtered_range : std::false_type
+	{};
 
 	template <typename R, typename F>
-	struct is_filtered_range<filtered_range_t<R, F>>
-	{
-		static constexpr bool value = true;
-	};
+	struct is_filtered_range<filtered_range_t<R, F>> : std::true_type
+	{};
 
 	template <typename T>
 	inline constexpr bool is_filtered_range_v = is_filtered_range<T>::value;
@@ -271,27 +268,6 @@ namespace atma
 // non-member operators
 namespace atma
 {
-#if 0
-	template <typename F, typename R,
-		CONCEPT_REQUIRES_(
-			detail::is_filter_functor_v<remove_cvref_t<F>>,
-			is_range_v<remove_cvref_t<R>>)>
-	inline auto operator | (F&& lhs, R&& rhs)
-	{
-		if constexpr (detail::is_filtered_range_v<remove_cvref_t<R>>)
-		{
-			auto predicate = [f=lhs.predicate(), g=rhs.predicate()](auto&& x) {
-				return g(std::forward<decltype(x)>(x)) && f(std::forward<decltype(x)>(x)); };
-
-			return filtered_range_t{rhs.source_container(), predicate};
-		}
-		else
-		{
-			return filtered_range_t{std::forward<R>(rhs), lhs.predicate()};
-		}
-	}
-#endif
-
 	template <typename R, typename F,
 		CONCEPT_REQUIRES_(
 			is_range_v<remove_cvref_t<R>>,

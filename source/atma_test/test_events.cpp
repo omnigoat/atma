@@ -18,7 +18,7 @@ using namespace std::chrono_literals;
 		atma::log_level_t::info, nullptr, __FILE__, __LINE__, __VA_ARGS__, "\n")
 
 
-#if 0
+#if 1
 SCENARIO("events can be constructed", "[event]")
 {
 	//rose::runtime_t RR;
@@ -79,25 +79,10 @@ SCENARIO("events can be constructed", "[event]")
 
 		while (fin != 2);
 
-#if 0
-		std::atomic_bool good = true;
-		auto a = std::async([&] {
-
-			e.bind(f);
-			while (good)
-			{
-				es.process_events_for_this_thread();
-			}
-
-		});
-
-		a.wait_for(1s);
-		e.raise(9);
-		e.raise(11);
-		e.raise(2);
-		a.wait_for(1s);
 		good = false;
-#endif
+
+		a.join();
+		b.join();
 	}
 }
 #endif
