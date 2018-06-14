@@ -57,17 +57,18 @@ namespace atma
 	template <typename R, typename F>
 	struct filtered_range_t
 	{
-		using source_container_t  = std::remove_reference_t<R>;
-		using source_iterator_t   = decltype(std::begin(std::declval<source_container_t&>()));
-		using storage_container_t = storage_type_t<R>;
+		using source_range_t     = std::remove_reference_t<R>;
+		using source_iterator_t  = decltype(std::begin(std::declval<source_range_t&>()));
+		using storage_range_t    = storage_type_t<R>;
+		using storage_functor_t  = storage_type_t<F>;
 
-		using value_type      = typename source_container_t::value_type;
-		using reference       = typename source_container_t::reference;
-		using const_reference = typename source_container_t::const_reference;
-		using iterator        = filtered_range_iterator_t<transfer_const_t<source_container_t, filtered_range_t>>;
+		using value_type      = typename source_range_t::value_type;
+		using reference       = typename source_range_t::reference;
+		using const_reference = typename source_range_t::const_reference;
+		using iterator        = filtered_range_iterator_t<transfer_const_t<source_range_t, filtered_range_t>>;
 		using const_iterator  = filtered_range_iterator_t<filtered_range_t const>;
-		using difference_type = typename source_container_t::difference_type;
-		using size_type       = typename source_container_t::size_type;
+		using difference_type = typename source_range_t::difference_type;
+		using size_type       = typename source_range_t::size_type;
 
 		filtered_range_t(filtered_range_t&&);
 		filtered_range_t(filtered_range_t const&) = delete;
@@ -75,9 +76,12 @@ namespace atma
 		template <typename RR, typename FF>
 		filtered_range_t(RR&&, FF&&);
 
-		decltype(auto) source_container()       { return std::forward<storage_container_t>(range_); }
-		decltype(auto) source_container() const { return std::forward<storage_container_t>(range_); }
-		decltype(auto) predicate() const { return (predicate_); }
+		decltype(auto) target_range() &  { return (range_); }
+		decltype(auto) target_range() && { return std::forward<storage_range_t>(range_); }
+		decltype(auto) target_range() const& { return (range_); }
+		decltype(auto) predicate() &  { return (predicate_); }
+		decltype(auto) predicate() && { return std::forward<storage_functor_t>(predicate_); }
+		decltype(auto) predicate() const& { return (predicate_); }
 
 		auto begin() const -> const_iterator;
 		auto end() const -> const_iterator;
@@ -85,10 +89,8 @@ namespace atma
 		auto end() -> iterator;
 
 	private:
-		// if R is an lvalue, const or otherwise, we too are an lvalue.
-		// otherwise, storage-type is a non-reference type, and we are the owner of the container.
-		storage_container_t range_;
-		F predicate_;
+		storage_range_t range_;
+		storage_functor_t predicate_;
 	};
 
 	template <typename R, typename F>
@@ -110,19 +112,17 @@ namespace atma
 		{}
 
 		template <typename R>
-		decltype(auto) operator ()(R&& xs) const &
-		{
-			return filtered_range_t{std::forward<R>(xs), fn_};
+		decltype(auto) operator ()(R&& xs) {
+			return filtered_range_t{std::forward<R>(xs), predicate()};
 		}
 
 		template <typename R>
-		decltype(auto) operator ()(R&& xs) const &&
-		{
-			return filtered_range_t{std::forward<R>(xs), std::forward<storage_functor_t>(fn_)};
+		decltype(auto) operator ()(R&& xs) const {
+			return filtered_range_t{std::forward<R>(xs), predicate()};
 		}
 
-		decltype(auto) predicate() const { return std::forward<storage_functor_t>(fn_); }
-		decltype(auto) predicate()       { return std::forward<storage_functor_t>(fn_); }
+		decltype(auto) predicate() &  { return (fn_); }
+		decltype(auto) predicate() && { return std::forward<storage_functor_t>(fn_); }
 
 	private:
 		storage_functor_t fn_;
@@ -239,11 +239,11 @@ namespace atma
 	template <typename R>
 	inline auto filtered_range_iterator_t<R>::operator ++() -> filtered_range_iterator_t&
 	{
-		ATMA_ASSERT(pos_ != owner_->source_container().end());
+		ATMA_ASSERT(pos_ != owner_->target_range().end());
 
 		do {
 			++pos_;
-		} while (pos_ != owner_->source_container().end() && !std::invoke(owner_->predicate(), *pos_));
+		} while (pos_ != owner_->target_range().end() && !std::invoke(owner_->predicate(), *pos_));
 
 		return *this;
 	}
@@ -279,7 +279,7 @@ namespace atma
 			auto predicate = [f=lhs.predicate(), g=rhs.predicate()](auto&& x) {
 				return std::invoke(f, std::forward<decltype(x)>(x)) && std::invoke(g, std::forward<decltype(x)>(x)); };
 
-			return filtered_range_t{lhs.source_container(), predicate};
+			return filtered_range_t{lhs.target_range(), predicate};
 		}
 		else
 		{
@@ -309,8 +309,8 @@ namespace atma
 		CONCEPT_REQUIRES_(
 			is_range_v<R>,
 			!detail::is_filtered_range_v<R>)>
-	inline auto filter(F&& predicate, R&& container) {
-		return filtered_range_t{std::forward<R>(container), std::forward<F>(predicate)}; }
+	inline auto filter(F&& predicate, R&& range) {
+		return filtered_range_t{std::forward<R>(range), std::forward<F>(predicate)}; }
 
 	// filter: f vs filtered-range<r, g>
 	template <typename F, typename R,
