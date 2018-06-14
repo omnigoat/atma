@@ -651,8 +651,8 @@ namespace atma { namespace unit_test {
 	CHECK_VECTOR_EX(v, , __VA_ARGS__)
 
 #define CHECK_WHOLE_VECTOR(v, ...) \
-	CHECK(v.size() == BOOST_PP_VARIADIC_SIZE(__VA_ARGS__)); \
-	CHECK_VECTOR_EX(v, , __VA_ARGS__)
+	CHECK((v).size() == BOOST_PP_VARIADIC_SIZE(__VA_ARGS__)); \
+	CHECK_VECTOR_EX((v), , __VA_ARGS__)
 
 
 }}
