@@ -236,11 +236,18 @@ SCENARIO("ranges can be zipped", "[ranges/zip]")
 	GIVEN("a const lvalue vector of numbers, and a const lvalue vector of strings")
 	{
 		atma::vector<int> numbers{1, 2, 3, 4};
-		atma::vector<std::string> strings{"hello", "mr", "radio", "your", "friendly", "neighbour"};
+		atma::vector<std::string> strings{"hello", "mr", "radio"};
 
-//		for (auto&& x : atma::zip(numbers, strings))
-//		{
-//
-//		}
+		for (auto&& [n, s] : atma::zip(numbers, strings))
+		{
+			std::cout << "number: " << n << ", string: " << s << std::endl;
+		}
+
+		for (auto&&[n, s] : atma::zip(numbers, strings) | atma::filter([](auto&& n, auto&& s) { return n % 2 == 0; }))
+		{
+			std::cout << "number: " << n << ", string: " << s << std::endl;
+		}
+
+		
 	}
 }

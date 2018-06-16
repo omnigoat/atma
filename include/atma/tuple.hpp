@@ -401,16 +401,14 @@ namespace atma {
 	{
 		template <typename FN, typename Tuple, size_t... idxs>
 		auto tuple_apply_impl(FN&& fn, Tuple&& tuple, idxs_t<idxs...>)
-			-> decltype(auto_tuple(fn(std::get<idxs>(tuple))...))
 		{
-			return auto_tuple(fn(std::get<idxs>(tuple))...);
+			return auto_tuple(std::invoke(std::forward<FN>(fn), std::get<idxs>(tuple))...);
 		}
 
 		template <typename FN, typename LHS, typename RHS, size_t... idxs>
 		auto tuple_binary_apply_impl(FN&& fn, LHS&& lhs, RHS&& rhs, idxs_t<idxs...>)
-			-> decltype(auto_tuple(fn(std::get<idxs>(std::forward<LHS>(lhs)), std::get<idxs>(std::forward<RHS>(rhs)))...))
 		{
-			return auto_tuple(fn(std::get<idxs>(lhs), std::get<idxs>(rhs))...);
+			return auto_tuple(std::invoke(std::forward<FN>(fn), std::get<idxs>(lhs), std::get<idxs>(rhs))...);
 		}
 	}
 
@@ -423,19 +421,19 @@ namespace atma {
 		idxs_list_t<std::tuple_size<std::remove_reference_t<LHS>>::value>()));
 
 	template <typename FN, typename Tuple>
-	auto tuple_apply(FN&& fn, Tuple&& tuple) -> tuple_apply_t<FN, Tuple>
+	auto tuple_apply(FN&& fn, Tuple&& tuple)
 	{
 		return detail::tuple_apply_impl(std::forward<FN>(fn), tuple, idxs_list_t<std::tuple_size<std::remove_reference_t<Tuple>>::value>());
 	}
 
 	template <typename FN, typename LHS, typename RHS>
-	auto tuple_binary_apply(FN&& fn, LHS&& lhs, RHS&& rhs) -> tuple_binary_apply_t<FN, LHS, RHS>
+	auto tuple_binary_apply(FN&& fn, LHS&& lhs, RHS&& rhs)
 	{
-		auto const lhs_size = std::tuple_size<std::decay_t<LHS>>::value;
-		auto const rhs_size = std::tuple_size<std::decay_t<RHS>>::value;
+		auto const lhs_size = std::tuple_size_v<std::remove_reference_t<LHS>>;
+		auto const rhs_size = std::tuple_size_v<std::remove_reference_t<RHS>>;
 		static_assert(lhs_size == rhs_size, "sizes must be the same");
 
-		return detail::tuple_binary_apply_impl(std::forward<FN>(fn), lhs, rhs, idxs_list_t<std::tuple_size<std::remove_reference_t<LHS>>::value>());
+		return detail::tuple_binary_apply_impl(std::forward<FN>(fn), lhs, rhs, idxs_list_t<lhs_size>());
 	}
 
 
@@ -444,8 +442,7 @@ namespace atma {
 	struct begin_functor_t
 	{
 		template <typename T>
-		auto operator ()(T&& t) -> decltype(std::begin(std::forward<T>(t)))
-		{
+		decltype(auto) operator ()(T&& t) const {
 			return std::begin(std::forward<T>(t));
 		}
 	};
@@ -453,8 +450,7 @@ namespace atma {
 	struct end_functor_t
 	{
 		template <typename T>
-		auto operator ()(T&& t) -> decltype(std::end(std::forward<T>(t)))
-		{
+		decltype(auto) operator ()(T&& t) const {
 			return std::end(std::forward<T>(t));
 		}
 	};
@@ -462,73 +458,78 @@ namespace atma {
 	struct increment_functor_t
 	{
 		template <typename T>
-		auto operator ()(T& t) -> decltype(++t)
-		{
-			return ++t;
+		decltype(auto) operator ()(T&& t) const {
+			return ++std::forward<T>(t);
 		}
 	};
 
 	struct eq_functor_t
 	{
 		template <typename LHS, typename RHS>
-		auto operator ()(LHS&& lhs, RHS&& rhs) -> bool
-		{
-			return lhs == rhs;
+		decltype(auto) operator ()(LHS&& lhs, RHS&& rhs) const {
+			return std::forward<LHS>(lhs) == std::forward<RHS>(rhs);
 		}
 	};
 
 	struct neq_functor_t
 	{
 		template <typename LHS, typename RHS>
-		auto operator ()(LHS&& lhs, RHS&& rhs) -> bool
-		{
-			return lhs == rhs;
+		decltype(auto) operator ()(LHS&& lhs, RHS&& rhs) const {
+			return std::forward<LHS>(lhs) != std::forward<RHS>(rhs);
 		}
 	};
 
 	struct dereference_functor_t
 	{
 		template <typename T>
-		auto operator ()(T& t) -> decltype(*t)
-		{
-			return *t;
+		decltype(auto) operator ()(T&& t) const {
+			return *std::forward<T>(t);
 		}
 	};
+
+
 
 	//
 	//
 	//
 	namespace detail
 	{
-		template <size_t idx>
-		struct tuple_any_of_tx
+		template <typename Tuple, size_t... idxs>
+		inline auto tuple_any_of_impl(Tuple&& tuple, std::index_sequence<idxs...>) -> bool
 		{
-			template <typename T2>
-			static auto apply(T2&& tuple) -> bool
-			{
-				return std::get<idx>(std::forward<T2>(tuple)) || tuple_any_of_tx<idx - 1>::apply(std::forward<T2>(tuple));
-			}
-		};
+			return (std::get<idxs>(tuple) || ...);
+		}
 
-		template <>
-		struct tuple_any_of_tx<0>
+		template <typename Tuple, size_t... idxs>
+		inline auto tuple_all_of_impl(Tuple&& tuple, std::index_sequence<idxs...>) -> bool
 		{
-			template <typename T2>
-			static auto apply(T2&& tuple) -> bool
-			{
-				return std::get<0>(std::forward<T2>(tuple));
-			}
-		};
+			return (std::get<idxs>(tuple) && ...);
+		}
 	}
 	
 	template <typename Tuple>
 	inline auto tuple_any_of(Tuple&& tuple) -> bool
 	{
-		return detail::tuple_any_of_tx<std::tuple_size<std::remove_reference_t<Tuple>>::value - 1>::apply(std::forward<Tuple>(tuple));
+		return detail::tuple_any_of_impl(tuple, std::make_index_sequence<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
+	}
+
+	template <typename Tuple>
+	inline auto tuple_all_of(Tuple&& tuple) -> bool
+	{
+		return detail::tuple_all_of_impl(tuple, std::make_index_sequence<std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
 	}
 
 
+	template <typename LHS, typename RHS>
+	auto tuple_all_elem_eq(LHS&& lhs, RHS&& rhs) -> bool
+	{
+		auto const lhs_size = std::tuple_size<std::decay_t<LHS>>::value;
+		auto const rhs_size = std::tuple_size<std::decay_t<RHS>>::value;
+		static_assert(lhs_size == rhs_size, "sizes must be the same");
 
+		auto vs = tuple_binary_apply(eq_functor_t(), lhs, rhs);
+		return tuple_all_of(vs);
+	}
 
 	template <typename LHS, typename RHS>
 	auto tuple_any_elem_eq(LHS&& lhs, RHS&& rhs) -> bool
