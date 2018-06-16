@@ -4,6 +4,10 @@
 
 namespace atma
 {
+	template <typename...> struct zip_range_t;
+	template <typename...> struct zip_range_iterator_t;
+	template <typename...> struct zip_range_sentinel_t;
+
 	namespace detail
 	{
 		template <typename C>
@@ -14,77 +18,107 @@ namespace atma
 			using type = std::conditional_t<std::is_const<C2>::value, typename C2::const_iterator, typename C2::iterator>;
 		};
 	}
+}
 
-	template <typename...> struct zip_range_t;
-	template <typename...> struct zip_range_iterator_t;
-
-
+// zip_range_t
+namespace atma
+{
 	template <typename... Ranges>
 	struct zip_range_t
 	{
-		using value_type      = std::tuple<typename std::remove_reference<Ranges>::type::value_type...>;
-		using reference       = std::tuple<typename std::remove_reference<Ranges>::type::reference...>;
-		using const_reference = std::tuple<typename std::remove_reference<Ranges>::type::const_reference...>;
+		using value_type      = std::tuple<typename std::remove_reference_t<Ranges>::value_type...>;
+		using reference       = std::tuple<typename std::remove_reference_t<Ranges>::reference...>;
+		using const_reference = std::tuple<typename std::remove_reference_t<Ranges>::const_reference...>;
 		using iterator        = zip_range_iterator_t<Ranges...>;
 		using const_iterator  = zip_range_iterator_t<Ranges const...>;
-
-		// seriously: what.
 		using difference_type = ptrdiff_t;
 		using size_type       = size_t;
-
 
 		zip_range_t(Ranges... ranges);
 
 		auto begin() -> iterator;
-		auto end() -> iterator;
+		auto end() -> zip_range_sentinel_t<Ranges...>;
 		auto begin() const -> const_iterator;
-		auto end() const -> const_iterator;
+		auto end() const -> zip_range_sentinel_t<Ranges...>;
 
 	private:
 		std::tuple<Ranges...> ranges_;
 	};
 
+	template <typename... Ranges>
+	zip_range_t(Ranges&&... ranges) -> zip_range_t<Ranges...>;
 
+}
+
+// zip_range_iterator_t
+namespace atma
+{
+	template <typename T>
+	struct membertype_value_type {
+		using type = typename std::remove_reference_t<T>::value_type;
+	};
+
+	template <typename T>
+	struct membertype_reference {
+		using type = typename std::remove_reference_t<T>::reference;
+	};
 
 	template <typename... Ranges>
-	struct zip_range_iterator_t
+	struct zip_range_iterator_t<Ranges...>
 	{
 		using range_tuple_type = std::tuple<Ranges...>;
 
-		using iterator_category = std::forward_iterator_tag;
-		using value_type        = std::tuple<typename std::remove_reference<Ranges>::type::value_type...>;
 		using difference_type   = ptrdiff_t;
-		using distance_type     = ptrdiff_t;
+		using value_type        = tuple_map_t<membertype_value_type, range_tuple_type>;
 		using pointer           = value_type*;
-		using reference         = std::tuple<typename std::remove_reference<Ranges>::type::reference...>;
+		using reference         = std::tuple<typename std::remove_reference_t<Ranges>::reference...>;
+		using const_reference   = std::tuple<typename std::remove_reference_t<Ranges>::const_reference...>;
+		using iterator_category = std::forward_iterator_tag;
 
 
-		using internal_iters_tuple_t = std::tuple<typename detail::zip_internal_range_iterator_t<Ranges>::type...>;
+		using internal_iters_tuple_t = std::tuple<decltype(std::begin(std::declval<Ranges&>()))...>;
 
 		zip_range_iterator_t(internal_iters_tuple_t const& iters);
 
+		auto operator  *() const -> reference;
 		auto operator ++() -> zip_range_iterator_t&;
-		auto operator  *() -> reference;
-		auto operator  *() const -> reference const;
+
+		auto base() const -> internal_iters_tuple_t const& { return iters_; }
+		auto base() -> internal_iters_tuple_t& { return iters_; }
 
 	private:
 		internal_iters_tuple_t iters_;
-
-		template <typename... Ranges>
-		friend auto operator == (zip_range_iterator_t<Ranges...> const& lhs, zip_range_iterator_t<Ranges...> const& rhs) -> bool;
 	};
 
 
+	template <typename... Ranges>
+	struct zip_range_sentinel_t : zip_range_iterator_t<Ranges...>
+	{
+		using zip_range_iterator_t<Ranges...>::zip_range_iterator_t;
 
+		//operator zip_range_iterator_t<Ranges...>&() { return static_cast<zip_range_iterator_t<Ranges...>&>(*this); }
+		//operator zip_range_iterator_t<Ranges...> const&() const { return static_cast<zip_range_iterator_t<Ranges...>&>(*this); }
+	};
+}
 
-	//======================================================================
-	// RANGE IMPLEMENTATION
-	//======================================================================
+namespace std
+{
+	template <typename... Ranges>
+	struct common_type<atma::zip_range_iterator_t<Ranges...>, atma::zip_range_sentinel_t<Ranges...>>
+	{
+		using type = atma::zip_range_iterator_t<Ranges...>;
+	};
+}
+
+//======================================================================
+// RANGE IMPLEMENTATION
+//======================================================================
+namespace atma
+{
 	template <typename... Ranges>
 	zip_range_t<Ranges...>::zip_range_t(Ranges... ranges)
 		: ranges_{ranges...}
-	{
-	}
+	{}
 
 	template <typename... Ranges>
 	auto zip_range_t<Ranges...>::begin() -> iterator
@@ -93,9 +127,9 @@ namespace atma
 	}
 
 	template <typename... Ranges>
-	auto zip_range_t<Ranges...>::end() -> iterator
+	auto zip_range_t<Ranges...>::end() -> zip_range_sentinel_t<Ranges...>
 	{
-		return {atma::tuple_apply(atma::end_functor_t(), ranges_)};
+		return zip_range_sentinel_t<Ranges...>{atma::tuple_apply(atma::end_functor_t(), ranges_)};
 	}
 
 	template <typename... Ranges>
@@ -105,47 +139,72 @@ namespace atma
 	}
 
 	template <typename... Ranges>
-	auto zip_range_t<Ranges...>::end() const -> const_iterator
+	auto zip_range_t<Ranges...>::end() const -> zip_range_sentinel_t<Ranges...>
 	{
-		return {atma::tuple_apply(atma::end_functor_t(), ranges_)};
+		return zip_range_sentinel_t<Ranges...>{atma::tuple_apply(atma::end_functor_t(), ranges_)};
 	}
+}
 
 
-
-	//======================================================================
-	// ITERATOR IMPLEMENTATION
-	//======================================================================
+//======================================================================
+// ITERATOR IMPLEMENTATION
+//======================================================================
+namespace atma
+{
 	template <typename... Ranges>
 	zip_range_iterator_t<Ranges...>::zip_range_iterator_t(internal_iters_tuple_t const& iters)
 		: iters_{iters}
-	{
-	}
+	{}
 
 	template <typename... Ranges>
 	auto zip_range_iterator_t<Ranges...>::operator ++ () -> zip_range_iterator_t&
 	{
-		atma::tuple_apply(atma::increment_functor_t(), iters_);
+		atma::tuple_apply(atma::increment_functor_t(), base());
 		return *this;
 	}
 
 	template <typename... Ranges>
-	auto zip_range_iterator_t<Ranges...>::operator *() -> reference
+	auto zip_range_iterator_t<Ranges...>::operator *() const -> reference
 	{
-		return atma::tuple_apply(atma::dereference_functor_t(), iters_);
+		return tuple_apply(atma::dereference_functor_t{}, base());
 	}
 
 	template <typename... Ranges>
-	auto operator != (zip_range_iterator_t<Ranges...> const& lhs, zip_range_iterator_t<Ranges...> const& rhs) -> bool
+	inline auto operator == (zip_range_iterator_t<Ranges...> const& lhs, zip_range_iterator_t<Ranges...> const& rhs) -> bool
 	{
-		return atma::tuple_any_elem_neq(lhs.iters_, rhs.iters_);
+		return atma::tuple_all_elem_eq(lhs.base(), rhs.base());
 	}
 
-
-
+	template <typename... Ranges>
+	inline auto operator == (zip_range_iterator_t<Ranges...> const& lhs, zip_range_sentinel_t<Ranges...> const& rhs) -> bool
+	{
+		// an iterator equals the sentinel the moment any of its internal iterators are EOF
+		return atma::tuple_any_elem_eq(lhs.base(), rhs.base());
+	}
 
 	template <typename... Ranges>
-	inline auto zip(Ranges&&... ranges) -> zip_range_t<Ranges...>
+	inline auto operator != (zip_range_iterator_t<Ranges...> const& lhs, zip_range_iterator_t<Ranges...> const& rhs) -> bool
 	{
-		return {std::forward<Ranges>(ranges)...};
+		return !operator == (lhs, rhs);
+	}
+
+	template <typename... Ranges>
+	inline auto operator != (zip_range_iterator_t<Ranges...> const& lhs, zip_range_sentinel_t<Ranges...> const& rhs) -> bool
+	{
+		// an iterator equals the sentinel the moment any of its internal iterators are EOF
+		return !atma::tuple_any_elem_eq(lhs.base(), rhs.base());
+	}
+}
+
+
+//======================================================================
+// NON-MEMBER FUNCTIONS
+//======================================================================
+namespace atma
+{
+	template <typename... Ranges>
+	inline auto zip(Ranges&&... ranges)
+	{
+		return zip_range_t{std::forward<Ranges>(ranges)...};
 	}
 }

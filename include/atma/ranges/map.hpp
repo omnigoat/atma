@@ -2,6 +2,7 @@
 
 #include <atma/function_traits.hpp>
 #include <atma/function.hpp>
+#include <atma/ranges/core.hpp>
 
 
 // forward-declares
@@ -216,7 +217,7 @@ namespace atma
 	template <typename R>
 	inline auto mapped_range_iterator_t<R>::operator *() const -> invoke_result_t
 	{
-		return std::invoke(owner_->fn_, *pos_);
+		return range_function_invoke(owner_->fn_, *pos_);
 	}
 
 	template <typename R>
