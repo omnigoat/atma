@@ -217,6 +217,12 @@
     <ClInclude Include="..\..\include\atma\ranges\core.hpp">
       <Filter>include\ranges</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\atma\ranges\iota.hpp">
+      <Filter>include\ranges</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\atma\meta.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\resources\atma.natvis" />

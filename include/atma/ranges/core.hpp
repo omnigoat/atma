@@ -29,6 +29,7 @@ namespace atma
 	inline constexpr bool is_range_v = detail::is_range<T>::value;
 }
 
+// range_function_invoke
 namespace atma
 {
 	namespace detail
@@ -61,3 +62,41 @@ namespace atma
 		return detail::range_function_invoke_impl(std::forward<F>(f), std::forward<Arg>(arg));
 	}
 }
+
+// ranges::for_each
+namespace atma
+{
+	template <typename F>
+	struct for_each_fn
+	{
+		template <typename FF>
+		for_each_fn(FF&& f)
+			: f_{std::forward<FF>(f)}
+		{}
+
+		template <typename R>
+		void operator ()(R&& range) const
+		{
+			for (auto&& x : std::forward<R>(range))
+				std::invoke(f_, std::forward<decltype(x)>(x));
+		}
+
+	private:
+		F f_;
+	};
+
+	template <typename R, typename F,
+		CONCEPT_REQUIRES_(is_range_v<remove_cvref_t<R>>)>
+	inline auto operator | (R&& range, for_each_fn<F> const& f) -> void
+	{
+		f(std::forward<R>(range));
+	}
+
+	template <typename F>
+	inline auto for_each(F&& f)
+	{
+		return for_each_fn<F>{std::forward<F>(f)};
+	}
+}
+
+

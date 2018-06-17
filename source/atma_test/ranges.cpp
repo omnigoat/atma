@@ -2,7 +2,7 @@
 
 #include <atma/algorithm.hpp>
 #include <atma/vector.hpp>
-
+#include <atma/meta.hpp>
 
 // used below
 struct is_3_t {
@@ -13,6 +13,14 @@ struct is_3_t {
 } const is_3;
 
 
+template <typename T, typename U,
+	CONCEPT_REQUIRES_((atma::concepts::SameC<T, U>()))
+>
+auto operator % (T&& lhs, U&& rhs)
+{
+	return "chicken";
+}
+
 
 SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 {
@@ -22,6 +30,11 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 
 	GIVEN("a prvalue vector of numbers")
 	{
+		struct dragon_t {};
+		struct knight_t {};
+
+		auto r = dragon_t{} % dragon_t{};
+
 		THEN("ownership is transferred")
 		{
 			auto result = atma::filter(is_even, atma::vector<int>{1, 2, 3, 4});
@@ -162,6 +175,19 @@ SCENARIO("ranges can be mapped", "[ranges/map]")
 			CHECK_WHOLE_VECTOR(result, 22, 24, 26, 28);
 		}
 
+		THEN("for-each works I guess?")
+		{
+			atma::vector<int> compar{22, 24, 26, 28};
+			auto b = compar.begin();
+
+			numbers 
+				| atma::map(plus_10)
+				| atma::map(mul_2)
+				| atma::for_each([&b](auto&& x) {
+					CHECK(x == *b++);
+				});
+		}
+
 		THEN("functions can be non-copyable")
 		{
 			noncopyable_negate f{};
@@ -238,14 +264,19 @@ SCENARIO("ranges can be zipped", "[ranges/zip]")
 		atma::vector<int> numbers{1, 2, 3, 4};
 		atma::vector<std::string> strings{"hello", "mr", "radio"};
 
-		for (auto&& [n, s] : atma::zip(numbers, strings))
 		{
-			std::cout << "number: " << n << ", string: " << s << std::endl;
+			int count = 0;
+			for (auto&& [n, s] : atma::zip(numbers, strings))
+				++count;
+			CHECK(count == 3);
 		}
 
-		for (auto&&[n, s] : atma::zip(numbers, strings) | atma::filter([](auto&& n, auto&& s) { return n % 2 == 0; }))
 		{
-			std::cout << "number: " << n << ", string: " << s << std::endl;
+			int count = 0;
+			auto number_was_even = [](auto&& n, auto&& s) { return n % 2 == 0; };
+			for (auto&&[n, s] : atma::zip(numbers, strings) | atma::filter(number_was_even))
+				++count;
+			CHECK(count == 1);
 		}
 
 		
