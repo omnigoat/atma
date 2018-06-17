@@ -27,7 +27,7 @@ SCENARIO("events can be constructed", "[event]")
 	std::atomic_int fin{};
 	auto f = [&](int x)
 	{
-		TEST_LOG("thread: ", std::this_thread::get_id(), ", x: ", x);
+		//TEST_LOG("thread: ", std::this_thread::get_id(), ", x: ", x);
 		if (x == 37)
 			++fin;
 	};
