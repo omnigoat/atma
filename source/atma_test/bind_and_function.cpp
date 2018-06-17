@@ -350,7 +350,8 @@ SCENARIO("functions can be constructed")
 
 	GIVEN("something")
 	{
-		std::function<void()> stdf = [] { std::cout << 4 << std::endl; };
+		int resulty = 0;
+		std::function<void()> stdf = [&resulty] { resulty = 4; };
 
 		uint32_t u32a, u32b;
 		uint64_t u64a, u64this;
@@ -375,6 +376,8 @@ SCENARIO("functions can be constructed")
 
 		auto g = (FN*)buf2;
 		(*g)();
+
+		CHECK(resulty == 4);
 	}
 
 }
