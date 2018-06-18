@@ -1,7 +1,10 @@
 #pragma once
 
+#include <atma/meta.hpp>
+
 #include <boost/preprocessor/variadic/to_seq.hpp>
 #include <boost/preprocessor/seq/for_each_i.hpp>
+
 
 // valid_expr, is_true, is_false
 namespace atma::concepts
