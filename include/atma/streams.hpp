@@ -260,13 +260,13 @@ namespace atma
 
 namespace atma
 {
-	template <typename FunctionType>
+	template <typename... Args>
 	struct reactive_stream_t : stream_t
 	{
-		auto subscribe(atma::function<FunctionType> const&) -> void;
+		auto subscribe(atma::function<void(Args...)> const&) -> void;
 
 	protected:
-		event_t event_;
+		event_t<Args...> event_;
 	};
 
 	template <typename T>
