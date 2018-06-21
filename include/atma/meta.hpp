@@ -17,17 +17,17 @@ namespace atma::meta
 	template <typename T = void>
 	struct any_
 	{
-		any_() = default;
-		any_(T&&)
+		constexpr any_() = default;
+		constexpr any_(T&&)
 		{}
 	};
 
 	template <>
 	struct any_<void>
 	{
-		any_() = default;
+		constexpr any_() = default;
 		template <typename T>
-		any_(T&&)
+		constexpr any_(T&&)
 		{}
 	};
 
@@ -196,6 +196,12 @@ namespace atma::meta
 		template <typename x, typename y>
 		using invoke = integral_constant_of<x() && y()>;
 	};
+
+	template <typename... xs>
+	using all = fold<and_op, bool_<true>, list<xs...>>;
+
+	template <typename... xs>
+	inline constexpr bool all_v = all<xs...>::value;
 }
 
 
