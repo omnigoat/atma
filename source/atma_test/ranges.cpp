@@ -13,14 +13,50 @@ struct is_3_t {
 } const is_3;
 
 
+struct result_t {};
+
 template <typename T, typename U,
-	CONCEPT_REQUIRES_((atma::concepts::SameC<T, U>()))
+	CONCEPT_REQUIRES_((atma::concepts::SameConcept<T, U>()))
 >
-auto operator % (T&& lhs, U&& rhs)
+auto operator % (T&& lhs, U&& rhs) -> result_t
 {
-	return "chicken";
+	return result_t{};
 }
 
+namespace tc
+{
+	using namespace atma;
+
+	
+	struct Same
+	{
+		template <typename... Ts>
+		struct same : std::true_type {};
+
+		template <typename T, typename... Us>
+		struct same<T, Us...> : meta::fold<meta::and_op, meta::list<meta::bool_<std::is_same<T, Us>::value>...>> {};
+
+		template<typename ...Ts>
+		using same_t = typename same<Ts...>::type;
+
+		template <typename... Ts>
+		auto contract() -> concepts::contract<
+				concepts::is_true<std::is_same<Ts...>>
+			>;
+
+#if 0
+		template<typename ...Ts>
+		auto contract() -> decltype(
+			concepts::contract(
+				concepts::is_true(same_t<Ts...>{})
+			));
+#endif // 0
+
+	};
+
+	template <typename... Ts>
+	using SameConcept = typename Same::same<Ts...>::type; //<Same, Ts...>;  // Same::same_t<Ts...>; // This handles void better than using the Same concept
+}
 
 SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 {
@@ -30,8 +66,21 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 
 	GIVEN("a prvalue vector of numbers")
 	{
+		using namespace atma;
+
 		struct dragon_t {};
 		struct knight_t {};
+
+		static_assert( atma::concepts::Same::template same<dragon_t, dragon_t>::value);
+		static_assert(!atma::concepts::Same::template same<knight_t, dragon_t>::value);
+
+		static_assert( concepts::contract<concepts::is_true<std::is_same<int, int>>>::value );
+
+
+		static_assert( concepts::models<tc::Same, dragon_t, dragon_t>::value);
+		static_assert(!concepts::models<tc::Same, knight_t, dragon_t>::value);
+
+		static_assert(std::is_same_v<decltype(knight_t{} % knight_t{}), result_t>);
 
 		auto r = dragon_t{} % dragon_t{};
 
