@@ -159,9 +159,8 @@ namespace atma::meta
 			using type = typename fold_impl<F, invoke<F, I, XH>, list<Xs...>>::type;
 		};
 
-
 		// fold_pick: pick which fold function to use (init value or no)
-		template <typename Args>
+		template <typename>
 		struct fold_pick;
 
 		template <typename F, typename I, typename... Xs>
@@ -189,7 +188,7 @@ namespace atma::meta
 }
 
 
-// and_op
+// logical operators
 namespace atma::meta
 {
 	struct and_op {
@@ -197,11 +196,21 @@ namespace atma::meta
 		using invoke = integral_constant_of<x() && y()>;
 	};
 
-	template <typename... xs>
-	using all = fold<and_op, bool_<true>, list<xs...>>;
+	struct or_op {
+		template <typename x, typename y>
+		using invoke = integral_constant_of<x() || y()>;
+	};
+}
 
-	template <typename... xs>
-	inline constexpr bool all_v = all<xs...>::value;
+
+// all/any
+namespace atma
+{
+	template <typename list>
+	using all = fold<and_op, bool_<true>, list>;
+
+	template <typename list>
+	using any = fold<or_op, bool_<false>, list>;
 }
 
 

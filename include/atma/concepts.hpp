@@ -215,20 +215,16 @@ namespace atma::concepts
 		struct same : std::true_type {};
 		
 		template <typename T, typename... Us>
-		struct same<T, Us...> : meta::fold<meta::and_op, meta::list<meta::bool_<std::is_same<T, Us>::value>...>> {};
+		struct same<T, Us...> : meta::all<meta::list<meta::bool_<std::is_same<T, Us>::value>...>>{};
 
 		template<typename ...Ts>
 		using same_t = typename same<Ts...>::type;
 
 		template<typename ...Ts>
-		auto contract() -> decltype(
-			concepts::contract(
-				concepts::is_true(same_t<Ts...>{})
-			));
+		auto contract() -> contract<
+			is_true<same_t<Ts...>>
+		>;
 	};
-
-	template <typename... Ts>
-	using SameConcept = typename Same::same<Ts...>::type; //<Same, Ts...>;  // Same::same_t<Ts...>; // This handles void better than using the Same concept
 }
 
 

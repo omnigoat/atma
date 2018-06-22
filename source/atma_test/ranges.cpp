@@ -23,41 +23,6 @@ auto operator % (T&& lhs, U&& rhs) -> result_t
 	return result_t{};
 }
 
-namespace tc
-{
-	using namespace atma;
-
-	
-	struct Same
-	{
-		template <typename... Ts>
-		struct same : std::true_type {};
-
-		template <typename T, typename... Us>
-		struct same<T, Us...> : meta::fold<meta::and_op, meta::list<meta::bool_<std::is_same<T, Us>::value>...>> {};
-
-		template<typename ...Ts>
-		using same_t = typename same<Ts...>::type;
-
-		template <typename... Ts>
-		auto contract() -> concepts::contract<
-				concepts::is_true<std::is_same<Ts...>>
-			>;
-
-#if 0
-		template<typename ...Ts>
-		auto contract() -> decltype(
-			concepts::contract(
-				concepts::is_true(same_t<Ts...>{})
-			));
-#endif // 0
-
-	};
-
-	template <typename... Ts>
-	using SameConcept = typename Same::same<Ts...>::type; //<Same, Ts...>;  // Same::same_t<Ts...>; // This handles void better than using the Same concept
-}
-
 SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 {
 	auto is_even = [](int i) { return i % 2 == 0; };
@@ -77,8 +42,11 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 		static_assert( concepts::contract<concepts::is_true<std::is_same<int, int>>>::value );
 
 
-		static_assert( concepts::models<tc::Same, dragon_t, dragon_t>::value);
-		static_assert(!concepts::models<tc::Same, knight_t, dragon_t>::value);
+		static_assert( concepts::models<concepts::Same, dragon_t, dragon_t>::value);
+		static_assert(!concepts::models<concepts::Same, knight_t, dragon_t>::value);
+
+		static_assert(!concepts::models<concepts::Same, knight_t, void>::value);
+		static_assert(!concepts::models<concepts::Same, void, dragon_t>::value);
 
 		static_assert(std::is_same_v<decltype(knight_t{} % knight_t{}), result_t>);
 
