@@ -86,7 +86,7 @@ namespace atma
 		// the actual short that was in our freemask
 		uint16 freemask_short = 0;
 
-		inline static emptiness_report_t const empty;
+		static emptiness_report_t const empty;
 
 		auto new_freemask_short() const -> uint16 { return freemask_short | (((1 << requested_blocks) - 1) << bit_idx); }
 		auto block_idx() const { return short_idx * 16 + bit_idx; }

@@ -395,7 +395,7 @@ namespace atma {
 			{}
 
 			template <typename... Args>
-			auto operator ()(Args&&... args) const -> decltype(call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...)))
+			decltype(auto) operator ()(Args&&... args) const
 			{
 				return call_fn_bound_tuple(fn_, bindings_, std::forward_as_tuple(args...));
 			}
