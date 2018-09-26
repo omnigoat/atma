@@ -11,27 +11,27 @@ namespace atma::meta
 	inline constexpr T* nullptr_ = nullptr;
 }
 
-// any
+// any_t
 namespace atma::meta
 {
 	template <typename T = void>
-	struct any_
+	struct any_t_
 	{
-		constexpr any_() = default;
-		constexpr any_(T&&)
+		constexpr any_t_() = default;
+		constexpr any_t_(T&&)
 		{}
 	};
 
 	template <>
-	struct any_<void>
+	struct any_t_<void>
 	{
-		constexpr any_() = default;
+		constexpr any_t_() = default;
 		template <typename T>
-		constexpr any_(T&&)
+		constexpr any_t_(T&&)
 		{}
 	};
 
-	using any = any_<>;
+	using any_t = any_t_<>;
 }
 
 // list
@@ -204,7 +204,7 @@ namespace atma::meta
 
 
 // all/any
-namespace atma
+namespace atma::meta
 {
 	template <typename list>
 	using all = fold<and_op, bool_<true>, list>;

@@ -3,6 +3,7 @@
 #include <atma/algorithm.hpp>
 #include <atma/vector.hpp>
 #include <atma/meta.hpp>
+#include <atma/concepts.hpp>
 
 // used below
 struct is_3_t {
@@ -16,7 +17,7 @@ struct is_3_t {
 struct result_t {};
 
 template <typename T, typename U,
-	CONCEPT_REQUIRES_((atma::concepts::SameConcept<T, U>()))
+	CONCEPT_MODELS_(atma::concepts::Same, T, U)
 >
 auto operator % (T&& lhs, U&& rhs) -> result_t
 {
@@ -39,7 +40,7 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 		static_assert( atma::concepts::Same::template same<dragon_t, dragon_t>::value);
 		static_assert(!atma::concepts::Same::template same<knight_t, dragon_t>::value);
 
-		static_assert( concepts::contract<concepts::is_true<std::is_same<int, int>>>::value );
+		static_assert( concepts::specifies<concepts::is_true<std::is_same<int, int>>>::value );
 
 
 		static_assert( concepts::models<concepts::Same, dragon_t, dragon_t>::value);
@@ -96,6 +97,8 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 	GIVEN("a non-const lvalue vector of numbers")
 	{
 		auto numbers = atma::vector<int>{1, 2, 3, 4};
+		static_assert(atma::concepts::models<atma::range_concept, decltype(numbers)>::value);
+		static_assert(!atma::concepts::models<atma::range_concept, int>::value );
 
 		THEN("cvrefness is preserved")
 		{

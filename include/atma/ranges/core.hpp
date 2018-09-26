@@ -6,7 +6,7 @@
 
 
 //======================================================================
-// atma  detail  is_range_v
+//  is_range_v
 //======================================================================
 namespace atma
 {
@@ -29,6 +29,15 @@ namespace atma
 
 	template <typename T>
 	inline constexpr bool is_range_v = detail::is_range<T>::value;
+
+	struct range_concept
+	{
+		template <typename T>
+		auto contract() -> concepts::specifies<
+			SPECIFIES_EXPR(std::begin(std::declval<T>())),
+			SPECIFIES_EXPR(std::end(std::declval<T>()))
+		>;
+	};
 }
 
 // range_function_invoke
@@ -88,7 +97,7 @@ namespace atma
 	};
 
 	template <typename R, typename F,
-		CONCEPT_REQUIRES_(is_range_v<remove_cvref_t<R>>)>
+		CONCEPT_MODELS_(range_concept, remove_cvref_t<R>)>
 	inline auto operator | (R&& range, for_each_fn<F> const& f) -> void
 	{
 		f(std::forward<R>(range));

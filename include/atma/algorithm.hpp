@@ -18,7 +18,7 @@ namespace atma
 
 	template <typename C, typename F>
 	void sort(C& container, F&& pred)
-		{ std::sort(container.begin(), container.end(), std::forward<F>(f)); }
+		{ std::sort(container.begin(), container.end(), std::forward<F>(pred)); }
 
 
 
@@ -262,8 +262,6 @@ namespace atma
 	template <typename IT, typename I, typename F>
 	inline auto foldl(IT const& begin, IT const& end, I&& initial, F&& fn) -> std::decay_t<I>
 	{
-		ATMA_ASSERT(!range.empty());
-
 		auto r = initial;
 
 		for (auto i = begin; i != end; ++i)
