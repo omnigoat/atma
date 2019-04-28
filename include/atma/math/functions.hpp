@@ -27,6 +27,11 @@ namespace atma::math
 	{
 		return x && (x & (x - 1)) == 0;
 	}
+
+	constexpr auto is_pow2(size_t x) -> bool
+	{
+		return x && (x & (x - 1)) == 0;
+	}
 }
 
 namespace aml = atma::math;
