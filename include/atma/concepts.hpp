@@ -6,45 +6,9 @@
 #include <boost/preprocessor/seq/for_each_i.hpp>
 
 
-// contract, is_true, is_false
+// specifies, is_true, is_false
 namespace atma::concepts
 {
-#if 0
-
-#if 1
-	constexpr struct contract_t
-	{
-		template<typename ...T>
-		void operator()(T &&...) const;
-	} contract2{};
-
-	template <typename... Args>
-	struct contract : decltype(contract2(Args...))
-	{};
-
-	namespace detail
-	{
-		template <bool> struct is_true_ii;
-		template <> struct is_true_ii<true> {};
-	}
-
-	template <typename Arg>
-	using is_true = detail::is_true_ii<Arg::type::value>;
-#else
-	template <typename... Args>
-	constexpr void contract(Args&&...);
-
-	template <typename Bool_>
-	constexpr auto is_true(Bool_) ->
-		std::enable_if_t<Bool_::value, int>;
-
-	template <typename Bool_>
-	constexpr auto is_false(Bool_) ->
-		std::enable_if_t<!Bool_::value, int>;
-#endif
-
-#else
-	
 	namespace detail
 	{
 		template <typename Arg>
@@ -56,13 +20,13 @@ namespace atma::concepts
 			std::enable_if_t<!Arg::value, std::true_type>;
 
 		template <typename... Args>
-		constexpr void contract_(Args&&...);
+		constexpr void specifies_(Args&&...);
 	}
 
 	template <typename... Args>
-	struct contract
+	struct specifies
 	{
-		using type = decltype(detail::contract_(Args{}...));
+		using type = decltype(detail::specifies_(Args{}...));
 		constexpr static auto value = true;
 	};
 
@@ -73,21 +37,8 @@ namespace atma::concepts
 	template <typename Arg, typename = decltype(detail::is_false_(Arg{}))>
 	struct is_false : std::true_type {};
 
-	
-	constexpr struct is_true_t
-	{
-		template<typename Bool_>
-		auto operator()(Bool_) const ->
-			std::enable_if_t<Bool_::value, int>;
-	} sis_true{};
-
-	constexpr struct is_false_t
-	{
-		template<typename Bool_>
-		auto operator()(Bool_) const ->
-			std::enable_if_t<!Bool_::value, int>;
-	} is_false{};
-#endif
+	template <typename Arg>
+	struct has : std::true_type {};
 }
 
 
@@ -151,6 +102,9 @@ namespace atma::concepts
 		: meta::bool_<decltype(detail::models_<Ts...>(meta::nullptr_<Concept>))::type::value>
 	{};
 
+	template <typename Concept, typename... Ts>
+	inline constexpr bool models_v = models<Concept, Ts...>::value;
+
 	template<typename Concept, typename... Ts>
 	auto model_of(Ts&&...) ->
 		std::enable_if_t<models<Concept, Ts...>::value>;
@@ -173,37 +127,58 @@ namespace atma::concepts
 	};
 }
 
-// concept: Integrals
+// concept: integrals
 namespace atma::concepts
 {
-	struct Integral
+	struct integral
 	{
 		template <typename T>
-		auto contract()  -> decltype(
-			concepts::contract(
-				concepts::is_true(std::is_signed<T>{})
-			));
+		auto contract() -> specifies<
+			is_true<std::is_integral<T>>
+		>;
 	};
 
-	struct SignedIntegral
-		: refines<Integral>
+	struct signed_integral
+		: refines<integral>
 	{
 		template <typename T>
-		auto contract() -> decltype(
-			concepts::contract(
-				concepts::is_true(std::is_signed<T>{})
-			));
+		auto contract() -> specifies<
+			is_true<std::is_signed<T>>
+		>;
 	};
 
-	struct UnsignedIntegral
-		: refines<Integral>
+	struct unsigned_integral
+		: refines<integral>
 	{
 		template <typename T>
-		auto contract() -> decltype(
-			concepts::contract(
-				concepts::is_false(std::is_signed<T>{})
-			));
+		auto contract() -> specifies<
+			is_false<std::is_unsigned<T>>
+		>;
 	};
+}
+
+// concepts: conversion
+namespace atma::concepts
+{
+	struct implicitly_convertible
+	{
+		template <typename From, typename To>
+		auto contract() -> specifies<
+			is_true<std::is_convertible<From, To>>
+		>;
+	};
+
+	struct explicitly_convertible
+	{
+		template <typename From, typename To>
+		auto contract(From (&from)()) -> specifies<
+			decltype(((void) static_cast<To>(from()), 42))
+		>;
+	};
+
+	struct convertible
+		: refines<implicitly_convertible, explicitly_convertible>
+	{};
 }
 
 // concept: Same
@@ -221,7 +196,7 @@ namespace atma::concepts
 		using same_t = typename same<Ts...>::type;
 
 		template<typename ...Ts>
-		auto contract() -> contract<
+		auto contract() -> specifies<
 			is_true<same_t<Ts...>>
 		>;
 	};

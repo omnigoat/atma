@@ -230,4 +230,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\source\include_guide.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
+  </ItemGroup>
 </Project>

@@ -10,7 +10,11 @@
 #include <boost/preprocessor.hpp>
 
 
-// yep
+//
+// ATMA_SCOPED_LOCK(...)
+// -----------------------
+//  takes any number of std::scoped_lock-able things and locks them
+//
 #define ATMA_SCOPED_LOCKM(r,d,i,x) \
 	BOOST_PP_COMMA_IF(i) decltype(x)
 
@@ -21,9 +25,20 @@
 	ATMA_SCOPED_LOCK_II(__COUNTER__, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
 
-// debug, this_thread, etc
 namespace atma
 {
+	const size_t max_pointer_size = sizeof(std::ptrdiff_t) * 2;
+}
+
+
+//
+// this_thread
+// -------------
+//
+namespace atma::this_thread
+{
+	using thread_id_t = std::thread::id;
+
 	namespace this_thread
 	{
 		inline auto set_debug_name(char const* thread_name)
@@ -34,11 +49,67 @@ namespace atma
 #endif
 		}
 	}
-
-	using thread_id_t = std::thread::id;
 }
 
 
+//
+// enqueue_function_to_queue
+// ---------------------------
+//  given a lockfree-queue, allocates within that queue enough space to store
+//  an atma::function and its closure (if applicable)
+//
+namespace atma
+{
+#if 0 // no args = no problems?
+	inline void enqueue_function_to_queue(lockfree_queue_t& queue, atma::function<void()> const& f)
+	{
+		using internal_function_t = basic_relative_function_t<max_pointer_size, void()>;
+
+		queue.with_allocation(sizeof(std::decay_t<decltype(f)>) + (uint32)f.external_buffer_size(), 4, true, [&f](auto& A) {
+			new (A.data()) internal_function_t(f, (char*)A.data() + sizeof(internal_function_t));
+		});
+	}
+#endif
+
+	template <typename... Args>
+	inline void enqueue_function_to_queue(lockfree_queue_t& queue, atma::function<void(Args...)> const& f)
+	{
+		using internal_function_t = basic_relative_function_t<max_pointer_size, void(Args...)>;
+
+		queue.with_allocation(sizeof(std::decay_t<decltype(f)>) + (uint32)f.external_buffer_size(), 4, true, [&f](auto& A) {
+			new (A.data()) internal_function_t(f, (char*)A.data() + sizeof(internal_function_t));
+		});
+	}
+}
+
+
+//
+// consume_queue_of_functions
+// ----------------------------
+//  given a lockfree-queue, consumes all work on that queue, on the assumption that
+//  all entries are a function returning void, with parameters of types matching the
+//  provided arguments. anything else is *danger*
+//
+namespace atma
+{
+	template <typename... Args>
+	inline void consume_queue_of_functions(lockfree_queue_t& queue, Args&&... args)
+	{
+		using internal_function_t = basic_relative_function_t<max_pointer_size, void(Args...)>;
+
+		while (queue.with_consumption([](auto& D) {
+			internal_function_t* f = (internal_function_t*)D.data();
+			(*f)(std::forward<Args>(args)...);
+			f->~internal_function_t();
+		}));
+	}
+}
+
+
+//
+// work_token_t
+// --------------
+//
 namespace atma
 {
 	struct alignas(4) work_token_t
@@ -85,50 +156,13 @@ namespace atma
 	};
 }
 
-namespace atma
-{
-	inline void enqueue_function_to_queue(lockfree_queue_t& queue, atma::function<void()> const& f)
-	{
-		using internal_function_t = basic_relative_function_t<16, void()>;
 
-		queue.with_allocation(sizeof(std::decay_t<decltype(f)>) + (uint32)f.external_buffer_size(), 4, true, [&f](auto& A) {
-			new (A.data()) internal_function_t(f, (char*)A.data() + sizeof(internal_function_t));
-		});
-	}
-
-	template <typename... Args>
-	inline void enqueue_function_to_queue(lockfree_queue_t& queue, atma::function<void(Args...)> const& f)
-	{
-		using internal_function_t = basic_relative_function_t<16, void(Args...)>;
-
-		queue.with_allocation(sizeof(std::decay_t<decltype(f)>) + (uint32)f.external_buffer_size(), 4, true, [&f](auto& A) {
-			new (A.data()) internal_function_t(f, (char*)A.data() + sizeof(internal_function_t));
-		});
-	}
-
-	template <typename... Args>
-	inline void consume_queue_of_functions(lockfree_queue_t& queue, Args&&... args)
-	{
-		using internal_function_t = basic_relative_function_t<16, void(Args...)>;
-
-		while (queue.with_consumption([](auto& D) {
-			internal_function_t* f = (internal_function_t*)D.data();
-			(*f)(std::forward<Args>(args)...);
-			f->~internal_function_t();
-		}));
-	}
-}
 
 // thread_work_provider
 namespace atma
 {
 	struct thread_work_provider_t
 	{
-	protected:
-		using onfly_function_t        = function<void()>;
-		using onfly_repeat_function_t = function<bool()>;
-
-	public:
 		using function_t        = function<void()>;
 		using repeat_function_t = function<bool()>;
 
@@ -231,7 +265,7 @@ namespace atma
 
 	private:
 		using queue_t = lockfree_queue_t;
-		using queue_fn_t = basic_relative_function_t<16, void()>;
+		using queue_fn_t = basic_relative_function_t<max_pointer_size, void()>;
 
 		auto reenter(std::atomic<bool> const& blocked) -> void;
 
@@ -274,7 +308,7 @@ namespace atma
 	{
 		if (running_)
 		{
-			signal(onfly_function_t{[&] {
+			signal(function_t{[&] {
 				running_ = false;
 			}});
 
@@ -341,7 +375,7 @@ namespace atma
 			signal_evergreen(fn);
 		};
 
-		signal(onfly_function_t{sg});
+		signal(function_t{sg});
 	}
 
 	inline auto inplace_engine_t::signal_block() -> void
@@ -350,7 +384,7 @@ namespace atma
 			return;
 
 		std::atomic<bool> blocked{true};
-		signal(onfly_function_t{[&blocked] { blocked = false; }});
+		signal(function_t{[&blocked] { blocked = false; }});
 
 		// the engine thread can't block itself!
 		if (std::this_thread::get_id() == handle_.get_id())
@@ -386,7 +420,7 @@ namespace atma
 		auto enqueue_repeat(repeat_function_t&&) -> void override;
 
 	private:
-		using internal_function_t = basic_relative_function_t<16, void()>;
+		using internal_function_t = basic_relative_function_t<max_pointer_size, void()>;
 
 		static auto worker_thread_runloop(thread_pool_t*, std::atomic_bool&) -> void;
 
@@ -434,7 +468,7 @@ namespace atma
 
 	inline auto thread_pool_t::enqueue_repeat(repeat_function_t const& fn) -> void
 	{
-		onfly_function_t rfn = [&, fn]{
+		function_t rfn = [&, fn]{
 			if (!fn())
 				return;
 			enqueue_repeat(fn);
@@ -447,7 +481,7 @@ namespace atma
 
 	inline auto thread_pool_t::enqueue_repeat(repeat_function_t&& fn) -> void
 	{
-		onfly_function_t rfn = [&, fn = std::move(fn)]{
+		function_t rfn = [&, fn = std::move(fn)]{
 			if (!fn())
 				return;
 			enqueue_repeat(std::move(fn));

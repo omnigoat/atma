@@ -22,7 +22,8 @@ using uint64 = uint64_t;
 using  intptr =  intptr_t;
 using uintptr = uintptr_t;
 
-using byte = uint8;
+using byte = uchar;
+
 using size_t = std::size_t;
 
 #define ATMA_PP_CAT_II(a, b) a##b
@@ -43,7 +44,6 @@ using size_t = std::size_t;
 		static constexpr bool value = test<T>(0); \
 	}; \
 	template <typename T> constexpr bool name##_v = name##_t<T>::value
-
 
 
 namespace atma

@@ -776,10 +776,16 @@ namespace atma
 
 		auto swap(basic_generic_function_t& rhs) -> void
 		{
-			auto tmp = detail::functor_wrapper_t{};
-			rhs.wrapper_.move_into(tmp);
-			wrapper_.move_into(rhs.wrapper_);
-			tmp.move_into(wrapper_);
+			// temporary storage for us
+			auto tmp = detail::sized_functor_buf_t<BS>{};
+			// move us into temporary
+			this->vtable_->move_into(tmp, this->vtable_, this->buf_);
+			// remember our vtable
+			auto tmpv = this->vtable_;
+			// move rhs into us
+			rhs.vtable_->move_into(this->buf_, this->vtable_, rhs.buf_);
+			// move temporary into rhs
+			tmpv->move_into(rhs.buf_, rhs.vtable_, tmp);
 		}
 
 		template <typename FN, typename = detail::allowable_functor_t<FN, R, Params...>>

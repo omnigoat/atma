@@ -24,5 +24,8 @@ SCENARIO("arena allocator can be constructed", "[allocators]")
 		void* M4 = A.allocate(20);
 
 		A.deallocate(M4, 20);
+		A.deallocate(M1, 20);
+		A.deallocate(M3, 20);
+		A.deallocate(M2, 20);
 	}
 }

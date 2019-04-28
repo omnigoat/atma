@@ -73,7 +73,7 @@ namespace atma
 		static const uint32 slot_byte_mask = (math::ct::exp2(slot_byte_bits) - 1) << slot_bit_bits << page_bits;
 		static const uint32 slot_bit_mask = (math::ct::exp2(slot_bit_bits) - 1) << page_bits;;
 
-		static uint32 extract_genr_idx(handle_t h) { return (h & slot_genr_mask) >> slot_bits >> page_bits; }
+		static uint32 extract_genr_idx(handle_t h) { return (h & genr_mask) >> slot_bits >> page_bits; }
 		static uint32 extract_slot_idx(handle_t h) { return (h & slot_mask) >> page_bits; }
 		static uint32 extract_slot_byte_idx(handle_t h) { return (h & slot_byte_mask) >> slot_bit_bits >> page_bits; }
 		static uint32 extract_slot_bit_idx(handle_t h) { return (h & slot_bit_mask) >> page_bits; }

@@ -10,6 +10,19 @@
 //======================================================================
 namespace atma
 {
+	struct range_concept
+	{
+		template <typename T>
+		auto contract() -> concepts::specifies<
+			concepts::has<decltype(std::begin(std::declval<T>()))>,
+			concepts::has<decltype(std::begin(std::declval<T>()))>
+		>;
+	};
+}
+
+
+namespace atma
+{
 	namespace detail
 	{
 		template <typename T, typename = std::void_t<>>
