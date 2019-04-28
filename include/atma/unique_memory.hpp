@@ -16,8 +16,8 @@ namespace atma
 		using allocator_type = Alloc;
 		using backing_t = atma::memory_t<byte, Alloc>;
 
-		basic_unique_memory_t();
-		explicit basic_unique_memory_t(size_t size);
+		basic_unique_memory_t(allocator_type const& = allocator_type());
+		explicit basic_unique_memory_t(size_t size, allocator_type const& = allocator_type());
 		basic_unique_memory_t(void const* data, size_t size);
 		basic_unique_memory_t(unique_memory_take_ownership_tag, void* data, size_t size);
 		basic_unique_memory_t(basic_unique_memory_t const&) = delete;
@@ -41,6 +41,8 @@ namespace atma
 
 		auto detach_memory() -> backing_t;
 
+		auto memory_operations() -> backing_t& { return memory_; }
+
 	private:
 		backing_t memory_;
 		size_t size_;
@@ -51,24 +53,28 @@ namespace atma
 
 
 	template <typename A>
-	inline basic_unique_memory_t<A>::basic_unique_memory_t()
-		: size_()
-	{
-	}
+	inline basic_unique_memory_t<A>::basic_unique_memory_t(allocator_type const& alloc)
+		: memory_(alloc)
+		, size_()
+	{}
 
 	template <typename A>
-	inline basic_unique_memory_t<A>::basic_unique_memory_t(size_t size)
-		: size_(size)
+	inline basic_unique_memory_t<A>::basic_unique_memory_t(size_t size, allocator_type const& alloc)
+		: memory_(alloc)
+		, size_(size)
 	{
 		if (size)
+		{
 			memory_.allocate(size);
+		}
 	}
 
 	template <typename A>
 	inline basic_unique_memory_t<A>::basic_unique_memory_t(void const* data, size_t size)
 		: size_(size)
 	{
-		if (size) {
+		if (size)
+		{
 			memory_.allocate(size);
 			memory_.memcpy(0, data, size);
 		}

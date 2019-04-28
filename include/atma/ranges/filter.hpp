@@ -301,7 +301,7 @@ namespace atma
 {
 	template <typename R, typename F,
 		CONCEPT_REQUIRES_(
-			is_range_v<remove_cvref_t<R>>,
+			(concepts::models_v<range_concept, R>),
 			detail::is_filter_functor_v<remove_cvref_t<F>>)>
 	inline auto operator | (R&& range, F&& functor)
 	{
@@ -332,30 +332,29 @@ namespace atma
 }
 
 
+
 // non-member functions
 namespace atma
 {
 	// filter: f vs r
 	template <typename F, typename R,
-		CONCEPT_REQUIRES_(
-			is_range_v<R>,
-			!detail::is_filtered_range_v<R>)>
+	CONCEPT_REQUIRES_((concepts::models_v<range_concept, R>), !detail::is_filtered_range_v<R>)>
 	inline auto filter(F&& predicate, R&& range) {
 		return filtered_range_t{std::forward<R>(range), std::forward<F>(predicate)}; }
 
 	// filter: f vs filtered-range<r, g>
 	template <typename F, typename R,
-		CONCEPT_REQUIRES_(detail::is_filtered_range_v<R>)>
+	CONCEPT_REQUIRES_(detail::is_filtered_range_v<R>)>
 	inline auto filter(F&& predicate, R&& range) {
 		return std::forward<R>(range) | filter_functor_t{std::forward<F>(predicate)}; }
 
 	// filter: member vs r
 	template <typename M, typename C, typename R,
-		CONCEPT_REQUIRES_(is_range_v<R>)>
+	CONCEPT_REQUIRES_(is_range_v<R>)>
 	inline auto filter(M C::*m, R&& range)
 	{
 		auto f = [m](auto&& x) -> bool { return x.*m; };
-		return filtered_range_t{std::forward<R>(range), f};
+		return filtered_range_t{std::forward<R>(range), std::move(f)};
 	}
 
 	// partial-filter: f

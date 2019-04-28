@@ -16,7 +16,7 @@
 //
 //=====================================================================
 #ifdef ATMA_PLATFORM_WINDOWS
-#	define ATMA_DEBUGBREAK() DebugBreak()
+#	define ATMA_DEBUGBREAK() __debugbreak()
 #else
 #	define ATMA_DEBUGBREAK()
 #endif

@@ -26,66 +26,62 @@
 //        objects and then access objects at positions N+, you will be in random
 //        memory territory, with no warning.
 //
+namespace atma::detail
+{
+	template <typename Allocator, bool Empty = std::is_empty_v<Allocator>>
+	struct base_memory_tx;
+
+
+	template <typename Allocator>
+	struct base_memory_tx<Allocator, false>
+	{
+		base_memory_tx()
+		{}
+
+		template <typename U>
+		base_memory_tx(base_memory_tx<U> const& rhs)
+			: allocator_(rhs.allocator())
+		{}
+
+		base_memory_tx(Allocator const& allocator)
+			: allocator_(allocator)
+		{}
+
+		auto allocator() -> Allocator& { return allocator_; }
+		auto allocator() const -> Allocator const& { return allocator_; }
+
+	private:
+		Allocator allocator_;
+	};
+
+
+	template <typename Allocator>
+	struct base_memory_tx<Allocator, true>
+		: protected Allocator
+	{
+		base_memory_tx()
+		{}
+
+		template <typename U>
+		base_memory_tx(base_memory_tx<U> const& rhs)
+			: Allocator(rhs.allocator())
+		{}
+
+		base_memory_tx(Allocator const& allocator)
+			: Allocator(allocator)
+		{}
+
+		auto allocator() -> Allocator& { return static_cast<Allocator&>(*this); }
+		auto allocator() const -> Allocator const& { return static_cast<Allocator const&>(*this); }
+	};
+
+
+	template <typename T, typename A>
+	using base_memory_t = base_memory_tx<typename std::allocator_traits<A>::template rebind_alloc<T>>;
+}
+
 namespace atma
 {
-	namespace detail
-	{
-		template <
-			typename Allocator,
-			bool Empty = std::is_empty<Allocator>::value
-		>
-		struct base_memory_tx;
-
-
-		template <typename Allocator>
-		struct base_memory_tx<Allocator, false>
-		{
-			base_memory_tx()
-			{}
-
-			template <typename U>
-			base_memory_tx(base_memory_tx<U> const& rhs)
-				: allocator_(rhs.allocator())
-			{}
-
-			base_memory_tx(Allocator const& allocator)
-				: allocator_(allocator)
-			{}
-
-			auto allocator() -> Allocator& { return allocator_; }
-			auto allocator() const -> Allocator const& { return allocator_; }
-
-		private:
-			Allocator allocator_;
-		};
-
-
-		template <typename Allocator>
-		struct base_memory_tx<Allocator, true>
-			: protected Allocator
-		{
-			base_memory_tx()
-			{}
-
-			template <typename U>
-			base_memory_tx(base_memory_tx<U> const& rhs)
-				: Allocator(rhs.allocator())
-			{}
-
-			base_memory_tx(Allocator const& allocator)
-				: Allocator(allocator)
-			{}
-
-			auto allocator() -> Allocator& { return static_cast<Allocator&>(*this); }
-			auto allocator() const -> Allocator const& { return static_cast<Allocator const&>(*this); }
-		};
-
-
-		template <typename T, typename A>
-		using base_memory_t = base_memory_tx<typename std::allocator_traits<A>::template rebind_alloc<T>>;
-	}
-
-
 	template <typename T, typename Allocator = atma::aligned_allocator_t<T>>
 	struct memory_t : detail::base_memory_t<T, Allocator>
 	{
@@ -134,6 +130,8 @@ namespace atma
 		auto memmove(size_t dest_idx, size_t src_idx, size_t count) -> void;
 		// to copy memory from somewhere else to within our allocated are
 		auto memcpy(size_t idx, value_type const*, size_t count) -> void;
+		// to zero-clear memory
+		auto memzero(size_t idx, size_t count) -> void;
 
 	private:
 		using alloc_traits = std::allocator_traits<allocator_type>;
@@ -261,6 +259,12 @@ namespace atma
 	inline auto memory_t<T, A>::memcpy(size_t idx, T const* src, size_t count) -> void
 	{
 		std::memmove(ptr_ + idx, src, sizeof(T) * count);
+	}
+
+	template <typename T, typename A>
+	inline auto memory_t<T, A>::memzero(size_t idx, size_t count) -> void
+	{
+		std::memset(ptr_ + idx, 0, sizeof(T) * count);
 	}
 
 	template <typename T, typename A>

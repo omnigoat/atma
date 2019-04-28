@@ -1,0 +1,9 @@
+
+// hash_table
+#define hash_table_template_declaration <typename K, typename V, typename KX, typename VX, typename H, typename E, typename A>
+#define hash_table_type_instantiated hash_table<K,V,KX,VX,H,E,A>
+
+
+// hash_map
+#define hash_map_template_declaration <typename K, typename V, typename H, typename E, typename A>
+#define hash_map_type_instantiated hash_map<K,V,H,E,A>

@@ -204,13 +204,13 @@ namespace atma::meta
 
 
 // all/any
-namespace atma
+namespace atma::meta
 {
 	template <typename list>
 	using all = fold<and_op, bool_<true>, list>;
 
-	template <typename list>
-	using any = fold<or_op, bool_<false>, list>;
+	//template <typename list>
+	//using any = fold<or_op, bool_<false>, list>;
 }
 
 

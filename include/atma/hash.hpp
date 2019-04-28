@@ -7,6 +7,7 @@ namespace atma
 	template <typename T>
 	struct hash_t
 	{
+		auto operator()(T const& x) const -> size_t;
 		auto operator()(hasher_t& hsh, T const& x) const -> void;
 	};
 
@@ -85,6 +86,11 @@ namespace atma
 		}
 	};
 
+	template <typename T>
+	inline auto hash_t<T>::operator()(T const& x) const -> size_t
+	{
+		return hasher_t{}(x).result();
+	}
 
 	template <typename T>
 	inline auto hash_t<T>::operator()(hasher_t& hsh, T const& x) const -> void
