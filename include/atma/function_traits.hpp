@@ -21,7 +21,7 @@ namespace atma
 	{};
 
 	template <typename F>
-	struct has_n_arguments_tx<1, F, std::void_t<std::invoke_result_t<F, meta::any>>>
+	struct has_n_arguments_tx<1, F, std::void_t<std::invoke_result_t<F, meta::any_t>>>
 		: std::true_type
 	{};
 
