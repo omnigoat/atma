@@ -21,6 +21,10 @@ namespace atma::concepts
 
 		template <typename... Args>
 		constexpr void specifies_(Args&&...);
+
+		template <typename T = std::void_t<>>
+		struct has_ : std::false_type
+		{};
 	}
 
 	template <typename... Args>
@@ -30,15 +34,17 @@ namespace atma::concepts
 		constexpr static auto value = true;
 	};
 
-
 	template <typename Arg, typename = decltype(detail::is_true_(Arg{}))>
-	struct is_true : std::true_type {};
+	struct is_true : std::true_type
+	{};
 
 	template <typename Arg, typename = decltype(detail::is_false_(Arg{}))>
-	struct is_false : std::true_type {};
+	struct is_false : std::true_type
+	{};
 
-	template <typename Arg>
-	struct has : std::true_type {};
+	template <typename Arg = std::void_t<>>
+	struct can : detail::has_<std::void_t<Arg>>
+	{};
 }
 
 
@@ -84,16 +90,14 @@ namespace atma::concepts
 	namespace detail
 	{
 		template <typename...>
-		auto models_(meta::any) ->
+		auto models_(meta::any_t) ->
 			std::false_type;
 		
-		template <typename... Ts, typename Concept, typename = decltype(&Concept::template contract<Ts...>)>
+		template <typename... Types, typename Concept, typename = decltype(&Concept::template contract<Types...>)>
 		auto models_(Concept*) ->
-			meta::fold<
-				meta::and_op,
-				meta::bool_<true>,
+			meta::all<
 				meta::map<
-					meta::bind_back<meta::invokify<concepts::models>, Ts...>,
+					meta::bind_back<meta::invokify<concepts::models>, Types...>,
 					detail::base_concepts_t<Concept>>>;
 	}
 
@@ -192,10 +196,10 @@ namespace atma::concepts
 		template <typename T, typename... Us>
 		struct same<T, Us...> : meta::all<meta::list<meta::bool_<std::is_same<T, Us>::value>...>>{};
 
-		template<typename ...Ts>
+		template<typename... Ts>
 		using same_t = typename same<Ts...>::type;
 
-		template<typename ...Ts>
+		template<typename... Ts>
 		auto contract() -> specifies<
 			is_true<same_t<Ts...>>
 		>;
@@ -252,3 +256,26 @@ namespace atma::concepts
 #define CONCEPT_REQUIRES_LIST(...) \
 	(BOOST_PP_SEQ_FOR_EACH_I(CONCEPT_REQUIRES_LIST_M, _, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__)))
 
+
+//
+//  CONCEPT_MODELS_(...)
+//  -------------------------
+//    example:
+//      template <typename A, typename B,
+//        CONCEPT_MODELS_(addable, A, B),
+//        CONCEPT_MODELS_(integral, A)>
+//      auto operator + (int x, R const& range) -> ...
+//
+#define CONCEPT_MODELS_(...) \
+    CONCEPT_MODELS_II_(ATMA_PP_CAT(_concept_models_, __COUNTER__), __VA_ARGS__)
+
+#define CONCEPT_MODELS_II_(arg_name, ...)                                   \
+    int arg_name = 42,                                                      \
+    std::enable_if_t<                                                       \
+        (arg_name == 43) || ::atma::concepts::models<__VA_ARGS__>::value,   \
+        int                                                                 \
+    > = 0                                                                   \
+    /**/
+
+#define SPECIFIES_EXPR(...) \
+    ::atma::concepts::can<decltype(__VA_ARGS__)>

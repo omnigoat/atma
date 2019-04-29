@@ -31,11 +31,11 @@ namespace atma {
 	//
 	template <size_t begin, size_t end, int step = 1>
 	using tuple_placeholder_range_t =
-		typename tuple_idxs_map_t<placeholder_t, idxs_range_t<begin, end, step>>;
+		typename tuple_idxs_map_t<placeholder_t, idxs_range_t<begin, end, step>>::type;
 
 	template <size_t count>
 	using tuple_placeholder_list_t =
-		typename tuple_idxs_map_t<placeholder_t, idxs_list_t<count>>;
+		typename tuple_idxs_map_t<placeholder_t, idxs_list_t<count>>::type;
 
 
 
