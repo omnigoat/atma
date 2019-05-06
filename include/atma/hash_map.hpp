@@ -313,9 +313,9 @@ namespace atma::detail
 					else
 					{
 						static_assert(std::is_convertible_v<bool, std::invoke_result_t<F, value_type&>>,
-							"result-type must be convertible to bool (true to stop iteration)");
+							"result-type must be convertible to bool (return true to continue iteration)");
 
-						if (std::invoke(std::forward<F>(f), chain_ptr->at(element_idx)))
+						if (!std::invoke(std::forward<F>(f), chain_ptr->at(element_idx)))
 							return;
 					}
 
