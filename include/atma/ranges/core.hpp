@@ -40,6 +40,53 @@ namespace atma
 	};
 }
 
+// span
+namespace atma
+{
+	template <typename T>
+	struct span_t
+	{
+		using element_type = T;
+		using value_type = std::remove_cv_t<T>;
+		using index_type = std::size_t;
+		using different_type = std::ptrdiff_t;
+		using pointer = T*;
+		using const_pointer = T const*;
+		using reference = T&;
+		using const_reference = T const&;
+		using iterator = pointer;
+		using const_iterator = const_pointer;
+		using reverse_iterator = std::reverse_iterator<iterator>;
+		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+		
+		explicit span_t()
+		{}
+
+		explicit span_t(pointer begin, pointer end)
+			: data_(begin)
+			, size_(end - begin)
+		{}
+
+		explicit span_t(pointer begin, size_t size)
+			: data_(begin)
+			, size_(size)
+		{}
+
+		iterator begin() { return data_; }
+		iterator end() { return data_ + size_; }
+		const_iterator begin() const { return data_; }
+		const_iterator end() const { return data_ + size_; }
+
+		auto size() const { return size_; }
+		auto size_bytes() const { return size_ * sizeof(value_type); }
+
+	private:
+		T* data_ = nullptr;
+		size_t size_ = 0;
+	};
+}
+
+
 // range_function_invoke
 namespace atma
 {

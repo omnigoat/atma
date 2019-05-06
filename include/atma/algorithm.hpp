@@ -178,6 +178,16 @@ namespace atma
 	}
 
 	//=====================================================================
+	// fill
+	//=====================================================================
+	template <typename range_tx, typename value_tx>
+	void fill(range_tx&& range, value_tx const& value)
+	{
+		std::fill(std::begin(range), std::end(range), value);
+	}
+
+
+	//=====================================================================
 	// remove_erase
 	//=====================================================================
 	template <typename range_tx, typename pred_tx>
