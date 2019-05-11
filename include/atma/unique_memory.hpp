@@ -223,6 +223,9 @@ namespace atma
 		E* begin_;
 		E* end_;
 	};
+
+	template <typename R>
+	memory_view_t(R&& range) -> memory_view_t<typename std::remove_reference_t<R>::value_type>;
 }
 
 

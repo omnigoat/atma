@@ -91,6 +91,8 @@ namespace atma::detail
 
 		hash_table(size_t buckets, size_t bucket_size, key_extractor_t, value_extractor_t, hasher_t = hash_t<key_t>{}, allocator_type const& = allocator_type());
 
+		void reset(size_t buckets, size_t bucket_size, hasher_t = hash_t<key_t>{});
+
 		void set_replacement_function(replacer_t const&);
 
 		auto insert(value_type const&) -> insert_result_t;
@@ -163,6 +165,32 @@ namespace atma::detail
 	}
 
 	hash_table_template_declaration
+	inline auto hash_table_type_instantiated::reset(size_t buckets, size_t bucket_size, hasher_t hasher) -> void
+	{
+		// don't support anything except a 
+		ATMA_ASSERT(buckets <= buckets_.size() / sizeof(bucket_chain_ptr) && bucket_size >= bucket_size_);
+
+		// assign new values to memset the minimum required
+		bucket_count_ = buckets;
+		bucket_size_ = bucket_size;
+		bucket_bitmask_ = math::log2((uint)bucket_count_);
+
+		for (auto& bucket : atma::memory_view_t<bucket_chain_ptr>(buckets_, 0, bucket_count_ * sizeof(bucket_chain_ptr)))
+		{
+			if (!bucket)
+				continue;
+
+			memset(bucket->elements.data(), 0, sizeof(value_type) * 16);
+			bucket->filled = 0;
+			for (auto next = &bucket->next_chain; *next; next = &(*next)->next_chain)
+			{
+				memset((*next)->elements.data(), 0, sizeof(value_type) * 16);
+				(*next)->filled = 0;
+			}
+		}
+	}
+
+	hash_table_template_declaration
 	inline auto hash_table_type_instantiated::insert(value_type const& x) -> insert_result_t
 	{
 		return insert_or_replace_with(x, [](auto&&...) { return false; });
@@ -185,6 +213,7 @@ namespace atma::detail
 		int available_element_idx = -1;
 
 		// begin scanning the bucket for matching entries
+		int exhausted = 0;
 		while (*chain_ptr_ptr)
 		{
 			auto& chain_ptr = *chain_ptr_ptr;
@@ -211,6 +240,8 @@ namespace atma::detail
 							return {&value, r};
 						}
 					}
+
+					++exhausted;
 				}
 				// we found an empty slot, let's record this in case we need to insert
 				else if (available_chain == nullptr)
@@ -223,20 +254,30 @@ namespace atma::detail
 			chain_ptr_ptr = &chain_ptr->next_chain;
 		}
 
-		// insert the value to a location we earlier determined was empty
-		if (available_chain != nullptr)
+		if (exhausted >= bucket_size_)
 		{
-			new (&(*available_chain)->at(available_element_idx)) value_type(x);
+			return {nullptr, false};
 		}
 
-		// we should have exhausted our search then
-		ATMA_ASSERT(*chain_ptr_ptr == nullptr, "chain search was not exhaustive");
+		// insert the value to a location we earlier determined was empty
+		value_type* addr = nullptr;
+		if (available_chain != nullptr)
+		{
+			addr = &(*available_chain)->at(available_element_idx);
+			new (addr) value_type(x);
+			(*available_chain)->filled |= (1 << available_element_idx);
+		}
+		else
+		{
+			// we should have exhausted our search then
+			ATMA_ASSERT(*chain_ptr_ptr == nullptr, "chain search was not exhaustive");
 
-		// create new page in the chain and insert element at index 0
-		chain_ptr_ptr->reset(new bucket_chain_t);
-		auto addr = &(*chain_ptr_ptr)->at(0);
-		new (addr) value_type(x);
-		(*chain_ptr_ptr)->filled = 1;
+			// create new page in the chain and insert element at index 0
+			chain_ptr_ptr->reset(new bucket_chain_t);
+			addr = &(*chain_ptr_ptr)->at(0);
+			new (addr) value_type(x);
+			(*chain_ptr_ptr)->filled = 1;
+		}
 
 		return {&value_extractor_(*addr), true};
 	}
