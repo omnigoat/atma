@@ -282,7 +282,7 @@ namespace atma::detail
 				auto& tupled_arguments = *candidate->second;
 				atma::enqueue_function_to_queue(
 					per_thread_queue(binding.thread_id),
-					std::function<void()>{[f = binding.f, &tupled_arguments]{std::apply(f, tupled_arguments); }});
+					atma::function<void()>{[f = binding.f, &tupled_arguments]{std::apply(f, tupled_arguments); }});
 			}
 
 			// enqueue the deletion of the per-thread argument copies
@@ -290,7 +290,7 @@ namespace atma::detail
 			{
 				atma::enqueue_function_to_queue(
 					per_thread_queue(arg_thread_id),
-					[&, tuple_args_ptr] { threaded_args_resource.deallocate(tuple_args_ptr, sizeof(tuple_type)); });
+					atma::function<void()>{[&, tuple_args_ptr] { threaded_args_resource.deallocate(tuple_args_ptr, sizeof(tuple_type)); }});
 			}
 
 			// execute the rest immediately
@@ -314,7 +314,7 @@ namespace atma::detail
 				{
 					atma::enqueue_function_to_queue(
 						per_thread_queue(thread_id),
-						std::function<void()>{atma::bind(binding.f, args...)});
+						atma::function<void()>{atma::bind(binding.f, args...)});
 				}
 			}
 		}
