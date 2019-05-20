@@ -4,7 +4,6 @@
 #include <atma/assert.hpp>
 #include <atma/types.hpp>
 
-
 namespace atma
 {
 	struct alignas(16) atomic128_t

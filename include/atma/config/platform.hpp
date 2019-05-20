@@ -9,11 +9,11 @@
 #    define ATMA_PLATFORM_WIN32 true
 #    define ATMA_POINTER_SIZE 4
 #  endif
-#	include "corecrt_malloc.h"
-#	include "windowsx.h"
-#	include "xmmintrin.h"
-#	undef min
-#	undef max
+#  define WIN32_LEAN_AND_MEAN
+#  include <Windows.h>
+#  include <xmmintrin.h>
+#  undef min
+#  undef max
 #endif
 
 #if defined(_MSC_VER)

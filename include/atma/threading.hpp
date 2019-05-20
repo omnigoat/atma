@@ -28,6 +28,8 @@
 namespace atma
 {
 	const size_t max_pointer_size = sizeof(std::ptrdiff_t) * 2;
+
+	using thread_id_t = std::thread::id;
 }
 
 
@@ -37,17 +39,12 @@ namespace atma
 //
 namespace atma::this_thread
 {
-	using thread_id_t = std::thread::id;
-
-	namespace this_thread
+	inline auto set_debug_name(char const* thread_name)
 	{
-		inline auto set_debug_name(char const* thread_name)
-		{
 #if ATMA_PLATFORM_WINDOWS
-			auto os_thread_name = platform_interop::make_platform_string(thread_name);
-			SetThreadDescription(GetCurrentThread(), os_thread_name.get());
+		auto os_thread_name = platform_interop::make_platform_string(thread_name);
+		SetThreadDescription(GetCurrentThread(), os_thread_name.get());
 #endif
-		}
 	}
 }
 
@@ -74,9 +71,10 @@ namespace atma
 	template <typename... Args>
 	inline void enqueue_function_to_queue(lockfree_queue_t& queue, atma::function<void(Args...)> const& f)
 	{
-		using internal_function_t = basic_relative_function_t<max_pointer_size, void(Args...)>;
+		using internal_function_t = basic_relative_function_t<(uint32)16, void(Args...)>;
+		auto const sz = sizeof(atma::remove_cvref_t<decltype(f)>);
 
-		queue.with_allocation(sizeof(std::decay_t<decltype(f)>) + (uint32)f.external_buffer_size(), 4, true, [&f](auto& A) {
+		queue.with_allocation((uint32)sz + (uint32)f.external_buffer_size(), 4, true, [&f](auto& A) {
 			new (A.data()) internal_function_t(f, (char*)A.data() + sizeof(internal_function_t));
 		});
 	}
