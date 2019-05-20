@@ -28,7 +28,7 @@ namespace atma
 		using const_pointer   = typename std::allocator_traits<Allocator>::const_pointer;
 		using iterator        = T*;
 		using const_iterator  = T const*;
-		using buffer_type     = atma::basic_unique_memory_t<Allocator>;
+		using buffer_type     = atma::basic_unique_memory_t<byte, Allocator>;
 		
 		vector();
 		explicit vector(size_t size);
@@ -342,7 +342,7 @@ namespace atma
 		auto c = capacity_;
 		size_ = 0;
 		capacity_ = 0;
-		return basic_unique_memory_t<A>{unique_memory_take_ownership_tag{}, imem_.detach_ptr(), c};
+		return buffer_type{unique_memory_take_ownership, imem_.detach_ptr(), c};
 	}
 
 	template <typename T, typename A>

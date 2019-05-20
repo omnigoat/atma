@@ -106,9 +106,6 @@ namespace atma::detail
 		auto for_all_in_same_bucket(key_t const&, F&&) -> void;
 
 	private:
-		// rebind provided allocator for byte allocations
-		using bucket_allocator_t = typename allocator_type::template rebind<byte>::other;
-
 		using bucket_chain_elements_t = std::array<byte, sizeof(value_type) * 16>;
 
 		struct bucket_chain_t;
@@ -128,6 +125,9 @@ namespace atma::detail
 			auto at(int i) -> value_type& { return reinterpret_cast<value_type*>(elements.data())[i]; }
 		};
 
+		// rebind provided allocator for byte allocations
+		using bucket_allocator_t = typename allocator_type::template rebind<bucket_chain_ptr>::other;
+
 	private:
 		key_extractor_t key_extractor_;
 		value_extractor_t value_extractor_;
@@ -137,7 +137,7 @@ namespace atma::detail
 		size_t bucket_size_ = 0;
 		size_t bucket_bitmask_ = 0;
 		replacer_t replacer_;
-		atma::basic_unique_memory_t<bucket_allocator_t> buckets_;
+		atma::basic_unique_memory_t<bucket_chain_ptr, bucket_allocator_t> buckets_;
 	};
 
 }
@@ -206,7 +206,7 @@ namespace atma::detail
 		auto const slot_idx = hash & bucket_bitmask_;
 		ATMA_ASSERT(slot_idx < bucket_count_, "how did this happen?");
 
-		bucket_chain_ptr* chain_ptr_ptr = reinterpret_cast<bucket_chain_ptr*>(buckets_.begin()) + slot_idx;
+		bucket_chain_ptr* chain_ptr_ptr = buckets_.begin() + slot_idx;
 		
 		// first we must see if it compares to other values
 		bucket_chain_ptr* available_chain = nullptr;
@@ -297,7 +297,7 @@ namespace atma::detail
 		auto const slot_idx = hash & bucket_bitmask_;
 		ATMA_ASSERT(slot_idx < bucket_count_, "how did this happen?");
 
-		bucket_chain_ptr* chain_ptr_ptr = reinterpret_cast<bucket_chain_ptr*>(buckets_.begin()) + slot_idx;
+		bucket_chain_ptr* chain_ptr_ptr = buckets_.begin() + slot_idx;
 
 		// begin scanning the bucket for matching entries
 		while (*chain_ptr_ptr)
@@ -332,7 +332,7 @@ namespace atma::detail
 		auto const slot_idx = hash & bucket_bitmask_;
 		ATMA_ASSERT(slot_idx < bucket_count_, "how did this happen?");
 
-		bucket_chain_ptr* chain_ptr_ptr = reinterpret_cast<bucket_chain_ptr*>(buckets_.begin()) + slot_idx;
+		bucket_chain_ptr* chain_ptr_ptr = buckets_.begin() + slot_idx;
 
 		while (*chain_ptr_ptr)
 		{
