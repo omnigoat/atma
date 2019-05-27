@@ -38,5 +38,8 @@
     <ClCompile Include="..\..\source\atma_test\test_allocators.cpp">
       <Filter>source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\source\atma_test\memory.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
