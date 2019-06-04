@@ -2,7 +2,6 @@
 
 #include <atma/memory.hpp>
 
-
 SCENARIO("base_memory_t can EBO properly", "[memory/base_memory_t]")
 {
 	GIVEN("an empty allocator")
@@ -34,7 +33,7 @@ SCENARIO("simple_memory_t behaves nicely", "[memory/simple_memory_t]")
 		THEN("simple_memory_t can constructed from a pointer & allocator")
 		{
 			byte* ptr = nullptr;
-			auto memory = memory_t(ptr);
+			auto memory = atma::simple_memory_t<byte, empty_allocator>(ptr);
 		}
 	}
 }
