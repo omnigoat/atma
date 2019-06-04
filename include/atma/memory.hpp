@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atma/aligned_allocator.hpp>
+#include <atma/concepts.hpp>
 
 #include <type_traits>
 #include <vector>
@@ -89,12 +90,12 @@ namespace atma
 	{
 		using base_type = detail::base_memory_t<T, Allocator>;
 
-		using allocator_type = typename base_type::allocator_type;
+		using allocator_type   = typename base_type::allocator_type;
 		using allocator_traits = typename base_type::allocator_traits;
-		using value_type = typename allocator_traits::value_type;
-		using pointer = typename allocator_traits::pointer;
-		using const_pointer = typename allocator_traits::const_pointer;
-		using reference = typename allocator_traits::value_type&;
+		using value_type       = typename allocator_traits::value_type;
+		using pointer          = typename allocator_traits::pointer;
+		using const_pointer    = typename allocator_traits::const_pointer;
+		using reference        = typename allocator_traits::value_type&;
 
 		simple_memory_t() = default;
 		explicit simple_memory_t(allocator_type const&);
@@ -117,6 +118,13 @@ namespace atma
 		value_type* ptr_ = nullptr;
 	};
 
+	//template <typename T, typename A, typename Integral, typename = std::enable_if_t<std::is_integral_v<Integral>>>
+	template <typename T, typename A, typename D,
+		CONCEPT_MODELS_(atma::concepts::integral, D)>
+	inline auto operator + (simple_memory_t<T, A> lhs, D d)
+	{
+		return simple_memory_t<T, A>(lhs.operator typename simple_memory_t<T, A>::pointer() + d, lhs.allocator());
+	}
 
 	//template <typename T>
 	//simple_memory_t(memory_take_ownership_tag, T* data) -> simple_memory_t<T, atma::aligned_allocator_t<T>>;
@@ -368,6 +376,25 @@ namespace atma
 	}
 
 }
+
+
+
+
+
+
+namespace atma
+{
+
+	template <typename T, typename A, typename... Args>
+	auto construct(simple_memory_t<T, A>& ptr, size_t idx, Args&&... args) -> typename simple_memory_t<T, A>::reference
+	{
+		using allocator_traits = typename simple_memory_t<T, A>::allocator_traits;
+
+		allocator_traits::construct(ptr.allocator(), ptr + idx, std::forward<Args>(args)...);
+	}
+}
+
+
 
 //
 //  basic_memory_t
