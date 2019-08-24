@@ -16,7 +16,7 @@ namespace atma
 	{
 		using value_type = std::remove_cv_t<T>;
 		using allocator_type = Alloc;
-		using backing_t = atma::memory_t<value_type, allocator_type>;
+		using backing_t = atma::basic_memory_t<value_type, allocator_type>;
 
 		basic_unique_memory_t(basic_unique_memory_t const&) = delete;
 		basic_unique_memory_t(basic_unique_memory_t&&);

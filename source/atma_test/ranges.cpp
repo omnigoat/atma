@@ -24,7 +24,7 @@ auto operator % (T&& lhs, U&& rhs) -> result_t
 	return result_t{};
 }
 
-SCENARIO("ranges can be filtered", "[ranges/filter_t]")
+SCENARIO_OF("ranges/filter_t", "ranges can be filtered")
 {
 	auto is_even = [](int i) { return i % 2 == 0; };
 	auto plus_10 = [](int i) { return i + 10; };
@@ -89,9 +89,12 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 		{
 			auto partial_filter = atma::filter(is_even);
 			auto filtered = partial_filter(numbers);
+			
+			// filtered must be referring to @numbers by const-reference
+			static_assert(std::is_same_v<typename decltype(filtered)::storage_range_t, atma::vector<int> const&>);
+
 			auto result = atma::as_vector | filtered;
 
-			static_assert(std::is_same_v<typename decltype(filtered)::storage_range_t, atma::vector<int> const&>);
 			CHECK_WHOLE_VECTOR(result, 2, 4);
 		}
 	}
@@ -165,7 +168,7 @@ SCENARIO("ranges can be filtered", "[ranges/filter_t]")
 
 
 
-SCENARIO("ranges can be mapped", "[ranges/map]")
+SCENARIO_OF("ranges/map", "ranges can be mapped")
 {
 	auto plus_10 = [](int i) { return i + 10; };
 	auto mul_2 = [](int x) { return x * 2; };
@@ -279,7 +282,7 @@ SCENARIO("ranges can be mapped", "[ranges/map]")
 }
 
 
-SCENARIO("ranges can be zipped", "[ranges/zip]")
+SCENARIO_OF("ranges/zip", "ranges can be zipped")
 {
 	GIVEN("a const lvalue vector of numbers, and a const lvalue vector of strings")
 	{
@@ -300,7 +303,5 @@ SCENARIO("ranges can be zipped", "[ranges/zip]")
 				++count;
 			CHECK(count == 1);
 		}
-
-		
 	}
 }
