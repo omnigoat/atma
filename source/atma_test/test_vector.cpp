@@ -6,7 +6,7 @@ using canary_t = atma::unit_test::canary_t;
 
 
 
-SCENARIO("vectors can be constructed", "[vector]")
+SCENARIO_OF("vector", "vectors can be constructed")
 {
 	GIVEN("a default-constructed vector")
 	{
@@ -209,7 +209,7 @@ SCENARIO("vectors can be constructed", "[vector]")
 
 }
 
-SCENARIO("vectors can be inserted into", "[vector]")
+SCENARIO_OF("vector", "vectors can be inserted into")
 {
 	GIVEN("a vector constructed with {1, 2, 3, 4}")
 	{
@@ -248,7 +248,7 @@ SCENARIO("vectors can be inserted into", "[vector]")
 }
 
 
-SCENARIO("vectors can be sized and resized", "[vector]")
+SCENARIO_OF("vector", "vectors can be sized and resized")
 {
 	GIVEN("an empty vector")
 	{
@@ -292,7 +292,7 @@ SCENARIO("vectors can be sized and resized", "[vector]")
 	}
 }
 
-SCENARIO("vectors can be assigned", "[vector]")
+SCENARIO_OF("vector", "vectors can be assigned")
 {
 	GIVEN("an empty vector 'v' and vector 'v2'={1,2,3,4}")
 	{

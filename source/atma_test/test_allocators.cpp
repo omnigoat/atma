@@ -11,7 +11,7 @@
 
 
 
-SCENARIO("arena allocator can be constructed", "[allocators]")
+SCENARIO_OF("allocators", "arena allocator can be constructed")
 {
 	GIVEN("a default-constructed arena-allocator")
 	{

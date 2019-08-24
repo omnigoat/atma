@@ -30,8 +30,7 @@ struct tm_t
 int what() { return 4; }
 
 
-
-SCENARIO("bind works with various things", "[bind]")
+SCENARIO_OF("bind", "bind works with various things")
 {
 	GIVEN("a binding to a free-function, and one to am equivalent non-closure lambda")
 	{
@@ -137,7 +136,7 @@ SCENARIO("bind works with various things", "[bind]")
 
 }
 
-SCENARIO("functions can be constructed")
+SCENARIO_OF("atma::function", "functions can be constructed")
 {
 	GIVEN("a default-constructed function")
 	{

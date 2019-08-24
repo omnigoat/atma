@@ -91,7 +91,7 @@ namespace atma
 		auto imem_recapacitize(size_t) -> void;
 
 	private:
-		using internal_memory_t = atma::memory_t<T, Allocator>;
+		using internal_memory_t = atma::basic_memory_t<T, Allocator>;
 
 		internal_memory_t imem_;
 		size_t capacity_;
