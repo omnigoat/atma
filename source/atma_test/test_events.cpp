@@ -1,4 +1,4 @@
-#include <atma/unit_test.hpp>
+﻿#include <atma/unit_test.hpp>
 
 #include <atma/event.hpp>
 #include <atma/lockfree_list.hpp>
@@ -19,7 +19,7 @@ using namespace std::chrono_literals;
 
 
 #if 1
-SCENARIO("events can be constructed", "[event]")
+SCENARIO_OF("events", "events can be constructed")
 {
 	//rose::runtime_t RR;
 	//rose::setup_default_logging_to_console(RR);

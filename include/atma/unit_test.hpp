@@ -5,20 +5,26 @@
 //
 
 // we support all of the C++11 features except noexcept
-#define CATCH_CONFIG_CPP11_NULLPTR
-#define CATCH_CONFIG_CPP11_NO_NOEXCEPT
-#define CATCH_CONFIG_CPP11_NO_GENERATED_METHODS
-#define CATCH_CONFIG_CPP11_IS_ENUM
-#define CATCH_CONFIG_CPP11_TUPLE
-#define CATCH_CONFIG_VARIADIC_MACROS
+//#define CATCH_CONFIG_CPP11_NULLPTR
+//#define CATCH_CONFIG_CPP11_NO_NOEXCEPT
+//#define CATCH_CONFIG_CPP11_NO_GENERATED_METHODS
+//#define CATCH_CONFIG_CPP11_IS_ENUM
+//#define CATCH_CONFIG_CPP11_TUPLE
+//#define CATCH_CONFIG_VARIADIC_MACROS
 
-#include "../../vendor/catch/catch.hpp"
+//#include "../../vendor/catch/catch.hpp"
+#include <doctest/doctest.h>
 
 
 // used for canary_t
 #include <boost/preprocessor/tuple/enum.hpp>
 #include <boost/preprocessor/array/elem.hpp>
+
 #include <map>
+#include <vector>
+#include <utility>
+#include <string>
+
 
 #if defined(CATCH_CONFIG_MAIN)
 

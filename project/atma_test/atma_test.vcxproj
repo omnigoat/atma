@@ -28,8 +28,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Test|x64'">
     <IncludePath>$(ProjectDir)..\..\vendor;$(ProjectDir)..\..\include;$(IncludePath)</IncludePath>
-    <OutDir>$(SolutionDir)$(TargetName)\builds\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)$(TargetName)\intermediates\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(ProjectDir)..\..\builds\$(Platform)\$(Configuration)\$(TargetName)\</OutDir>
+    <IntDir>$(ProjectDir)..\..\intermediates\$(Platform)\$(Configuration)\$(TargetName)\</IntDir>
     <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
@@ -63,7 +63,6 @@
     <ClCompile Include="..\..\source\atma_test\memory.cpp" />
     <ClCompile Include="..\..\source\atma_test\queue.cpp" />
     <ClCompile Include="..\..\source\atma_test\ranges.cpp" />
-    <ClCompile Include="..\..\source\atma_test\string.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_allocators.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_events.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_utf8_string.cpp" />

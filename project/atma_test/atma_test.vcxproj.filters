@@ -14,9 +14,6 @@
     <ClCompile Include="..\..\source\atma_test\entrypoint.cpp">
       <Filter>source</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\source\atma_test\string.cpp">
-      <Filter>source</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\source\atma_test\ranges.cpp">
       <Filter>source</Filter>
     </ClCompile>
