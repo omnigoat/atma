@@ -382,8 +382,72 @@ namespace atma { namespace unit_test {
 
 #endif
 
+#ifdef DOCTEST_CONFIG_IMPLEMENT
+namespace atma::unit_test
+{
+	struct AtmaReporter : doctest::ConsoleReporter
+	{
+		using ConsoleReporter::ConsoleReporter;
+
+		// don't print intro, that's dumb
+		void test_run_start() override
+		{}
+
+		void test_run_end(doctest::TestRunStats const& stats) override
+		{
+			using namespace doctest;
+
+			separator_to_stream();
+
+			bool const nothing_failed = stats.numTestCasesFailed == 0 && stats.numAssertsFailed == 0;
+
+			char const* test_cases_singularplural = (stats.numTestCasesPassingFilters == 1) ? " test case" : " test cases";
+			char const* asserts_singularplural = (stats.numAsserts == 1) ? " assertion" : " assertions";
+
+			if (nothing_failed)
+			{
+				s << "\n" << Color::Green << "  Passed " << stats.numTestCasesPassingFilters << test_cases_singularplural
+				  << " with " << stats.numAsserts << asserts_singularplural << "\n\n";
+			}
+			else
+			{
+				s << "\n" << Color::Red << "  Failed " << stats.numTestCasesFailed << " of " << stats.numTestCasesPassingFilters << test_cases_singularplural
+					<< " failed with " << stats.numAssertsFailed << " of " << stats.numAsserts << " failing" << asserts_singularplural << "\n\n";
+			}
 
 
+#if 0
+			s << Color::Cyan << "[doctest] " << Color::None << "test cases: " << std::setw(6)
+				<< p.numTestCasesPassingFilters << " | "
+				<< ((p.numTestCasesPassingFilters == 0 || anythingFailed) ? Color::None :
+					Color::Green)
+				<< std::setw(6) << p.numTestCasesPassingFilters - p.numTestCasesFailed << " passed"
+				<< Color::None << " | " << (p.numTestCasesFailed > 0 ? Color::Red : Color::None)
+				<< std::setw(6) << p.numTestCasesFailed << " failed" << Color::None << " | ";
+			if (opt.no_skipped_summary == false) {
+				const int numSkipped = p.numTestCases - p.numTestCasesPassingFilters;
+				s << (numSkipped == 0 ? Color::None : Color::Yellow) << std::setw(6) << numSkipped
+					<< " skipped" << Color::None;
+			}
+			s << "\n";
+			s << Color::Cyan << "[doctest] " << Color::None << "assertions: " << std::setw(6)
+				<< p.numAsserts << " | "
+				<< ((p.numAsserts == 0 || anythingFailed) ? Color::None : Color::Green)
+				<< std::setw(6) << (p.numAsserts - p.numAssertsFailed) << " passed" << Color::None
+				<< " | " << (p.numAssertsFailed > 0 ? Color::Red : Color::None) << std::setw(6)
+				<< p.numAssertsFailed << " failed" << Color::None << " |\n";
+			s << Color::Cyan << "[doctest] " << Color::None
+				<< "Status: " << (p.numTestCasesFailed > 0 ? Color::Red : Color::Green)
+				<< ((p.numTestCasesFailed > 0) ? "FAILURE!" : "SUCCESS!") << Color::None << std::endl;
+#endif
+		}
+	};
+}
+#endif
+
+#ifdef DOCTEST_CONFIG_IMPLEMENT
+REGISTER_REPORTER("atma_console", -1, ::atma::unit_test::AtmaReporter);
+#endif
 
 namespace atma { namespace unit_test {
 

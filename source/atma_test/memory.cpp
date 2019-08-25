@@ -124,7 +124,7 @@ SCENARIO_OF("memory/basic_memory_t", "basic_memory_t behaves nicely")
 	}
 }
 
-#if 0
+#if 1
 SCENARIO_OF("memory/operations", "memory operations behave")
 {
 	GIVEN("an empty allocator")
@@ -167,7 +167,7 @@ SCENARIO_OF("memory/operations", "memory operations behave")
 		THEN("copy_construct_range works - iterator edition")
 		{
 			auto dest_storage = std::vector<int>{0, 0, 0, 0, 0, 0};
-			auto src_storage = std::vector<int>{1, 2, 3, 4};
+			auto src_storage = std::vector<int>{1, 2, 3};
 
 			auto dest_memory = memory_t(dest_storage.data());
 

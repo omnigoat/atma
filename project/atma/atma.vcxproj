@@ -76,6 +76,7 @@
     <ClInclude Include="..\..\include\atma\utf\utf8_string_range_header.hpp" />
     <ClInclude Include="..\..\include\atma\utf\utf8_string_range.hpp" />
     <ClInclude Include="..\..\include\atma\vector.hpp" />
+    <ClInclude Include="..\..\vendor\doctest\doctest.h" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\resources\atma.natvis">

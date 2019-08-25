@@ -26,6 +26,12 @@
     <Filter Include="include\ranges">
       <UniqueIdentifier>{28e5fe84-943a-4755-93f4-596a859c63e9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="vendor">
+      <UniqueIdentifier>{a649a1d5-c558-42fa-a91e-814e0769b4c5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vendor\doctest">
+      <UniqueIdentifier>{12db3afe-a656-41e8-9bf4-d6c36d02f70d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\atma\math\vector4f.hpp">
@@ -222,6 +228,9 @@
     </ClInclude>
     <ClInclude Include="..\..\include\atma\meta.hpp">
       <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\vendor\doctest\doctest.h">
+      <Filter>vendor\doctest</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
