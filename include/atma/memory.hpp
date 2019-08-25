@@ -80,7 +80,7 @@ namespace atma
 
 			first_type& first() { return static_cast<first_type&>(*this); }
 			second_type& second() { return second_; }
-			first_type const& first() const { return static_cast<first_type&>(*this); }
+			first_type const& first() const { return static_cast<first_type const&>(*this); }
 			second_type const& second() const { return second_; }
 
 		private:
@@ -103,8 +103,10 @@ namespace atma
 				: Second(second), first_(first)
 			{}
 
-			First&& first() const { return first_; }
-			Second&& second() const { return static_cast<Second&>(*this); }
+			First& first() { return first_; }
+			Second& second() { return static_cast<Second&>(*this); }
+			First const& first() const { return first_; }
+			Second const& second() const { return static_cast<Second const&>(*this); }
 
 		private:
 			typename Tr<First, Second>::first_type first_;
@@ -121,6 +123,10 @@ namespace atma
 	template <typename First, typename Second, template <typename, typename> typename Transformer = detail::default_storage_transformer_t>
 	using ebo_pair_t = detail::ebo_pair_tx<First, Second>;
 }
+
+
+
+
 //
 //  base_memory_t
 //  ---------------
@@ -555,6 +561,17 @@ namespace atma
 // anything that inherits from simple_memory_t is considered a memory type
 namespace atma
 {
+	struct random_access_range
+	{
+		// has begin(range), end(range), and returned itertor is random-access
+		template <typename Range>
+		auto contract() -> concepts::specifies<
+			concepts::can<decltype(begin(std::declval<Range>()))>,
+			concepts::can<decltype(end(std::declval<Range>()))>,
+			concepts::is_true<std::is_same<std::random_access_iterator_tag, decltype(begin(std::declval<Range>()))>>
+		>;
+	};
+
 	template <typename M>
 	struct is_memory_type_t 
 		: std::void_t<typename M::value_type, typename M::allocator_type>
@@ -566,115 +583,108 @@ namespace atma
 }
 
 
-// dest_range
+// memxfer_range_t
 namespace atma
 {
 	constexpr struct memory_dest_tag_t {} memory_dest_tag;
 	constexpr struct memory_src_tag_t {} memory_src_tag;
 
-	template <typename Tag, typename T, typename A, typename I = T*>
+	template <typename Iter>
+	using enable_if_contiguous_iterator_t =
+		std::enable_if_t<std::is_same_v<std::random_access_iterator_tag, typename std::iterator_traits<Iter>::iterator_category>>;
+
+	// a range that can provide begin/end
+	template <typename Range>
+	using enable_if_contiguous_range_t =
+		std::enable_if_t<atma::concepts::models_v<random_access_range, Range>>;
+
+	// a range that can only provide 'begin' (maybe 'data')
+	template <typename Range>
+	using enable_if_baseaddr_range_t =
+		void;
+
+	template <typename Tag, typename T, typename A>
 	struct memxfer_range_t
 	{
 		using allocator_type = A;
 
 		memxfer_range_t(T* ptr, size_t idx, size_t size)
-			: alloc_and_vtable_(allocator_type(), &is_vtable)
-			, storage(IterSize{ptr + idx, size})
+			: alloc_and_ptr_(allocator_type(), ptr + idx)
+			, size_(size)
 		{}
 
-		template <typename M, typename = std::enable_if_t<is_memory_type_v<M>>>
+		template <typename M, typename = enable_if_contiguous_range_t<M>>
 		memxfer_range_t(M memory, size_t idx, size_t size)
-			: alloc_and_vtable_(memory.allocator(), &is_vtable)
-			, storage{IterSize{memory.data() + idx, size}}
+			: alloc_and_ptr_(memory.allocator(), memory.data() + idx)
+			, size_(size)
 		{}
 
 		template <typename M, typename = std::enable_if_t<is_memory_type_v<M>>>
 		memxfer_range_t(M memory, size_t size)
-			: alloc_and_vtable_(memory.allocator(), &is_vtable)
-			, storage(IterSize{memory.data(), size})
+			: alloc_and_ptr_(memory.allocator(), memory.data())
+			, size_(size)
 		{}
 
-		template <typename Iter>
+		template <typename Iter, typename = enable_if_contiguous_iterator_t<Iter>>
 		memxfer_range_t(Iter begin, Iter end)
-			: alloc_and_vtable_(allocator_type(), &pi_vtable)
-			, storage(PairIterator(begin, end))
+			: alloc_and_ptr_(allocator_type(), &*begin)
+			, size_(std::distance(begin, end))
 		{}
 
-		template <typename Range, typename = std::enable_if_t<atma::is_range_v<Range>>>
+		template <typename Range, typename = enable_if_contiguous_range_t<Range>>
 		memxfer_range_t(Range const& range)
-			: alloc_and_vtable_(allocator_type(), &pi_vtable)
-			, storage{PairIterator(std::begin(range), std::end(range))}
+			: alloc_and_ptr_(allocator_type(), &*begin(range))
+			, size_(std::distance(std::begin(range), std::end(range)))
 		{}
 
-		memxfer_range_t(std::vector<T> const& range)
-			: alloc_and_vtable_(allocator_type(), &pi_vtable)
-			, storage{ PairIterator{range.begin(), range.end()} }
+		memxfer_range_t(std::vector<std::remove_const_t<T>> const& range)
+			: alloc_and_ptr_(allocator_type(), range.data())
+			, size_(range.size())
 		{}
 
 		~memxfer_range_t()
 		{}
 
-		A& allocator() { return alloc_and_vtable_.first(); }
-		I begin() const { return (this->*alloc_and_vtable_.second()->begin)(); }
-		I end() const { return (this->*alloc_and_vtable_.second()->end)(); }
-		size_t size() const { return (this->*alloc_and_vtable_.second()->size)(); }
-
-	private: // vtable shenanigans
-		I pi_begin() const { return storage.is.begin; }
-		I pi_end() const { return storage.pi.end; }
-		size_t pi_size() const { return storage.pi.end - storage.pi.begin; }
-
-		I is_begin() const { return storage.is.begin; }
-		I is_end() const { return storage.is.begin + storage.is.size; }
-		size_t is_size() const { return storage.is.size; }
-
-		struct vtable_t
-		{
-			using begin_end_fptr = I(memxfer_range_t::*)() const;
-			using size_fptr = size_t(memxfer_range_t::*)() const;
-
-			begin_end_fptr begin, end;
-			size_fptr size;
-		};
-
-		static constexpr vtable_t pi_vtable = { &memxfer_range_t::pi_begin, &memxfer_range_t::pi_end, &memxfer_range_t::pi_size };
-		static constexpr vtable_t is_vtable = { &memxfer_range_t::is_begin, &memxfer_range_t::is_end, &memxfer_range_t::is_size };
+		allocator_type& allocator() const { return const_cast<allocator_type&>(alloc_and_ptr_.first()); }
+		T* begin() { return alloc_and_ptr_.second(); }
+		T* end() { return alloc_and_ptr_.second() + size_; }
+		T const* begin() const { return alloc_and_ptr_.second(); }
+		T const* end() const { return alloc_and_ptr_.second() + size_; }
+		size_t size() const { return size_; }
 
 	private:
 		// store the allocator EBO-d with the vtable pointer
-		using alloc_and_vtable_type = ebo_pair_t<A, vtable_t const*, detail::first_as_reference_transformer_t>;
-		alloc_and_vtable_type alloc_and_vtable_;
-
-		struct PairIterator {
-			I begin;
-			I end;
-		};
-
-		struct IterSize {
-			I begin;
-			size_t size;
-		};
-
-		union Storage
-		{
-			Storage(PairIterator&& pi) : pi(std::move(pi)) {}
-			Storage(IterSize&& is) : is(std::move(is)) {}
-			~Storage() {}
-			PairIterator pi;
-			IterSize is;
-		} storage;
+		using alloc_and_ptr_type = ebo_pair_t<A, T*, detail::first_as_reference_transformer_t>;
+		alloc_and_ptr_type alloc_and_ptr_;
+		size_t size_ = 0;
 	};
 
-	template <typename T, typename A, typename I = T*>
-	struct dest_range_t : memxfer_range_t<memory_dest_tag_t, T, A, I>
-	{
-		using memxfer_range_t<memory_dest_tag_t, T, A, I>::memxfer_range_t;
-	};
+	// ranged-based-for
+	template <typename G, typename T, typename A>
+	inline auto begin(memxfer_range_t<G, T, A>& r)
+		{ return r.begin(); }
 
-	template <typename T, typename A, typename I = T*>
-	struct src_range_t : memxfer_range_t<memory_src_tag_t, T, A, I>
+	template <typename G, typename T, typename A>
+	inline auto end(memxfer_range_t<G, T, A>& r)
+		{ return r.end(); }
+
+	template <typename G, typename T, typename A>
+	inline auto begin(memxfer_range_t<G, T, A> const& r)
+		{ return r.begin(); }
+
+	template <typename G, typename T, typename A>
+	inline auto end(memxfer_range_t<G, T, A> const& r)
+		{ return r.end(); }
+}
+
+// dest_range
+namespace atma
+{
+	// dest/src versions
+	template <typename T, typename A>
+	struct dest_range_t : memxfer_range_t<memory_dest_tag_t, T, A>
 	{
-		using memxfer_range_t< memory_src_tag_t, T, A, I>::memxfer_range_t;
+		using memxfer_range_t<memory_dest_tag_t, T, A>::memxfer_range_t;
 	};
 
 	// deduction guides
@@ -686,40 +696,16 @@ namespace atma
 
 	template <typename M, typename = std::enable_if_t<is_memory_type_v<M>>>
 	dest_range_t(M, size_t) -> dest_range_t<typename M::value_type, typename M::allocator_type>;
-
-	// ranged-based-for
-	template <typename T, typename A, typename I>
-	inline auto begin(memxfer_range_t<T, A, I> const& r)
-		{ return r.begin(); }
-
-	template <typename T, typename A, typename I>
-	inline auto end(memxfer_range_t<T, A, I> const& r)
-		{ return r.end(); }
 }
-
 
 // src_range
 namespace atma
 {
-#if 0
-	template <typename T, typename A, typename I = T*>
-	struct src_range_t
+	template <typename T, typename A>
+	struct src_range_t : memxfer_range_t<memory_src_tag_t, T, A>
 	{
-		src_range_t(T* ptr, size_t idx, size_t size)
-			: iter(ptr), idx(idx), size(size), allocator(std::allocator())
-		{}
-
-		template <typename M, typename = std::enable_if_t<is_memory_type_v<M>>>
-		src_range_t(M memory, size_t idx, size_t size)
-			: allocator(memory.allocator()), iter(memory), idx(idx), size(size)
-		{}
-
-		A& allocator;
-		I iter;
-		size_t idx = 0;
-		size_t size = 0;
+		using memxfer_range_t<memory_src_tag_t, T, A>::memxfer_range_t;
 	};
-#endif
 
 	template <typename T>
 	src_range_t(T*, size_t, size_t) -> src_range_t<T, std::allocator<T>>;
@@ -728,7 +714,7 @@ namespace atma
 	src_range_t(M, size_t, size_t) -> src_range_t<typename M::value_type, typename M::allocator_type>;
 
 	template <typename T>
-	src_range_t(std::vector<T> const&) -> src_range_t<T, std::allocator<T>, typename std::vector<T>::const_iterator>;
+	src_range_t(std::vector<T> const&) -> src_range_t<T const, std::allocator<T>>;
 }
 
 
@@ -780,12 +766,12 @@ namespace atma::memory
 // copy_construct_range
 namespace atma::memory
 {
-	template <typename DT, typename DA, typename DI, typename SA, typename SI>
-	inline auto copy_construct_range(dest_range_t<DT, DA, DI> dest_range, src_range_t<DT, SA, SI> src_range) -> void
+	template <typename DT, typename DA, typename ST, typename SA>
+	inline auto copy_construct_range(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
 	{
 		ATMA_ASSERT(dest_range.size() == src_range.size());
 
-		auto px = begin(dest_range);
+		DT* px = begin(dest_range);
 		auto pxe = end(dest_range);
 		auto py = begin(src_range);
 
