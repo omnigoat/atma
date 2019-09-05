@@ -11,11 +11,24 @@ namespace atma
 	struct range_concept
 	{
 		template <typename T>
-		auto contract()->concepts::specifies<
-			SPECIFIES_EXPR(std::begin(std::declval<T>())),
+		auto contract() -> concepts::specifies<
+			//SPECIFIES_EXPR(std::begin(std::declval<T>())),
 			SPECIFIES_EXPR(std::end(std::declval<T>()))
 		>;
 	};
+
+	struct random_access_range_concept
+		: concepts::refines<range_concept>
+	{
+		// returned itertor is random-access and it can be indexed by int
+		template <typename Range>
+		auto contract() -> concepts::specifies<
+			//concepts::is_true<std::is_same<std::random_access_iterator_tag, decltype(begin(std::declval<Range>()))>>,
+			SPECIFIES_EXPR(std::declval<Range>()[0])
+		>;
+	};
+
+	
 }
 
 // span

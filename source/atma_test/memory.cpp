@@ -159,7 +159,7 @@ SCENARIO_OF("memory/operations", "memory operations behave")
 
 			atma::memory::copy_construct_range(
 				atma::dest_range_t{dest_memory, 1, 4},
-				atma::src_range_t{src_memory, 0, 4});
+				atma::src_range_t{src_memory, 4});
 
 			CHECK_MEMORY(dest_memory, 0, 1, 2, 3, 4, 0);
 		}
@@ -173,7 +173,7 @@ SCENARIO_OF("memory/operations", "memory operations behave")
 
 			atma::memory::copy_construct_range(
 				atma::dest_range_t{dest_memory, 1, 3},
-				atma::src_range_t{src_storage});
+				atma::src_range_t{src_storage.begin(), src_storage.end()});
 
 			CHECK_MEMORY(dest_memory, 0, 1, 2, 3, 0, 0);
 		}
