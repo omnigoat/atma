@@ -5,6 +5,8 @@
 #include <atma/assert.hpp>
 #include <atma/types.hpp>
 
+#include <atma/ranges/core.hpp>
+
 #include <type_traits>
 #include <vector>
 #include <memory>
@@ -561,14 +563,13 @@ namespace atma
 // anything that inherits from simple_memory_t is considered a memory type
 namespace atma
 {
-	struct random_access_range
+	struct memory_span_concept
+		: concepts::refines<random_access_range_concept>
 	{
-		// has begin(range), end(range), and returned itertor is random-access
-		template <typename Range>
+		template <typename Memory>
 		auto contract() -> concepts::specifies<
-			concepts::can<decltype(begin(std::declval<Range>()))>,
-			concepts::can<decltype(end(std::declval<Range>()))>,
-			concepts::is_true<std::is_same<std::random_access_iterator_tag, decltype(begin(std::declval<Range>()))>>
+			SPECIFIES_EXPR(std::declval<Memory>().allocator()),
+			SPECIFIES_EXPR(std::declval<Memory>().data())
 		>;
 	};
 
@@ -596,7 +597,7 @@ namespace atma
 	// a range that can provide begin/end
 	template <typename Range>
 	using enable_if_contiguous_range_t =
-		std::enable_if_t<atma::concepts::models_v<random_access_range, Range>>;
+		std::enable_if_t<atma::concepts::models_v<random_access_range_concept, Range>>;
 
 	// a range that can only provide 'begin' (maybe 'data')
 	template <typename Range>
@@ -613,15 +614,27 @@ namespace atma
 			, size_(size)
 		{}
 
-		template <typename M, typename = enable_if_contiguous_range_t<M>>
-		memxfer_range_t(M memory, size_t idx, size_t size)
-			: alloc_and_ptr_(memory.allocator(), memory.data() + idx)
+		template <typename Range, CONCEPT_MODELS_(random_access_range_concept, Range)>
+		memxfer_range_t(Range const& range)
+			: alloc_and_ptr_(allocator_type(), &*begin(range))
+			, size_(std::distance(std::begin(range), std::end(range)))
+		{}
+
+		template <typename Range, CONCEPT_MODELS_(random_access_range_concept, Range)>
+		memxfer_range_t(Range const& range, size_t idx, size_t size)
+			: alloc_and_ptr_(allocator_type(), &range[idx])
 			, size_(size)
 		{}
 
-		template <typename M, typename = std::enable_if_t<is_memory_type_v<M>>>
+		template <typename M, CONCEPT_MODELS_(memory_span_concept, M)>
 		memxfer_range_t(M memory, size_t size)
 			: alloc_and_ptr_(memory.allocator(), memory.data())
+			, size_(size)
+		{}
+
+		template <typename M, CONCEPT_MODELS_(memory_span_concept, M)>
+		memxfer_range_t(M memory, size_t idx, size_t size)
+			: alloc_and_ptr_(memory.allocator(), memory.data() + idx)
 			, size_(size)
 		{}
 
@@ -629,12 +642,6 @@ namespace atma
 		memxfer_range_t(Iter begin, Iter end)
 			: alloc_and_ptr_(allocator_type(), &*begin)
 			, size_(std::distance(begin, end))
-		{}
-
-		template <typename Range, typename = enable_if_contiguous_range_t<Range>>
-		memxfer_range_t(Range const& range)
-			: alloc_and_ptr_(allocator_type(), &*begin(range))
-			, size_(std::distance(std::begin(range), std::end(range)))
 		{}
 
 		memxfer_range_t(std::vector<std::remove_const_t<T>> const& range)
@@ -713,8 +720,17 @@ namespace atma
 	template <typename M, typename = std::enable_if_t<is_memory_type_v<M>>>
 	src_range_t(M, size_t, size_t) -> src_range_t<typename M::value_type, typename M::allocator_type>;
 
+	template <typename M, CONCEPT_MODELS_(memory_span_concept, M)>
+	src_range_t(M, size_t) -> src_range_t<typename M::value_type, typename M::allocator_type>;
+
 	template <typename T>
 	src_range_t(std::vector<T> const&) -> src_range_t<T const, std::allocator<T>>;
+
+	template <typename I, typename = enable_if_contiguous_iterator_t<I>> //CONCEPT_MODELS_(concepts::contiguous_iterator_concept, I)>    /// typename = enable_if_contiguous_iterator_t<I>, typename T = std::remove_reference_t<decltype(*begin(std::declval<I>()))>>
+	src_range_t(I begin, I end) -> src_range_t
+		< std::remove_reference_t<decltype(*begin(std::declval<I>()))>
+		, std::allocator<std::remove_reference_t<decltype(*begin(std::declval<I>()))>>
+		>;
 }
 
 
