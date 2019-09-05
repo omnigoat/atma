@@ -53,6 +53,9 @@ namespace atma::meta
 	template <auto x>
 	using integral_constant_of = std::integral_constant<decltype(x), x>;
 
+	template <typename...>
+	using void_ = void;
+
 	template <bool     x> using bool_   = integral_constant_of<x>;
 	template <char     x> using char_   = integral_constant_of<x>;
 	template <int      x> using int_    = integral_constant_of<x>;
@@ -82,6 +85,13 @@ namespace atma::meta
 	};
 }
 
+// typeval
+namespace atma::meta
+{
+	template <typename T>
+	constexpr auto typeval = T::type::value;
+}
+
 // defer
 namespace atma::meta
 {
@@ -99,9 +109,10 @@ namespace atma::meta
 		using defer_ = decltype(try_defer_<C, Ts...>(0));
 	}
 
-	template <template <typename...> typename C, typename... Ts>
-	struct defer : decltype(detail::try_defer_<C, Ts...>(0))
-	{};
+	template <template <typename...> class C, typename... Ts>
+	struct defer : detail::defer_<C, Ts...>
+	{
+	};
 }
 
 // invokify & invoke
@@ -192,13 +203,13 @@ namespace atma::meta
 namespace atma::meta
 {
 	struct and_op {
-		template <typename x, typename y>
-		using invoke = integral_constant_of<x() && y()>;
+		template <typename A, typename B>
+		using invoke = integral_constant_of<typeval<A> && typeval<B>>;
 	};
 
 	struct or_op {
-		template <typename x, typename y>
-		using invoke = integral_constant_of<x() || y()>;
+		template <typename A, typename B>
+		using invoke = integral_constant_of<typeval<A> || typeval<B>>;
 	};
 }
 
@@ -209,8 +220,8 @@ namespace atma::meta
 	template <typename list>
 	using all = fold<and_op, bool_<true>, list>;
 
-	//template <typename list>
-	//using any = fold<or_op, bool_<false>, list>;
+	template <typename list>
+	using any = fold<or_op, bool_<false>, list>;
 }
 
 

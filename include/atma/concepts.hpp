@@ -12,18 +12,18 @@ namespace atma::concepts
 	namespace detail
 	{
 		template <typename Arg>
-		constexpr auto is_true_(Arg) ->
+		constexpr auto is_true_() ->
 			std::enable_if_t<Arg::value, std::true_type>;
 
 		template <typename Arg>
-		constexpr auto is_false_(Arg) ->
+		constexpr auto is_false_() ->
 			std::enable_if_t<!Arg::value, std::true_type>;
 
 		template <typename... Args>
 		constexpr void specifies_(Args&&...);
 
 		template <typename T = std::void_t<>>
-		struct has_ : std::false_type
+		struct can_ : std::false_type
 		{};
 	}
 
@@ -34,16 +34,16 @@ namespace atma::concepts
 		constexpr static auto value = true;
 	};
 
-	template <typename Arg, typename = decltype(detail::is_true_(Arg{}))>
+	template <typename Arg, typename = std::enable_if_t<Arg::value, std::true_type>>
 	struct is_true : std::true_type
 	{};
 
-	template <typename Arg, typename = decltype(detail::is_false_(Arg{}))>
+	template <typename Arg, typename = std::enable_if_t<!Arg::value, std::true_type>>
 	struct is_false : std::true_type
 	{};
 
-	template <typename Arg = std::void_t<>>
-	struct can : detail::has_<std::void_t<Arg>>
+	template <typename Arg>
+	struct can : detail::can_<std::void_t<Arg>>
 	{};
 }
 
@@ -97,7 +97,7 @@ namespace atma::concepts
 		auto models_(Concept*) ->
 			meta::all<
 				meta::map<
-					meta::bind_back<meta::invokify<concepts::models>, Types...>,
+					meta::bind_back<meta::invokify<models>, Types...>,
 					detail::base_concepts_t<Concept>>>;
 	}
 
@@ -196,12 +196,27 @@ namespace atma::concepts
 		template <typename T, typename... Us>
 		struct same<T, Us...> : meta::all<meta::list<meta::bool_<std::is_same<T, Us>::value>...>>{};
 
-		template<typename... Ts>
+		template <typename... Ts>
 		using same_t = typename same<Ts...>::type;
 
-		template<typename... Ts>
+		template <typename... Ts>
 		auto contract() -> specifies<
 			is_true<same_t<Ts...>>
+		>;
+	};
+}
+
+// concepts: iterators
+namespace atma::concepts
+{
+	struct contiguous_iterator_concept
+	{
+		template <typename Iter>
+		auto contract() -> specifies<
+			// SERIOUSLY, make this std::contiguous_access_iterator_tag when available
+			is_true<std::is_same<std::random_access_iterator_tag, typename std::iterator_traits<Iter>::iterator_category>>,
+			//SPECIFIES_EXPR(std::declval<Iter>().blam())
+			concepts::can<decltype(std::declval<Iter>().blam())>
 		>;
 	};
 }
@@ -261,20 +276,20 @@ namespace atma::concepts
 //  CONCEPT_MODELS_(...)
 //  -------------------------
 //    example:
-//      template <typename A, typename B,
-//        CONCEPT_MODELS_(addable, A, B),
-//        CONCEPT_MODELS_(integral, A)>
-//      auto operator + (int x, R const& range) -> ...
+//      template <typename Range, typename Offset,
+//        CONCEPT_MODELS_(addable, Range, Offset),
+//        CONCEPT_MODELS_(integral, Offset)>
+//      auto operator + (R const& range, Offset x) -> ...
 //
-#define CONCEPT_MODELS_(...) \
-    CONCEPT_MODELS_II_(ATMA_PP_CAT(_concept_models_, __COUNTER__), __VA_ARGS__)
+#define CONCEPT_MODELS_(concept, ...) \
+    CONCEPT_MODELS_II_(ATMA_PP_CAT(_concept_models_, __COUNTER__), concept, __VA_ARGS__)
 
-#define CONCEPT_MODELS_II_(arg_name, ...)                                   \
-    int arg_name = 42,                                                      \
-    std::enable_if_t<                                                       \
-        (arg_name == 43) || ::atma::concepts::models<__VA_ARGS__>::value,   \
-        int                                                                 \
-    > = 0                                                                   \
+#define CONCEPT_MODELS_II_(arg_name, ...)                              \
+    int arg_name = 42,                                                 \
+    std::enable_if_t<                                                  \
+        (arg_name == 43) || ::atma::concepts::models_v<__VA_ARGS__>,   \
+        int                                                            \
+    > = 0                                                              \
     /**/
 
 #define SPECIFIES_EXPR(...) \
