@@ -560,16 +560,14 @@ namespace atma
 
 
 
-// anything that inherits from simple_memory_t is considered a memory type
 namespace atma
 {
-	struct memory_span_concept
-		: concepts::refines<random_access_range_concept>
+	struct memory_range_concept
 	{
 		template <typename Memory>
 		auto contract() -> concepts::specifies<
-			SPECIFIES_EXPR(std::declval<Memory>().allocator()),
-			SPECIFIES_EXPR(std::declval<Memory>().data())
+			SPECIFIES_EXPR(std::declval<Memory>().data()),
+			SPECIFIES_EXPR(std::declval<Memory>().allocator())
 		>;
 	};
 
@@ -593,64 +591,69 @@ namespace atma
 	constexpr struct memory_dest_tag_t {} memory_dest_tag;
 	constexpr struct memory_src_tag_t {} memory_src_tag;
 
-	template <typename Iter>
-	using enable_if_contiguous_iterator_t =
-		std::enable_if_t<std::is_same_v<std::random_access_iterator_tag, typename std::iterator_traits<Iter>::iterator_category>>;
-
-	// a range that can provide begin/end
-	template <typename Range>
-	using enable_if_contiguous_range_t =
-		std::enable_if_t<atma::concepts::models_v<random_access_range_concept, Range>>;
-
-	// a range that can only provide 'begin' (maybe 'data')
-	template <typename Range>
-	using enable_if_baseaddr_range_t =
-		void;
-
 	template <typename Tag, typename T, typename A>
 	struct memxfer_range_t
 	{
 		using allocator_type = A;
+
+		//
+		// Poitner
+		//
+		memxfer_range_t(T* ptr, size_t size)
+			: alloc_and_ptr_(allocator_type(), ptr)
+			, size_(size)
+		{}
 
 		memxfer_range_t(T* ptr, size_t idx, size_t size)
 			: alloc_and_ptr_(allocator_type(), ptr + idx)
 			, size_(size)
 		{}
 
+		//
+		// Generic Range
+		//
 		template <typename Range, CONCEPT_MODELS_(random_access_range_concept, Range)>
-		memxfer_range_t(Range const& range)
-			: alloc_and_ptr_(allocator_type(), &*begin(range))
-			, size_(std::distance(std::begin(range), std::end(range)))
+		memxfer_range_t(Range&& range)
+			: alloc_and_ptr_(allocator_type(), &*(std::begin)(range))
+			, size_(std::distance((std::begin)(range), (std::end)(range)))
 		{}
 
 		template <typename Range, CONCEPT_MODELS_(random_access_range_concept, Range)>
-		memxfer_range_t(Range const& range, size_t idx, size_t size)
+		memxfer_range_t(Range&& range, size_t size)
+			: alloc_and_ptr_(allocator_type(), &*(std::begin)(range))
+			, size_(size)
+		{}
+
+		template <typename Range, CONCEPT_MODELS_(random_access_range_concept, Range)>
+		memxfer_range_t(Range&& range, size_t idx, size_t size)
 			: alloc_and_ptr_(allocator_type(), &range[idx])
 			, size_(size)
 		{}
 
-		template <typename M, typename = std::enable_if_t<is_memory_type_v<M>>> //CONCEPT_MODELS_(memory_span_concept, M)>
+		//
+		// Memory (Range + .allocator())
+		//
+		template <typename M, CONCEPT_MODELS_(memory_range_concept, M)>
 		memxfer_range_t(M memory, size_t size)
 			: alloc_and_ptr_(memory.allocator(), memory.data())
 			, size_(size)
 		{}
 
-		template <typename M, typename = std::enable_if_t<is_memory_type_v<M>>> //CONCEPT_MODELS_(memory_span_concept, M)>
+		template <typename M, CONCEPT_MODELS_(memory_range_concept, M)>
 		memxfer_range_t(M memory, size_t idx, size_t size)
 			: alloc_and_ptr_(memory.allocator(), memory.data() + idx)
 			, size_(size)
 		{}
 
-		template <typename Iter> // typename = enable_if_contiguous_iterator_t<Iter>
-		memxfer_range_t(Iter begin, Iter end)
+		//
+		// Iterator Pair
+		//
+		template <typename It, CONCEPT_MODELS_(concepts::contiguous_iterator_concept, It)>
+		memxfer_range_t(It begin, It end)
 			: alloc_and_ptr_(allocator_type(), &*begin)
 			, size_(std::distance(begin, end))
 		{}
 
-		memxfer_range_t(std::vector<std::remove_const_t<T>> const& range)
-			: alloc_and_ptr_(allocator_type(), range.data())
-			, size_(range.size())
-		{}
 
 		~memxfer_range_t()
 		{}
@@ -690,7 +693,6 @@ namespace atma
 // dest_range
 namespace atma
 {
-	// dest/src versions
 	template <typename T, typename A>
 	struct dest_range_t : memxfer_range_t<memory_dest_tag_t, T, A>
 	{
@@ -701,11 +703,17 @@ namespace atma
 	template <typename T>
 	dest_range_t(T*, size_t, size_t) -> dest_range_t<T, std::allocator<T>>;
 
-	template <typename M, typename = std::enable_if_t<is_memory_type_v<M>>>
-	dest_range_t(M, size_t, size_t) -> dest_range_t<typename M::value_type, typename M::allocator_type>;
+	template <typename Range, typename... Args, CONCEPT_MODELS_(random_access_range_concept, Range)>
+	dest_range_t(Range, Args&&...) -> dest_range_t<typename Range::value_type, std::allocator<typename Range::value_type>>;
 
-	template <typename M, typename = std::enable_if_t<is_memory_type_v<M>>>
-	dest_range_t(M, size_t) -> dest_range_t<typename M::value_type, typename M::allocator_type>;
+	template <typename M, typename... Args, CONCEPT_MODELS_(memory_range_concept, M)>
+	dest_range_t(M, Args...) -> dest_range_t<typename M::value_type, typename M::allocator_type>;
+
+	template <typename I, CONCEPT_MODELS_(concepts::contiguous_iterator_concept, I)>
+	dest_range_t(I begin, I end) -> dest_range_t
+		< std::remove_reference_t<decltype(*std::declval<I>())>
+		, std::allocator<std::remove_reference_t<decltype(*std::declval<I>())>>
+		>;
 }
 
 // src_range
@@ -717,24 +725,21 @@ namespace atma
 		using memxfer_range_t<memory_src_tag_t, T, A>::memxfer_range_t;
 	};
 
+	// deduction guides
 	template <typename T>
-	src_range_t(T*, size_t, size_t) -> src_range_t<T, std::allocator<T>>;
+	src_range_t(T*, size_t, size_t)->src_range_t<T, std::allocator<T>>;
 
-	template <typename M, typename = std::enable_if_t<is_memory_type_v<M>>>
-	src_range_t(M, size_t, size_t) -> src_range_t<typename M::value_type, typename M::allocator_type>;
+	template <typename Range, typename... Args, CONCEPT_MODELS_(random_access_range_concept, Range)>
+	src_range_t(Range, Args&& ...) -> src_range_t<typename Range::value_type, std::allocator<typename Range::value_type>>;
 
-	template <typename M, typename = std::enable_if_t<is_memory_type_v<M>>>
-	src_range_t(M, size_t) -> src_range_t<typename M::value_type, typename M::allocator_type>;
+	template <typename M, typename... Args, CONCEPT_MODELS_(memory_range_concept, M)>
+	src_range_t(M, Args...) -> src_range_t<typename M::value_type, typename M::allocator_type>;
 
-	template <typename T>
-	src_range_t(std::vector<T> const&) -> src_range_t<T const, std::allocator<T>>;
-
-	template <typename I, CONCEPT_MODELS_(concepts::contiguous_iterator_concept, I)>    /// typename = enable_if_contiguous_iterator_t<I>, typename T = std::remove_reference_t<decltype(*begin(std::declval<I>()))>>
+	template <typename I, CONCEPT_MODELS_(concepts::contiguous_iterator_concept, I)>
 	src_range_t(I begin, I end) -> src_range_t
-		<int, std::allocator<int>>;
-		//< std::remove_reference_t<decltype(*begin(std::declval<I>()))>
-		//, std::allocator<std::remove_reference_t<decltype(*begin(std::declval<I>()))>>
-		//>;
+		< std::remove_reference_t<decltype(*std::declval<I>())>
+		, std::allocator<std::remove_reference_t<decltype(*std::declval<I>())>>
+		>;
 }
 
 

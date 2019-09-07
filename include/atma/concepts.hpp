@@ -221,12 +221,34 @@ namespace atma::concepts
 
 #define CONTRACT_FWDS_TO_II(s, data, elem) std::declval<elem>()
 
+//
+//  CONTRACT_CALL_TEST
+//  --------------------
+//    calls another function by passing each type-argument as a std::declval, so
+//    that you can use function-argument-variables in SPECIFIES_EXPR, for example.
+//
+//    see random_iterator_concept for an example
+//
+#define CONTRACT_CALL_TEST(fn_name, ...) \
+	decltype(fn_name( \
+		BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_TRANSFORM(CONTRACT_FWDS_TO_II, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))) \
+	))
+
+//
+//  CONTRACT_FWDS_TO
+//  -------------------
+//    calls another function by passing each type-argument as a std::declval, so
+//    that you can use function-argument-variables in SPECIFIES_EXPR, for example.
+//
+//    as opposed to CONTRACT_CALL_TEST, this specifies the entire contract, like
+//
+//       template <typename It>
+//       CONTRACT_FWDS_TO(test, It&, It&, typename std::iterator_traits<It>::difference_type);
+//
 #define CONTRACT_FWDS_TO(fn_name, ...) \
 	auto contract() -> decltype(fn_name( \
 		BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_TRANSFORM(CONTRACT_FWDS_TO_II, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))) \
-	));
-
-
+	))
 
 
 
@@ -313,55 +335,44 @@ namespace atma::concepts
 {
 	struct iterator_concept
 	{
-		template <typename Iter>
+		template <typename It>
 		auto contract() -> specifies
 		<
-			// iterator-traits
-			SPECIFIES_TYPE(typename std::iterator_traits<Iter>::value_type),
-			SPECIFIES_TYPE(typename std::iterator_traits<Iter>::difference_type),
-			SPECIFIES_TYPE(typename std::iterator_traits<Iter>::reference),
-			SPECIFIES_TYPE(typename std::iterator_traits<Iter>::pointer),
-			SPECIFIES_TYPE(typename std::iterator_traits<Iter>::iterator_category),
+			SPECIFIES_TYPE(typename std::iterator_traits<It>::value_type),
+			SPECIFIES_TYPE(typename std::iterator_traits<It>::difference_type),
+			SPECIFIES_TYPE(typename std::iterator_traits<It>::reference),
+			SPECIFIES_TYPE(typename std::iterator_traits<It>::pointer),
+			SPECIFIES_TYPE(typename std::iterator_traits<It>::iterator_category),
 
-			// basic expressions for iterator
-			SPECIFIES_EXPR(*std::declval<Iter>()),
-			SPECIFIES_EXPR_OF_TYPE(Iter&, ++std::declval<Iter>())
+			SPECIFIES_EXPR(*std::declval<It>()),
+			SPECIFIES_EXPR_OF_TYPE(It&, ++std::declval<It>())
 		>;
 	};
 
 	struct forward_iterator_concept
 		: refines<iterator_concept>
 	{
-		template <typename Iter>
+		template <typename It>
 		auto contract() -> specifies<
-			is_true<std::is_base_of<std::forward_iterator_tag, typename Iter::iterator_category>>,
-			SPECIFIES_EXPR_OF_TYPE(Iter, std::declval<Iter>()++),
-			SPECIFIES_EXPR_OF_TYPE(typename std::iterator_traits<Iter>::reference, *std::declval<Iter>()++)
+			SPECIFIES_EXPR_OF_TYPE(It, std::declval<It>()++),
+			SPECIFIES_EXPR_OF_TYPE(typename std::iterator_traits<It>::reference, *std::declval<It>()++)
 		>;
 	};
-
 
 	struct bidirectional_iterator_concept
 		: refines<forward_iterator_concept>
 	{
-		template <typename Iter>
+		template <typename It>
 		auto contract() -> specifies<
-			SPECIFIES_EXPR_OF_TYPE(Iter&, --std::declval<Iter>()),
-			SPECIFIES_EXPR_OF_TYPE(Iter, std::declval<Iter>()--),
-			SPECIFIES_EXPR_OF_TYPE(typename std::iterator_traits<Iter>::reference, *std::declval<Iter>()--)
+			SPECIFIES_EXPR_OF_TYPE(It&, --std::declval<It>()),
+			SPECIFIES_EXPR_OF_TYPE(It, std::declval<It>()--),
+			SPECIFIES_EXPR_OF_TYPE(typename std::iterator_traits<It>::reference, *std::declval<It>()--)
 		>;
 	};
-
 
 	struct random_iterator_concept
 		: refines<bidirectional_iterator_concept>
 	{
-		template <typename It>
-		CONTRACT_FWDS_TO(test,
-			It&, It&,
-			typename std::iterator_traits<It>::difference_type,
-			typename std::iterator_traits<It>::reference);
-
 		template <typename It, typename difference_type, typename reference>
 		auto test(It& a, It& b, difference_type n, reference) -> specifies
 		<
@@ -377,16 +388,23 @@ namespace atma::concepts
 			SPECIFIES_EXPR_OF_TYPEISH(bool, a >= b),
 			SPECIFIES_EXPR_OF_TYPEISH(bool, a > b)
 		>;
+
+		template <typename It>
+		auto contract() -> specifies<
+			CONTRACT_CALL_TEST(test, It&, It&,
+				typename std::iterator_traits<It>::difference_type,
+				typename std::iterator_traits<It>::reference)
+		>;
 	};
 
 	struct contiguous_iterator_concept
 		: refines<random_iterator_concept>
 	{
-		template <typename Iter>
+		template <typename It>
 		auto contract() -> specifies<
-			// SERIOUSLY, make this std::contiguous_access_iterator_tag when available
-			is_true<std::is_base_of<std::random_access_iterator_tag, typename std::iterator_traits<Iter>::iterator_category>>,
-			SPECIFIES_EXPR(std::declval<Iter>() - std::declval<Iter>())
+			// we can't fully express the constraint 'contiguous' - but we *can* ask
+			// for std::addressof the first element plus a difference type to be dereferenceable
+			SPECIFIES_EXPR(*(std::addressof(*std::declval<It>()) + std::declval<typename std::iterator_traits<It>::difference_type>()))
 		>;
 	};
 }
