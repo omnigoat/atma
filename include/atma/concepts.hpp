@@ -4,7 +4,8 @@
 
 #include <boost/preprocessor/variadic/to_seq.hpp>
 #include <boost/preprocessor/seq/for_each_i.hpp>
-
+#include <boost/preprocessor/seq/transform.hpp>
+#include <boost/preprocessor/seq/enum.hpp>
 
 // specifies, is_true, is_false
 namespace atma::concepts
@@ -45,6 +46,9 @@ namespace atma::concepts
 	template <typename Arg>
 	struct can : detail::can_<std::void_t<Arg>>
 	{};
+
+	template <auto Expr>
+	struct valid_expr : std::true_type {};
 }
 
 
@@ -131,96 +135,6 @@ namespace atma::concepts
 	};
 }
 
-// concept: integrals
-namespace atma::concepts
-{
-	struct integral
-	{
-		template <typename T>
-		auto contract() -> specifies<
-			is_true<std::is_integral<T>>
-		>;
-	};
-
-	struct signed_integral
-		: refines<integral>
-	{
-		template <typename T>
-		auto contract() -> specifies<
-			is_true<std::is_signed<T>>
-		>;
-	};
-
-	struct unsigned_integral
-		: refines<integral>
-	{
-		template <typename T>
-		auto contract() -> specifies<
-			is_false<std::is_unsigned<T>>
-		>;
-	};
-}
-
-// concepts: conversion
-namespace atma::concepts
-{
-	struct implicitly_convertible
-	{
-		template <typename From, typename To>
-		auto contract() -> specifies<
-			is_true<std::is_convertible<From, To>>
-		>;
-	};
-
-	struct explicitly_convertible
-	{
-		template <typename From, typename To>
-		auto contract(From (&from)()) -> specifies<
-			decltype(((void) static_cast<To>(from()), 42))
-		>;
-	};
-
-	struct convertible
-		: refines<implicitly_convertible, explicitly_convertible>
-	{};
-}
-
-// concept: Same
-namespace atma::concepts
-{
-	struct Same
-	{
-		template <typename... Ts>
-		struct same : std::true_type {};
-		
-		template <typename T, typename... Us>
-		struct same<T, Us...> : meta::all<meta::list<meta::bool_<std::is_same<T, Us>::value>...>>{};
-
-		template <typename... Ts>
-		using same_t = typename same<Ts...>::type;
-
-		template <typename... Ts>
-		auto contract() -> specifies<
-			is_true<same_t<Ts...>>
-		>;
-	};
-}
-
-// concepts: iterators
-namespace atma::concepts
-{
-	struct contiguous_iterator_concept
-	{
-		template <typename Iter>
-		auto contract() -> specifies<
-			// SERIOUSLY, make this std::contiguous_access_iterator_tag when available
-			is_true<std::is_same<std::random_access_iterator_tag, typename std::iterator_traits<Iter>::iterator_category>>,
-			//SPECIFIES_EXPR(std::declval<Iter>().blam())
-			concepts::can<decltype(std::declval<Iter>().blam())>
-		>;
-	};
-}
-
 
 //
 //  CONCEPT_REQUIRES(...)
@@ -292,5 +206,187 @@ namespace atma::concepts
     > = 0                                                              \
     /**/
 
+#define SPECIFIES_TYPE(...) \
+	decltype(std::void_t<__VA_ARGS__>(), std::true_type())
+
 #define SPECIFIES_EXPR(...) \
     ::atma::concepts::can<decltype(__VA_ARGS__)>
+
+#define SPECIFIES_EXPR_OF_TYPE(type, ...) \
+	::atma::concepts::is_true<::std::is_same<type, decltype(__VA_ARGS__)>>
+
+#define SPECIFIES_EXPR_OF_TYPEISH(type, ...) \
+	::atma::concepts::is_true<::std::is_convertible<decltype(__VA_ARGS__), type>>
+
+
+#define CONTRACT_FWDS_TO_II(s, data, elem) std::declval<elem>()
+
+#define CONTRACT_FWDS_TO(fn_name, ...) \
+	auto contract() -> decltype(fn_name( \
+		BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_TRANSFORM(CONTRACT_FWDS_TO_II, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))) \
+	));
+
+
+
+
+
+
+
+
+// concept: integrals
+namespace atma::concepts
+{
+	struct integral
+	{
+		template <typename T>
+		auto contract()->specifies<
+			is_true<std::is_integral<T>>
+		>;
+	};
+
+	struct signed_integral
+		: refines<integral>
+	{
+		template <typename T>
+		auto contract()->specifies<
+			is_true<std::is_signed<T>>
+		>;
+	};
+
+	struct unsigned_integral
+		: refines<integral>
+	{
+		template <typename T>
+		auto contract()->specifies<
+			is_false<std::is_unsigned<T>>
+		>;
+	};
+}
+
+// concepts: conversion
+namespace atma::concepts
+{
+	struct implicitly_convertible
+	{
+		template <typename From, typename To>
+		auto contract()->specifies<
+			is_true<std::is_convertible<From, To>>
+		>;
+	};
+
+	struct explicitly_convertible
+	{
+		template <typename From, typename To>
+		auto contract(From (&from)())->specifies<
+			decltype(((void) static_cast<To>(from()), 42))
+		>;
+	};
+
+	struct convertible
+		: refines<implicitly_convertible, explicitly_convertible>
+	{};
+}
+
+// concept: Same
+namespace atma::concepts
+{
+	struct Same
+	{
+		template <typename... Ts>
+		struct same : std::true_type {};
+
+		template <typename T, typename... Us>
+		struct same<T, Us...> : meta::all<meta::list<meta::bool_<std::is_same<T, Us>::value>...>> {};
+
+		template <typename... Ts>
+		using same_t = typename same<Ts...>::type;
+
+		template <typename... Ts>
+		auto contract()->specifies<
+			is_true<same_t<Ts...>>
+		>;
+	};
+}
+
+// concepts: iterators
+namespace atma::concepts
+{
+	struct iterator_concept
+	{
+		template <typename Iter>
+		auto contract() -> specifies
+		<
+			// iterator-traits
+			SPECIFIES_TYPE(typename std::iterator_traits<Iter>::value_type),
+			SPECIFIES_TYPE(typename std::iterator_traits<Iter>::difference_type),
+			SPECIFIES_TYPE(typename std::iterator_traits<Iter>::reference),
+			SPECIFIES_TYPE(typename std::iterator_traits<Iter>::pointer),
+			SPECIFIES_TYPE(typename std::iterator_traits<Iter>::iterator_category),
+
+			// basic expressions for iterator
+			SPECIFIES_EXPR(*std::declval<Iter>()),
+			SPECIFIES_EXPR_OF_TYPE(Iter&, ++std::declval<Iter>())
+		>;
+	};
+
+	struct forward_iterator_concept
+		: refines<iterator_concept>
+	{
+		template <typename Iter>
+		auto contract() -> specifies<
+			is_true<std::is_base_of<std::forward_iterator_tag, typename Iter::iterator_category>>,
+			SPECIFIES_EXPR_OF_TYPE(Iter, std::declval<Iter>()++),
+			SPECIFIES_EXPR_OF_TYPE(typename std::iterator_traits<Iter>::reference, *std::declval<Iter>()++)
+		>;
+	};
+
+
+	struct bidirectional_iterator_concept
+		: refines<forward_iterator_concept>
+	{
+		template <typename Iter>
+		auto contract() -> specifies<
+			SPECIFIES_EXPR_OF_TYPE(Iter&, --std::declval<Iter>()),
+			SPECIFIES_EXPR_OF_TYPE(Iter, std::declval<Iter>()--),
+			SPECIFIES_EXPR_OF_TYPE(typename std::iterator_traits<Iter>::reference, *std::declval<Iter>()--)
+		>;
+	};
+
+
+	struct random_iterator_concept
+		: refines<bidirectional_iterator_concept>
+	{
+		template <typename It>
+		CONTRACT_FWDS_TO(test,
+			It&, It&,
+			typename std::iterator_traits<It>::difference_type,
+			typename std::iterator_traits<It>::reference);
+
+		template <typename It, typename difference_type, typename reference>
+		auto test(It& a, It& b, difference_type n, reference) -> specifies
+		<
+			SPECIFIES_EXPR_OF_TYPE(It&, a += n),
+			SPECIFIES_EXPR_OF_TYPE(It, a + n),
+			SPECIFIES_EXPR_OF_TYPE(It, n + a),
+			SPECIFIES_EXPR_OF_TYPE(It&, a -= n),
+			SPECIFIES_EXPR_OF_TYPE(It, a - n),
+			SPECIFIES_EXPR_OF_TYPE(difference_type, b - a),
+			SPECIFIES_EXPR_OF_TYPEISH(reference, a[n]),
+			SPECIFIES_EXPR_OF_TYPEISH(bool, a < b),
+			SPECIFIES_EXPR_OF_TYPEISH(bool, a <= b),
+			SPECIFIES_EXPR_OF_TYPEISH(bool, a >= b),
+			SPECIFIES_EXPR_OF_TYPEISH(bool, a > b)
+		>;
+	};
+
+	struct contiguous_iterator_concept
+		: refines<random_iterator_concept>
+	{
+		template <typename Iter>
+		auto contract() -> specifies<
+			// SERIOUSLY, make this std::contiguous_access_iterator_tag when available
+			is_true<std::is_base_of<std::random_access_iterator_tag, typename std::iterator_traits<Iter>::iterator_category>>,
+			SPECIFIES_EXPR(std::declval<Iter>() - std::declval<Iter>())
+		>;
+	};
+}
