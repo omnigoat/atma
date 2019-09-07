@@ -137,31 +137,24 @@ SCENARIO_OF("memory/operations", "memory operations behave")
 		memory_t m;
 		m.allocate(4);
 
-		THEN("copy_construct_range works - iterator edition")
-		{
-			auto dest_storage = std::vector<int>{ 0, 0, 0, 0, 0, 0 };
-			auto src_storage = std::vector<int>{ 1, 2, 3 };
 
-			auto dest_memory = memory_t(dest_storage.data());
-
-			atma::memory::copy_construct_range(
-				atma::dest_range_t{ dest_memory, 1, 3 },
-				atma::src_range_t{ src_storage.begin(), src_storage.end() });
-
-			CHECK_MEMORY(dest_memory, 0, 1, 2, 3, 0, 0);
-		}
-
-#if 0
+#if 1
 		THEN("construct_range works")
 		{
 			auto dest_storage = std::vector<int>{0, 0, 0, 0, 0, 0};
 			auto dest_memory = memory_t(dest_storage.data());
 
+			//atma::memory::construct_range(
+			//	atma::dest_range_t{dest_memory, 1, 4},
+			//	4);
+			//
+			//CHECK_MEMORY(dest_memory, 0, 4, 4, 4, 4, 0);
+
 			atma::memory::construct_range(
-				atma::dest_range_t{dest_memory, 1, 4},
+				atma::dest_range_t{dest_storage, 2},
 				4);
 
-			CHECK_MEMORY(dest_memory, 0, 4, 4, 4, 4, 0);
+			CHECK_MEMORY(dest_memory, 4, 4, 0, 0, 0, 0);
 		}
 
 		THEN("copy_construct_range works")
@@ -174,7 +167,7 @@ SCENARIO_OF("memory/operations", "memory operations behave")
 
 			atma::memory::copy_construct_range(
 				atma::dest_range_t{dest_memory, 1, 4},
-				atma::src_range_t{src_memory, 4u});
+				atma::src_range_t(src_memory, 4));
 
 			CHECK_MEMORY(dest_memory, 0, 1, 2, 3, 4, 0);
 		}

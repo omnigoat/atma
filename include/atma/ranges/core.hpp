@@ -12,7 +12,7 @@ namespace atma
 	{
 		template <typename T>
 		auto contract() -> concepts::specifies<
-			//SPECIFIES_EXPR(std::begin(std::declval<T>())),
+			SPECIFIES_EXPR(std::begin(std::declval<T>())),
 			SPECIFIES_EXPR(std::end(std::declval<T>()))
 		>;
 	};
