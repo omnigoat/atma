@@ -92,6 +92,7 @@ namespace atma::meta
 	constexpr auto typeval = T::type::value;
 }
 
+
 // defer
 namespace atma::meta
 {
