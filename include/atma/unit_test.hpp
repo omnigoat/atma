@@ -389,6 +389,85 @@ namespace atma::unit_test
 	{
 		using ConsoleReporter::ConsoleReporter;
 
+		void log_assert(const doctest::AssertData& rb) override
+		{
+			using namespace doctest;
+
+			if (!rb.m_failed && !opt.success)
+				return;
+
+			std::lock_guard<std::mutex> lock(mutex);
+
+			{
+				if (hasLoggedCurrentTestStart)
+					return;
+
+				separator_to_stream();
+				s << "\n";
+
+				file_line_to_stream(s, tc->m_file, tc->m_line, "\n");
+				if (tc->m_description)
+					s << Color::Yellow << "DESCRIPTION: " << Color::None << tc->m_description << "\n";
+				if (tc->m_test_suite && tc->m_test_suite[0] != '\0')
+					s << Color::Yellow << "TEST SUITE: " << Color::None << tc->m_test_suite << "\n";
+				if (strncmp(tc->m_name, "  Scenario:", 11) != 0)
+					s << Color::None << "TEST CASE:  ";
+				s << Color::None << tc->m_name << "\n";
+
+				for (auto& curr : subcasesStack)
+					if (curr.m_name[0] != '\0')
+						s << "  " << curr.m_name << "\n";
+
+				s << "\n";
+
+				hasLoggedCurrentTestStart = true;
+			}
+
+			file_line_to_stream(s, rb.m_file, rb.m_line, " ");
+			successOrFailColoredStringToStream(!rb.m_failed, rb.m_at);
+			if ((rb.m_at & (assertType::is_throws_as | assertType::is_throws_with)) ==
+				0) //!OCLINT bitwise operator in conditional
+				s << Color::Cyan << assertString(rb.m_at) << "( " << rb.m_expr << " ) "
+				<< Color::None;
+
+			if (rb.m_at & assertType::is_throws) { //!OCLINT bitwise operator in conditional
+				s << (rb.m_threw ? "threw as expected!" : "did NOT throw at all!") << "\n";
+			}
+			else if (rb.m_at &
+				assertType::is_throws_as) { //!OCLINT bitwise operator in conditional
+				s << Color::Cyan << assertString(rb.m_at) << "( " << rb.m_expr << ", "
+					<< rb.m_exception_type << " ) " << Color::None
+					<< (rb.m_threw ? (rb.m_threw_as ? "threw as expected!" :
+						"threw a DIFFERENT exception: ") :
+						"did NOT throw at all!")
+					<< Color::Cyan << rb.m_exception << "\n";
+			}
+			else if (rb.m_at &
+				assertType::is_throws_with) { //!OCLINT bitwise operator in conditional
+				s << Color::Cyan << assertString(rb.m_at) << "( " << rb.m_expr << ", \""
+					<< rb.m_exception_type << "\" ) " << Color::None
+					<< (rb.m_threw ? (!rb.m_failed ? "threw as expected!" :
+						"threw a DIFFERENT exception: ") :
+						"did NOT throw at all!")
+					<< Color::Cyan << rb.m_exception << "\n";
+			}
+			else if (rb.m_at & assertType::is_nothrow) { //!OCLINT bitwise operator in conditional
+				s << (rb.m_threw ? "THREW exception: " : "didn't throw!") << Color::Cyan
+					<< rb.m_exception << "\n";
+			}
+			else {
+				s << (rb.m_threw ? "THREW exception: " :
+					(!rb.m_failed ? "is correct!\n" : "is NOT correct!\n"));
+				if (rb.m_threw)
+					s << rb.m_exception << "\n";
+				else
+					s << "  values: " << assertString(rb.m_at) << "( " << rb.m_decomp << " )\n";
+			}
+
+			log_contexts();
+		}
+
+
 		// don't print intro, that's dumb
 		void test_run_start() override
 		{}
@@ -412,34 +491,8 @@ namespace atma::unit_test
 			else
 			{
 				s << "\n" << Color::Red << "  Failed " << stats.numTestCasesFailed << " of " << stats.numTestCasesPassingFilters << test_cases_singularplural
-					<< " failed with " << stats.numAssertsFailed << " of " << stats.numAsserts << " failing" << asserts_singularplural << "\n\n";
+					<< " with " << stats.numAssertsFailed << " of " << stats.numAsserts << " failing" << asserts_singularplural << "\n\n";
 			}
-
-
-#if 0
-			s << Color::Cyan << "[doctest] " << Color::None << "test cases: " << std::setw(6)
-				<< p.numTestCasesPassingFilters << " | "
-				<< ((p.numTestCasesPassingFilters == 0 || anythingFailed) ? Color::None :
-					Color::Green)
-				<< std::setw(6) << p.numTestCasesPassingFilters - p.numTestCasesFailed << " passed"
-				<< Color::None << " | " << (p.numTestCasesFailed > 0 ? Color::Red : Color::None)
-				<< std::setw(6) << p.numTestCasesFailed << " failed" << Color::None << " | ";
-			if (opt.no_skipped_summary == false) {
-				const int numSkipped = p.numTestCases - p.numTestCasesPassingFilters;
-				s << (numSkipped == 0 ? Color::None : Color::Yellow) << std::setw(6) << numSkipped
-					<< " skipped" << Color::None;
-			}
-			s << "\n";
-			s << Color::Cyan << "[doctest] " << Color::None << "assertions: " << std::setw(6)
-				<< p.numAsserts << " | "
-				<< ((p.numAsserts == 0 || anythingFailed) ? Color::None : Color::Green)
-				<< std::setw(6) << (p.numAsserts - p.numAssertsFailed) << " passed" << Color::None
-				<< " | " << (p.numAssertsFailed > 0 ? Color::Red : Color::None) << std::setw(6)
-				<< p.numAssertsFailed << " failed" << Color::None << " |\n";
-			s << Color::Cyan << "[doctest] " << Color::None
-				<< "Status: " << (p.numTestCasesFailed > 0 ? Color::Red : Color::Green)
-				<< ((p.numTestCasesFailed > 0) ? "FAILURE!" : "SUCCESS!") << Color::None << std::endl;
-#endif
 		}
 	};
 }
