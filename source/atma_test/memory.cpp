@@ -124,25 +124,25 @@ SCENARIO_OF("memory/basic_memory_t", "basic_memory_t behaves nicely")
 	}
 }
 
-SCENARIO_OF("memory/xfer_ranges", "a dest range is contructed")
+TYPE_TO_STRING(atma::dest_range_t<int>);
+TYPE_TO_STRING(atma::src_range_t<int>);
+
+SCENARIO_TEMPLATE("a memory-xfer-range is contructed ", range_type, atma::dest_range_t<int>, atma::src_range_t<int>)
 {
 	GIVEN("the types int & std::allocator<int>")
 	{
-		using value_type = int;
-		using allocator_type = std::allocator<int>;
-
-		THEN("dest_range_t is default constructible")
+		THEN("it is default constructible")
 		{
-			atma::dest_range_t<value_type, allocator_type> d;
+			range_type d;
 			ATMA_UNUSED(d);
 		}
 
-		THEN("dest_range_t constructs from pointer and size")
+		THEN("it constructs from pointer and size")
 		{
 			int const numsize = 4;
 			int numbers[numsize] = { 1, 2, 3, 4 };
 
-			atma::dest_range_t<value_type, allocator_type> d(numbers, numsize);
+			range_type d(numbers, numsize);
 			
 			CHECK(d.empty() == false);
 			CHECK(d.size() == numsize);
@@ -150,14 +150,14 @@ SCENARIO_OF("memory/xfer_ranges", "a dest range is contructed")
 			CHECK(d.end() == numbers + numsize);
 		}
 
-		THEN("dest_range_t constructs from pointer, offset, and size")
+		THEN("it constructs from pointer, offset, and size")
 		{
 			int const offset = 2;
 			int const numsize = 4;
 			int numbers[numsize] = { 1, 2, 3, 4 };
 
 			int const range_size = numsize - offset;
-			atma::dest_range_t<value_type, allocator_type> d(numbers, offset, range_size);
+			range_type d(numbers, offset, range_size);
 
 			CHECK(d.empty() == false);
 			CHECK(d.size() == range_size);
@@ -165,11 +165,11 @@ SCENARIO_OF("memory/xfer_ranges", "a dest range is contructed")
 			CHECK(d.end() == numbers + numsize);
 		}
 
-		THEN("dest_range_t constructs from generic range (vector)")
+		THEN("it constructs from generic range (vector)")
 		{
 			auto numbers = std::vector<int>{1, 2, 3, 4};
 
-			atma::dest_range_t<value_type, allocator_type> d(numbers);
+			range_type d(numbers);
 
 			CHECK(d.empty() == false);
 			CHECK(d.size() == numbers.size());
@@ -178,11 +178,11 @@ SCENARIO_OF("memory/xfer_ranges", "a dest range is contructed")
 			CHECK(d.begin() == &*numbers.begin());
 		}
 
-		THEN("dest_range_t constructs from vector and size")
+		THEN("it constructs from vector and size")
 		{
 			auto numbers = std::vector<int>{ 1, 2, 3, 4 };
 
-			atma::dest_range_t<value_type, allocator_type> d(numbers, 3);
+			range_type d(numbers, 3);
 
 			CHECK(d.empty() == false);
 			CHECK(d.size() == 3);
@@ -191,11 +191,11 @@ SCENARIO_OF("memory/xfer_ranges", "a dest range is contructed")
 			CHECK(d.begin() == &*numbers.begin());
 		}
 
-		THEN("dest_range_t constructs from vector, offset, and size")
+		THEN("it constructs from vector, offset, and size")
 		{
 			auto numbers = std::vector<int>{ 1, 2, 3, 4 };
 
-			atma::dest_range_t<value_type, allocator_type> d(numbers, 1, 3);
+			range_type d(numbers, 1, 3);
 
 			CHECK(d.empty() == false);
 			CHECK(d.size() == 3);
@@ -204,12 +204,12 @@ SCENARIO_OF("memory/xfer_ranges", "a dest range is contructed")
 			CHECK(d.begin() == &*numbers.begin() + 1);
 		}
 
-		THEN("dest_range_t constructs from a simple_memory_t & size")
+		THEN("it constructs from a simple_memory_t & size")
 		{
 			auto numbers = std::vector<int>{ 1, 2, 3, 4 };
 			auto mem = atma::simple_memory_t<int>(numbers.data());
 
-			atma::dest_range_t<value_type, allocator_type> d(mem, numbers.size());
+			range_type d(mem, numbers.size());
 
 			CHECK(d.empty() == false);
 			CHECK(d.size() == numbers.size());
@@ -218,12 +218,12 @@ SCENARIO_OF("memory/xfer_ranges", "a dest range is contructed")
 			CHECK(d.begin() == numbers.data());
 		}
 
-		THEN("dest_range_t constructs from a simple_memory_t, offset, and size")
+		THEN("it constructs from a simple_memory_t, offset, and size")
 		{
 			auto numbers = std::vector<int>{ 1, 2, 3, 4 };
 			auto mem = atma::simple_memory_t<int>(numbers.data());
 
-			atma::dest_range_t<value_type, allocator_type> d(mem, 2, numbers.size() - 2);
+			range_type d(mem, 2, numbers.size() - 2);
 
 			CHECK(d.empty() == false);
 			CHECK(d.size() == 2);

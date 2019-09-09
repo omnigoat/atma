@@ -691,7 +691,7 @@ namespace atma
 // dest_range
 namespace atma
 {
-	template <typename T, typename A>
+	template <typename T, typename A = std::allocator<T>>
 	struct dest_range_t : memxfer_range_t<memory_dest_tag_t, T, A>
 	{
 		using memxfer_range_t<memory_dest_tag_t, T, A>::memxfer_range_t;
@@ -717,7 +717,7 @@ namespace atma
 // src_range
 namespace atma
 {
-	template <typename T, typename A>
+	template <typename T, typename A = std::allocator<T>>
 	struct src_range_t : memxfer_range_t<memory_src_tag_t, T, A>
 	{
 		using memxfer_range_t<memory_src_tag_t, T, A>::memxfer_range_t;
