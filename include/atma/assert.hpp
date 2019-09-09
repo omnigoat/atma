@@ -30,6 +30,14 @@
 #endif
 
 
+
+#define ATMA_UNUSED_II(s, d, e) (void)e
+
+#define ATMA_UNUSED(...) \
+	BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_TRANSFORM(ATMA_UNUSED_II, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__)))
+
+
+
 //=====================================================================
 //
 //    HANDLING
