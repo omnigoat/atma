@@ -45,7 +45,6 @@ using size_t = std::size_t;
 	}; \
 	template <typename T> constexpr bool name##_v = name##_t<T>::value
 
-
 namespace atma
 {
 	//
