@@ -570,18 +570,6 @@ namespace atma
 			SPECIFIES_EXPR(std::declval<Memory>().allocator())
 		>;
 	};
-
-	template <typename, typename = std::void_t<>>
-	struct is_memory_type_t : std::false_type {};
-
-
-	template <typename M>
-	struct is_memory_type_t<M, std::void_t<typename M::value_type, typename M::allocator_type>>
-		: std::bool_constant<std::is_base_of<simple_memory_t<typename M::value_type, typename M::allocator_type>, M>::value>
-	{};
-
-	template <typename M>
-	constexpr bool is_memory_type_v = is_memory_type_t<M>::value;
 }
 
 
@@ -597,7 +585,16 @@ namespace atma
 		using allocator_type = A;
 
 		//
-		// Poitner
+		// default-constructor only allowed if allocator doesn't hold state
+		//
+		template <typename A2 = A, typename = std::enable_if_t<std::is_empty_v<A2>>>
+		memxfer_range_t()
+			: alloc_and_ptr_(allocator_type(), nullptr)
+			, size_()
+		{}
+
+		//
+		// Pointer
 		//
 		memxfer_range_t(T* ptr, size_t size)
 			: alloc_and_ptr_(allocator_type(), ptr)
@@ -664,6 +661,7 @@ namespace atma
 		T const* begin() const { return alloc_and_ptr_.second(); }
 		T const* end() const { return alloc_and_ptr_.second() + size_; }
 		size_t size() const { return size_; }
+		bool empty() const { return size_ == 0; }
 
 	private:
 		// store the allocator EBO-d with the vtable pointer
@@ -700,14 +698,14 @@ namespace atma
 	};
 
 	// deduction guides
-	template <typename T>
-	dest_range_t(T*, size_t, size_t) -> dest_range_t<T, std::allocator<T>>;
+	template <typename T, typename... SizeTs>
+	dest_range_t(T*, SizeTs...) -> dest_range_t<T, std::allocator<T>>;
 
-	template <typename Range, typename... Args, CONCEPT_MODELS_(random_access_range_concept, Range)>
-	dest_range_t(Range, Args&&...) -> dest_range_t<typename Range::value_type, std::allocator<typename Range::value_type>>;
+	template <typename Range, typename... SizeTs, CONCEPT_MODELS_(random_access_range_concept, Range)>
+	dest_range_t(Range, SizeTs...) -> dest_range_t<typename Range::value_type, std::allocator<typename Range::value_type>>;
 
-	template <typename M, typename... Args, CONCEPT_MODELS_(memory_range_concept, M)>
-	dest_range_t(M, Args...) -> dest_range_t<typename M::value_type, typename M::allocator_type>;
+	template <typename M, typename... SizeTs, CONCEPT_MODELS_(memory_range_concept, M)>
+	dest_range_t(M, SizeTs...) -> dest_range_t<typename M::value_type, typename M::allocator_type>;
 
 	template <typename I, CONCEPT_MODELS_(concepts::contiguous_iterator_concept, I)>
 	dest_range_t(I begin, I end) -> dest_range_t
@@ -726,14 +724,14 @@ namespace atma
 	};
 
 	// deduction guides
-	template <typename T>
-	src_range_t(T*, size_t, size_t)->src_range_t<T, std::allocator<T>>;
+	template <typename T, typename... SizeTs>
+	src_range_t(T*, SizeTs...) -> src_range_t<T, std::allocator<T>>;
 
-	template <typename Range, typename... Args, CONCEPT_MODELS_(random_access_range_concept, Range)>
-	src_range_t(Range, Args&& ...) -> src_range_t<typename Range::value_type, std::allocator<typename Range::value_type>>;
+	template <typename Range, CONCEPT_MODELS_(random_access_range_concept, Range)>
+	src_range_t(Range, ...) -> src_range_t<typename Range::value_type, std::allocator<typename Range::value_type>>;
 
-	template <typename M, typename... Args, CONCEPT_MODELS_(memory_range_concept, M)>
-	src_range_t(M, Args...) -> src_range_t<typename M::value_type, typename M::allocator_type>;
+	template <typename M, CONCEPT_MODELS_(memory_range_concept, M)>
+	src_range_t(M, ...) -> src_range_t<typename M::value_type, typename M::allocator_type>;
 
 	template <typename I, CONCEPT_MODELS_(concepts::contiguous_iterator_concept, I)>
 	src_range_t(I begin, I end) -> src_range_t
