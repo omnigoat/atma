@@ -276,7 +276,7 @@ namespace atma
 	//=====================================================================
 	inline auto operator == (utf8_string_t const& lhs, utf8_string_t const& rhs) -> bool
 	{
-		return lhs.raw_size() == rhs.raw_size() && ::strcmp(lhs.raw_begin(), rhs.raw_begin()) == 0;
+		return lhs.raw_size() == rhs.raw_size() && ::memcmp(lhs.raw_begin(), rhs.raw_begin(), lhs.raw_size()) == 0;
 	}
 
 	inline auto operator != (utf8_string_t const& lhs, utf8_string_t const& rhs) -> bool
