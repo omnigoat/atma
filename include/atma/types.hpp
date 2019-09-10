@@ -156,3 +156,72 @@ namespace atma
 	template <typename T>
 	inline constexpr bool is_range_v = detail::is_range<T>::value;
 }
+
+
+//
+//  value_type_of
+//  ---------------
+//    deducing value-type from R
+//    
+//     - tries remove-ref(*begin(R))
+//     - tries R::value_type
+//     - fails
+//
+namespace atma
+{
+	namespace detail
+	{
+		// value_type_of_ii
+		template <typename R, typename = std::void_t<>>
+		struct value_type_of_ii
+		{
+			static_assert(actually_false<R>, "couldn't not deduce a value-type for Range");
+		};
+
+		template <typename R>
+		struct value_type_of_ii<R, std::void_t<typename std::remove_reference_t<R>::value_type>>
+		{
+			using type = typename std::remove_reference_t<R>::value_type;
+		};
+
+		// value_type_of
+		template <typename R, typename = std::void_t<>>
+		struct value_type_of
+		{
+			using type = typename value_type_of_ii<R>::type;
+		};
+
+		template <typename R>
+		struct value_type_of<R, std::void_t<decltype(*begin(std::declval<R&>()))>>
+		{
+			using type = std::remove_reference_t<decltype(*begin(std::declval<R&>()))>;
+		};
+	}
+
+	template <typename R>
+	using value_type_of_t = typename detail::value_type_of<R>::type;
+}
+
+
+//
+//  allocator_type_of
+//  -------------------
+//    returns a "Range"'s allocator, or std::allocator<value-type> if possible
+//
+namespace atma
+{
+	template <typename R, typename = std::void_t<>>
+	struct allocator_type_of
+	{
+		using type = std::allocator<value_type_of_t<R>>;
+	};
+
+	template <typename R>
+	struct allocator_type_of<R, std::void_t<typename R::allocator_type>>
+	{
+		using type = typename R::allocator_type;
+	};
+
+	template <typename R>
+	using allocator_type_of_t = typename allocator_type_of<std::remove_reference_t<R>>::type;
+}
