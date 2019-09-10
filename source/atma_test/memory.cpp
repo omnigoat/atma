@@ -1,11 +1,11 @@
 #include <atma/unit_test.hpp>
 #include <atma/memory.hpp>
-//#include <atma/vector.hpp>
+#include <atma/string.hpp>
 
 #include <numeric>
 
 #define CHECK_MEMORY_II_m(r, v, i, elem) \
-	CHECK(((decltype(v)::pointer)v)[i] == elem);
+	CHECK_EQ(((decltype(v)::pointer)v)[i], elem);
 
 #define CHECK_MEMORY_II(v, seq) \
 	BOOST_PP_SEQ_FOR_EACH_I(CHECK_MEMORY_II_m, v, seq)
@@ -235,44 +235,239 @@ SCENARIO_TEMPLATE("a memory-xfer-range is contructed ", range_type, atma::dest_r
 }
 
 #if 1
-SCENARIO_OF("memory/operations", "memory operations behave")
+struct dragon_t
 {
-	GIVEN("an empty allocator")
+	dragon_t() = default;
+
+	dragon_t(atma::string const& name, int age)
+		: name(name), age(age)
+	{}
+
+	dragon_t(dragon_t const&) = default;
+	dragon_t(dragon_t&& rhs)
+		: name(std::move(rhs.name))
+		, age(rhs.age)
 	{
-		using empty_allocator = atma::aligned_allocator_t<int>;
-		using memory_t = atma::basic_memory_t<int, empty_allocator>;
+		rhs.age = 0;
+	}
 
-		static_assert(std::is_empty_v<empty_allocator>, "empty_allocator not empty!");
+	atma::string name;
+	int age = 0;
 
-		memory_t m;
-		m.allocate(4);
+	bool operator == (dragon_t const& rhs) const
+	{
+		return name == rhs.name && age == rhs.age;
+	}
+};
 
+std::ostream& operator << (std::ostream& stream, dragon_t const& dragon)
+{
+	return stream << "dragon{" << dragon.name << ", " << dragon.age << '}';
+}
 
-#if 1
-		THEN("construct_range works")
+TYPE_TO_STRING(dragon_t);
+
+SCENARIO_OF("memory/operations", "construct_range is called")
+{
+	GIVEN("an empty allocator and the dragon-type")
+	{
+		using value_type = dragon_t;
+		using allocator_type = atma::aligned_allocator_t<dragon_t>;
+		using memory_t = atma::basic_memory_t<value_type, allocator_type>;
+
+		static_assert(std::is_empty_v<allocator_type>, "allocator not empty!");
+
+		dragon_t const empty_dragon;
+		dragon_t const oliver{"oliver", 33};
+
+		GIVEN("memory pointing to an lvalue vector")
 		{
-			auto dest_storage = std::vector<int>{0, 0, 0, 0, 0, 0};
+			auto dest_storage = std::vector<value_type>(6, empty_dragon);
 			auto dest_memory = memory_t(dest_storage.data());
 
-			//atma::memory::construct_range(
-			//	atma::dest_range_t{dest_memory, 1, 4},
-			//	4);
-			//
-			//CHECK_MEMORY(dest_memory, 0, 4, 4, 4, 4, 0);
+			THEN("construct_range can construct the whole range with a direct constructor")
+			{
+				atma::memory::construct_range(
+					atma::dest_range_t{dest_memory, dest_storage.size()},
+					"oliver", 33);
 
-			atma::memory::construct_range(
-				atma::dest_range_t{dest_storage, 2},
-				4);
+				CHECK_MEMORY(dest_memory,
+					oliver, oliver, oliver,
+					oliver, oliver, oliver);
+			}
 
-			CHECK_MEMORY(dest_memory, 4, 4, 0, 0, 0, 0);
+			THEN("a partial-range can be constructed via a direct constructor")
+			{
+				atma::memory::construct_range(
+					atma::dest_range_t{dest_memory, 4},
+					"oliver", 33);
+
+				CHECK_MEMORY(dest_memory,
+					oliver, oliver, oliver, oliver,
+					empty_dragon, empty_dragon);
+			}
+
+			THEN("a partial-range can be constructed via a direct constructor")
+			{
+				atma::memory::construct_range(
+					atma::dest_range_t{dest_memory, 1, 4},
+					"oliver", 33);
+
+				CHECK_MEMORY(dest_memory,
+					empty_dragon,
+					oliver, oliver, oliver, oliver,
+					empty_dragon);
+			}
+
+			THEN("a partial-range can be constructed via the copy-constructor")
+			{
+				atma::memory::construct_range(
+					atma::dest_range_t{dest_memory, 1, 4},
+					oliver);
+
+				CHECK_MEMORY(dest_memory,
+					empty_dragon,
+					oliver, oliver, oliver, oliver,
+					empty_dragon);
+			}
 		}
+	}
+}
 
+
+SCENARIO_OF("memory/operations", "copy_construct_range is called")
+{
+	GIVEN("an empty allocator and the dragon-type")
+	{
+		using value_type = dragon_t;
+		using allocator_type = atma::aligned_allocator_t<dragon_t>;
+		using memory_t = atma::basic_memory_t<value_type, allocator_type>;
+
+		static_assert(std::is_empty_v<allocator_type>, "allocator not empty!");
+
+		dragon_t const empty_dragon;
+		dragon_t const oliver{"oliver", 33};
+		dragon_t const henry{"henry", 24};
+		dragon_t const marcie{"marcie", 27};
+		dragon_t const rachael{"rachael", 19};
+
+		GIVEN("destination memory pointing to an lvalue vector")
+		{
+			auto dest_storage = std::vector<value_type>(6, empty_dragon);
+			auto dest_memory = memory_t(dest_storage.data());
+
+			GIVEN("source memory pointing to a const-lvalue vector")
+			{
+				auto const src_storage = std::vector<value_type>{oliver, henry, marcie, rachael};
+
+				THEN("copy_construct_range can copy-construct the beginning of the range")
+				{
+					atma::memory::copy_construct_range(
+						atma::dest_range_t{dest_memory, 4},
+						atma::src_range_t{src_storage});
+
+					CHECK_MEMORY(dest_memory,
+						oliver, henry, marcie, rachael,
+						empty_dragon, empty_dragon);
+				}
+
+				THEN("copy_construct_range can copy-construct the middle of the range")
+				{
+					atma::memory::copy_construct_range(
+						atma::dest_range_t{dest_memory, 1, 4},
+						atma::src_range_t{src_storage});
+
+					CHECK_MEMORY(dest_memory,
+						empty_dragon,
+						oliver, henry, marcie, rachael,
+						empty_dragon);
+				}
+
+				THEN("copy_construct_range can copy-construct bits of both ranges")
+				{
+					atma::memory::copy_construct_range(
+						atma::dest_range_t{dest_memory, 4, 2},
+						atma::src_range_t{src_storage, 2, 2});
+
+					CHECK_MEMORY(dest_memory,
+						empty_dragon, empty_dragon, empty_dragon, empty_dragon,
+						marcie, rachael);
+				}
+			}
+		}
+	}
+}
+
+
+SCENARIO_OF("memory/operations", "copy_construct_range is called")
+{
+	GIVEN("an empty allocator and the dragon-type")
+	{
+		using value_type = dragon_t;
+		using allocator_type = atma::aligned_allocator_t<dragon_t>;
+		using memory_t = atma::basic_memory_t<value_type, allocator_type>;
+
+		static_assert(std::is_empty_v<allocator_type>, "allocator not empty!");
+
+		dragon_t const empty_dragon;
+		dragon_t const oliver{"oliver", 33};
+		dragon_t const henry{"henry", 24};
+		dragon_t const marcie{"marcie", 27};
+		dragon_t const rachael{"rachael", 19};
+
+		GIVEN("destination memory pointing to an lvalue vector")
+		{
+			auto dest_storage = std::vector<value_type>(6, empty_dragon);
+			auto dest_memory = memory_t(dest_storage.data());
+
+			GIVEN("source memory pointing to an lvalue vector")
+			{
+				auto src_storage = std::vector<value_type>{oliver, henry, marcie, rachael};
+
+				THEN("move_construct_range can move part of the range")
+				{
+					atma::memory::move_construct_range(
+						atma::dest_range_t{dest_memory, 4},
+						atma::src_range_t{src_storage.begin(), src_storage.end()});
+
+					CHECK_MEMORY(dest_memory,
+						oliver, henry, marcie, rachael,
+						empty_dragon, empty_dragon);
+
+					CHECK_VECTOR(src_storage,
+						empty_dragon, empty_dragon, empty_dragon, empty_dragon);
+				}
+
+				THEN("move_construct_range can move part of the range")
+				{
+					atma::memory::move_construct_range(
+						atma::dest_range_t{dest_memory, 2},
+						atma::src_range_t{src_storage, 0, 2});
+
+					CHECK_MEMORY(dest_memory,
+						oliver, henry,
+						empty_dragon, empty_dragon, empty_dragon, empty_dragon);
+
+					CHECK_VECTOR(src_storage,
+						empty_dragon, empty_dragon,
+						marcie, rachael);
+				}
+			}
+		}
+	}
+}
+
+#if 1
+		
+
+		
+#if 0
 		THEN("copy_construct_range works")
 		{
-			auto dest_storage = std::vector<int>{0, 0, 0, 0, 0, 0};
+			//auto dest_storage = std::vector<int>{0, 0, 0, 0, 0, 0};
 			auto src_storage = std::vector<int>{1, 2, 3, 4};
 
-			auto dest_memory = atma::simple_memory_t<int, empty_allocator>(dest_storage.data());
+			//auto dest_memory = atma::simple_memory_t<int, empty_allocator>(dest_storage.data());
 			auto src_memory = atma::simple_memory_t<int, empty_allocator>(src_storage.data());
 
 			atma::memory::copy_construct_range(
@@ -284,10 +479,10 @@ SCENARIO_OF("memory/operations", "memory operations behave")
 
 		THEN("copy_construct_range works - iterator edition")
 		{
-			auto dest_storage = std::vector<int>{0, 0, 0, 0, 0, 0};
+			//auto dest_storage = std::vector<int>{0, 0, 0, 0, 0, 0};
 			auto src_storage = std::vector<int>{1, 2, 3};
 
-			auto dest_memory = memory_t(dest_storage.data());
+			//auto dest_memory = memory_t(dest_storage.data());
 
 			atma::memory::copy_construct_range(
 				atma::dest_range_t{dest_memory, 1, 3},
@@ -295,6 +490,16 @@ SCENARIO_OF("memory/operations", "memory operations behave")
 
 			CHECK_MEMORY(dest_memory, 0, 1, 2, 3, 0, 0);
 		}
+		THEN("")
+		{
+			atma::memory::construct_range(
+				atma::dest_range_t{dest_memory, 1, 4},
+				4);
+
+			CHECK_MEMORY(dest_memory, 0, 4, 4, 4, 4, 0);
+		}
+#endif
+
 #endif
 #if 0
 		THEN("move_construct_range works")
@@ -337,7 +542,7 @@ SCENARIO_OF("memory/operations", "memory operations behave")
 			CHECK(*dest_storage[0] == 1);
 			CHECK(*dest_storage[1] == 2);
 		}
-#endif
 	}
 }
+#endif
 #endif
