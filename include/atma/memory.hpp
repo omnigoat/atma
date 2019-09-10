@@ -698,14 +698,14 @@ namespace atma
 	};
 
 	// deduction guides
-	template <typename T, typename... SizeTs>
-	dest_range_t(T*, SizeTs...) -> dest_range_t<T, std::allocator<T>>;
+	template <typename T, typename... Args>
+	dest_range_t(T*, Args...) -> dest_range_t<T, std::allocator<T>>;
 
-	template <typename Range, typename... SizeTs, CONCEPT_MODELS_(random_access_range_concept, Range)>
-	dest_range_t(Range, SizeTs...) -> dest_range_t<typename Range::value_type, std::allocator<typename Range::value_type>>;
+	template <typename Range, typename... Args, CONCEPT_MODELS_(random_access_range_concept, Range)>
+	dest_range_t(Range, Args...) -> dest_range_t<typename Range::value_type, std::allocator<typename Range::value_type>>;
 
-	template <typename M, typename... SizeTs, CONCEPT_MODELS_(memory_range_concept, M)>
-	dest_range_t(M, SizeTs...) -> dest_range_t<typename M::value_type, typename M::allocator_type>;
+	template <typename M, typename... Args, CONCEPT_MODELS_(memory_range_concept, M)>
+	dest_range_t(M, Args...) -> dest_range_t<typename M::value_type, typename M::allocator_type>;
 
 	template <typename I, CONCEPT_MODELS_(concepts::contiguous_iterator_concept, I)>
 	dest_range_t(I begin, I end) -> dest_range_t
@@ -724,14 +724,20 @@ namespace atma
 	};
 
 	// deduction guides
-	template <typename T, typename... SizeTs>
-	src_range_t(T*, SizeTs...) -> src_range_t<T, std::allocator<T>>;
+	template <typename T, typename... Args>
+	src_range_t(T*, Args...) -> src_range_t<T, std::allocator<T>>;
 
-	template <typename Range, CONCEPT_MODELS_(random_access_range_concept, Range)>
-	src_range_t(Range, ...) -> src_range_t<typename Range::value_type, std::allocator<typename Range::value_type>>;
+	// we must use 'decltype(*begin(range))' so that if passed a
+	// const-range we correctly deduce T to be a const-T
+	//
+	// yeah it's a bit of a pain
+	template <typename Range, typename... Args, CONCEPT_MODELS_(random_access_range_concept, Range)>
+	src_range_t(Range&& r, Args...) -> src_range_t<
+		std::remove_reference_t<decltype(*begin(std::forward<Range>(r)))>,
+		std::allocator<typename std::remove_reference_t<Range>::value_type>>;
 
-	template <typename M, CONCEPT_MODELS_(memory_range_concept, M)>
-	src_range_t(M, ...) -> src_range_t<typename M::value_type, typename M::allocator_type>;
+	template <typename M, typename... Args, CONCEPT_MODELS_(memory_range_concept, M)>
+	src_range_t(M, Args...) -> src_range_t<typename M::value_type, typename M::allocator_type>;
 
 	template <typename I, CONCEPT_MODELS_(concepts::contiguous_iterator_concept, I)>
 	src_range_t(I begin, I end) -> src_range_t
@@ -794,30 +800,25 @@ namespace atma::memory
 	{
 		ATMA_ASSERT(dest_range.size() == src_range.size());
 
-		DT* px = begin(dest_range);
-		auto pxe = end(dest_range);
 		auto py = begin(src_range);
 
-		using dest_alloc_traits = std::allocator_traits<DA>;
-		while (px != pxe)
-			dest_alloc_traits::construct(dest_range.allocator(), &*px++, *py++);
+		for (auto& x : dest_range)
+			std::allocator_traits<DA>::construct(dest_range.allocator(), &x, *py++);
 	}
 }
 
 // move_construct_range
 namespace atma::memory
 {
-	template <typename T, typename A, typename B>
-	inline auto move_construct_range(dest_range_t<T, A> dest_range, src_range_t<T, B> src_range) -> void
+	template <typename DT, typename DA, typename ST, typename SA>
+	inline auto move_construct_range(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
 	{
 		ATMA_ASSERT(dest_range.size() == src_range.size());
 
-		auto px = (T*)dest_range.ptr + dest_range.idx;
-		auto py = (T*)src_range.ptr + src_range.idx;
+		auto py = begin(src_range);
 
-		using dest_alloc_traits = std::allocator_traits<A>;
-		while (dest_range.size --> 0 && src_range.size --> 0)
-			dest_alloc_traits::construct(dest_range.allocator, px++, std::move(*py++));
+		for (auto& x : dest_range)
+			std::allocator_traits<DA>::construct(dest_range.allocator(), &x, std::move(*py++));
 	}
 
 	template <typename T, typename A, typename SrcIt>
