@@ -234,7 +234,6 @@ SCENARIO_TEMPLATE("a memory-xfer-range is contructed ", range_type, atma::dest_r
 	}
 }
 
-#if 1
 struct dragon_t
 {
 	dragon_t() = default;
@@ -399,7 +398,7 @@ SCENARIO_OF("memory/operations", "copy_construct_range is called")
 }
 
 
-SCENARIO_OF("memory/operations", "copy_construct_range is called")
+SCENARIO_OF("memory/operations", "move_construct_range is called")
 {
 	GIVEN("an empty allocator and the dragon-type")
 	{
@@ -456,93 +455,3 @@ SCENARIO_OF("memory/operations", "copy_construct_range is called")
 		}
 	}
 }
-
-#if 1
-		
-
-		
-#if 0
-		THEN("copy_construct_range works")
-		{
-			//auto dest_storage = std::vector<int>{0, 0, 0, 0, 0, 0};
-			auto src_storage = std::vector<int>{1, 2, 3, 4};
-
-			//auto dest_memory = atma::simple_memory_t<int, empty_allocator>(dest_storage.data());
-			auto src_memory = atma::simple_memory_t<int, empty_allocator>(src_storage.data());
-
-			atma::memory::copy_construct_range(
-				atma::dest_range_t{dest_memory, 1, 4},
-				atma::src_range_t(src_memory, 4));
-
-			CHECK_MEMORY(dest_memory, 0, 1, 2, 3, 4, 0);
-		}
-
-		THEN("copy_construct_range works - iterator edition")
-		{
-			//auto dest_storage = std::vector<int>{0, 0, 0, 0, 0, 0};
-			auto src_storage = std::vector<int>{1, 2, 3};
-
-			//auto dest_memory = memory_t(dest_storage.data());
-
-			atma::memory::copy_construct_range(
-				atma::dest_range_t{dest_memory, 1, 3},
-				atma::src_range_t{src_storage.begin(), src_storage.end()});
-
-			CHECK_MEMORY(dest_memory, 0, 1, 2, 3, 0, 0);
-		}
-		THEN("")
-		{
-			atma::memory::construct_range(
-				atma::dest_range_t{dest_memory, 1, 4},
-				4);
-
-			CHECK_MEMORY(dest_memory, 0, 4, 4, 4, 4, 0);
-		}
-#endif
-
-#endif
-#if 0
-		THEN("move_construct_range works")
-		{
-			auto dest_storage = std::vector<std::unique_ptr<int>>(2);
-			auto src_storage = std::vector<std::unique_ptr<int>>();
-			src_storage.emplace_back(std::move(std::make_unique<int>(1)));
-			src_storage.emplace_back(std::move(std::make_unique<int>(2)));
-
-			auto dest_memory = atma::simple_memory_t<std::unique_ptr<int>>(dest_storage.data());
-			auto src_memory = atma::simple_memory_t<std::unique_ptr<int>>(src_storage.data());
-
-			atma::memory::move_construct_range(
-				atma::dest_range_t{dest_memory, 2},
-				atma::src_range_t{src_memory, 0, 2});
-
-			CHECK(src_storage[0] == nullptr);
-			CHECK(src_storage[1] == nullptr);
-
-			CHECK(*dest_storage[0] == 1);
-			CHECK(*dest_storage[1] == 2);
-		}
-
-		THEN("move_construct_range works - iterator edition")
-		{
-			auto dest_storage = std::vector<std::unique_ptr<int>>(2);
-			auto src_storage = std::vector<std::unique_ptr<int>>();
-			src_storage.emplace_back(std::move(std::make_unique<int>(1)));
-			src_storage.emplace_back(std::move(std::make_unique<int>(2)));
-
-			auto dest_memory = atma::simple_memory_t<std::unique_ptr<int>>(dest_storage.data());
-
-			atma::memory::move_construct_range(
-				atma::dest_range_t{dest_memory, 2},
-				src_storage.begin(), src_storage.end());
-
-			CHECK(src_storage[0] == nullptr);
-			CHECK(src_storage[1] == nullptr);
-
-			CHECK(*dest_storage[0] == 1);
-			CHECK(*dest_storage[1] == 2);
-		}
-	}
-}
-#endif
-#endif
