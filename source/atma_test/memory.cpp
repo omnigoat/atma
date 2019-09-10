@@ -250,6 +250,12 @@ struct dragon_t
 		rhs.age = 0;
 	}
 
+	~dragon_t()
+	{
+		name.clear();
+		age = 0;
+	}
+
 	atma::string name;
 	int age = 0;
 
@@ -455,3 +461,34 @@ SCENARIO_OF("memory/operations", "move_construct_range is called")
 		}
 	}
 }
+
+SCENARIO_OF("memory/operations", "destruct is called")
+{
+	GIVEN("a memory-range of instantiated dragons")
+	{
+		using value_type = dragon_t;
+		using allocator_type = atma::aligned_allocator_t<dragon_t>;
+		using memory_t = atma::basic_memory_t<value_type, allocator_type>;
+
+		static_assert(std::is_empty_v<allocator_type>, "allocator not empty!");
+
+		dragon_t const empty_dragon;
+		dragon_t const oliver{"oliver", 33};
+		dragon_t const henry{"henry", 24};
+		dragon_t const marcie{"marcie", 27};
+		dragon_t const rachael{"rachael", 19};
+
+		auto dest_storage = std::vector<value_type>{oliver, henry, marcie, rachael};
+		auto dest_memory = memory_t(dest_storage.data());
+
+		THEN("destruct calls the destructor of the whole range")
+		{
+			atma::memory::destruct_range(
+				atma::dest_range_t{dest_memory, 4});
+
+			CHECK_VECTOR(dest_storage,
+				empty_dragon, empty_dragon, empty_dragon, empty_dragon);
+		}
+	}
+}
+

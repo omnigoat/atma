@@ -54,7 +54,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>REM $(TargetPath) -r=atma_console</Command>
+      <Command>$(TargetPath) -r=atma_console</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
