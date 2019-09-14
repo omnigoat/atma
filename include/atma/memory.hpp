@@ -613,12 +613,12 @@ namespace atma
 		template <typename Range, CONCEPT_MODELS_(random_access_range_concept, Range)>
 		memxfer_range_t(Range&& range)
 			: alloc_and_ptr_(allocator_type(), &*std::begin(std::forward<Range>(range)))
-			, size_(std::distance((std::begin)(std::forward<Range>(range)), (std::end)(std::forward<Range>(range))))
+			, size_(std::distance(std::begin(std::forward<Range>(range)), std::end(std::forward<Range>(range))))
 		{}
 
 		template <typename Range, CONCEPT_MODELS_(random_access_range_concept, Range)>
 		memxfer_range_t(Range&& range, size_t size)
-			: alloc_and_ptr_(allocator_type(), &*(std::begin)(range))
+			: alloc_and_ptr_(allocator_type(), &*std::begin(range))
 			, size_(size)
 		{}
 
@@ -671,33 +671,6 @@ namespace atma
 		alloc_and_ptr_type alloc_and_ptr_;
 		size_t size_ = 0;
 	};
-
-#if 0
-	// ranged-based-for
-	template <typename G, typename T, typename A>
-	inline auto begin(memxfer_range_t<G, T, A>& r)
-		{ return r.begin(); }
-
-	template <typename G, typename T, typename A>
-	inline auto end(memxfer_range_t<G, T, A>& r)
-		{ return r.end(); }
-
-	template <typename G, typename T, typename A>
-	inline auto begin(memxfer_range_t<G, T, A> const& r)
-		{ return r.begin(); }
-
-	template <typename G, typename T, typename A>
-	inline auto end(memxfer_range_t<G, T, A> const& r)
-		{ return r.end(); }
-
-	template <typename G, typename T, typename A>
-	inline auto begin(memxfer_range_t<G, T, A>&& r)
-		{ return r.begin(); }
-
-	template <typename G, typename T, typename A>
-	inline auto end(memxfer_range_t<G, T, A>&& r)
-		{ return r.end(); }
-#endif
 }
 
 
@@ -794,9 +767,8 @@ namespace atma::memory
 	template <typename T, typename A, typename... Args>
 	inline auto construct_range(dest_range_t<T, A> range, Args&&... args) -> void
 	{
-		using dest_alloc_traits = std::allocator_traits<A>;
 		for (auto& x : range)
-			dest_alloc_traits::construct(range.allocator(), &x, std::forward<Args>(args)...);
+			std::allocator_traits<A>::construct(range.allocator(), &x, std::forward<Args>(args)...);
 	}
 }
 
@@ -808,7 +780,7 @@ namespace atma::memory
 	{
 		ATMA_ASSERT(dest_range.size() == src_range.size());
 
-		auto py = begin(src_range);
+		auto py = std::begin(src_range);
 
 		for (auto& x : dest_range)
 			std::allocator_traits<DA>::construct(dest_range.allocator(), &x, *py++);
@@ -823,7 +795,7 @@ namespace atma::memory
 	{
 		ATMA_ASSERT(dest_range.size() == src_range.size());
 
-		auto py = begin(src_range);
+		auto py = std::begin(src_range);
 
 		for (auto& x : dest_range)
 			std::allocator_traits<DA>::construct(dest_range.allocator(), &x, std::move(*py++));
@@ -857,12 +829,16 @@ namespace atma::memory
 	template <typename DT, typename DA, typename ST, typename SA>
 	inline auto memcpy(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
 	{
+		ATMA_ASSERT(dest_range.size() == src_range.size());
+
 		std::memcpy(dest_range.begin(), src_range.begin(), src_range.bytesize());
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
 	inline auto memmove(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
 	{
+		ATMA_ASSERT(dest_range.size() == src_range.size());
+
 		std::memmove(dest_range.begin(), src_range.begin(), src_range.bytesize());
 	}
 }
