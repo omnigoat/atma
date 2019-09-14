@@ -662,6 +662,7 @@ namespace atma
 		T const* begin() const { return alloc_and_ptr_.second(); }
 		T const* end() const { return alloc_and_ptr_.second() + size_; }
 		size_t size() const { return size_; }
+		size_t bytesize() const { return size_ * sizeof T; }
 		bool empty() const { return size_ == 0; }
 
 	private:
@@ -834,7 +835,7 @@ namespace atma::memory
 		auto px = (T*)dest_range.ptr + dest_range.idx;
 
 		using dest_alloc_traits = std::allocator_traits<A>;
-		while (dest_range.size--> 0 && src_begin != src_end)
+		while (dest_range.size --> 0 && src_begin != src_end)
 			dest_alloc_traits::construct(dest_range.allocator, px++, std::move(*src_begin++));
 	}
 }
@@ -847,5 +848,21 @@ namespace atma::memory
 	{
 		for (auto& x : dest_range)
 			std::allocator_traits<DA>::destroy(dest_range.allocator(), &x);
+	}
+}
+
+// memcpy / memmove
+namespace atma::memory
+{
+	template <typename DT, typename DA, typename ST, typename SA>
+	inline auto memcpy(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
+	{
+		std::memcpy(dest_range.begin(), src_range.begin(), src_range.bytesize());
+	}
+
+	template <typename DT, typename DA, typename ST, typename SA>
+	inline auto memmove(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
+	{
+		std::memmove(dest_range.begin(), src_range.begin(), src_range.bytesize());
 	}
 }

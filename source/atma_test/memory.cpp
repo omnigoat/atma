@@ -492,3 +492,43 @@ SCENARIO_OF("memory/operations", "destruct is called")
 	}
 }
 
+SCENARIO_OF("memory/operations", "memcpy or memmove is called")
+{
+	GIVEN("a memory-range of instantiated integers")
+	{
+		using value_type = int;
+		using allocator_type = atma::aligned_allocator_t<value_type>;
+		using memory_t = atma::basic_memory_t<value_type, allocator_type>;
+
+		static_assert(std::is_empty_v<allocator_type>, "allocator not empty!");
+
+		auto dest_storage = std::vector<value_type>{1, 2, 3, 4};
+		auto dest_memory = memory_t(dest_storage.data());
+
+		GIVEN("source memory pointing to an lvalue vector")
+		{
+			auto src_storage = std::vector<value_type>{5, 6, 7, 8};
+
+			THEN("memcpy performs correctly")
+			{
+				atma::memory::memcpy(
+					atma::dest_range_t{dest_memory, 2},
+					atma::src_range_t{src_storage, 2, 2});
+
+				CHECK_VECTOR(dest_storage,
+					7, 8, 3, 4);
+			}
+
+			THEN("memmove performs overlapping regions correctly")
+			{
+				atma::memory::memmove(
+					atma::dest_range_t{dest_memory, 2},
+					atma::src_range_t{dest_memory, 1, 2});
+
+				CHECK_VECTOR(dest_storage,
+					2, 3, 3, 4);
+			}
+		}
+	}
+}
+
