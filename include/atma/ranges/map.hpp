@@ -150,16 +150,17 @@ namespace atma
 		using invoke_result_t   = typename owner_t::invoke_result_t;
 
 		using iterator_category = std::forward_iterator_tag;
-		using value_type        = typename owner_t::value_type;
+		using value_type        = std::remove_reference_t<invoke_result_t>;
 		using difference_type   = ptrdiff_t;
 		using distance_type     = ptrdiff_t;
 		using pointer           = value_type*;
-		using reference         = typename owner_t::reference;
+		using reference         = invoke_result_t;
 
 		mapped_range_iterator_t(R*, target_iterator_t const& begin, target_iterator_t const& end);
 
 		auto operator  *() const -> invoke_result_t;
 		auto operator ++() -> mapped_range_iterator_t&;
+		auto operator ++(int) -> mapped_range_iterator_t;
 
 	private:
 		R* owner_;
@@ -225,6 +226,14 @@ namespace atma
 	{
 		++pos_;
 		return *this;
+	}
+
+	template <typename R>
+	inline auto mapped_range_iterator_t<R>::operator ++(int) -> mapped_range_iterator_t
+	{
+		auto r = *this;
+		++*this;
+		return r;
 	}
 
 	template <typename R>

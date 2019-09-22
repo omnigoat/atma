@@ -43,7 +43,7 @@ namespace atma::concepts
 	struct is_false : std::true_type
 	{};
 
-	template <typename Arg>
+	template <typename... Arg>
 	struct can : detail::can_<std::void_t<Arg>>
 	{};
 
@@ -206,6 +206,19 @@ namespace atma::concepts
     > = 0                                                              \
     /**/
 
+
+#define CONCEPT_NOT_MODELS_(concept, ...) \
+    CONCEPT_NOT_MODELS_II_(ATMA_PP_CAT(_concept_models_, __COUNTER__), concept, __VA_ARGS__)
+
+#define CONCEPT_NOT_MODELS_II_(arg_name, ...)                          \
+    int arg_name = 42,                                                 \
+    std::enable_if_t<                                                  \
+        (arg_name == 43) || !::atma::concepts::models_v<__VA_ARGS__>,  \
+        int                                                            \
+    > = 0                                                              \
+    /**/
+
+
 #define SPECIFIES_TYPE(...) \
 	decltype(std::void_t<__VA_ARGS__>(), std::true_type())
 
@@ -309,6 +322,31 @@ namespace atma::concepts
 	{};
 }
 
+// concept: copy-constructible
+namespace atma
+{
+	struct copy_constructible_concept
+	{
+		template <typename T, typename U = T>
+		auto contract() -> concepts::specifies
+		<
+			SPECIFIES_EXPR(T(std::declval<U>()))
+		>;
+	};
+}
+
+namespace atma
+{
+	struct assignable_concept
+	{
+		template <typename T, typename U = T>
+		auto contract() -> concepts::specifies
+		<
+			SPECIFIES_EXPR(std::declval<T&>() = std::declval<U>())
+		>;
+	};
+}
+
 // concept: Same
 namespace atma::concepts
 {
@@ -345,7 +383,7 @@ namespace atma::concepts
 			SPECIFIES_TYPE(typename std::iterator_traits<It>::iterator_category),
 
 			SPECIFIES_EXPR(*std::declval<It>()),
-			SPECIFIES_EXPR_OF_TYPE(It&, ++std::declval<It>())
+			SPECIFIES_EXPR_OF_TYPE(It&, ++std::declval<It&>())
 		>;
 	};
 
@@ -354,8 +392,8 @@ namespace atma::concepts
 	{
 		template <typename It>
 		auto contract() -> specifies<
-			SPECIFIES_EXPR_OF_TYPE(It, std::declval<It>()++),
-			SPECIFIES_EXPR_OF_TYPE(typename std::iterator_traits<It>::reference, *std::declval<It>()++)
+			SPECIFIES_EXPR_OF_TYPE(It, std::declval<It&>()++),
+			SPECIFIES_EXPR_OF_TYPE(typename std::iterator_traits<It>::reference, *std::declval<It&>()++)
 		>;
 	};
 
@@ -364,9 +402,9 @@ namespace atma::concepts
 	{
 		template <typename It>
 		auto contract() -> specifies<
-			SPECIFIES_EXPR_OF_TYPE(It&, --std::declval<It>()),
-			SPECIFIES_EXPR_OF_TYPE(It, std::declval<It>()--),
-			SPECIFIES_EXPR_OF_TYPE(typename std::iterator_traits<It>::reference, *std::declval<It>()--)
+			SPECIFIES_EXPR_OF_TYPE(It&, --std::declval<It&>()),
+			SPECIFIES_EXPR_OF_TYPE(It, std::declval<It&>()--),
+			SPECIFIES_EXPR_OF_TYPE(typename std::iterator_traits<It>::reference, *std::declval<It&>()--)
 		>;
 	};
 

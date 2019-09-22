@@ -272,7 +272,7 @@ std::ostream& operator << (std::ostream& stream, dragon_t const& dragon)
 
 TYPE_TO_STRING(dragon_t);
 
-SCENARIO_OF("memory/operations", "construct_range is called")
+SCENARIO_OF("memory/operations", "range_construct is called")
 {
 	GIVEN("an empty allocator and the dragon-type")
 	{
@@ -290,9 +290,9 @@ SCENARIO_OF("memory/operations", "construct_range is called")
 			auto dest_storage = std::vector<value_type>(6, empty_dragon);
 			auto dest_memory = memory_t(dest_storage.data());
 
-			THEN("construct_range can construct the whole range with a direct constructor")
+			THEN("range_construct can construct the whole range with a direct constructor")
 			{
-				atma::memory::construct_range(
+				atma::memory::range_construct(
 					atma::dest_range_t{dest_memory, dest_storage.size()},
 					"oliver", 33);
 
@@ -303,7 +303,7 @@ SCENARIO_OF("memory/operations", "construct_range is called")
 
 			THEN("a partial-range can be constructed via a direct constructor")
 			{
-				atma::memory::construct_range(
+				atma::memory::range_construct(
 					atma::dest_range_t{dest_memory, 4},
 					"oliver", 33);
 
@@ -314,7 +314,7 @@ SCENARIO_OF("memory/operations", "construct_range is called")
 
 			THEN("a partial-range can be constructed via a direct constructor")
 			{
-				atma::memory::construct_range(
+				atma::memory::range_construct(
 					atma::dest_range_t{dest_memory, 1, 4},
 					"oliver", 33);
 
@@ -326,7 +326,7 @@ SCENARIO_OF("memory/operations", "construct_range is called")
 
 			THEN("a partial-range can be constructed via the copy-constructor")
 			{
-				atma::memory::construct_range(
+				atma::memory::range_construct(
 					atma::dest_range_t{dest_memory, 1, 4},
 					oliver);
 
@@ -340,7 +340,7 @@ SCENARIO_OF("memory/operations", "construct_range is called")
 }
 
 
-SCENARIO_OF("memory/operations", "copy_construct_range is called")
+SCENARIO_OF("memory/operations", "range_copy_construct is called")
 {
 	GIVEN("an empty allocator and the dragon-type")
 	{
@@ -365,9 +365,9 @@ SCENARIO_OF("memory/operations", "copy_construct_range is called")
 			{
 				auto const src_storage = std::vector<value_type>{oliver, henry, marcie, rachael};
 
-				THEN("copy_construct_range can copy-construct the beginning of the range")
+				THEN("range_copy_construct can copy-construct the beginning of the range")
 				{
-					atma::memory::copy_construct_range(
+					atma::memory::range_copy_construct(
 						atma::dest_range_t{dest_memory, 4},
 						atma::src_range_t{src_storage});
 
@@ -376,9 +376,9 @@ SCENARIO_OF("memory/operations", "copy_construct_range is called")
 						empty_dragon, empty_dragon);
 				}
 
-				THEN("copy_construct_range can copy-construct the middle of the range")
+				THEN("range_copy_construct can copy-construct the middle of the range")
 				{
-					atma::memory::copy_construct_range(
+					atma::memory::range_copy_construct(
 						atma::dest_range_t{dest_memory, 1, 4},
 						atma::src_range_t{src_storage});
 
@@ -388,9 +388,9 @@ SCENARIO_OF("memory/operations", "copy_construct_range is called")
 						empty_dragon);
 				}
 
-				THEN("copy_construct_range can copy-construct bits of both ranges")
+				THEN("range_copy_construct can copy-construct bits of both ranges")
 				{
-					atma::memory::copy_construct_range(
+					atma::memory::range_copy_construct(
 						atma::dest_range_t{dest_memory, 4, 2},
 						atma::src_range_t{src_storage, 2, 2});
 
@@ -398,13 +398,23 @@ SCENARIO_OF("memory/operations", "copy_construct_range is called")
 						empty_dragon, empty_dragon, empty_dragon, empty_dragon,
 						marcie, rachael);
 				}
+
+				THEN("")
+				{
+					auto dest2_storage = std::vector<value_type>(4, empty_dragon);
+
+					//static_assert(atma::concepts::models<atma::assignable_concept, typename decltype(dest2_storage)::value_type>::value);
+					//static_assert(atma::concepts::models_v<atma::dest_memory_range_concept, decltype(dest2_storage)>);
+
+					atma::memory::range_copy_construct(dest2_storage, src_storage);
+				}
 			}
 		}
 	}
 }
 
 
-SCENARIO_OF("memory/operations", "move_construct_range is called")
+SCENARIO_OF("memory/operations", "range_move_construct is called")
 {
 	GIVEN("an empty allocator and the dragon-type")
 	{
@@ -429,9 +439,9 @@ SCENARIO_OF("memory/operations", "move_construct_range is called")
 			{
 				auto src_storage = std::vector<value_type>{oliver, henry, marcie, rachael};
 
-				THEN("move_construct_range can move part of the range")
+				THEN("range_move_construct can move part of the range")
 				{
-					atma::memory::move_construct_range(
+					atma::memory::range_move_construct(
 						atma::dest_range_t{dest_memory, 4},
 						atma::src_range_t{src_storage.begin(), src_storage.end()});
 
@@ -443,9 +453,9 @@ SCENARIO_OF("memory/operations", "move_construct_range is called")
 						empty_dragon, empty_dragon, empty_dragon, empty_dragon);
 				}
 
-				THEN("move_construct_range can move part of the range")
+				THEN("range_move_construct can move part of the range")
 				{
-					atma::memory::move_construct_range(
+					atma::memory::range_move_construct(
 						atma::dest_range_t{dest_memory, 2},
 						atma::src_range_t{src_storage, 0, 2});
 
@@ -483,7 +493,7 @@ SCENARIO_OF("memory/operations", "destruct is called")
 
 		THEN("destruct calls the destructor of the whole range")
 		{
-			atma::memory::destruct_range(
+			atma::memory::range_destruct(
 				atma::dest_range_t{dest_memory, 4});
 
 			CHECK_VECTOR(dest_storage,
@@ -504,6 +514,8 @@ SCENARIO_OF("memory/operations", "memcpy or memmove is called")
 
 		auto dest_storage = std::vector<value_type>{1, 2, 3, 4};
 		auto dest_memory = memory_t(dest_storage.data());
+
+		//atma::memory::range_construct<int, allocator_type>(dest_memory, 0);
 
 		GIVEN("source memory pointing to an lvalue vector")
 		{
