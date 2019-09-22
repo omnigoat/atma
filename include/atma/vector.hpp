@@ -195,7 +195,7 @@ namespace atma
 	template <typename T, typename A>
 	inline vector<T,A>::~vector()
 	{
-		memory::range_destruct(imem_.dest_subrange(size_));
+		memory::range_destruct(dest_range_t(imem_, size_));
 		imem_.deallocate();
 	}
 
@@ -387,12 +387,12 @@ namespace atma
 		if (size < size_)
 		{
 			memory::range_destruct(
-				imem_.dest_subrange(size, size_ - size));
+				dest_range_t(imem_ + size, size_ - size));
 		}
 		else if (size_ < size)
 		{
 			memory::range_construct(
-				imem_.dest_subrange(size_, size - size_));
+				dest_range_t(imem_ + size_, size - size_));
 		}
 
 		IMEM_GUARD_GT(size);
@@ -408,12 +408,12 @@ namespace atma
 		if (size < size_)
 		{
 			memory::destruct(
-				imem_.dest_range(size, size_ - size));
+				dest_range_t(imem_ + size, size_ - size));
 		}
 		else if (size_ < size)
 		{
 			memory::range_construct(
-				imem_.dest_range(size_, size - size_),
+				dest_range_t(imem_ + size_, size - size_),
 				x);
 		}
 
@@ -543,13 +543,14 @@ namespace atma
 			else
 			{
 				memory::relocate_range(
-					imem_.dest_subrange(reloc_offset, mvsz),
-					imem_.src_subrange(offset, mvsz));
+					dest_range_t(imem_ + reloc_offset),
+					src_range_t(imem_ + offset),
+					mvsz);
 			}
 		}
 
+		// maybe sanity check
 		static_assert(concepts::models_v<concepts::forward_iterator_concept, H>);
-		//decltype(dest_range_t(imem_ + offset, rangesize));
 		static_assert(concepts::models_v<memory_concept, decltype(dest_range_t(imem_ + offset, rangesize))>);
 
 		memory::range_copy_construct(
@@ -644,14 +645,14 @@ namespace atma
 	{
 		if (newcap < size_)
 		{
-			memory::range_destruct(imem_.dest_subrange(newcap, size_ - newcap));
+			memory::range_destruct(dest_range_t(imem_ + newcap, size_ - newcap));
 			size_ = newcap;
 		}
 
 		if (newcap != capacity_)
 		{
-			auto tmp = imem_;
-
+			auto tmp = std::move(*this);
+			
 			if (newcap == 0)
 			{
 				imem_ = nullptr;
@@ -659,13 +660,13 @@ namespace atma
 			else
 			{
 				imem_.allocate(newcap);
+
 				memory::range_move_construct(
-					imem_.dest_subrange(),
-					src_range_t(tmp, size_));
+					dest_range_t(imem_),
+					src_range_t(tmp));
 			}
 
-			memory::range_destruct(tmp.dest_subrange(size_));
-			tmp.deallocate();
+			size_ = tmp.size();
 		}
 
 		capacity_ = newcap;
