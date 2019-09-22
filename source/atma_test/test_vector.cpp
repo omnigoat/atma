@@ -329,3 +329,42 @@ SCENARIO_OF("vector", "vectors can be assigned")
 		}
 	}
 }
+
+
+SCENARIO_OF("vector", "vector::insert is called")
+{
+	GIVEN("an empty vector 'v' and vector 'v2'={1,2,3,4}")
+	{
+		atma::vector<int> v;
+		atma::vector<int> v2{1, 2, 3, 4};
+
+		WHEN("v.insert(v2.begin, v2.end) is called")
+		{
+			v.insert(v.end(), v2.begin(), v2.end());
+
+			THEN("an exact copy is made")
+			{
+				CHECK(!v.empty());
+				CHECK_WHOLE_VECTOR(v, 1, 2, 3, 4);
+				CHECK(v == v2);
+			}
+		}
+	}
+
+	GIVEN("an empty vector 'v' and vector 'v2'={'henry', 'theodore', 'marcie', 'rachael'}")
+	{
+		atma::vector<std::string> v{"timothy", "maria"};
+		atma::vector<std::string> v2{"henry", "theodore", "marcie", "rachael"};
+
+		WHEN("v.insert(v2.begin, v2.end) is called")
+		{
+			v.insert(v.begin() + 1, v2.begin(), v2.end());
+
+			THEN("an exact copy is made")
+			{
+				CHECK(!v.empty());
+				CHECK_WHOLE_VECTOR(v, "timothy", "henry", "theodore", "marcie", "rachael", "maria");
+			}
+		}
+	}
+}

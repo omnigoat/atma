@@ -179,6 +179,7 @@ namespace atma
 		auto operator  *() const -> reference const;
 		auto operator  *() -> reference;
 		auto operator ++() -> filtered_range_iterator_t&;
+		auto operator ++(int) -> filtered_range_iterator_t;
 
 		auto owner() const -> owner_t const* { return owner_; }
 		auto target() const -> target_iterator_t const& { return pos_; }
@@ -279,6 +280,14 @@ namespace atma
 		} while (pos_ != target_range_end && !range_function_invoke(owner_->predicate(), *pos_));
 
 		return *this;
+	}
+
+	template <typename O, typename I>
+	inline auto filtered_range_iterator_t<O, I>::operator ++(int) -> filtered_range_iterator_t
+	{
+		auto r = *this;
+		++*this;
+		return r;
 	}
 
 	template <typename O, typename I, typename J>
