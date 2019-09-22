@@ -227,6 +227,8 @@ namespace atma
 		simple_memory_t() = default;
 		explicit simple_memory_t(allocator_type const&);
 		explicit simple_memory_t(pointer, allocator_type const& = allocator_type());
+		simple_memory_t(memory_allocate_copy_tag, const_pointer, size_t size, allocator_type const& = allocator_type());
+		explicit simple_memory_t(size_t capacity, allocator_type const& = allocator_type());
 		template <typename B> simple_memory_t(simple_memory_t<T, B> const&);
 
 		auto operator = (simple_memory_t const&) -> simple_memory_t& = default;
@@ -242,6 +244,10 @@ namespace atma
 		auto operator -> () const -> pointer;
 
 		auto data() const -> pointer { return ptr_; }
+
+		// allocator interface
+		auto allocate(size_t) -> bool;
+		auto deallocate(size_t = 0) -> void;
 
 	protected:
 		value_type* ptr_ = nullptr;
@@ -262,102 +268,6 @@ namespace atma
 		return simple_memory_t<T, A>(lhs.operator typename simple_memory_t<T, A>::pointer() + d, lhs.allocator());
 	}
 }
-
-//
-//  operable_memory_t
-//  -------------------
-//
-//    this is a memory
-//
-namespace atma
-{
-	template <typename T, typename Allocator = std::allocator<T>>
-	struct operable_memory_t : simple_memory_t<T, Allocator>
-	{
-		using base_type = simple_memory_t<T, Allocator>;
-
-		using allocator_type   = typename base_type::allocator_type;
-		using allocator_traits = typename base_type::allocator_traits;
-		using value_type       = typename allocator_traits::value_type;
-		using pointer          = typename allocator_traits::pointer;
-		using const_pointer    = typename allocator_traits::const_pointer;
-		using reference        = typename allocator_traits::value_type&;
-
-		// use base_type's constructor(s)
-		using base_type::base_type;
-
-		// destination ranges
-		operator dest_range_t<T, Allocator>() const
-		{
-			return dest_range_t{*this};
-		}
-
-		auto dest_subrange(size_t start, size_t size) const
-		{
-			return dest_range_t{*this, start, size};
-		}
-
-		auto dest_subrange(size_t size = unbounded_memory_size) const
-		{
-			return dest_range_t{*this, size};
-		}
-
-		// src ranges
-		operator src_range_t<T, Allocator>() const
-		{
-			return src_range_t{*this};
-		}
-
-		auto src_subrange(size_t start, size_t size) const
-		{
-			return src_range_t{*this, start, size};
-		}
-
-		auto src_subrange(size_t size = unbounded_memory_size) const
-		{
-			return src_range_t{*this, size};
-		}
-	};
-}
-
-//
-//  allocatable_memory_t
-//  ----------------------
-//
-//    this is a memory
-//
-namespace atma
-{
-	template <typename T, typename Allocator = atma::aligned_allocator_t<T>>
-	struct allocatable_memory_t : operable_memory_t<T, Allocator>
-	{
-		using base_type = operable_memory_t<T, Allocator>;
-
-		using allocator_type   = typename base_type::allocator_type;
-		using allocator_traits = typename base_type::allocator_traits;
-		using value_type       = typename allocator_traits::value_type;
-		using pointer          = typename allocator_traits::pointer;
-		using const_pointer    = typename allocator_traits::const_pointer;
-		using reference        = typename allocator_traits::value_type&;
-
-		// use base's constructors
-		using base_type::base_type;
-
-		allocatable_memory_t(memory_allocate_copy_tag, const_pointer, size_t size, allocator_type const& = allocator_type());
-		explicit allocatable_memory_t(size_t capacity, allocator_type const& = allocator_type());
-
-		auto operator = (allocatable_memory_t const&) -> allocatable_memory_t& = default;
-		auto operator = (pointer) -> allocatable_memory_t&;
-		template <typename B> auto operator = (allocatable_memory_t<T, B> const&) -> allocatable_memory_t&;
-
-
-		// allocator interface
-		auto allocate(size_t) -> bool;
-		auto deallocate(size_t = 0) -> void;
-	};
-}
-
-
 
 //
 //  basic_memory_t
@@ -384,7 +294,7 @@ namespace atma
 namespace atma
 {
 	template <typename T, typename Allocator = std::allocator<T>>
-	using basic_memory_t = allocatable_memory_t<T, Allocator>;
+	using basic_memory_t = simple_memory_t<T, Allocator>;
 
 	using memory_t = basic_memory_t<byte>;
 }
@@ -451,7 +361,7 @@ namespace atma
 namespace atma
 {
 	template <typename T, typename A>
-	inline allocatable_memory_t<T, A>::allocatable_memory_t(memory_allocate_copy_tag, const_pointer data, size_t size, allocator_type const& alloc)
+	inline simple_memory_t<T, A>::simple_memory_t(memory_allocate_copy_tag, const_pointer data, size_t size, allocator_type const& alloc)
 		: base_type(alloc)
 	{
 		allocate(size);
@@ -459,12 +369,13 @@ namespace atma
 	}
 
 	template <typename T, typename A>
-	inline allocatable_memory_t<T, A>::allocatable_memory_t(size_t capacity, allocator_type const& alloc)
+	inline simple_memory_t<T, A>::simple_memory_t(size_t capacity, allocator_type const& alloc)
 		: base_type(alloc)
 	{
 		allocate(capacity);
 	}
 
+#if 0
 	template <typename T, typename A>
 	inline auto allocatable_memory_t<T, A>::operator = (pointer rhs) -> allocatable_memory_t&
 	{
@@ -480,16 +391,17 @@ namespace atma
 		this->allocator() = rhs.allocator();
 		return *this;
 	}
+#endif
 
 	template <typename T, typename A>
-	inline auto allocatable_memory_t<T, A>::allocate(size_t count) -> bool
+	inline auto simple_memory_t<T, A>::allocate(size_t count) -> bool
 	{
 		this->ptr_= allocator_traits::allocate(this->allocator(), count);
 		return this->ptr_ != nullptr;
 	}
 
 	template <typename T, typename A>
-	inline auto allocatable_memory_t<T, A>::deallocate(size_t count) -> void
+	inline auto simple_memory_t<T, A>::deallocate(size_t count) -> void
 	{
 		allocator_traits::deallocate(this->allocator(), this->ptr_, count);
 	}
@@ -780,7 +692,9 @@ namespace atma::memory
 		ATMA_ASSERT(dest_range.unbounded() || dest_range.size() == sz);
 		ATMA_ASSERT(src_range.unbounded() || src_range.size() == sz);
 
-		ATMA_ASSERT_MEMORY_RANGES_DISJOINT(dest_range, src_range);
+		ATMA_ASSERT_MEMORY_RANGES_DISJOINT(
+			(dest_range_t<DT, DA>(dest_range.begin(), dest_range.begin() + sz)),
+			(src_range_t<ST, SA>(src_range.begin(), src_range.begin() + sz)));
 
 		auto px = std::begin(dest_range);
 		auto py = std::begin(src_range);
