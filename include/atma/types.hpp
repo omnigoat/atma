@@ -26,6 +26,15 @@ using byte = uchar;
 
 using size_t = std::size_t;
 
+
+// void_t - msvc still seems to have issues
+namespace atma
+{
+	template <class... Ts> struct make_void { using type = void; };
+	template <class... Ts> using void_t = typename make_void<Ts...>::type;
+}
+
+
 #define ATMA_PP_CAT_II(a, b) a##b
 #define ATMA_PP_CAT(a, b) ATMA_PP_CAT_II(a, b)
 
