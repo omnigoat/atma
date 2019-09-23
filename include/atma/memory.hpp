@@ -4,6 +4,7 @@
 #include <atma/concepts.hpp>
 #include <atma/assert.hpp>
 #include <atma/types.hpp>
+#include <atma/ebo_pair.hpp>
 
 #include <atma/ranges/core.hpp>
 
@@ -27,117 +28,6 @@ namespace atma
 #define ATMA_ASSERT_MEMORY_RANGES_DISJOINT(lhs, rhs) \
 	ATMA_ASSERT(std::addressof(*std::end(lhs)) <= std::addressof(*std::begin(rhs)) || \
 		std::addressof(*std::end(rhs)) <= std::addressof(*std::begin(lhs)))
-
-// ebo-pair
-namespace atma
-{
-	namespace detail
-	{
-		template <typename First, typename Second>
-		struct default_storage_transformer_t
-		{
-			using first_type = First;
-			using second_type = Second;
-		};
-
-		template <typename First, typename Second>
-		struct first_as_reference_transformer_t
-		{
-			using first_type = First&;
-			using second_type = Second;
-		};
-
-		template <typename First, typename Second,
-			template <typename, typename> typename Storage = default_storage_transformer_t,
-			bool = std::is_empty_v<First>, bool = std::is_empty_v<Second>>
-		struct ebo_pair_tx;
-
-		template <typename First, typename Second, template <typename, typename> typename StorageTransformer>
-		struct ebo_pair_tx<First, Second, StorageTransformer, false, false>
-		{
-			using first_type = typename StorageTransformer<First, Second>::first_type;
-			using second_type = typename StorageTransformer<First, Second>::second_type;
-
-			ebo_pair_tx() = default;
-			ebo_pair_tx(ebo_pair_tx const&) = default;
-			~ebo_pair_tx() = default;
-
-			template <typename F, typename S>
-			ebo_pair_tx(F&& first, S&& second)
-				: first_(first), second_(second)
-			{}
-
-			first_type& first() const { return first_; }
-			second_type& second() const { return second_; }
-
-		private:
-			first_type first_;
-			second_type second_;
-		};
-
-		template <typename First, typename Second, template <typename, typename> typename StorageTransformer>
-		struct ebo_pair_tx<First, Second, StorageTransformer, true, false>
-			: protected First
-		{
-			using first_type = typename StorageTransformer<First, Second>::first_type;
-			using second_type = typename StorageTransformer<First, Second>::second_type;
-
-			ebo_pair_tx() = default;
-			ebo_pair_tx(ebo_pair_tx const&) = default;
-			~ebo_pair_tx() = default;
-
-			template <typename F, typename S>
-			ebo_pair_tx(F&& first, S&& second)
-				: First(first), second_(second)
-			{}
-
-			first_type& first() { return static_cast<first_type&>(*this); }
-			second_type& second() { return second_; }
-			first_type const& first() const { return static_cast<first_type const&>(*this); }
-			second_type const& second() const { return second_; }
-
-		private:
-			second_type second_;
-		};
-
-		template <typename First, typename Second, template <typename, typename> typename Tr>
-		struct ebo_pair_tx<First, Second, Tr, false, true>
-			: protected First
-		{
-			using first_type = First;
-			using second_type = Second;
-
-			ebo_pair_tx() = default;
-			ebo_pair_tx(ebo_pair_tx const&) = default;
-			~ebo_pair_tx() = default;
-
-			template <typename F, typename S>
-			ebo_pair_tx(F&& first, S&& second)
-				: Second(second), first_(first)
-			{}
-
-			First& first() { return first_; }
-			Second& second() { return static_cast<Second&>(*this); }
-			First const& first() const { return first_; }
-			Second const& second() const { return static_cast<Second const&>(*this); }
-
-		private:
-			typename Tr<First, Second>::first_type first_;
-		};
-
-		// if they're both zero-size, just inherit from second
-		template <typename First, typename Second, template <typename, typename> typename Tr>
-		struct ebo_pair_tx<First, Second, Tr, true, true>
-			: ebo_pair_tx<First, Second, Tr, false, true>
-		{};
-	}
-
-
-	template <typename First, typename Second, template <typename, typename> typename Transformer = detail::default_storage_transformer_t>
-	using ebo_pair_t = detail::ebo_pair_tx<First, Second>;
-}
-
-
 
 
 //
@@ -269,6 +159,8 @@ namespace atma
 		value_type* ptr_ = nullptr;
 	};
 
+
+	// deduction guides
 	template <typename T>
 	basic_memory_t(T*) -> basic_memory_t<T>;
 
@@ -276,12 +168,11 @@ namespace atma
 	basic_memory_t(T*, A const&) -> basic_memory_t<T, A>;
 
 
-
-	template <typename T, typename A, typename D,
-		CONCEPT_MODELS_(atma::concepts::integral, D)>
+	// addition
+	template <typename T, typename A, typename D, CONCEPT_MODELS_(atma::concepts::integral, D)>
 	inline auto operator + (basic_memory_t<T, A> lhs, D d)
 	{
-		return basic_memory_t<T, A>(lhs.operator typename basic_memory_t<T, A>::pointer() + d, lhs.allocator());
+		return basic_memory_t<T, A>(lhs.data() + d, lhs.allocator());
 	}
 }
 
@@ -555,12 +446,10 @@ namespace atma
 			, size_(std::distance(begin, end))
 		{}
 
+		~memxfer_range_t() = default;
 
-		~memxfer_range_t()
-		{}
+		allocator_type& allocator() const { return const_cast<memxfer_range_t*>(this)->alloc_and_ptr_.first(); }
 
-		allocator_type& allocator() const { return const_cast<allocator_type&>(alloc_and_ptr_.first()); }
-		
 		T* data() { return begin(); }
 		T* begin() { return alloc_and_ptr_.second(); }
 		T* end() { ATMA_ASSERT(!unbounded()); return alloc_and_ptr_.second() + size_; }
@@ -576,7 +465,7 @@ namespace atma
 
 	private:
 		// store the allocator EBO-d with the vtable pointer
-		using alloc_and_ptr_type = ebo_pair_t<A, T* const, detail::first_as_reference_transformer_t>;
+		using alloc_and_ptr_type = ebo_pair_t<A, T* const, first_as_reference_transformer_t>;
 		alloc_and_ptr_type alloc_and_ptr_;
 		size_t const size_ = 0;
 	};

@@ -232,6 +232,9 @@
     <ClInclude Include="..\..\vendor\doctest\doctest.h">
       <Filter>vendor\doctest</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\atma\ebo_pair.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\resources\atma.natvis" />
