@@ -136,7 +136,7 @@ namespace atma
 		imem_.allocate(capacity_);
 
 		memory::range_construct(
-			dest_range_t(imem_, size));
+			dest_range(imem_, size));
 	}
 
 	template <typename T, typename A>
@@ -147,7 +147,7 @@ namespace atma
 		imem_.allocate(capacity_);
 
 		memory::range_construct(
-			dest_range_t(imem_, size),
+			dest_range(imem_, size),
 			d);
 	}
 
@@ -176,7 +176,7 @@ namespace atma
 		imem_.allocate(capacity_);
 
 		memory::range_copy_construct(
-			dest_range_t(imem_),
+			dest_range(imem_),
 			src_range_t(rhs.imem_),
 			size_);
 	}
@@ -195,7 +195,7 @@ namespace atma
 	template <typename T, typename A>
 	inline vector<T,A>::~vector()
 	{
-		memory::range_destruct(dest_range_t(imem_, size_));
+		memory::range_destruct(dest_range(imem_, size_));
 		imem_.deallocate();
 	}
 
@@ -358,7 +358,7 @@ namespace atma
 	inline auto vector<T, A>::clear() -> void
 	{
 		memory::range_destruct(
-			dest_range_t(imem_, size_));
+			dest_range(imem_, size_));
 
 		imem_.deallocate();
 
@@ -387,12 +387,12 @@ namespace atma
 		if (size < size_)
 		{
 			memory::range_destruct(
-				dest_range_t(imem_ + size, size_ - size));
+				dest_range(imem_ + size, size_ - size));
 		}
 		else if (size_ < size)
 		{
 			memory::range_construct(
-				dest_range_t(imem_ + size_, size - size_));
+				dest_range(imem_ + size_, size - size_));
 		}
 
 		IMEM_GUARD_GT(size);
@@ -408,12 +408,12 @@ namespace atma
 		if (size < size_)
 		{
 			memory::destruct(
-				dest_range_t(imem_ + size, size_ - size));
+				dest_range(imem_ + size, size_ - size));
 		}
 		else if (size_ < size)
 		{
 			memory::range_construct(
-				dest_range_t(imem_ + size_, size - size_),
+				dest_range(imem_ + size_, size - size_),
 				x);
 		}
 
@@ -470,7 +470,7 @@ namespace atma
 		IMEM_GUARD_LT(size_ + 1);
 
 		memory::memmove(
-			dest_range_t(imem_ + offset + 1),
+			dest_range(imem_ + offset + 1),
 			src_range_t(imem_ + offset),
 			size_ - offset);
 
@@ -493,7 +493,7 @@ namespace atma
 		IMEM_GUARD_LT(size_ + 1);
 
 		memory::memmove(
-			dest_range_t(imem_ + offset + 1),
+			dest_range(imem_ + offset + 1),
 			src_range_t(imem_ + offset),
 			size_ - offset);
 
@@ -536,14 +536,14 @@ namespace atma
 			if constexpr (std::is_trivial_v<value_type>)
 			{
 				memory::memmove(
-					dest_range_t(imem_ + reloc_offset),
+					dest_range(imem_ + reloc_offset),
 					src_range_t(imem_ + offset),
 					mvsz);
 			}
 			else
 			{
 				memory::relocate_range(
-					dest_range_t(imem_ + reloc_offset),
+					dest_range(imem_ + reloc_offset),
 					src_range_t(imem_ + offset),
 					mvsz);
 			}
@@ -551,10 +551,10 @@ namespace atma
 
 		// maybe sanity check
 		static_assert(concepts::models_v<concepts::forward_iterator_concept, H>);
-		static_assert(concepts::models_v<memory_concept, decltype(dest_range_t(imem_ + offset, rangesize))>);
+		static_assert(concepts::models_v<memory_concept, decltype(dest_range(imem_ + offset, rangesize))>);
 
 		memory::range_copy_construct(
-			dest_range_t(imem_ + offset, rangesize),
+			dest_range(imem_ + offset, rangesize),
 			start);
 
 		size_ += rangesize;
@@ -588,7 +588,7 @@ namespace atma
 
 		// destruct elements in the range
 		memory::range_destruct(
-			dest_range_t{imem_, rangesize});
+			dest_range(imem_, rangesize));
 
 		auto newcap = imem_capsize(size_ - rangesize);
 		if (newcap < capacity_)
@@ -598,12 +598,12 @@ namespace atma
 			imem_.allocate(newcap);
 
 			memory::range_move_construct(
-				dest_range_t(imem_),
+				dest_range(imem_),
 				src_range_t(tmp),
 				offset);
 
 			memory::range_move_construct(
-				dest_range_t(imem_),
+				dest_range(imem_),
 				src_range_t(tmp + offset_end),
 				tailsize);
 
@@ -612,12 +612,12 @@ namespace atma
 		else
 		{
 			memory::range_move_construct(
-				dest_range_t(imem_ + offset),
+				dest_range(imem_ + offset),
 				src_range_t(imem_ + offset_end),
 				tailsize);
 
 			memory::range_destruct(
-				dest_range_t(imem_ + offset_end, tailsize));
+				dest_range(imem_ + offset_end, tailsize));
 		}
 
 		size_ -= rangesize;
@@ -645,7 +645,7 @@ namespace atma
 	{
 		if (newcap < size_)
 		{
-			memory::range_destruct(dest_range_t(imem_ + newcap, size_ - newcap));
+			memory::range_destruct(dest_range(imem_ + newcap, size_ - newcap));
 			size_ = newcap;
 		}
 
@@ -662,7 +662,7 @@ namespace atma
 				imem_.allocate(newcap);
 
 				memory::range_move_construct(
-					dest_range_t(imem_),
+					dest_range(imem_),
 					src_range_t(tmp));
 			}
 
