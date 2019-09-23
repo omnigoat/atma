@@ -21,8 +21,8 @@ namespace atma
 	constexpr struct memory_src_tag_t {} memory_src_tag;
 	constexpr size_t unbounded_memory_size = ~size_t();
 
-	template <typename T, typename A = std::allocator<T>> struct dest_range_t;
-	template <typename T, typename A = std::allocator<T>> struct src_range_t;
+	//template <typename T, typename A = std::allocator<T>> struct dest_memxfer_range_t;
+	//template <typename T, typename A = std::allocator<T>> struct src_range_t;
 }
 
 #define ATMA_ASSERT_MEMORY_RANGES_DISJOINT(lhs, rhs) \
@@ -472,31 +472,104 @@ namespace atma
 }
 
 
-
+#if 0
 // dest_range
 namespace atma
 {
 	template <typename T, typename A>
-	struct dest_range_t : memxfer_range_t<memory_dest_tag_t, T, A>
+	struct dest_memxfer_range_t : memxfer_range_t<memory_dest_tag_t, T, A>
 	{
 		using memxfer_range_t<memory_dest_tag_t, T, A>::memxfer_range_t;
 	};
 
 	// deduction guides
 	template <typename T, typename... Args>
-	dest_range_t(T*, Args...) -> dest_range_t<T, std::allocator<T>>;
+	dest_memxfer_range_t(T*, Args...) -> dest_memxfer_range_t<T, std::allocator<T>>;
 
 	template <typename Range, typename... Args, CONCEPT_MODELS_(random_access_range_concept, Range)>
-	dest_range_t(Range&&, Args...) -> dest_range_t<value_type_of_t<Range>, allocator_type_of_t<Range>>;
+	dest_memxfer_range_t(Range&&, Args...) -> dest_memxfer_range_t<value_type_of_t<Range>, allocator_type_of_t<Range>>;
 
 	template <typename M, typename... Args, CONCEPT_MODELS_(memory_concept, M)>
-	dest_range_t(M&&, Args...) -> dest_range_t<value_type_of_t<M>, allocator_type_of_t<M>>;
+	dest_memxfer_range_t(M&&, Args...) -> dest_memxfer_range_t<value_type_of_t<M>, allocator_type_of_t<M>>;
 
 	template <typename I, CONCEPT_MODELS_(concepts::contiguous_iterator_concept, I)>
-	dest_range_t(I begin, I end) -> dest_range_t
+	dest_memxfer_range_t(I begin, I end) -> dest_memxfer_range_t
 		< std::remove_reference_t<decltype(*std::declval<I>())>
 		, std::allocator<std::remove_reference_t<decltype(*std::declval<I>())>>
 		>;
+}
+#endif
+
+// dest_range
+namespace atma
+{
+	template <typename T, typename A>
+	using dest_memxfer_range_t = memxfer_range_t<memory_dest_tag_t, T, A>;
+
+	// pointer
+	template <typename T, typename... Args>
+	inline auto dest_range(T* data)
+		-> dest_memxfer_range_t<T, std::allocator<T>>
+	{
+		static_assert(!std::is_const_v<T>);
+		return {data};
+	}
+
+	template <typename T, typename... Args>
+	inline auto dest_range(T* data, size_t size)
+		-> dest_memxfer_range_t<T, std::allocator<T>>
+	{
+		static_assert(!std::is_const_v<T>);
+		return {data, size};
+	}
+
+	template <typename T, typename... Args>
+	inline auto dest_range(T* data, size_t offset, size_t size)
+		-> dest_memxfer_range_t<T, std::allocator<T>>
+	{
+		static_assert(!std::is_const_v<T>);
+		return {data, offset, size};
+	}
+
+	// random-access-range
+	template <typename Range, typename... Args, CONCEPT_MODELS_(random_access_range_concept, Range)>
+	inline auto dest_range(Range&& range, size_t size)
+		-> dest_memxfer_range_t<value_type_of_t<Range>, allocator_type_of_t<Range>>
+	{
+		return {std::forward<Range>(range), size};
+	}
+
+	// "memory"
+	template <typename M, typename... Args, CONCEPT_MODELS_(memory_concept, M)>
+	inline auto dest_range(M&& memory)
+		-> dest_memxfer_range_t<value_type_of_t<M>, allocator_type_of_t<M>>
+	{
+		return {std::forward<M>(memory)};
+	}
+
+	template <typename M, typename... Args, CONCEPT_MODELS_(memory_concept, M)>
+	inline auto dest_range(M&& memory, size_t size)
+		-> dest_memxfer_range_t<value_type_of_t<M>, allocator_type_of_t<M>>
+	{
+		return {std::forward<M>(memory), size};
+	}
+
+	template <typename M, typename... Args, CONCEPT_MODELS_(memory_concept, M)>
+	inline auto dest_range(M&& memory, size_t offset, size_t size)
+		-> dest_memxfer_range_t<value_type_of_t<M>, allocator_type_of_t<M>>
+	{
+		return {std::forward<M>(memory), offset, size};
+	}
+
+	// iterator-pair
+	template <typename It, CONCEPT_MODELS_(concepts::contiguous_iterator_concept, It)>
+	inline auto dest_range(It begin, It end)
+		-> dest_memxfer_range_t
+		< std::remove_reference_t<decltype(*std::declval<It>())>
+		, std::allocator<std::remove_reference_t<decltype(*std::declval<It>())>>>
+	{
+		return {begin, end};
+	}
 }
 
 // src_range
@@ -553,7 +626,7 @@ namespace atma::memory
 namespace atma::memory
 {
 	template <typename T, typename A, typename... Args>
-	inline auto range_construct(dest_range_t<T, A> range, Args&&... args) -> void
+	inline auto range_construct(dest_memxfer_range_t<T, A> range, Args&&... args) -> void
 	{
 		for (auto& x : range)
 			std::allocator_traits<A>::construct(range.allocator(), &x, std::forward<Args>(args)...);
@@ -564,7 +637,7 @@ namespace atma::memory
 namespace atma::memory
 {
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto range_copy_construct(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range, size_t sz) -> void
+	inline auto range_copy_construct(dest_memxfer_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range, size_t sz) -> void
 	{
 		if (sz == 0)
 			return;
@@ -574,7 +647,7 @@ namespace atma::memory
 		ATMA_ASSERT(src_range.unbounded() || src_range.size() == sz);
 
 		ATMA_ASSERT_MEMORY_RANGES_DISJOINT(
-			(dest_range_t<DT, DA>(dest_range.begin(), dest_range.begin() + sz)),
+			(dest_memxfer_range_t<DT, DA>(dest_range.begin(), dest_range.begin() + sz)),
 			(src_range_t<ST, SA>(src_range.begin(), src_range.begin() + sz)));
 
 		auto px = std::begin(dest_range);
@@ -584,7 +657,7 @@ namespace atma::memory
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto range_copy_construct(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
+	inline auto range_copy_construct(dest_memxfer_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
 	{
 		ATMA_ASSERT(!dest_range.unbounded() || !src_range.unbounded());
 
@@ -630,7 +703,7 @@ namespace atma::memory
 namespace atma::memory
 {
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto relocate_range(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range, size_t sz) -> void
+	inline auto relocate_range(dest_memxfer_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range, size_t sz) -> void
 	{
 		if (sz == 0)
 			return;
@@ -666,7 +739,7 @@ namespace atma::memory
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto relocate_range(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
+	inline auto relocate_range(dest_memxfer_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
 	{
 		ATMA_ASSERT(!dest_range.unbounded() || !src_range.unbounded());
 
@@ -683,7 +756,7 @@ namespace atma::memory
 namespace atma::memory
 {
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto range_move_construct(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range, size_t sz) -> void
+	inline auto range_move_construct(dest_memxfer_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range, size_t sz) -> void
 	{
 		if (sz == 0)
 			return;
@@ -716,7 +789,7 @@ namespace atma::memory
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto range_move_construct(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
+	inline auto range_move_construct(dest_memxfer_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
 	{
 		ATMA_ASSERT(!dest_range.unbounded() || !src_range.unbounded());
 
@@ -729,7 +802,7 @@ namespace atma::memory
 	}
 
 	template <typename T, typename A, typename SrcIt>
-	inline auto range_move_construct(dest_range_t<T, A> dest_range, SrcIt src_begin, SrcIt src_end) -> void
+	inline auto range_move_construct(dest_memxfer_range_t<T, A> dest_range, SrcIt src_begin, SrcIt src_end) -> void
 	{
 		auto px = (T*)dest_range.ptr + dest_range.idx;
 
@@ -746,7 +819,7 @@ namespace atma::memory
 namespace atma::memory
 {
 	template <typename DT, typename DA>
-	inline auto range_destruct(dest_range_t<DT, DA> dest_range) -> void
+	inline auto range_destruct(dest_memxfer_range_t<DT, DA> dest_range) -> void
 	{
 		for (auto& x : dest_range)
 			std::allocator_traits<DA>::destroy(dest_range.allocator(), &x);
@@ -757,7 +830,7 @@ namespace atma::memory
 namespace atma::memory
 {
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto memcpy(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range, size_t sz) -> void
+	inline auto memcpy(dest_memxfer_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range, size_t sz) -> void
 	{
 		static_assert(sizeof DT == sizeof ST);
 		
@@ -769,7 +842,7 @@ namespace atma::memory
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto memcpy(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
+	inline auto memcpy(dest_memxfer_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
 	{
 		ATMA_ASSERT(!dest_range.unbounded() || !src_range.unbounded());
 
@@ -782,7 +855,7 @@ namespace atma::memory
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto memmove(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range, size_t sz) -> void
+	inline auto memmove(dest_memxfer_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range, size_t sz) -> void
 	{
 		static_assert(sizeof DT == sizeof ST);
 
@@ -794,7 +867,7 @@ namespace atma::memory
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto memmove(dest_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
+	inline auto memmove(dest_memxfer_range_t<DT, DA> dest_range, src_range_t<ST, SA> src_range) -> void
 	{
 		ATMA_ASSERT(!dest_range.unbounded() || !src_range.unbounded());
 
@@ -811,7 +884,7 @@ namespace atma::memory
 namespace atma::memory
 {
 	template <typename DT, typename DA, typename V>
-	inline auto memcpy(dest_range_t<DT, DA> dest_range, V v) -> void
+	inline auto memcpy(dest_memxfer_range_t<DT, DA> dest_range, V v) -> void
 	{
 		ATMA_ASSERT(dest_range.bytesize() % sizeof V == 0);
 
