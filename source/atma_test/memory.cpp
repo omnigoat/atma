@@ -29,15 +29,15 @@ SCENARIO_OF("memory/base_memory_t", "base_memory_t EBO")
 	}
 }
 
-SCENARIO_OF("memory/simple_memory_t", "simple_memory_t construction")
+SCENARIO_OF("memory/basic_memory_t", "basic_memory_t construction")
 {
 	GIVEN("an empty allocator")
 	{
 		using empty_allocator = atma::aligned_allocator_t<int>;
 		using storage_t = std::vector<int>;
-		using int_memory_t = atma::simple_memory_t<int, empty_allocator>;
+		using int_memory_t = atma::basic_memory_t<int, empty_allocator>;
 
-		THEN("simple_memory_t can be default-constructed")
+		THEN("basic_memory_t can be default-constructed")
 		{
 			int_memory_t memory;
 
@@ -45,7 +45,7 @@ SCENARIO_OF("memory/simple_memory_t", "simple_memory_t construction")
 			CHECK((int*)memory == nullptr);
 		}
 
-		THEN("simple_memory_t can constructed from a pointer & allocator")
+		THEN("basic_memory_t can constructed from a pointer & allocator")
 		{
 			storage_t store{1, 2, 3, 4};
 			auto memory = int_memory_t{store.data(), empty_allocator()};
@@ -55,14 +55,14 @@ SCENARIO_OF("memory/simple_memory_t", "simple_memory_t construction")
 			CHECK_MEMORY(memory, 1, 2, 3, 4);
 		}
 
-		THEN("simple_memory_t has working deduction guides")
+		THEN("basic_memory_t has working deduction guides")
 		{
 			int* data = nullptr;
-			auto m1 = atma::simple_memory_t{data};
-			auto m2 = atma::simple_memory_t{data, empty_allocator()};
+			auto m1 = atma::basic_memory_t{data};
+			auto m2 = atma::basic_memory_t{data, empty_allocator()};
 		}
 
-		THEN("simple_memory_t can be assigned")
+		THEN("basic_memory_t can be assigned")
 		{
 			int_memory_t memory;
 			storage_t store{1, 2, 3, 4};
@@ -73,7 +73,7 @@ SCENARIO_OF("memory/simple_memory_t", "simple_memory_t construction")
 			CHECK_MEMORY(memory, 1, 2, 3, 4);
 		}
 
-		THEN("simple_memory_t can be indexed")
+		THEN("basic_memory_t can be indexed")
 		{
 			storage_t store{1, 2, 3, 4};
 			int_memory_t memory{store.data()};
@@ -84,7 +84,7 @@ SCENARIO_OF("memory/simple_memory_t", "simple_memory_t construction")
 			CHECK(memory[3] == 4);
 		}
 
-		THEN("simple_memory_t can fake pointer arithmetic")
+		THEN("basic_memory_t can fake pointer arithmetic")
 		{
 			storage_t store{1, 2, 3, 4};
 
@@ -204,10 +204,10 @@ SCENARIO_TEMPLATE("a memory-xfer-range is contructed ", range_type, atma::dest_r
 			CHECK(d.begin() == &*numbers.begin() + 1);
 		}
 
-		THEN("it constructs from a simple_memory_t & size")
+		THEN("it constructs from a basic_memory_t & size")
 		{
 			auto numbers = std::vector<int>{ 1, 2, 3, 4 };
-			auto mem = atma::simple_memory_t<int>(numbers.data());
+			auto mem = atma::basic_memory_t<int>(numbers.data());
 
 			range_type d(mem, numbers.size());
 
@@ -218,10 +218,10 @@ SCENARIO_TEMPLATE("a memory-xfer-range is contructed ", range_type, atma::dest_r
 			CHECK(d.begin() == numbers.data());
 		}
 
-		THEN("it constructs from a simple_memory_t, offset, and size")
+		THEN("it constructs from a basic_memory_t, offset, and size")
 		{
 			auto numbers = std::vector<int>{ 1, 2, 3, 4 };
-			auto mem = atma::simple_memory_t<int>(numbers.data());
+			auto mem = atma::basic_memory_t<int>(numbers.data());
 
 			range_type d(mem, 2, numbers.size() - 2);
 

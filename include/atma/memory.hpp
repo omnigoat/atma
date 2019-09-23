@@ -205,71 +205,6 @@ namespace atma::detail
 }
 
 //
-//  simple_memory_t
-//  -----------------
-//
-//    this stores a pointer & allocator pair, and allows assignment, indexing, and offsets
-//
-namespace atma
-{
-	template <typename T, typename Allocator = std::allocator<T>>
-	struct simple_memory_t : detail::base_memory_t<T, Allocator>
-	{
-		using base_type = detail::base_memory_t<T, Allocator>;
-
-		using allocator_type   = typename base_type::allocator_type;
-		using allocator_traits = typename base_type::allocator_traits;
-		using value_type       = typename allocator_traits::value_type;
-		using pointer          = typename allocator_traits::pointer;
-		using const_pointer    = typename allocator_traits::const_pointer;
-		using reference        = typename allocator_traits::value_type&;
-
-		simple_memory_t() = default;
-		explicit simple_memory_t(allocator_type const&);
-		explicit simple_memory_t(pointer, allocator_type const& = allocator_type());
-		simple_memory_t(memory_allocate_copy_tag, const_pointer, size_t size, allocator_type const& = allocator_type());
-		explicit simple_memory_t(size_t capacity, allocator_type const& = allocator_type());
-		template <typename B> simple_memory_t(simple_memory_t<T, B> const&);
-
-		auto operator = (simple_memory_t const&) -> simple_memory_t& = default;
-		auto operator = (pointer) -> simple_memory_t&;
-		template <typename B> auto operator = (simple_memory_t<T, B> const&) -> simple_memory_t&;
-
-		operator bool() const { return ptr_ != nullptr; }
-		operator pointer() const { return ptr_; }
-		operator const_pointer() const { return ptr_; }
-
-		auto operator *  () const -> reference;
-		auto operator [] (intptr) const -> reference;
-		auto operator -> () const -> pointer;
-
-		auto data() const -> pointer { return ptr_; }
-
-		// allocator interface
-		auto allocate(size_t) -> bool;
-		auto deallocate(size_t = 0) -> void;
-
-	protected:
-		value_type* ptr_ = nullptr;
-	};
-
-	template <typename T>
-	simple_memory_t(T*) -> simple_memory_t<T>;
-
-	template <typename T, typename A>
-	simple_memory_t(T*, A const&) -> simple_memory_t<T, A>;
-
-
-
-	template <typename T, typename A, typename D,
-		CONCEPT_MODELS_(atma::concepts::integral, D)>
-	inline auto operator + (simple_memory_t<T, A> lhs, D d)
-	{
-		return simple_memory_t<T, A>(lhs.operator typename simple_memory_t<T, A>::pointer() + d, lhs.allocator());
-	}
-}
-
-//
 //  basic_memory_t
 //  ----------------
 //
@@ -294,8 +229,65 @@ namespace atma
 namespace atma
 {
 	template <typename T, typename Allocator = std::allocator<T>>
-	using basic_memory_t = simple_memory_t<T, Allocator>;
+	struct basic_memory_t : detail::base_memory_t<T, Allocator>
+	{
+		using base_type = detail::base_memory_t<T, Allocator>;
 
+		using allocator_type   = typename base_type::allocator_type;
+		using allocator_traits = typename base_type::allocator_traits;
+		using value_type       = typename allocator_traits::value_type;
+		using pointer          = typename allocator_traits::pointer;
+		using const_pointer    = typename allocator_traits::const_pointer;
+		using reference        = typename allocator_traits::value_type&;
+
+		basic_memory_t() = default;
+		explicit basic_memory_t(allocator_type const&);
+		explicit basic_memory_t(pointer, allocator_type const& = allocator_type());
+		basic_memory_t(memory_allocate_copy_tag, const_pointer, size_t size, allocator_type const& = allocator_type());
+		explicit basic_memory_t(size_t capacity, allocator_type const& = allocator_type());
+		template <typename B> basic_memory_t(basic_memory_t<T, B> const&);
+
+		auto operator = (basic_memory_t const&) -> basic_memory_t& = default;
+		auto operator = (pointer) -> basic_memory_t&;
+		template <typename B> auto operator = (basic_memory_t<T, B> const&) -> basic_memory_t&;
+
+		operator bool() const { return ptr_ != nullptr; }
+		operator pointer() const { return ptr_; }
+		operator const_pointer() const { return ptr_; }
+
+		auto operator *  () const -> reference;
+		auto operator [] (intptr) const -> reference;
+		auto operator -> () const -> pointer;
+
+		auto data() const -> pointer { return ptr_; }
+
+		// allocator interface
+		auto allocate(size_t) -> bool;
+		auto deallocate(size_t = 0) -> void;
+
+	protected:
+		value_type* ptr_ = nullptr;
+	};
+
+	template <typename T>
+	basic_memory_t(T*) -> basic_memory_t<T>;
+
+	template <typename T, typename A>
+	basic_memory_t(T*, A const&) -> basic_memory_t<T, A>;
+
+
+
+	template <typename T, typename A, typename D,
+		CONCEPT_MODELS_(atma::concepts::integral, D)>
+	inline auto operator + (basic_memory_t<T, A> lhs, D d)
+	{
+		return basic_memory_t<T, A>(lhs.operator typename basic_memory_t<T, A>::pointer() + d, lhs.allocator());
+	}
+}
+
+
+namespace atma
+{
 	using memory_t = basic_memory_t<byte>;
 }
 
@@ -305,25 +297,25 @@ namespace atma
 namespace atma
 {
 	template <typename T, typename A>
-	inline simple_memory_t<T, A>::simple_memory_t(allocator_type const& allocator)
+	inline basic_memory_t<T, A>::basic_memory_t(allocator_type const& allocator)
 		: base_type(allocator)
 	{}
 
 	template <typename T, typename A>
-	inline simple_memory_t<T, A>::simple_memory_t(pointer data, allocator_type const& alloc)
+	inline basic_memory_t<T, A>::basic_memory_t(pointer data, allocator_type const& alloc)
 		: base_type(alloc)
 		, ptr_(data)
 	{}
 
 	template <typename T, typename A>
 	template <typename B>
-	inline simple_memory_t<T, A>::simple_memory_t(simple_memory_t<T, B> const& rhs)
+	inline basic_memory_t<T, A>::basic_memory_t(basic_memory_t<T, B> const& rhs)
 		: detail::base_memory_t<T, A>(rhs.allocator())
 		, ptr_(rhs.ptr_)
 	{}
 
 	template <typename T, typename A>
-	inline auto simple_memory_t<T, A>::operator = (pointer rhs) -> simple_memory_t &
+	inline auto basic_memory_t<T, A>::operator = (pointer rhs) -> basic_memory_t &
 	{
 		ptr_ = rhs;
 		return *this;
@@ -331,7 +323,7 @@ namespace atma
 
 	template <typename T, typename A>
 	template <typename B>
-	inline auto simple_memory_t<T, A>::operator = (simple_memory_t<T, B> const& rhs) -> simple_memory_t &
+	inline auto basic_memory_t<T, A>::operator = (basic_memory_t<T, B> const& rhs) -> basic_memory_t &
 	{
 		ptr_ = rhs.ptr_;
 		this->allocator() = rhs.allocator();
@@ -339,19 +331,19 @@ namespace atma
 	}
 
 	template <typename T, typename A>
-	inline auto simple_memory_t<T, A>::operator *  () const -> reference
+	inline auto basic_memory_t<T, A>::operator *  () const -> reference
 	{
 		return *ptr_;
 	}
 
 	template <typename T, typename A>
-	inline auto simple_memory_t<T, A>::operator [] (intptr idx) const -> reference
+	inline auto basic_memory_t<T, A>::operator [] (intptr idx) const -> reference
 	{
 		return ptr_[idx];
 	}
 
 	template <typename T, typename A>
-	inline auto simple_memory_t<T, A>::operator -> () const -> pointer
+	inline auto basic_memory_t<T, A>::operator -> () const -> pointer
 	{
 		return ptr_;
 	}
@@ -361,7 +353,7 @@ namespace atma
 namespace atma
 {
 	template <typename T, typename A>
-	inline simple_memory_t<T, A>::simple_memory_t(memory_allocate_copy_tag, const_pointer data, size_t size, allocator_type const& alloc)
+	inline basic_memory_t<T, A>::basic_memory_t(memory_allocate_copy_tag, const_pointer data, size_t size, allocator_type const& alloc)
 		: base_type(alloc)
 	{
 		allocate(size);
@@ -369,7 +361,7 @@ namespace atma
 	}
 
 	template <typename T, typename A>
-	inline simple_memory_t<T, A>::simple_memory_t(size_t capacity, allocator_type const& alloc)
+	inline basic_memory_t<T, A>::basic_memory_t(size_t capacity, allocator_type const& alloc)
 		: base_type(alloc)
 	{
 		allocate(capacity);
@@ -394,14 +386,14 @@ namespace atma
 #endif
 
 	template <typename T, typename A>
-	inline auto simple_memory_t<T, A>::allocate(size_t count) -> bool
+	inline auto basic_memory_t<T, A>::allocate(size_t count) -> bool
 	{
 		this->ptr_= allocator_traits::allocate(this->allocator(), count);
 		return this->ptr_ != nullptr;
 	}
 
 	template <typename T, typename A>
-	inline auto simple_memory_t<T, A>::deallocate(size_t count) -> void
+	inline auto basic_memory_t<T, A>::deallocate(size_t count) -> void
 	{
 		allocator_traits::deallocate(this->allocator(), this->ptr_, count);
 	}
@@ -656,9 +648,9 @@ namespace atma
 namespace atma::memory
 {
 	template <typename T, typename A, typename... Args>
-	inline auto construct(simple_memory_t<T, A> const& ptr, Args&&... args) -> void
+	inline auto construct(basic_memory_t<T, A> const& ptr, Args&&... args) -> void
 	{
-		simple_memory_t<T, A>::allocator_traits::construct(ptr.allocator(), (T*)ptr, std::forward<Args>(args)...);
+		basic_memory_t<T, A>::allocator_traits::construct(ptr.allocator(), (T*)ptr, std::forward<Args>(args)...);
 	}
 
 	template <typename T, typename... Args>
