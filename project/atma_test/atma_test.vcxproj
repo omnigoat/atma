@@ -69,11 +69,6 @@
     <ClCompile Include="..\..\source\atma_test\test_utf8_string.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_vector.cpp" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\rose\rose.vcxproj">
-      <Project>{58b3d2c1-0ab1-48cf-8b47-60dc3fc9adb6}</Project>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

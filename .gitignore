@@ -1,5 +1,6 @@
 
 ; ignore visual studio files
+.vs/
 Debug/
 Release/
 x64/
