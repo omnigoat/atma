@@ -40,8 +40,6 @@ SCENARIO_OF("ranges/filter_t", "ranges can be filtered")
 		static_assert( atma::concepts::Same::template same<dragon_t, dragon_t>::value);
 		static_assert(!atma::concepts::Same::template same<knight_t, dragon_t>::value);
 
-		static_assert( concepts::specifies<concepts::is_true<std::is_same<int, int>>>::value );
-
 		static_assert( atma::concepts::Same::template same_t<dragon_t, dragon_t>::value);
 		static_assert(!atma::concepts::Same::template same_t<knight_t, dragon_t>::value);
 
