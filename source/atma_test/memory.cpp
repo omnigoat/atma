@@ -14,8 +14,101 @@
 	CHECK_MEMORY_II(v, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
 
+#if 1
+namespace whatever
+{
+	using namespace atma;
+
+	namespace detail
+	{
+		template <typename F, typename G>
+		struct functor_call_
+		{
+			static_assert(std::is_empty_v<F>, "lambda must be empty");
+
+			template <typename... Args, typename = std::enable_if_t<!std::is_invocable_v<G, Args...>>>
+			constexpr auto operator ()(Args&& ... args) const -> std::invoke_result_t<F, Args...>
+			{
+				return std::invoke(reinterpret_cast<F const&>(const_cast<functor_call_&>(*this)), std::forward<Args>(args)...);
+			}
+		};
+
+		// first potential function, no enable-shenanigans required
+		template <typename F>
+		struct functor_call_<F, void>
+		{
+			static_assert(std::is_empty_v<F>, "lambda must be empty");
+
+			template <typename... Args>
+			constexpr auto operator ()(Args&& ... args) const -> std::invoke_result_t<F, Args...>
+			{
+				return std::invoke(reinterpret_cast<F const&>(const_cast<functor_call_&>(*this)), std::forward<Args>(args)...);
+			}
+		};
+
+		// last function is dummy value
+		template <typename F>
+		struct functor_call_<void, F>
+		{};
+
+
+		template <typename, typename> struct multi_functor_t;
+		template <typename... Fs, typename... Gs>
+		struct multi_functor_t<atma::meta::list<Fs...>, atma::meta::list<Gs...>>
+			: detail::functor_call_<Fs, Gs>...
+		{};
+	}
+
+	template <typename... Fs>
+	struct multi_functor_t
+		: detail::multi_functor_t<meta::list<Fs..., void>, meta::list<void, Fs...>>
+	{};
+
+	auto plus1 = [](auto n) -> std::enable_if_t<std::is_signed_v<decltype(n)> && sizeof(decltype(n)) == 4, decltype(n)> { return n + 1; };
+	auto plus2 = [](auto n) -> std::enable_if_t<std::is_signed_v<decltype(n)>, decltype(n)> { return n + 2; };
+	auto plus3 = [](auto n) { return n + 3; };
+	auto plus4 = [](auto n) { return n + 4; };
+
+	template <typename... Fs>
+	constexpr auto make_functor(Fs&&... fs) -> multi_functor_t<std::remove_reference_t<Fs>...>
+	{
+		return {};
+	}
+
+	#define RETURN_TYPE_IF(type, ...) \
+		std::enable_if_t<__VA_ARGS__, type>
+
+	auto constexpr plus = make_functor(plus1, plus2, plus3, plus4);
+	
+	#define smol_lambda_m(r,d,i,x) BOOST_PP_COMMA_IF(i) auto&& x
+	#define smol_lambda_iii(params, expr) [](BOOST_PP_SEQ_FOR_EACH_I(lambda_m, ~, params)) -> decltype(expr) { return expr; }
+	#define smol_lambda_ii(seq) lambda_iii(BOOST_PP_SEQ_TAIL(BOOST_PP_SEQ_REVERSE(seq)), BOOST_PP_SEQ_HEAD(BOOST_PP_SEQ_REVERSE(seq)))
+	#define smol_lambda(...) lambda_ii(BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+
+	auto constexpr minus = make_functor(
+		[](auto n) -> RETURN_TYPE_IF(decltype(n), concepts::model_of<atma::integral_concept>(n))
+		{
+			return n - 10;
+		},
+		[](auto n) -> RETURN_TYPE_IF(decltype(n), concepts::model_of<atma::signed_integral_concept>(n))
+		{
+			return n - 1;
+		});
+
+	void okay()
+	{
+		auto r = plus(4);
+		(void)r;
+	}
+
+}
+#endif
+
+
 SCENARIO_OF("memory/base_memory_t", "base_memory_t EBO")
 {
+	whatever::okay();
+
 	GIVEN("an empty allocator")
 	{
 		using empty_allocator = atma::aligned_allocator_t<int>;
@@ -338,7 +431,6 @@ SCENARIO_OF("memory/operations", "range_construct is called")
 		}
 	}
 }
-
 
 SCENARIO_OF("memory/operations", "range_copy_construct is called")
 {
