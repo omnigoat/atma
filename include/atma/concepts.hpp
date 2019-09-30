@@ -10,45 +10,23 @@
 // specifies, is_true, is_false
 namespace atma::concepts
 {
+	template <bool x>
+	using is_true = std::bool_constant<x>;
+
+	template <typename Arg, typename = std::enable_if_t<!Arg::value>>
+	struct is_false : std::true_type
+	{};
+
 	namespace detail
 	{
-		template <typename Arg>
-		constexpr auto is_true_() ->
-			std::enable_if_t<Arg::value, std::true_type>;
-
-		template <typename Arg>
-		constexpr auto is_false_() ->
-			std::enable_if_t<!Arg::value, std::true_type>;
-
-		template <typename... Args>
-		constexpr void specifies_(Args&&...);
-
-		template <typename T = std::void_t<>>
-		struct can_ : std::false_type
+		template <typename List, typename = std::enable_if_t<meta::all<List>::value>> 
+		struct specifies_
+			: std::true_type
 		{};
 	}
 
 	template <typename... Args>
-	struct specifies
-	{
-		using type = decltype(detail::specifies_(Args{}...));
-		constexpr static auto value = true;
-	};
-
-	template <typename Arg, typename = std::enable_if_t<Arg::value, std::true_type>>
-	struct is_true : std::true_type
-	{};
-
-	template <typename Arg, typename = std::enable_if_t<!Arg::value, std::true_type>>
-	struct is_false : std::true_type
-	{};
-
-	template <typename... Arg>
-	struct can : detail::can_<std::void_t<Arg>>
-	{};
-
-	template <auto Expr>
-	struct valid_expr : std::true_type {};
+	using specifies = detail::specifies_<meta::list<Args...>>;
 }
 
 
@@ -84,7 +62,7 @@ namespace atma::concepts::detail
 
 namespace atma::concepts
 {
-	template <typename Concept, typename... Ts>
+	template <typename Concept, typename...>
 	struct models;
 }
 
@@ -105,17 +83,21 @@ namespace atma::concepts
 					detail::base_concepts_t<Concept>>>;
 	}
 
-	template <typename Concept, typename... Ts>
-	struct models
-		: meta::bool_<decltype(detail::models_<Ts...>(meta::nullptr_<Concept>))::type::value>
+	template <typename Concept, typename... Types>
+	struct models : decltype(detail::models_<Types...>(meta::nullptr_<Concept>))
 	{};
 
-	template <typename Concept, typename... Ts>
-	inline constexpr bool models_v = models<Concept, Ts...>::value;
+	template <typename Concept, typename... Types>
+	inline constexpr bool models_v = models<Concept, Types...>::value;
 
-	template<typename Concept, typename... Ts>
-	auto model_of(Ts&&...) ->
-		std::enable_if_t<models<Concept, Ts...>::value>;
+	template <typename Concept, typename... Types>
+	constexpr bool model_of(Types&&...)
+	{
+		return models<Concept, Types...>::value;
+	}
+
+	template <typename Concept, typename... Types>
+	using enable_if_concept_applies_t = std::enable_if_t<models_v<Concept, Types...>>;
 }
 
 // refines
@@ -223,13 +205,13 @@ namespace atma::concepts
 	decltype(std::void_t<__VA_ARGS__>(), std::true_type())
 
 #define SPECIFIES_EXPR(...) \
-    ::atma::concepts::can<decltype(__VA_ARGS__)>
+    decltype(__VA_ARGS__, std::true_type())
 
 #define SPECIFIES_EXPR_OF_TYPE(type, ...) \
-	::atma::concepts::is_true<::std::is_same<type, decltype(__VA_ARGS__)>>
+	::std::is_same<type, decltype(__VA_ARGS__)>
 
 #define SPECIFIES_EXPR_OF_TYPEISH(type, ...) \
-	::atma::concepts::is_true<::std::is_convertible<decltype(__VA_ARGS__), type>>
+	::std::is_convertible<decltype(__VA_ARGS__), type>
 
 
 #define CONTRACT_FWDS_TO_II(s, data, elem) std::declval<elem>()
@@ -264,39 +246,41 @@ namespace atma::concepts
 	))
 
 
-
-
-
-
 // concept: integrals
-namespace atma::concepts
+namespace atma
 {
-	struct integral
+	struct integral_concept
 	{
 		template <typename T>
-		auto contract()->specifies<
-			is_true<std::is_integral<T>>
+		auto contract() -> concepts::specifies<
+			std::is_integral<T>
 		>;
 	};
 
-	struct signed_integral
-		: refines<integral>
+	struct signed_integral_concept
+		: concepts::refines<integral_concept>
 	{
 		template <typename T>
-		auto contract()->specifies<
-			is_true<std::is_signed<T>>
+		auto contract() -> concepts::specifies<
+			std::is_signed<T>
 		>;
 	};
 
-	struct unsigned_integral
-		: refines<integral>
+	struct unsigned_integral_concept
+		: concepts::refines<integral_concept>
 	{
 		template <typename T>
-		auto contract()->specifies<
-			is_false<std::is_unsigned<T>>
+		auto contract() -> concepts::specifies<
+			std::is_unsigned<T>
 		>;
 	};
+
+	static_assert(concepts::models_v<integral_concept, int>);
+	static_assert(concepts::models_v<signed_integral_concept, int>);
+	static_assert(concepts::models_v<unsigned_integral_concept, unsigned int>);
+	static_assert(!concepts::models_v<unsigned_integral_concept, int>);
 }
+
 
 // concepts: conversion
 namespace atma::concepts
@@ -304,8 +288,8 @@ namespace atma::concepts
 	struct implicitly_convertible
 	{
 		template <typename From, typename To>
-		auto contract()->specifies<
-			is_true<std::is_convertible<From, To>>
+		auto contract() -> specifies<
+			std::is_convertible<From, To>
 		>;
 	};
 
@@ -363,7 +347,7 @@ namespace atma::concepts
 
 		template <typename... Ts>
 		auto contract()->specifies<
-			is_true<same_t<Ts...>>
+			same_t<Ts...>
 		>;
 	};
 }
@@ -411,8 +395,12 @@ namespace atma::concepts
 	struct random_iterator_concept
 		: refines<bidirectional_iterator_concept>
 	{
-		template <typename It, typename difference_type, typename reference>
-		auto test(It& a, It& b, difference_type n, reference) -> specifies
+		template <typename It,
+			typename...,
+			typename difference_type = typename std::iterator_traits<It>::difference_type,
+			typename reference_type = typename std::iterator_traits<It>::reference
+		>
+		auto contract(It& a, It& b, difference_type n) -> specifies
 		<
 			SPECIFIES_EXPR_OF_TYPE(It&, a += n),
 			SPECIFIES_EXPR_OF_TYPE(It, a + n),
@@ -420,18 +408,11 @@ namespace atma::concepts
 			SPECIFIES_EXPR_OF_TYPE(It&, a -= n),
 			SPECIFIES_EXPR_OF_TYPE(It, a - n),
 			SPECIFIES_EXPR_OF_TYPE(difference_type, b - a),
-			SPECIFIES_EXPR_OF_TYPEISH(reference, a[n]),
+			SPECIFIES_EXPR_OF_TYPEISH(reference_type, a[n]),
 			SPECIFIES_EXPR_OF_TYPEISH(bool, a < b),
 			SPECIFIES_EXPR_OF_TYPEISH(bool, a <= b),
 			SPECIFIES_EXPR_OF_TYPEISH(bool, a >= b),
 			SPECIFIES_EXPR_OF_TYPEISH(bool, a > b)
-		>;
-
-		template <typename It>
-		auto contract() -> specifies<
-			CONTRACT_CALL_TEST(test, It&, It&,
-				typename std::iterator_traits<It>::difference_type,
-				typename std::iterator_traits<It>::reference)
 		>;
 	};
 
