@@ -6,7 +6,7 @@
 
 #include <rose/runtime.hpp>
 
-#include "../../shiny/include/lion/console_log_handler.hpp"
+//#include "../../shiny/include/lion/console_log_handler.hpp"
 
 
 #include <future>
