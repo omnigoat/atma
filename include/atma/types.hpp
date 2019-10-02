@@ -234,3 +234,9 @@ namespace atma
 	template <typename R>
 	using allocator_type_of_t = typename allocator_type_of<std::remove_reference_t<R>>::type;
 }
+
+namespace atma
+{
+	template <typename T>
+	using rmref_t = std::remove_reference_t<T>;
+}

@@ -20,6 +20,7 @@
     <ClInclude Include="..\..\include\atma\flyweight.hpp" />
     <ClInclude Include="..\..\include\atma\function.hpp" />
     <ClInclude Include="..\..\include\atma\function_composition.hpp" />
+    <ClInclude Include="..\..\include\atma\functor.hpp" />
     <ClInclude Include="..\..\include\atma\handle_table.hpp" />
     <ClInclude Include="..\..\include\atma\hash_map.hpp" />
     <ClInclude Include="..\..\include\atma\lockfree_list.hpp" />
