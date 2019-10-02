@@ -19,11 +19,11 @@ namespace whatever
 {
 	using namespace atma;
 
+	// functor-call
 	namespace detail
 	{
-		template <typename, typename> struct functor_call_;
-		template <typename... Fs, typename F>
-		struct functor_call_<atma::meta::list<Fs...>, F>
+		template <typename F, typename... Fs>
+		struct functor_call_
 		{
 			static_assert(std::is_empty_v<F>, "functor must be empty");
 
@@ -33,18 +33,23 @@ namespace whatever
 				return std::invoke(reinterpret_cast<F const&>(const_cast<functor_call_&>(*this)), std::forward<Args>(args)...);
 			}
 		};
+	}
 
-		template <typename, typename, typename> struct multi_functor_;
+	// multi-functor
+	namespace detail
+	{
+		template <typename, typename, typename>
+		struct multi_functor_;
 
 		template <typename... Fs, typename F>
 		struct multi_functor_<atma::meta::list<Fs...>, F, atma::meta::list<>>
-			: functor_call_<meta::list<Fs...>, F>
+			: functor_call_<F, Fs...>
 		{};
 
 		template <typename... Fs, typename F, typename G, typename... Gs>
 		struct multi_functor_<atma::meta::list<Fs...>, F, atma::meta::list<G, Gs...>>
 			: multi_functor_<meta::list<Fs..., F>, G, meta::list<Gs...>>
-			, functor_call_<meta::list<Fs...>, F>
+			, functor_call_<F, Fs...>
 		{};
 	}
 
