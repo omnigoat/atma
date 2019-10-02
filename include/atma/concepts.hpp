@@ -19,16 +19,21 @@ namespace atma::concepts
 
 	namespace detail
 	{
-		template <typename List, typename = std::enable_if_t<meta::all<List>::value>> 
+		template <bool b, typename = std::enable_if_t<b>> 
 		struct specifies_
 			: std::true_type
 		{};
 	}
 
-	template <typename... Args>
-	using specifies = detail::specifies_<meta::list<Args...>>;
+	template <auto... Vals>
+	using specifies = detail::specifies_<(Vals && ...)>;
 }
 
+namespace atma::concepts::detail
+{
+	template <typename T>
+	constexpr bool true_v = true;
+}
 
 // base_concept_t
 namespace atma::concepts::detail
@@ -201,17 +206,18 @@ namespace atma::concepts
     /**/
 
 
-#define SPECIFIES_TYPE(...) \
-	decltype(std::void_t<__VA_ARGS__>(), std::true_type())
 
-#define SPECIFIES_EXPR(...) \
-    decltype(__VA_ARGS__, std::true_type())
+#define SPECIFIES_TYPE(type_expr) \
+	::atma::concepts::detail::true_v<type_expr>
 
-#define SPECIFIES_EXPR_OF_TYPE(type, ...) \
-	::std::is_same<type, decltype(__VA_ARGS__)>
+#define SPECIFIES_EXPR(expr) \
+	::atma::concepts::detail::true_v<decltype(expr)>
 
-#define SPECIFIES_EXPR_OF_TYPEISH(type, ...) \
-	::std::is_convertible<decltype(__VA_ARGS__), type>
+#define SPECIFIES_EXPR_OF_TYPE(type, expr) \
+	::std::is_same_v<type, decltype(expr)>
+
+#define SPECIFIES_EXPR_OF_TYPEISH(type, expr) \
+	::std::is_convertible_v<decltype(expr), type>
 
 
 #define CONTRACT_FWDS_TO_II(s, data, elem) std::declval<elem>()
@@ -253,7 +259,7 @@ namespace atma
 	{
 		template <typename T>
 		auto contract() -> concepts::specifies<
-			std::is_integral<T>
+			std::is_integral_v<T>
 		>;
 	};
 
@@ -262,7 +268,7 @@ namespace atma
 	{
 		template <typename T>
 		auto contract() -> concepts::specifies<
-			std::is_signed<T>
+			std::is_signed_v<T>
 		>;
 	};
 
@@ -271,7 +277,7 @@ namespace atma
 	{
 		template <typename T>
 		auto contract() -> concepts::specifies<
-			std::is_unsigned<T>
+			std::is_unsigned_v<T>
 		>;
 	};
 
@@ -289,15 +295,15 @@ namespace atma::concepts
 	{
 		template <typename From, typename To>
 		auto contract() -> specifies<
-			std::is_convertible<From, To>
+			std::is_convertible_v<From, To>
 		>;
 	};
 
 	struct explicitly_convertible
 	{
 		template <typename From, typename To>
-		auto contract(From (&from)())->specifies<
-			decltype(((void) static_cast<To>(from()), 42))
+		auto contract(From (&from)()) -> specifies<
+			SPECIFIES_EXPR(static_cast<To>(from))
 		>;
 	};
 
@@ -346,8 +352,8 @@ namespace atma::concepts
 		using same_t = typename same<Ts...>::type;
 
 		template <typename... Ts>
-		auto contract()->specifies<
-			same_t<Ts...>
+		auto contract() -> specifies<
+			same_t<Ts...>::value
 		>;
 	};
 }
