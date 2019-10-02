@@ -21,52 +21,42 @@ namespace whatever
 
 	namespace detail
 	{
-		template <typename F, typename G>
-		struct functor_call_
+		template <typename, typename> struct functor_call_;
+		template <typename... Fs, typename F>
+		struct functor_call_<atma::meta::list<Fs...>, F>
 		{
-			static_assert(std::is_empty_v<F>, "lambda must be empty");
+			static_assert(std::is_empty_v<F>, "functor must be empty");
 
-			template <typename... Args, typename = std::enable_if_t<!std::is_invocable_v<G, Args...>>>
+			template <typename... Args, typename = std::enable_if_t<(!std::is_invocable_v<Fs, Args...> && ...)>>
 			constexpr auto operator ()(Args&& ... args) const -> std::invoke_result_t<F, Args...>
 			{
 				return std::invoke(reinterpret_cast<F const&>(const_cast<functor_call_&>(*this)), std::forward<Args>(args)...);
 			}
 		};
 
-		// first potential function, no enable-shenanigans required
-		template <typename F>
-		struct functor_call_<F, void>
-		{
-			static_assert(std::is_empty_v<F>, "lambda must be empty");
+		template <typename, typename, typename> struct multi_functor_;
 
-			template <typename... Args>
-			constexpr auto operator ()(Args&& ... args) const -> std::invoke_result_t<F, Args...>
-			{
-				return std::invoke(reinterpret_cast<F const&>(const_cast<functor_call_&>(*this)), std::forward<Args>(args)...);
-			}
-		};
-
-		// last function is dummy value
-		template <typename F>
-		struct functor_call_<void, F>
+		template <typename... Fs, typename F>
+		struct multi_functor_<atma::meta::list<Fs...>, F, atma::meta::list<>>
+			: functor_call_<meta::list<Fs...>, F>
 		{};
 
-
-		template <typename, typename> struct multi_functor_t;
-		template <typename... Fs, typename... Gs>
-		struct multi_functor_t<atma::meta::list<Fs...>, atma::meta::list<Gs...>>
-			: detail::functor_call_<Fs, Gs>...
+		template <typename... Fs, typename F, typename G, typename... Gs>
+		struct multi_functor_<atma::meta::list<Fs...>, F, atma::meta::list<G, Gs...>>
+			: multi_functor_<meta::list<Fs..., F>, G, meta::list<Gs...>>
+			, functor_call_<meta::list<Fs...>, F>
 		{};
 	}
 
-	template <typename... Fs>
+	template <typename F, typename... Fs>
 	struct multi_functor_t
-		: detail::multi_functor_t<meta::list<Fs..., void>, meta::list<void, Fs...>>
+		: detail::multi_functor_<meta::list<>, F, meta::list<Fs...>>
 	{};
 
-	auto plus1 = [](auto n) -> std::enable_if_t<std::is_signed_v<decltype(n)> && sizeof(decltype(n)) == 4, decltype(n)> { return n + 1; };
-	auto plus2 = [](auto n) -> std::enable_if_t<std::is_signed_v<decltype(n)>, decltype(n)> { return n + 2; };
+
+	auto plus1 = [](auto n) -> std::enable_if_t<std::is_signed_v<decltype(n)>, decltype(n)> { return n + 1; };
 	auto plus3 = [](auto n) { return n + 3; };
+	auto plus2 = [](auto n) -> std::enable_if_t<std::is_signed_v<decltype(n)>, decltype(n)> { return n + 2; };
 	auto plus4 = [](auto n) { return n + 4; };
 
 	template <typename... Fs>
@@ -78,7 +68,7 @@ namespace whatever
 	#define RETURN_TYPE_IF(type, ...) \
 		std::enable_if_t<__VA_ARGS__, type>
 
-	auto constexpr plus = make_functor(plus1, plus2, plus3, plus4);
+	auto constexpr plus = make_functor(plus1, plus3, plus2, plus4);
 	
 	#define smol_lambda_m(r,d,i,x) BOOST_PP_COMMA_IF(i) auto&& x
 	#define smol_lambda_iii(params, expr) [](BOOST_PP_SEQ_FOR_EACH_I(lambda_m, ~, params)) -> decltype(expr) { return expr; }
@@ -97,7 +87,7 @@ namespace whatever
 
 	void okay()
 	{
-		auto r = plus(4);
+		auto r = plus(4u);
 		(void)r;
 	}
 
