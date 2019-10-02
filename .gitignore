@@ -3,6 +3,8 @@
 Debug/
 Release/
 x64/
+.vs/
+
 *.opensdf
 *.suo
 *.sdf

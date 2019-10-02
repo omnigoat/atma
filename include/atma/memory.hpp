@@ -357,8 +357,8 @@ namespace atma
 		auto contract(Memory& memory) -> concepts::specifies
 		<
 			// range has allocator/data
-			SPECIFIES_TYPE(typename std::remove_reference_t<Memory>::value_type),
-			SPECIFIES_TYPE(typename std::remove_reference_t<Memory>::allocator_type),
+			SPECIFIES_TYPE(typename Memory::value_type),
+			SPECIFIES_TYPE(typename Memory::allocator_type),
 			SPECIFIES_EXPR(memory.data()),
 			has_allocator_retrieval_v<Memory>
 		>;
@@ -375,7 +375,7 @@ namespace atma
 		<
 			// we can assign/copy-construct to elements in this range
 			//concepts::is_true<concepts::models<assignable_concept, typename std::remove_reference_t<Memory>::value_type>>,
-			concepts::models_v<copy_constructible_concept, typename std::remove_reference_t<Memory>::value_type>
+			concepts::models_v<copy_constructible_concept, typename Memory::value_type>
 		>;
 	};
 }
@@ -600,21 +600,21 @@ namespace atma
 	}
 
 	// "memory"
-	template <typename M, typename... Args, CONCEPT_MODELS_(memory_concept, M)>
+	template <typename M, typename... Args, CONCEPT_MODELS_(memory_concept, rmref_t<M>)>
 	inline auto dest_range(M&& memory)
 		-> dest_memxfer_range_t<value_type_of_t<M>, allocator_type_of_t<M>>
 	{
 		return {std::forward<M>(memory)};
 	}
 
-	template <typename M, typename... Args, CONCEPT_MODELS_(memory_concept, M)>
+	template <typename M, typename... Args, CONCEPT_MODELS_(memory_concept, rmref_t<M>)>
 	inline auto dest_range(M&& memory, size_t size)
 		-> dest_memxfer_range_t<value_type_of_t<M>, allocator_type_of_t<M>>
 	{
 		return {std::forward<M>(memory), size};
 	}
 
-	template <typename M, typename... Args, CONCEPT_MODELS_(memory_concept, M)>
+	template <typename M, typename... Args, CONCEPT_MODELS_(memory_concept, rmref_t<M>)>
 	inline auto dest_range(M&& memory, size_t offset, size_t size)
 		-> dest_memxfer_range_t<value_type_of_t<M>, allocator_type_of_t<M>>
 	{
@@ -654,7 +654,9 @@ namespace atma
 	template <typename Range, typename... Args, CONCEPT_MODELS_(random_access_range_concept, Range)>
 	src_range_t(Range&&, Args...) -> src_range_t<value_type_of_t<Range>, allocator_type_of_t<Range>>;
 
-	template <typename M, typename... Args, CONCEPT_MODELS_(memory_concept, M), CONCEPT_NOT_MODELS_(sized_range_concept, M)>
+	template <typename M, typename... Args,
+		CONCEPT_MODELS_(memory_concept, rmref_t<M>),
+		CONCEPT_NOT_MODELS_(sized_range_concept, rmref_t<M>)>
 	src_range_t(M&&, Args...) -> src_range_t<value_type_of_t<M>, allocator_type_of_t<M>>;
 
 	template <typename I>
@@ -730,9 +732,9 @@ namespace atma::memory
 	}
 
 	template <typename DR, typename SR,
-		CONCEPT_MODELS_(sized_memory_range_concept, DR),
-		CONCEPT_MODELS_(sized_memory_range_concept, SR),
-		CONCEPT_MODELS_(value_type_copy_constructible_concept, DR)>
+		CONCEPT_MODELS_(sized_memory_range_concept, rmref_t<DR>),
+		CONCEPT_MODELS_(sized_memory_range_concept, rmref_t<SR>),
+		CONCEPT_MODELS_(copy_constructible_concept, typename rmref_t<DR>::value_type)>
 	inline auto range_copy_construct(DR&& dest_range, SR&& src_range) -> void
 	{
 		ATMA_ASSERT(std::size(dest_range) == std::size(src_range));
