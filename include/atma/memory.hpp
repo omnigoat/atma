@@ -360,7 +360,7 @@ namespace atma
 			SPECIFIES_TYPE(typename std::remove_reference_t<Memory>::value_type),
 			SPECIFIES_TYPE(typename std::remove_reference_t<Memory>::allocator_type),
 			SPECIFIES_EXPR(std::declval<Memory&>().data()),
-			has_allocator_retrieval<Memory>
+			has_allocator_retrieval_v<Memory>
 		>;
 	};
 
@@ -375,7 +375,7 @@ namespace atma
 		<
 			// we can assign/copy-construct to elements in this range
 			//concepts::is_true<concepts::models<assignable_concept, typename std::remove_reference_t<Memory>::value_type>>,
-			concepts::models<copy_constructible_concept, typename std::remove_reference_t<Memory>::value_type>
+			concepts::models_v<copy_constructible_concept, typename std::remove_reference_t<Memory>::value_type>
 		>;
 	};
 }
