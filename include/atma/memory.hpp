@@ -354,12 +354,12 @@ namespace atma
 	struct memory_concept
 	{
 		template <typename Memory>
-		auto contract() -> concepts::specifies
+		auto contract(Memory& memory) -> concepts::specifies
 		<
 			// range has allocator/data
 			SPECIFIES_TYPE(typename std::remove_reference_t<Memory>::value_type),
 			SPECIFIES_TYPE(typename std::remove_reference_t<Memory>::allocator_type),
-			SPECIFIES_EXPR(std::declval<Memory&>().data()),
+			SPECIFIES_EXPR(memory.data()),
 			has_allocator_retrieval_v<Memory>
 		>;
 	};

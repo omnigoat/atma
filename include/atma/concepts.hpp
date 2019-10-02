@@ -7,16 +7,9 @@
 #include <boost/preprocessor/seq/transform.hpp>
 #include <boost/preprocessor/seq/enum.hpp>
 
-// specifies, is_true, is_false
+// specifies
 namespace atma::concepts
 {
-	template <bool x>
-	using is_true = std::bool_constant<x>;
-
-	template <typename Arg, typename = std::enable_if_t<!Arg::value>>
-	struct is_false : std::true_type
-	{};
-
 	namespace detail
 	{
 		template <bool b, typename = std::enable_if_t<b>> 
@@ -29,6 +22,14 @@ namespace atma::concepts
 	using specifies = detail::specifies_<(Vals && ...)>;
 }
 
+
+//
+// true_v
+// --------
+//  this allows us to just make a random type equate to true,
+//  which is useful in a SFINAE context where we just want to
+//  see if something is possible. if it compiles -> true.
+//
 namespace atma::concepts::detail
 {
 	template <typename T>
@@ -65,15 +66,12 @@ namespace atma::concepts::detail
 	using base_concepts_t = typename base_concepts<T>::type;
 }
 
+// models
 namespace atma::concepts
 {
 	template <typename Concept, typename...>
 	struct models;
-}
 
-// models
-namespace atma::concepts
-{
 	namespace detail
 	{
 		template <typename...>
@@ -220,37 +218,6 @@ namespace atma::concepts
 	::std::is_convertible_v<decltype(expr), type>
 
 
-#define CONTRACT_FWDS_TO_II(s, data, elem) std::declval<elem>()
-
-//
-//  CONTRACT_CALL_TEST
-//  --------------------
-//    calls another function by passing each type-argument as a std::declval, so
-//    that you can use function-argument-variables in SPECIFIES_EXPR, for example.
-//
-//    see random_iterator_concept for an example
-//
-#define CONTRACT_CALL_TEST(fn_name, ...) \
-	decltype(fn_name( \
-		BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_TRANSFORM(CONTRACT_FWDS_TO_II, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))) \
-	))
-
-//
-//  CONTRACT_FWDS_TO
-//  -------------------
-//    calls another function by passing each type-argument as a std::declval, so
-//    that you can use function-argument-variables in SPECIFIES_EXPR, for example.
-//
-//    as opposed to CONTRACT_CALL_TEST, this specifies the entire contract, like
-//
-//       template <typename It>
-//       CONTRACT_FWDS_TO(test, It&, It&, typename std::iterator_traits<It>::difference_type);
-//
-#define CONTRACT_FWDS_TO(fn_name, ...) \
-	auto contract() -> decltype(fn_name( \
-		BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_TRANSFORM(CONTRACT_FWDS_TO_II, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))) \
-	))
-
 
 // concept: integrals
 namespace atma
@@ -289,26 +256,26 @@ namespace atma
 
 
 // concepts: conversion
-namespace atma::concepts
+namespace atma
 {
-	struct implicitly_convertible
+	struct implicitly_convertible_concept
 	{
 		template <typename From, typename To>
-		auto contract() -> specifies<
+		auto contract() -> concepts::specifies<
 			std::is_convertible_v<From, To>
 		>;
 	};
 
-	struct explicitly_convertible
+	struct explicitly_convertible_concept
 	{
 		template <typename From, typename To>
-		auto contract(From (&from)()) -> specifies<
+		auto contract(From&& from) -> concepts::specifies<
 			SPECIFIES_EXPR(static_cast<To>(from))
 		>;
 	};
 
-	struct convertible
-		: refines<implicitly_convertible, explicitly_convertible>
+	struct convertible_concept
+		: concepts::refines<implicitly_convertible_concept, explicitly_convertible_concept>
 	{};
 }
 
@@ -330,9 +297,9 @@ namespace atma
 	struct assignable_concept
 	{
 		template <typename T, typename U = T>
-		auto contract() -> concepts::specifies
+		auto contract(T& to, U& from) -> concepts::specifies
 		<
-			SPECIFIES_EXPR(std::declval<T&>() = std::declval<U>())
+			SPECIFIES_EXPR(to = from)
 		>;
 	};
 }
@@ -342,18 +309,9 @@ namespace atma::concepts
 {
 	struct Same
 	{
-		template <typename... Ts>
-		struct same : std::true_type {};
-
 		template <typename T, typename... Us>
-		struct same<T, Us...> : meta::all<meta::list<meta::bool_<std::is_same<T, Us>::value>...>> {};
-
-		template <typename... Ts>
-		using same_t = typename same<Ts...>::type;
-
-		template <typename... Ts>
 		auto contract() -> specifies<
-			same_t<Ts...>::value
+			(std::is_same_v<T, Us> && ...)
 		>;
 	};
 }
@@ -364,7 +322,7 @@ namespace atma::concepts
 	struct iterator_concept
 	{
 		template <typename It>
-		auto contract() -> specifies
+		auto contract(It& a) -> specifies
 		<
 			SPECIFIES_TYPE(typename std::iterator_traits<It>::value_type),
 			SPECIFIES_TYPE(typename std::iterator_traits<It>::difference_type),
@@ -373,28 +331,32 @@ namespace atma::concepts
 			SPECIFIES_TYPE(typename std::iterator_traits<It>::iterator_category),
 
 			SPECIFIES_EXPR(*std::declval<It>()),
-			SPECIFIES_EXPR_OF_TYPE(It&, ++std::declval<It&>())
+			SPECIFIES_EXPR_OF_TYPE(It&, ++a)
 		>;
 	};
 
 	struct forward_iterator_concept
 		: refines<iterator_concept>
 	{
-		template <typename It>
-		auto contract() -> specifies<
-			SPECIFIES_EXPR_OF_TYPE(It, std::declval<It&>()++),
-			SPECIFIES_EXPR_OF_TYPE(typename std::iterator_traits<It>::reference, *std::declval<It&>()++)
+		template <typename It,
+			typename...,
+			typename reference = typename std::iterator_traits<It>::reference>
+		auto contract(It& a) -> specifies<
+			SPECIFIES_EXPR_OF_TYPE(It, a++),
+			SPECIFIES_EXPR_OF_TYPE(reference, *a++)
 		>;
 	};
 
 	struct bidirectional_iterator_concept
 		: refines<forward_iterator_concept>
 	{
-		template <typename It>
-		auto contract() -> specifies<
-			SPECIFIES_EXPR_OF_TYPE(It&, --std::declval<It&>()),
-			SPECIFIES_EXPR_OF_TYPE(It, std::declval<It&>()--),
-			SPECIFIES_EXPR_OF_TYPE(typename std::iterator_traits<It>::reference, *std::declval<It&>()--)
+		template <typename It,
+			typename...,
+			typename reference = std::iterator_traits<It>::reference>
+		auto contract(It& a) -> specifies<
+			SPECIFIES_EXPR_OF_TYPE(It&, --a),
+			SPECIFIES_EXPR_OF_TYPE(It, a--),
+			SPECIFIES_EXPR_OF_TYPE(reference, *a--)
 		>;
 	};
 
@@ -425,11 +387,13 @@ namespace atma::concepts
 	struct contiguous_iterator_concept
 		: refines<random_iterator_concept>
 	{
-		template <typename It>
-		auto contract() -> specifies<
+		template <typename It,
+			typename...,
+			typename difference_type = typename std::iterator_traits<It>::difference_type>
+		auto contract(It a, difference_type n) -> specifies<
 			// we can't fully express the constraint 'contiguous' - but we *can* ask
 			// for std::addressof the first element plus a difference type to be dereferenceable
-			SPECIFIES_EXPR(*(std::addressof(*std::declval<It>()) + std::declval<typename std::iterator_traits<It>::difference_type>()))
+			SPECIFIES_EXPR(*(std::addressof(*a) + n))
 		>;
 	};
 }
