@@ -15,46 +15,6 @@
 	CHECK_MEMORY_II(v, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
 
-#if 1
-namespace whatever
-{
-	using namespace atma;
-
-	auto plus1 = [](auto n) -> std::enable_if_t<std::is_signed_v<decltype(n)>, decltype(n)> { return n + 1; };
-	auto plus3 = [](auto n) { return n + 3; };
-	auto plus2 = [](auto n) -> std::enable_if_t<std::is_signed_v<decltype(n)>, decltype(n)> { return n + 2; };
-	auto plus4 = [](auto n) { return n + 4; };
-
-	#define RETURN_TYPE_IF(type, ...) \
-		std::enable_if_t<__VA_ARGS__, type>
-
-	auto constexpr plus = atma::make_functor(plus1, plus3, plus2, plus4);
-	
-	#define smol_lambda_m(r,d,i,x) BOOST_PP_COMMA_IF(i) auto&& x
-	#define smol_lambda_iii(params, expr) [](BOOST_PP_SEQ_FOR_EACH_I(lambda_m, ~, params)) -> decltype(expr) { return expr; }
-	#define smol_lambda_ii(seq) lambda_iii(BOOST_PP_SEQ_TAIL(BOOST_PP_SEQ_REVERSE(seq)), BOOST_PP_SEQ_HEAD(BOOST_PP_SEQ_REVERSE(seq)))
-	#define smol_lambda(...) lambda_ii(BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
-
-	auto constexpr minus = make_functor(
-		[](auto n) -> RETURN_TYPE_IF(decltype(n), concepts::model_of<atma::integral_concept>(n))
-		{
-			return n - 10;
-		},
-		[](auto n) -> RETURN_TYPE_IF(decltype(n), concepts::model_of<atma::signed_integral_concept>(n))
-		{
-			return n - 1;
-		});
-
-	void okay()
-	{
-		auto r = plus(4u);
-		(void)r;
-	}
-
-}
-#endif
-
-
 SCENARIO_OF("memory/base_memory_t", "base_memory_t EBO")
 {
 	whatever::okay();
