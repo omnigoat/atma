@@ -17,8 +17,6 @@
 
 SCENARIO_OF("memory/base_memory_t", "base_memory_t EBO")
 {
-	whatever::okay();
-
 	GIVEN("an empty allocator")
 	{
 		using empty_allocator = atma::aligned_allocator_t<int>;
@@ -369,6 +367,11 @@ SCENARIO_OF("memory/operations", "range_copy_construct is called")
 
 				THEN("range_copy_construct can copy-construct the beginning of the range")
 				{
+					atma::memory2::range_copy_construct(
+						atma::dest_range(dest_memory, 4),
+						atma::src_range_t(src_storage),
+						4);
+
 					atma::memory::range_copy_construct(
 						atma::dest_range(dest_memory, 4),
 						atma::src_range_t{src_storage});
