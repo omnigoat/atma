@@ -4,7 +4,7 @@
 
 
 #define RETURN_TYPE_IF(type, ...) \
-	std::enable_if_t<__VA_ARGS__, type>
+	std::enable_if_t<::atma::concepts::detail::all_true_v<__VA_ARGS__>, type>
 
 
 namespace atma
@@ -58,5 +58,16 @@ namespace atma
 	{
 		return {};
 	}
+
+	template <typename... Fs>
+	struct maker_functor
+		: multi_functor_t<rmref_t<Fs>...>
+	{
+		maker_functor(Fs&&... fs)
+		{}
+	};
+
+	template <typename... Fs>
+	maker_functor(Fs&&...) -> maker_functor<Fs...>;
 }
 
