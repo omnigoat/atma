@@ -34,6 +34,9 @@ namespace atma::concepts::detail
 {
 	template <typename T>
 	constexpr bool true_v = true;
+
+	template <auto... Vs>
+	constexpr bool all_true_v = (Vs && ...);
 }
 
 // base_concept_t
@@ -94,9 +97,15 @@ namespace atma::concepts
 	inline constexpr bool models_v = models<Concept, Types...>::value;
 
 	template <typename Concept, typename... Types>
-	constexpr bool model_of(Types&&...)
+	inline constexpr bool model_of(Types...)
 	{
-		return models<Concept, Types...>::value;
+		return true; //models_v<Concept, Types...>;
+	}
+
+	template <typename Concept>
+	inline constexpr bool model_ofs()
+	{
+		return true; //models_v<Concept, Types...>;
 	}
 
 	template <typename Concept, typename... Types>

@@ -5,6 +5,7 @@
 #include <atma/assert.hpp>
 #include <atma/types.hpp>
 #include <atma/ebo_pair.hpp>
+#include <atma/functor.hpp>
 
 #include <atma/ranges/core.hpp>
 
@@ -364,6 +365,10 @@ namespace atma
 		>;
 	};
 
+	struct sized_memory_concept
+		: concepts::refines<memory_concept, sized_range_concept>
+	{};
+
 	struct sized_memory_range_concept
 		: concepts::refines<memory_concept, range_concept, sized_range_concept>
 	{};
@@ -696,6 +701,68 @@ namespace atma::memory
 }
 
 // copy_construct_range
+namespace atma::memory2
+{
+#if 0
+	ATMA_ASSERT_MEMORY_RANGES_DISJOINT(
+		(dest_memxfer_range_t<DT, DA>(dest.begin(), dest.begin() + sz)),
+		(src_range_t<ST, SA>(src.begin(), src.begin() + sz)));
+#endif
+	constexpr auto _range_copy_construct = [](auto&& dest, auto&& src, size_t sz)
+	{
+		using allocator_type = allocator_type_of_t<rmref_t<decltype(dest)>>;
+
+		auto px = std::begin(dest);
+		auto py = std::begin(src);
+		for (size_t i = 0; i != sz; ++i)
+			std::allocator_traits<allocator_type>::construct(retrieve_allocator(dest), px++, *py++);
+	};
+
+	constexpr auto range_copy_construct = make_functor(
+		[](auto&& dest, auto&& src, size_t sz)
+			-> RETURN_TYPE_IF(void,
+				concepts::models_v<memory_concept, rmref_t<decltype(dest)>>,
+				concepts::models_v<memory_concept, rmref_t<decltype(src)>>)
+		{
+			if (sz == 0)
+				return;
+
+			ATMA_ASSERT(sz != unbounded_memory_size);
+
+			if constexpr (concepts::models_v<sized_memory_concept, rmref_t<decltype(dest)>>
+				&& concepts::models_v<sized_memory_concept, rmref_t<decltype(src)>>)
+			{
+				ATMA_ASSERT(dest.size() == src.size());
+			}
+			
+			if constexpr (concepts::models_v<sized_memory_concept, rmref_t<decltype(dest)>>)
+			{
+				ATMA_ASSERT(dest.size() == sz);
+			}
+			
+			if constexpr (concepts::models_v<sized_memory_concept, rmref_t<decltype(src)>>)
+			{
+				ATMA_ASSERT(src.size() == sz);
+			}
+
+			using allocator_type = allocator_type_of_t<decltype(dest)>;
+
+			auto px = std::begin(dest);
+			auto py = std::begin(src);
+			for (size_t i = 0; i != sz; ++i)
+				std::allocator_traits<allocator_type>::construct(retrieve_allocator(dest), px++, *py++);
+		},
+		[](auto&& dest, auto&& src, size_t sz)
+			-> RETURN_TYPE_IF(void,
+				concepts::models_v<sized_memory_concept, rmref_t<decltype(dest)>>,
+				concepts::models_v<sized_memory_concept, rmref_t<decltype(src)>>)
+		{
+			ATMA_ASSERT(dest.size() == src.size());
+
+			
+		});
+}
+
 namespace atma::memory
 {
 	template <typename DT, typename DA, typename ST, typename SA>
