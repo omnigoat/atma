@@ -6,6 +6,8 @@
 #include <boost/preprocessor/seq/for_each_i.hpp>
 #include <boost/preprocessor/seq/transform.hpp>
 #include <boost/preprocessor/seq/enum.hpp>
+#include <boost/preprocessor/comma_if.hpp>
+
 
 // specifies
 namespace atma::concepts
@@ -97,7 +99,7 @@ namespace atma::concepts
 	inline constexpr bool models_v = models<Concept, Types...>::value;
 
 	template <typename Concept, typename... Types>
-	inline constexpr bool model_of(Types...)
+	inline constexpr bool model_of(Types&&...)
 	{
 		return true; //models_v<Concept, Types...>;
 	}
@@ -178,6 +180,12 @@ namespace atma::concepts
 
 #define CONCEPT_REQUIRES_LIST(...) \
 	(BOOST_PP_SEQ_FOR_EACH_I(CONCEPT_REQUIRES_LIST_M, _, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__)))
+
+
+#define MODELS_ARGS_M(r,d,i,x) BOOST_PP_COMMA_IF(i) ::std::remove_reference_t<decltype(x)>
+#define MODELS_ARGS(concept, ...) \
+	::atma::concepts::models_v<concept, BOOST_PP_SEQ_FOR_EACH_I(MODELS_ARGS_M, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))>
+
 
 
 //
