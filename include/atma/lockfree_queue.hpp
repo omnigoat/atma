@@ -19,14 +19,14 @@ namespace atma
 
 	struct base_lockfree_queue_t
 	{
-		struct allocation_t;
+		struct encoder_t;
 		struct decoder_t;
 
 		base_lockfree_queue_t();
 		base_lockfree_queue_t(void*, uint32);
 		base_lockfree_queue_t(uint32);
 
-		auto commit(allocation_t&) -> void;
+		auto commit(encoder_t&) -> void;
 		auto consume() -> decoder_t;
 		auto finalize(decoder_t&) -> void;
 
@@ -108,7 +108,7 @@ namespace atma
 
 		auto impl_read_queue_write_info() -> std::tuple<byte*, uint32, uint32>;
 		auto impl_read_queue_read_info() -> std::tuple<byte*, uint32, uint32>;
-		auto impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t, uint32 alignment, uint32 size) -> allocation_t;
+		auto impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t, uint32 alignment, uint32 size) -> encoder_t;
 		auto impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void;
 
 	private:
@@ -237,8 +237,8 @@ namespace atma
 	};
 
 
-	// allocation_t
-	struct base_lockfree_queue_t::allocation_t : headerer_t
+	// encoder_t
+	struct base_lockfree_queue_t::encoder_t : headerer_t
 	{
 		operator bool() const { return buf_ != nullptr; }
 
@@ -254,7 +254,7 @@ namespace atma
 		template <typename T> auto encode_struct(T&&) -> bool;
 
 	private:
-		allocation_t(byte* buf, uint32 wp, allocstate_t, alloctype_t, uint32 alignment, uint32 size);
+		encoder_t(byte* buf, uint32 wp, allocstate_t, alloctype_t, uint32 alignment, uint32 size);
 
 		friend struct base_lockfree_queue_t;
 	};
@@ -644,7 +644,7 @@ namespace atma
 		return {p, allocerr_t::success, size};
 	}
 
-	inline auto base_lockfree_queue_t::commit(allocation_t& a) -> void
+	inline auto base_lockfree_queue_t::commit(encoder_t& a) -> void
 	{
 		uint32* ah = (uint32*)(a.buf_ + a.op_);
 
@@ -658,9 +658,9 @@ namespace atma
 	}
 
 
-	inline auto base_lockfree_queue_t::impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t type, uint32 alignment, uint32 size) -> allocation_t
+	inline auto base_lockfree_queue_t::impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t type, uint32 alignment, uint32 size) -> encoder_t
 	{
-		return allocation_t{wb, wp, allocstate_t::flag_commit, type, alignment, size};
+		return encoder_t{wb, wp, allocstate_t::flag_commit, type, alignment, size};
 	}
 
 	inline auto base_lockfree_queue_t::impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void
@@ -697,7 +697,7 @@ namespace atma
 			{
 				// no other thread can touch the old write-buffer/write-position, so no
 				// need to perform atomic operations anymore
-				auto A = allocation_t{wb, wbs, wp, alloctype_t::jump, 0, jump_command_body_size};
+				auto A = encoder_t{wb, wbs, wp, alloctype_t::jump, 0, jump_command_body_size};
 				A.encode_uint64(nwi.ui64[0]);
 				A.encode_uint32(nwbs);
 				commit(A);
@@ -731,8 +731,8 @@ namespace atma
 		return buf_ + (aml::alignby(op_ + header_size, alignment()) % buffer_size());
 	}
 
-	// allocation_t
-	inline base_lockfree_queue_t::allocation_t::allocation_t(byte* buf, uint32 wp, allocstate_t state, alloctype_t type, uint32 alignment, uint32 size)
+	// encoder_t
+	inline base_lockfree_queue_t::encoder_t::encoder_t(byte* buf, uint32 wp, allocstate_t state, alloctype_t type, uint32 alignment, uint32 size)
 		: headerer_t{buf, wp, wp, (uint32)state, (uint32)type, alignment, size}
 	{
 		p_ = aml::alignby(p_ + header_size, this->alignment());
@@ -741,7 +741,7 @@ namespace atma
 		ATMA_ASSERT(size <= header_size_bitmask);
 	}
 
-	inline auto base_lockfree_queue_t::allocation_t::encode_byte(byte b) -> void*
+	inline auto base_lockfree_queue_t::encoder_t::encode_byte(byte b) -> void*
 	{
 		ATMA_ASSERT(p_ != (op_ + header_size + raw_size()) % buffer_size());
 		ATMA_ASSERT(0 <= p_ && p_ < buffer_size());
@@ -752,26 +752,26 @@ namespace atma
 		return r;
 	}
 
-	inline auto base_lockfree_queue_t::allocation_t::encode_uint16(uint16 i) -> void
+	inline auto base_lockfree_queue_t::encoder_t::encode_uint16(uint16 i) -> void
 	{
 		encode_byte(i & 0xff);
 		encode_byte(i >> 8);
 	}
 
-	inline auto base_lockfree_queue_t::allocation_t::encode_uint32(uint32 i) -> void
+	inline auto base_lockfree_queue_t::encoder_t::encode_uint32(uint32 i) -> void
 	{
 		encode_uint16(i & 0xffff);
 		encode_uint16(i >> 16);
 	}
 
-	inline auto base_lockfree_queue_t::allocation_t::encode_uint64(uint64 i) -> void
+	inline auto base_lockfree_queue_t::encoder_t::encode_uint64(uint64 i) -> void
 	{
 		encode_uint32(i & 0xffffffff);
 		encode_uint32(i >> 32);
 	}
 
 	template <typename T>
-	inline auto base_lockfree_queue_t::allocation_t::encode_pointer(T* p) -> void
+	inline auto base_lockfree_queue_t::encoder_t::encode_pointer(T* p) -> void
 	{
 #if ATMA_POINTER_SIZE == 8
 			encode_uint64((uint64)p);
@@ -782,7 +782,7 @@ namespace atma
 #endif
 	}
 
-	inline auto base_lockfree_queue_t::allocation_t::encode_data(void const* data, uint32 size) -> void
+	inline auto base_lockfree_queue_t::encoder_t::encode_data(void const* data, uint32 size) -> void
 	{
 		static_assert(sizeof(uint64) <= sizeof(uintptr), "pointer is greater than 64 bits??");
 
@@ -792,7 +792,7 @@ namespace atma
 	}
 
 	template <typename T>
-	inline auto base_lockfree_queue_t::allocation_t::encode_struct(T&& x) -> bool
+	inline auto base_lockfree_queue_t::encoder_t::encode_struct(T&& x) -> bool
 	{
 		// require contiugous
 		if ((p_ + sizeof(x)) % buffer_size() < p_)
@@ -805,7 +805,7 @@ namespace atma
 		return true;
 	}
 
-	inline auto base_lockfree_queue_t::allocation_t::encode_data(unique_memory_t const& data) -> void
+	inline auto base_lockfree_queue_t::encoder_t::encode_data(unique_memory_t const& data) -> void
 	{
 		static_assert(sizeof(uint64) <= sizeof(uintptr), "pointer is greater than 64 bits??");
 
@@ -931,7 +931,7 @@ namespace atma
 			: base_lockfree_queue_t{size}
 		{}
 
-		auto allocate(uint32 size, uint32 alignment = 4, bool contiguous = false) -> allocation_t
+		auto allocate(uint32 size, uint32 alignment = 4, bool contiguous = false) -> encoder_t
 		{
 			alignment = std::max(alignment, 4u);
 
@@ -985,7 +985,7 @@ namespace atma
 			: base_lockfree_queue_t{size}
 		{}
 
-		auto allocate(uint32 size, uint32 alignment = 1, bool contiguous = false) -> allocation_t
+		auto allocate(uint32 size, uint32 alignment = 1, bool contiguous = false) -> encoder_t
 		{
 			ATMA_ASSERT(is_pow2(alignment));
 			ATMA_ASSERT(size <= write_buf_size(), "queue can not allocate that much");
