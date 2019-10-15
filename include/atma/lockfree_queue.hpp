@@ -31,7 +31,7 @@ namespace atma
 		auto finalize(decoder_t&) -> void;
 
 	protected:
-		struct headerer_t;
+		struct allocation_t;
 		struct housekeeping_t;
 		
 		using atomic_uint32_t = std::atomic<uint32>;
@@ -193,25 +193,25 @@ namespace atma
 		};
 
 		buffer_t writing_, reading_;
-	};
+	}; 
 
 
-	// headerer_t
-	struct base_lockfree_queue_t::headerer_t
+	// allocation_t
+	struct base_lockfree_queue_t::allocation_t
 	{
 		auto alignment() const -> uint32;
 		auto size() const -> uint32;
 		auto data() const -> void*;
 
 	protected:
-		headerer_t(byte* buf, uint32 op, uint32 p, uint32 state, uint32 type, uint32 alignment, uint32 size)
+		allocation_t(byte* buf, uint32 op, uint32 p, uint32 state, uint32 type, uint32 alignment, uint32 size)
 			: buf_{buf}
 			, op_{op}, p_{p}
 			, state_{state}, type_{type}, alignment_{alignment}, size_{size}
 		{}
 
-		headerer_t(byte* buf, uint32 op_, uint32 p_, uint32 header)
-			: headerer_t{buf, op_, p_,
+		allocation_t(byte* buf, uint32 op_, uint32 p_, uint32 header)
+			: allocation_t{buf, op_, p_,
 				(header >> header_state_bitshift) & header_state_bitmask,
 				(header >> header_type_bitshift) & header_type_bitmask,
 				(header >> header_alignment_bitshift) & header_alignment_bitmask,
@@ -238,7 +238,7 @@ namespace atma
 
 
 	// encoder_t
-	struct base_lockfree_queue_t::encoder_t : headerer_t
+	struct base_lockfree_queue_t::encoder_t : allocation_t
 	{
 		operator bool() const { return buf_ != nullptr; }
 
@@ -261,7 +261,7 @@ namespace atma
 
 
 	// decoder_t
-	struct base_lockfree_queue_t::decoder_t : headerer_t
+	struct base_lockfree_queue_t::decoder_t : allocation_t
 	{
 		decoder_t(decoder_t const&) = delete;
 		decoder_t(decoder_t&&);
@@ -711,8 +711,8 @@ namespace atma
 	}
 
 
-	// headerer_t
-	inline auto base_lockfree_queue_t::headerer_t::size() const -> uint32
+	// allocation_t
+	inline auto base_lockfree_queue_t::allocation_t::size() const -> uint32
 	{
 		// size after all alignment shenanigans
 		uint32 ag = alignment();
@@ -721,19 +721,19 @@ namespace atma
 		return r;
 	}
 
-	inline auto base_lockfree_queue_t::headerer_t::alignment() const -> uint32
+	inline auto base_lockfree_queue_t::allocation_t::alignment() const -> uint32
 	{
 		return 4 * aml::pow2(alignment_);
 	}
 
-	inline auto base_lockfree_queue_t::headerer_t::data() const -> void*
+	inline auto base_lockfree_queue_t::allocation_t::data() const -> void*
 	{
 		return buf_ + (aml::alignby(op_ + header_size, alignment()) % buffer_size());
 	}
 
 	// encoder_t
 	inline base_lockfree_queue_t::encoder_t::encoder_t(byte* buf, uint32 wp, allocstate_t state, alloctype_t type, uint32 alignment, uint32 size)
-		: headerer_t{buf, wp, wp, (uint32)state, (uint32)type, alignment, size}
+		: allocation_t{buf, wp, wp, (uint32)state, (uint32)type, alignment, size}
 	{
 		p_ = aml::alignby(p_ + header_size, this->alignment());
 		p_ %= this->buffer_size();
@@ -816,11 +816,11 @@ namespace atma
 
 	// decoder_t
 	inline base_lockfree_queue_t::decoder_t::decoder_t()
-		: headerer_t(nullptr, 0, 0, 0)
+		: allocation_t(nullptr, 0, 0, 0)
 	{}
 
 	inline base_lockfree_queue_t::decoder_t::decoder_t(byte* buf, uint32 rp)
-		: headerer_t(buf, rp, rp, *(uint32*)(buf + rp))
+		: allocation_t(buf, rp, rp, *(uint32*)(buf + rp))
 	{
 		p_ += header_size;
 		p_ = aml::alignby(p_, alignment());
@@ -828,7 +828,7 @@ namespace atma
 	}
 
 	inline base_lockfree_queue_t::decoder_t::decoder_t(decoder_t&& rhs)
-		: headerer_t(rhs.buf_, rhs.op_, rhs.p_, rhs.state_, rhs.type_, rhs.alignment_, rhs.size_)
+		: allocation_t(rhs.buf_, rhs.op_, rhs.p_, rhs.state_, rhs.type_, rhs.alignment_, rhs.size_)
 	{
 		memset(&rhs, 0, sizeof(decoder_t));
 	}
