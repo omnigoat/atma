@@ -49,6 +49,7 @@
       <DiagnosticsFormat>Caret</DiagnosticsFormat>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <EnforceTypeConversionRules>true</EnforceTypeConversionRules>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
