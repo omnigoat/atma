@@ -24,9 +24,9 @@ namespace atma
 		struct encoder_t;
 		struct decoder_t;
 
-		base_lockfree_queue_t();
+		base_lockfree_queue_t() = default;
 		base_lockfree_queue_t(void*, uint32);
-		base_lockfree_queue_t(uint32);
+		base_lockfree_queue_t(uint32 buffer_size_bytes);
 
 		auto commit(encoder_t&) -> void;
 		auto consume() -> decoder_t;
@@ -109,7 +109,7 @@ namespace atma
 		// encode/decode
 		static constexpr uint32 encode_header(uint32 state, uint32 type, uint32 alignment, uint32 size)
 		{
-			ATMA_ASSERT(size <= (size & header_size_bitmask));
+			ATMA_ASSERT(size <= header_size_bitmask);
 			return (state << header_state_bitshift) | (type << header_type_bitshift) | (alignment << header_alignment_bitshift) | size;
 		}
 
@@ -177,31 +177,40 @@ namespace atma
 		buffer_t writing_, reading_;
 	}; 
 
+#pragma warning (push)
+#pragma warning (disable: 4324)
 
 	// housekeeping_t
 	struct alignas(16) base_lockfree_queue_t::housekeeping_t
 	{
 		housekeeping_t(byte* buffer, uint32 buffer_size, bool requires_delete)
-			: buffer_{buffer}
-			, buffer_size_{buffer_size}
-			, requires_delete_{requires_delete}
-			, w{}, f{}, r{}, e{buffer_size}
+			: buffer(buffer)
+			, buffer_size(buffer_size)
+			, requires_delete(requires_delete)
+			, e(buffer_size)
 		{}
 
-		cursor_t w; // write
-		cursor_t f; // full
-		cursor_t r; // read
-		cursor_t e; // empty
+		~housekeeping_t()
+		{
+			if (requires_delete)
+				delete [] buffer;
+		}
 
-		auto buffer() const -> byte* { return buffer_; }
-		auto buffer_size() const -> uint32 { return buffer_size_; }
-		auto requires_delete() const -> bool { return requires_delete_; }
+		byte* const buffer;
+		uint32 const buffer_size;
+		bool const requires_delete;
 
-	private:
-		byte* buffer_ = nullptr;
-		uint32 buffer_size_ = 0;
-		bool requires_delete_ = false;
+
+		//
+		// the four horsemen, where this data-structure gets its name.
+		//
+		cursor_t w = 0; // write
+		cursor_t f = 0; // full
+		cursor_t r = 0; // read
+		cursor_t e = 0; // empty
 	};
+
+#pragma warning (pop)
 
 
 	// header_t
@@ -224,8 +233,6 @@ namespace atma
 			};
 		};
 	};
-
-	
 
 
 	// allocation_t
@@ -252,7 +259,7 @@ namespace atma
 		{}
 
 		auto header() const -> uint32 { return (state_ << header_state_bitshift) | (type_ << header_type_bitshift) | (alignment_ << header_alignment_bitshift) | size_; }
-		auto buffer_size() const -> uint32 { return buf_housekeeping(buf_)->buffer_size(); }
+		auto buffer_size() const -> uint32 { return buf_housekeeping(buf_)->buffer_size; }
 		auto type() const -> alloctype_t { return (alloctype_t)type_; }
 		auto raw_size() const -> uint32 { return size_; }
 
@@ -325,13 +332,19 @@ namespace atma
 
 		friend struct base_lockfree_queue_t;
 	};
+}
 
 
 
 
-	inline base_lockfree_queue_t::base_lockfree_queue_t()
-	{}
-
+//
+//
+//  base_lockfree_queue_t implementation
+//  --------------------------------------
+//
+//
+namespace atma
+{
 	inline base_lockfree_queue_t::base_lockfree_queue_t(void* buf, uint32 size)
 		: base_lockfree_queue_t{buf, size, false}
 	{}
@@ -352,6 +365,9 @@ namespace atma
 
 	inline auto base_lockfree_queue_t::buf_init(void* buf, uint32 size, bool requires_delete) -> void*
 	{
+		// reserve a pointer - we will heap-allocate the housekeeping structure
+		// and point to it in the first eight bytes of the given buffer. for
+		// speed's sake, we will not 
 		size -= sizeof(housekeeping_t*);
 		auto addr = (byte*)((housekeeping_t**)buf + 1);
 		*reinterpret_cast<housekeeping_t**>(buf) = atma::aligned_allocator_t<housekeeping_t>().allocate(1); //new housekeeping_t{addr, size, requires_delete};
@@ -417,7 +433,7 @@ namespace atma
 				e = atma::atomic_load(&hk->e);
 
 			// read header (atomic operation on 4-byte alignment)
-			uint32 rp = r % hk->buffer_size();
+			uint32 rp = r % hk->buffer_size;
 			uint32* hp = reinterpret_cast<uint32*>(rb + rp);
 			header_t h = atma::atomic_load(hp);
 			std::atomic_thread_fence(std::memory_order_seq_cst);
@@ -438,7 +454,7 @@ namespace atma
 		}
 
 		// 2) we now have exclusive access to our range of memory
-		decoder_t D{rb, r % hk->buffer_size()};
+		decoder_t D{rb, r % hk->buffer_size};
 
 		switch (D.type())
 		{
@@ -484,20 +500,21 @@ namespace atma
 
 	inline auto base_lockfree_queue_t::finalize(decoder_t& D) -> void
 	{
-		// 1) read info
-		auto hk = buf_housekeeping(D.buf_);
-		auto hp = (uint32*)(D.buf_ + D.op_);
+		// 1) info
+		auto wp = D.buf_;
+		auto hk = buf_housekeeping(wp);
+		auto hp = (uint32*)(wp + D.op_);
 		ATMA_ASSERT((uint64)hp % 4 == 0);
 
 		// 2) zero-out memory (very required), except header
 		//  - use acquire/release so that all memsets get visible
-		auto size_wrap   = std::max((D.op_ + header_size + D.raw_size()) - (int64)hk->buffer_size(), 0ll);
+		auto size_wrap   = std::max((D.op_ + header_size + D.raw_size()) - (int64)hk->buffer_size, 0ll);
 		auto size_middle = std::max(D.raw_size() - size_wrap, 0ll);
-		ATMA_ASSERT(D.op_ + size_middle <= hk->buffer_size());
+		ATMA_ASSERT(D.op_ + size_middle <= hk->buffer_size);
 
 		std::atomic_thread_fence(std::memory_order_acquire);
-		memset(D.buf_ + (D.op_ + header_size) % hk->buffer_size(), 0, size_middle);
-		memset(D.buf_, 0, size_wrap);
+		memset(wp + (D.op_ + header_size) % hk->buffer_size, 0, size_middle);
+		memset(wp, 0, size_wrap);
 		std::atomic_thread_fence(std::memory_order_release);
 
 		// atomically set the header to "ready to clear", which is encoded as an "empty jump"
@@ -512,9 +529,9 @@ namespace atma
 
 		// 3) move empty-position along
 		uint32 ep = atma::atomic_load(&hk->e);
-		for (uint32 epm = ep % hk->buffer_size();; epm = ep % hk->buffer_size())
+		for (uint32 epm = ep % hk->buffer_size;; epm = ep % hk->buffer_size)
 		{
-			auto ehp = reinterpret_cast<uint32*>(hk->buffer() + epm);
+			auto ehp = reinterpret_cast<uint32*>(wp + epm);
 			ATMA_ASSERT((uint64)ehp % 4 == 0);
 
 			header_t eh = atma::atomic_load(ehp);
@@ -533,7 +550,7 @@ namespace atma
 						break;
 					}
 					// very wrong. un-swap and try the whole thing again.
-					else if ((orig_ep - ep) % hk->buffer_size() != 0)
+					else if ((orig_ep - ep) % hk->buffer_size != 0)
 					{
 						atma::atomic_exchange(ehp, eh.u32);
 						ep = atma::atomic_load(&hk->e);
@@ -578,8 +595,8 @@ namespace atma
 		if (w < header_size)
 			return {0, allocerr_t::invalid, 0};
 
-		auto space = hk->buffer_size() - w - header_size;
-		if ((w + header_size + space) % hk->buffer_size() == e)
+		auto space = hk->buffer_size - w - header_size;
+		if ((w + header_size + space) % hk->buffer_size == e)
 			return {0, allocerr_t::invalid, 0};
 
 		return impl_allocate(hk, w, e, space, 1, true);
@@ -593,7 +610,7 @@ namespace atma
 		uint32 sz = header_size + size;
 
 		// expand size so that:
-		uint32 const bs = hk->buffer_size();
+		uint32 const bs = hk->buffer_size;
 
 		// "original position", "new position", "padding size"
 		uint32 op;
@@ -630,8 +647,8 @@ namespace atma
 			op = np - sz;
 		}
 
-		uint32  p = op % hk->buffer_size();
-		uint32* hp = (uint32*)(hk->buffer() + p);
+		uint32  p = op % hk->buffer_size;
+		uint32* hp = (uint32*)(hk->buffer + p);
 		header_t h = atma::atomic_load(hp);
 
 		// if we've wrapped, we must wait for ep to wrap as well.
@@ -655,8 +672,8 @@ namespace atma
 			header_t padv = atma::atomic_exchange(hp, padh);
 
 			op += ps;
-			p = op % hk->buffer_size();
-			hp = (uint32*)(hk->buffer() + p);
+			p = op % hk->buffer_size;
+			hp = (uint32*)(hk->buffer + p);
 			h = atma::atomic_load(hp);
 		}
 
@@ -671,7 +688,7 @@ namespace atma
 
 #if ATMA_ENABLE_ASSERTS
 		for (uint i = header_size; i != header_size + size; ++i)
-			ATMA_ASSERT(hk->buffer()[(p + i) % hk->buffer_size()] == 0);
+			ATMA_ASSERT(hk->buffer[(p + i) % hk->buffer_size] == 0);
 #endif
 
 		return {p, allocerr_t::success, size};
@@ -702,8 +719,8 @@ namespace atma
 		//static_assert(sizeof(uint64) >= sizeof(void*), "pointers too large! where are you?");
 		//housekeeping_t* hk;
 		//hkn.bu
-		//auto yay = new char[hk->buffer_size() * 2];
-		//auto hk = new (yay) housekeeping_t{yay + sizeof(housekeeping_t*), hk->buffer_size() * 2, true)};
+		//auto yay = new char[hk->buffer_size * 2];
+		//auto hk = new (yay) housekeeping_t{yay + sizeof(housekeeping_t*), hk->buffer_size * 2, true)};
 		//hk->
 		if (jump_command_body_size <= available)
 		{
@@ -974,7 +991,7 @@ namespace atma
 			atma::atomic_load_128(&writebuf, &writing_);
 			auto whk = writebuf.housekeeping();
 			
-			ATMA_ASSERT(size <= whk->buffer_size(), "queue can not allocate that much");
+			ATMA_ASSERT(size <= whk->buffer_size, "queue can not allocate that much");
 
 			allocinfo_t ai;
 			for (;;)
@@ -992,14 +1009,14 @@ namespace atma
 				{
 					if (auto pai = impl_allocate_pad(whk, w, e))
 					{
-						auto A = impl_make_allocation(writebuf.pointer, whk->buffer_size(), pai.p, alloctype_t::pad, 4, pai.sz);
+						auto A = impl_make_allocation(writebuf.pointer, whk->buffer_size, pai.p, alloctype_t::pad, 4, pai.sz);
 						commit(A);
 					}
 				}
 #endif
 			}
 
-			return impl_make_allocation(writebuf.pointer, whk->buffer_size(), ai.p, alloctype_t::normal, alignment, ai.sz);
+			return impl_make_allocation(writebuf.pointer, whk->buffer_size, ai.p, alloctype_t::normal, alignment, ai.sz);
 		}
 	};
 
