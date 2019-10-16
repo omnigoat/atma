@@ -12,11 +12,13 @@
 #include <algorithm>
 #include <atomic>
 
+
+#define ATMA_LOCKFREE_QUEUE_JUMP_ENABLED 0
+
+
+
 namespace atma
 {
-	
-
-
 	struct base_lockfree_queue_t
 	{
 		struct encoder_t;
@@ -86,30 +88,51 @@ namespace atma
 			operator bool() const { return err == allocerr_t::success; }
 		};
 		
+		// header-size in bytes
 		static constexpr uint32 header_size = 4;
+
+		// header-breakdown in bits
 		static constexpr uint32 header_state_bitsize = 2;
-		static constexpr uint32 header_state_bitshift = 30;
 		static constexpr uint32 header_type_bitsize = 2;
-		static constexpr uint32 header_type_bitshift = 28;
 		static constexpr uint32 header_alignment_bitsize = 2;
-		static constexpr uint32 header_alignment_bitshift = 26;
 		static constexpr uint32 header_size_bitsize = 26;
-		static constexpr uint32 jump_command_body_size = sizeof(void*) + sizeof(uint32);
 
-		static constexpr uint32 header_state_bitmask = aml::pow2(header_state_bitsize) - 1;
-		static constexpr uint32 header_type_bitmask = aml::pow2(header_type_bitsize) - 1;
-		static constexpr uint32 header_alignment_bitmask = aml::pow2(header_alignment_bitsize) - 1;
-		static constexpr uint32 header_size_bitmask = aml::pow2(header_size_bitsize) - 1;
+		static constexpr uint32 header_state_bitmask     = 0b11000000'00000000'00000000'00000000;
+		static constexpr uint32 header_type_bitmask      = 0b00110000'00000000'00000000'00000000;
+		static constexpr uint32 header_alignment_bitmask = 0b00001100'00000000'00000000'00000000;
+		static constexpr uint32 header_size_bitmask      = 0b00000011'11111111'11111111'11111111;
 
-		static uint32 const invalid_allocation_mask = 0x80000000;
-		static uint32 const invalid_contiguous_mask = 0x40000000;
+		static constexpr uint32 header_state_bitshift = 30;
+		static constexpr uint32 header_type_bitshift = 28;
+		static constexpr uint32 header_alignment_bitshift = 26;
 
-		std::chrono::nanoseconds const starve_timeout{5000};
+		// encode/decode
+		static constexpr uint32 encode_header(uint32 state, uint32 type, uint32 alignment, uint32 size)
+		{
+			ATMA_ASSERT(size <= (size & header_size_bitmask));
+			return (state << header_state_bitshift) | (type << header_type_bitshift) | (alignment << header_alignment_bitshift) | size;
+		}
+
+		static constexpr uint32 decode_header_state(uint32 x) { return (x & header_state_bitmask) >> header_state_bitshift; }
+		static constexpr uint32 decode_header_type(uint32 x) { return (x & header_type_bitmask ) >> header_type_bitshift; }
+		static constexpr uint32 decode_header_alignment(uint32 x) { return (x & header_alignment_bitmask) >> header_alignment_bitshift; }
+		static constexpr uint32 decode_header_size(uint32 x) { return x & header_size_bitmask; }
+
+
+	protected:
+
+		static constexpr uint32 invalid_allocation_mask = 0x80000000;
+		static constexpr uint32 invalid_contiguous_mask = 0x40000000;
 
 		auto impl_read_queue_write_info() -> std::tuple<byte*, uint32, uint32>;
 		auto impl_read_queue_read_info() -> std::tuple<byte*, uint32, uint32>;
 		auto impl_make_allocation(byte* wb, uint32 wbs, uint32 wp, alloctype_t, uint32 alignment, uint32 size) -> encoder_t;
+
+		// jumping currently not supported
+#if ATMA_LOCKFREE_QUEUE_JUMP_ENABLED
+		static constexpr uint32 jump_command_body_size = sizeof(void*) + sizeof(uint32);
 		auto impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void;
+#endif
 
 	private:
 		base_lockfree_queue_t(void*, uint32, bool);
@@ -120,61 +143,20 @@ namespace atma
 		static auto available_space(uint32 wp, uint32 ep, uint32 bufsize, bool contiguous) -> uint32;
 
 	protected:
-		struct header_t
-		{
-			header_t(uint32 x = 0)
-				: u32{x}
-			{}
-
-			union
-			{
-				uint32 u32;
-
-				struct
-				{
-					uint32       size      : header_size_bitsize;
-					uint32       alignment : header_alignment_bitsize;
-					alloctype_t  type      : header_type_bitsize;
-					allocstate_t state     : header_state_bitsize;
-				};
-			};
-		};
-
 		using cursor_t = uint32;
+
+		struct housekeeping_t;
+		struct header_t;
 
 		auto impl_allocate_default(housekeeping_t*, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t;
 		auto impl_allocate_pad(housekeeping_t*, cursor_t const& w, cursor_t const& e) -> allocinfo_t;
 		auto impl_allocate(housekeeping_t*, cursor_t const& w, cursor_t const& e, uint32 size, uint32 alignment, bool ct) -> allocinfo_t;
 
-		struct alignas(16) housekeeping_t
-		{
-			housekeeping_t(byte* buffer, uint32 buffer_size, bool requires_delete)
-				: buffer_{buffer}
-				, buffer_size_{buffer_size}
-				, requires_delete_{requires_delete}
-				, w{}, f{}, r{}, e{buffer_size}
-			{}
 
-			cursor_t w; // write
-			cursor_t f; // full
-			cursor_t r; // read
-			cursor_t e; // empty
-		
-			auto buffer() const -> byte* { return buffer_; }
-			auto buffer_size() const -> uint32 { return buffer_size_; }
-			auto requires_delete() const -> bool { return requires_delete_; }
-
-		private:
-			byte* buffer_ = nullptr;
-			uint32 buffer_size_ = 0;
-			bool requires_delete_ = false;
-		};
-
-
-	
+	protected: // buffers
 		struct buffer_t
 		{
-			buffer_t() 
+			buffer_t()
 				: pointer()
 				, uses()
 			{}
@@ -196,6 +178,56 @@ namespace atma
 	}; 
 
 
+	// housekeeping_t
+	struct alignas(16) base_lockfree_queue_t::housekeeping_t
+	{
+		housekeeping_t(byte* buffer, uint32 buffer_size, bool requires_delete)
+			: buffer_{buffer}
+			, buffer_size_{buffer_size}
+			, requires_delete_{requires_delete}
+			, w{}, f{}, r{}, e{buffer_size}
+		{}
+
+		cursor_t w; // write
+		cursor_t f; // full
+		cursor_t r; // read
+		cursor_t e; // empty
+
+		auto buffer() const -> byte* { return buffer_; }
+		auto buffer_size() const -> uint32 { return buffer_size_; }
+		auto requires_delete() const -> bool { return requires_delete_; }
+
+	private:
+		byte* buffer_ = nullptr;
+		uint32 buffer_size_ = 0;
+		bool requires_delete_ = false;
+	};
+
+
+	// header_t
+	struct base_lockfree_queue_t::header_t
+	{
+		header_t(uint32 x = 0)
+			: u32{x}
+		{}
+
+		union
+		{
+			uint32 u32;
+
+			struct
+			{
+				uint32       size      : header_size_bitsize;
+				uint32       alignment : header_alignment_bitsize;
+				alloctype_t  type      : header_type_bitsize;
+				allocstate_t state     : header_state_bitsize;
+			};
+		};
+	};
+
+	
+
+
 	// allocation_t
 	struct base_lockfree_queue_t::allocation_t
 	{
@@ -205,17 +237,18 @@ namespace atma
 
 	protected:
 		allocation_t(byte* buf, uint32 op, uint32 p, uint32 state, uint32 type, uint32 alignment, uint32 size)
-			: buf_{buf}
-			, op_{op}, p_{p}
-			, state_{state}, type_{type}, alignment_{alignment}, size_{size}
+			: buf_(buf)
+			, op_(op), p_(p)
+			, state_(state), type_(type), alignment_(alignment), size_(size)
 		{}
 
-		allocation_t(byte* buf, uint32 op_, uint32 p_, uint32 header)
-			: allocation_t{buf, op_, p_,
-				(header >> header_state_bitshift) & header_state_bitmask,
-				(header >> header_type_bitshift) & header_type_bitmask,
-				(header >> header_alignment_bitshift) & header_alignment_bitmask,
-				header & header_size_bitmask}
+		allocation_t(byte* buf, uint32 op, uint32 p, uint32 header)
+			: buf_(buf)
+			, op_(op), p_(p)
+			, state_(decode_header_state(header))
+			, type_(decode_header_type(header))
+			, alignment_(decode_header_alignment(header))
+			, size_(decode_header_size(header))
 		{}
 
 		auto header() const -> uint32 { return (state_ << header_state_bitshift) | (type_ << header_type_bitshift) | (alignment_ << header_alignment_bitshift) | size_; }
@@ -663,6 +696,7 @@ namespace atma
 		return encoder_t{wb, wp, allocstate_t::flag_commit, type, alignment, size};
 	}
 
+#if ATMA_LOCKFREE_QUEUE_JUMP_ENABLED
 	inline auto base_lockfree_queue_t::impl_encode_jump(uint32 available, byte* wb, uint32 wbs, uint32 wp) -> void
 	{
 		//static_assert(sizeof(uint64) >= sizeof(void*), "pointers too large! where are you?");
@@ -671,9 +705,6 @@ namespace atma
 		//auto yay = new char[hk->buffer_size() * 2];
 		//auto hk = new (yay) housekeeping_t{yay + sizeof(housekeeping_t*), hk->buffer_size() * 2, true)};
 		//hk->
-		
-
-#if 0
 		if (jump_command_body_size <= available)
 		{
 			// current write-info
@@ -707,8 +738,8 @@ namespace atma
 				delete[] (byte*)nwi.ui64[0];
 			}
 		}
-#endif
 	}
+#endif
 
 
 	// allocation_t
