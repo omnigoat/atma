@@ -17,12 +17,12 @@ std::atomic<uint32> counter;
 std::atomic<bool> read_terminate{false};
 std::mutex mtx;
 
-#define DO_VERIFICATION 0
+#define DO_VERIFICATION 1
 
 #if DO_VERIFICATION
-uint32 const maxnum = 100000; //std::numeric_limits<uint32>::max() / 8 + 3; // 1024 * 1024 * 1024; //1000000;
+uint32 const element_count = 100000;
 #else
-uint32 const maxnum = 2'000'000;
+uint32 const element_count = 2'000'000;
 #endif
 
 using fn_t = atma::function<void()>;
@@ -33,14 +33,15 @@ void write_number(queue_t& Q)
 
 	for (;;)
 	{
-		int sz = sizeof(fn_t); //std::max(4, rand() % 32);
+		int sz = sizeof(uint32); //std::max(4, rand() % 32);
 		
 		auto idx = counter++;
-		if (idx >= maxnum)
+		if (idx >= element_count)
 			break;
 
 		Q.with_allocation(sz, 0, true, [idx](auto& A) {
-			A.encode_struct(fn_t{[idx]{std::cout << idx << std::endl; }});
+			//A.encode_struct(fn_t{[idx]{std::cout << idx << std::endl; }});
+			A.encode_uint32(idx);
 		});
 	}
 }
@@ -49,7 +50,7 @@ void read_number(queue_t& Q, numbers_t& ns, uint32* allread)
 {
 	atma::this_thread::set_debug_name("read-thread");
 
-	for (; *allread != maxnum;)
+	for (; *allread != element_count;)
 	{
 		Q.with_consumption([&](queue_t::decoder_t& D)
 		{
@@ -57,21 +58,22 @@ void read_number(queue_t& Q, numbers_t& ns, uint32* allread)
 			D.decode_uint32(r);
 			
 #if DO_VERIFICATION
-			if (++ns[r] > 1)
-				ATMA_HALT("bad things");
+			auto nr = ++ns[r];
+			(void)nr;
+			ATMA_ASSERT(nr == 1);
 #endif
 
-			if (r % 10000 == 0)
+			// every 10k just print out where we're at for a "progress bar"
+			auto here = atma::atomic_pre_increment(allread);
+			if (here % 10000 == 0)
 				std::cout << "r: " << r << std::endl;
-
-			atma::atomic_pre_increment(allread);
 		});
 	}
 }
 
-SCENARIO("lockfree_queue is amazing")
+SCENARIO_OF("lockfree_queue", "lockfree_queue is amazing")
 {
-#if 0
+#if 1
 	std::cout << "beginning queue test" << std::endl;
 
 	atma::lockfree_queue_t Q{8 + 512};
@@ -96,11 +98,13 @@ SCENARIO("lockfree_queue is amazing")
 	for (int i = 0; i != read_thread_count; ++i)
 		read_threads[i].join();
 
+	CHECK(allread == element_count);
+
 #if DO_VERIFICATION
 	std::cout << "ended queue alloc/read" << std::endl;
 	std::cout << "beginning verification" << std::endl;
 
-	for (int i = 0; i != maxnum; ++i)
+	for (int i = 0; i != element_count; ++i)
 	{
 		int found = 0;
 		for (auto const& p : readnums)
@@ -108,12 +112,15 @@ SCENARIO("lockfree_queue is amazing")
 			auto candidate = p.find(i);
 			if (candidate != p.end())
 			{
-				ATMA_ASSERT(candidate->second == 1);
+				if (candidate->second != 1)
+					{ CHECK(candidate->second == 1); }
+
 				++found;
 			}
 		}
 
-		ATMA_ASSERT(found == 1);
+		if (found != 1)
+			{ CHECK(found == 1); }
 	}
 #endif
 #endif
