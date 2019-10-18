@@ -99,6 +99,9 @@ namespace atma::concepts
 	inline constexpr bool models_v = models<Concept, Types...>::value;
 
 	template <typename Concept, typename... Types>
+	inline constexpr bool models_ref_v = models<Concept, rmref_t<Types>...>::value;
+
+	template <typename Concept, typename... Types>
 	inline constexpr bool model_of(Types&&...)
 	{
 		return true; //models_v<Concept, Types...>;

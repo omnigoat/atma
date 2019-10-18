@@ -399,6 +399,7 @@ namespace atma
 				auto nh = h;
 				nh.state = allocstate_t::mid_read;
 				bool br  = atma::atomic_compare_exchange(hp, h.u32, nh.u32);
+				(void)br;
 				ATMA_ASSERT(br);
 				break;
 			}
@@ -474,6 +475,7 @@ namespace atma
 		ch.state = allocstate_t::empty;
 		ch.type = alloctype_t::jump;
 		auto r = atma::atomic_compare_exchange((header_t*)hp, h, ch, &oh);
+		(void)r;
 		ATMA_ASSERT(r);
 		//ATMA_ASSERT(oh.state == allocstate_t::mid_read);
 

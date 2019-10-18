@@ -450,9 +450,16 @@ SCENARIO_OF("memory/operations", "range_move_construct is called")
 
 				THEN("range_move_construct can move part of the range")
 				{
+					//MODELS_ARGS(dest_memory_concept, dest),
+					//MODELS_ARGS(src_memory_concept, src),
+					//MODELS_ARGS(bounded_memory_concept, dest),
+					//MODELS_ARGS(bounded_memory_concept, src))
+
+					static_assert(MODELS_ARGS(atma::dest_memory_concept, atma::dest_range(dest_memory, 4)));
+
 					atma::memory::range_move_construct(
 						atma::dest_range(dest_memory, 4),
-						atma::src_range(src_storage.begin(), src_storage.end()));
+						atma::src_range(src_storage.data(), src_storage.size()));
 
 					CHECK_MEMORY(dest_memory,
 						oliver, henry, marcie, rachael,
