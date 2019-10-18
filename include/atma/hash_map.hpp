@@ -160,7 +160,8 @@ namespace atma::detail
 		, bucket_bitmask_(math::log2((uint)bucket_count_))
 		, buckets_(bucket_count_ * sizeof(bucket_chain_ptr), alloc)
 	{
-		buckets_.memory_operations().memzero(0, bucket_count_ * sizeof(bucket_chain_ptr));
+		//buckets_.memory_operations().memzero(0, bucket_count_ * sizeof(bucket_chain_ptr));
+		//memory::memzero()
 		ATMA_ASSERT(math::is_pow2(buckets), "must use power-of-two for number of buckets");
 	}
 

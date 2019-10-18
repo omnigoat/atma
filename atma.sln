@@ -12,6 +12,7 @@ Global
 		Development|x64 = Development|x64
 		Distribution|x64 = Distribution|x64
 		Test|x64 = Test|x64
+		TestOpt|x64 = TestOpt|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.Development|x64.ActiveCfg = Test|x64
@@ -20,12 +21,16 @@ Global
 		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.Distribution|x64.Build.0 = Test|x64
 		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.Test|x64.ActiveCfg = Test|x64
 		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.Test|x64.Build.0 = Test|x64
+		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.TestOpt|x64.ActiveCfg = TestOpt|x64
+		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.TestOpt|x64.Build.0 = TestOpt|x64
 		{3301E1FA-9F23-43C6-A5E1-183204867D44}.Development|x64.ActiveCfg = Development|x64
 		{3301E1FA-9F23-43C6-A5E1-183204867D44}.Development|x64.Build.0 = Development|x64
 		{3301E1FA-9F23-43C6-A5E1-183204867D44}.Distribution|x64.ActiveCfg = Distribution|x64
 		{3301E1FA-9F23-43C6-A5E1-183204867D44}.Distribution|x64.Build.0 = Distribution|x64
 		{3301E1FA-9F23-43C6-A5E1-183204867D44}.Test|x64.ActiveCfg = Development|x64
 		{3301E1FA-9F23-43C6-A5E1-183204867D44}.Test|x64.Build.0 = Development|x64
+		{3301E1FA-9F23-43C6-A5E1-183204867D44}.TestOpt|x64.ActiveCfg = Development|x64
+		{3301E1FA-9F23-43C6-A5E1-183204867D44}.TestOpt|x64.Build.0 = Development|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
