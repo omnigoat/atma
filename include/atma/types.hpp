@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <memory>
 
 using uchar  = unsigned char;
 using ushort = unsigned short;
