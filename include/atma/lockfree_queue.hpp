@@ -366,14 +366,17 @@ namespace atma
 	inline auto base_lockfree_queue_t::buf_init(void* buf, uint32 size, bool requires_delete) -> void*
 	{
 		// reserve a pointer - we will heap-allocate the housekeeping structure
-		// and point to it in the first eight bytes of the given buffer. for
-		// speed's sake, we will not 
+		// and use the first eight bytes of the given buffer to store the pointer.
+		// so first we subtract a sizeof(pointer) from the buffer and offset it
 		size -= sizeof(housekeeping_t*);
-		auto addr = (byte*)((housekeeping_t**)buf + 1);
-		*reinterpret_cast<housekeeping_t**>(buf) = atma::aligned_allocator_t<housekeeping_t>().allocate(1); //new housekeeping_t{addr, size, requires_delete};
-		new (*reinterpret_cast<housekeeping_t**>(buf)) housekeeping_t{addr, size, requires_delete};
+		auto buffer_begin_addr = (byte*)((housekeeping_t**)buf + 1);
 
-		return addr;
+		// now allocate the housekeeping structure
+		housekeeping_t*& hkptr = *reinterpret_cast<housekeeping_t**>(buf);
+		hkptr = atma::aligned_allocator_t<housekeeping_t>().allocate(1);
+		new (hkptr) housekeeping_t{buffer_begin_addr, size, requires_delete};
+
+		return buffer_begin_addr;
 	}
 
 	inline auto base_lockfree_queue_t::buf_housekeeping(void* buf) -> housekeeping_t*
