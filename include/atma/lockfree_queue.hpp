@@ -19,6 +19,22 @@
 
 namespace atma
 {
+	//
+	// the four-horsemen lockfree queue algorithm
+	// ---------------------------------------------
+	//
+	//  this algorithm uses four "cursors" or "horsemen" into a buffer to allow for a
+	//  multiple-reader multiple-writer lockfree queue. the four horsemen are:
+	//
+	//    w | the write horseman, who is placed inside a _virtual_ space of (conceptually)
+	//      | infinite size. obviously it's not infinite and we wrap at 2^32, but
+	//      | conceptually it's not limited by the size of the buffer. we use it to order
+	//      | allocations
+	//
+	//    r | the read horseman, who is located in "buffer space", and wraps when its
+	//      | value exceeds the size of the buffer. it orders reads.
+	//
+	//    
 	struct base_lockfree_queue_t
 	{
 		struct encoder_t;
@@ -381,7 +397,7 @@ namespace atma
 
 	inline auto base_lockfree_queue_t::buf_housekeeping(void* buf) -> housekeeping_t*
 	{
-		return *((housekeeping_t**)buf - 1);
+		return ((housekeeping_t**)buf)[-1];
 	}
 
 	inline auto base_lockfree_queue_t::available_space(uint32 wp, uint32 ep, uint32 bufsize, bool contiguous) -> uint32
@@ -507,7 +523,7 @@ namespace atma
 		auto wp = D.buf_;
 		auto hk = buf_housekeeping(wp);
 		auto hp = (uint32*)(wp + D.op_);
-		ATMA_ASSERT((uint64)hp % 4 == 0);
+		ATMA_ASSERT((uint64)hp % header_size == 0);
 
 		// 2) zero-out memory (very required), except header
 		//  - use acquire/release so that all memsets get visible
@@ -610,10 +626,11 @@ namespace atma
 		ATMA_ASSERT(alignment > 0);
 		ATMA_ASSERT(w % 4 == 0);
 
-		uint32 sz = header_size + size;
-
-		// expand size so that:
 		uint32 const bs = hk->buffer_size;
+
+
+		// expand required size to include size of header
+		uint32 sz = header_size + size;
 
 		// "original position", "new position", "padding size"
 		uint32 op;
@@ -625,16 +642,35 @@ namespace atma
 		{
 			op = atma::atomic_load(&hk->w);
 
-			for (uint32 npm = (op + sz) % bs;; npm = (op + sz) % bs)
+			for (;;)
 			{
+				// new-position-modulo
+				//
+				// even though the write-horseman is in virtual-space, we can't perform
+				// any contiguous allocation that would wrap around our buffer. so we
+				// first decide if we're going to pad this single allocation into a
+				// large one, then post-allocation split it into two
+				uint32 npm = (op + sz) % bs;
+
+				// we've wrapped - allocate additional space to first pad to the end of
+				// the buffer then reserve space for our requested allocation
 				if (npm != 0 && npm < header_size + size)
 				{
 					ps = sz - npm;
 					np = op + ps + sz;
 				}
+				// we didn't wrap, just move our cursor
 				else
 				{
 					np = op + sz;
+				}
+
+				// I think this might be impossible to reach, but just in case, we can't
+				// pad less than the size of a header
+				if (ps < header_size)
+				{
+					op = atma::atomic_load(&hk->w);
+					continue;
 				}
 
 				if (atma::atomic_compare_exchange(&hk->w, op, np, &op))
@@ -650,6 +686,9 @@ namespace atma
 			op = np - sz;
 		}
 
+		//  p: position inside buffer
+		// hp: header-address inside buffer
+		//  h: header of this allocation
 		uint32  p = op % hk->buffer_size;
 		uint32* hp = (uint32*)(hk->buffer + p);
 		header_t h = atma::atomic_load(hp);
