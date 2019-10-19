@@ -189,6 +189,8 @@ namespace atma::concepts
 #define MODELS_ARGS(concept, ...) \
 	::atma::concepts::models_v<concept, BOOST_PP_SEQ_FOR_EACH_I(MODELS_ARGS_M, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))>
 
+#define MODELS_NOT_ARGS(concept, ...) \
+	!::atma::concepts::models_v<concept, BOOST_PP_SEQ_FOR_EACH_I(MODELS_ARGS_M, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))>
 
 
 //
@@ -237,6 +239,8 @@ namespace atma::concepts
 #define SPECIFIES_EXPR_OF_TYPEISH(type, expr) \
 	::std::is_convertible_v<decltype(expr), type>
 
+#define SPECIFIES_CONCEPT_MODELS(concept_name, ...) \
+	::atma::concepts::models_v<concept_name, __VA_ARGS__>
 
 
 // concept: integrals
@@ -337,12 +341,12 @@ namespace atma::concepts
 }
 
 // concepts: iterators
-namespace atma::concepts
+namespace atma
 {
 	struct iterator_concept
 	{
 		template <typename It>
-		auto contract(It& a) -> specifies
+		auto contract(It& a) -> concepts::specifies
 		<
 			SPECIFIES_TYPE(typename std::iterator_traits<It>::value_type),
 			SPECIFIES_TYPE(typename std::iterator_traits<It>::difference_type),
@@ -356,24 +360,24 @@ namespace atma::concepts
 	};
 
 	struct forward_iterator_concept
-		: refines<iterator_concept>
+		: concepts::refines<iterator_concept>
 	{
 		template <typename It,
 			typename...,
 			typename reference = typename std::iterator_traits<It>::reference>
-		auto contract(It& a) -> specifies<
+		auto contract(It& a) -> concepts::specifies<
 			SPECIFIES_EXPR_OF_TYPE(It, a++),
 			SPECIFIES_EXPR_OF_TYPE(reference, *a++)
 		>;
 	};
 
 	struct bidirectional_iterator_concept
-		: refines<forward_iterator_concept>
+		: concepts::refines<forward_iterator_concept>
 	{
 		template <typename It,
 			typename...,
 			typename reference = std::iterator_traits<It>::reference>
-		auto contract(It& a) -> specifies<
+		auto contract(It& a) -> concepts::specifies<
 			SPECIFIES_EXPR_OF_TYPE(It&, --a),
 			SPECIFIES_EXPR_OF_TYPE(It, a--),
 			SPECIFIES_EXPR_OF_TYPE(reference, *a--)
@@ -381,14 +385,14 @@ namespace atma::concepts
 	};
 
 	struct random_iterator_concept
-		: refines<bidirectional_iterator_concept>
+		: concepts::refines<bidirectional_iterator_concept>
 	{
 		template <typename It,
 			typename...,
 			typename difference_type = typename std::iterator_traits<It>::difference_type,
 			typename reference_type = typename std::iterator_traits<It>::reference
 		>
-		auto contract(It& a, It& b, difference_type n) -> specifies
+		auto contract(It& a, It& b, difference_type n) -> concepts::specifies
 		<
 			SPECIFIES_EXPR_OF_TYPE(It&, a += n),
 			SPECIFIES_EXPR_OF_TYPE(It, a + n),
@@ -405,12 +409,12 @@ namespace atma::concepts
 	};
 
 	struct contiguous_iterator_concept
-		: refines<random_iterator_concept>
+		: concepts::refines<random_iterator_concept>
 	{
 		template <typename It,
 			typename...,
 			typename difference_type = typename std::iterator_traits<It>::difference_type>
-		auto contract(It a, difference_type n) -> specifies<
+		auto contract(It a, difference_type n) -> concepts::specifies<
 			// we can't fully express the constraint 'contiguous' - but we *can* ask
 			// for std::addressof the first element plus a difference type to be dereferenceable
 			SPECIFIES_EXPR(*(std::addressof(*a) + n))
