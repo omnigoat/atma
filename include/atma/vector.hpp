@@ -550,7 +550,7 @@ namespace atma
 		}
 
 		// maybe sanity check
-		static_assert(concepts::models_v<concepts::forward_iterator_concept, H>);
+		static_assert(concepts::models_v<forward_iterator_concept, H>);
 		static_assert(concepts::models_v<memory_concept, decltype(dest_range(imem_ + offset, rangesize))>);
 
 		memory::range_copy_construct(

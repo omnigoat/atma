@@ -151,6 +151,7 @@ SCENARIO_TEMPLATE("a memory-xfer-range is contructed ", range_type, atma::dest_b
 			CHECK(d.end() == numbers + numsize);
 		}
 
+#if 0
 		THEN("it constructs from pointer, offset, and size")
 		{
 			int const offset = 2;
@@ -232,6 +233,8 @@ SCENARIO_TEMPLATE("a memory-xfer-range is contructed ", range_type, atma::dest_b
 			CHECK(d.end() == mem.data() + numbers.size());
 			CHECK(d.begin() == numbers.data() + 2);
 		}
+#endif
+
 	}
 }
 
@@ -367,10 +370,14 @@ SCENARIO_OF("memory/operations", "range_copy_construct is called")
 
 				THEN("range_copy_construct can copy-construct the beginning of the range")
 				{
+					//atma::memory2::range_copy_construct(
+					//	atma::dest_range(dest_memory, 4),
+					//	atma::src_range(src_storage),
+					//	4);
+
 					atma::memory2::range_copy_construct(
-						atma::dest_range(dest_memory, 4),
-						atma::src_range(src_storage),
-						4);
+						atma::dest_range(dest_memory),
+						atma::src_range(src_storage));
 
 					atma::memory2::range_copy_construct(
 						atma::dest_range(dest_storage, 4),
