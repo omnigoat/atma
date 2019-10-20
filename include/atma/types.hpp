@@ -185,7 +185,9 @@ namespace atma
 		template <typename R, typename = std::void_t<>>
 		struct value_type_of_ii
 		{
-			static_assert(actually_false<R>, "couldn't not deduce a value-type for Range");
+			struct nilx_ {};
+
+			using type = nilx_;
 		};
 
 		template <typename R>
