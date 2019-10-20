@@ -376,11 +376,11 @@ SCENARIO_OF("memory/operations", "range_copy_construct is called")
 					//	4);
 
 					atma::memory2::range_copy_construct(
-						atma::dest_range(dest_memory),
+						atma::xfer_dest(dest_memory),
 						atma::src_range(src_storage));
 
 					atma::memory2::range_copy_construct(
-						atma::dest_range(dest_storage, 4),
+						atma::xfer_dest(dest_storage, 4),
 						atma::src_range(src_storage));
 
 					atma::memory::range_copy_construct(

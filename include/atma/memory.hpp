@@ -375,6 +375,17 @@ namespace atma
 		>;
 	};
 
+	struct sized_range_concept
+		: concepts::refines<range_concept>
+	{
+		template <typename Range>
+		auto contract(Range range) -> concepts::specifies
+		<
+			// range can provide size
+			SPECIFIES_EXPR(std::size(range))
+		>;
+	};
+
 	struct bounded_memory_concept
 		: concepts::refines<memory_concept>
 	{
@@ -525,7 +536,97 @@ namespace atma
 	template <typename T, typename A>
 	using dest_bounded_memxfer_range_t = bounded_memxfer_range_t<memory_dest_tag_t, T, A>;
 
-	
+	template <typename Range>
+	using dest_memxfer_range_of_t = dest_memxfer_range_t<value_type_of_t<Range>, allocator_type_of_t<Range>>;
+
+	template <typename Range>
+	using dest_bounded_memxfer_range_of_t = dest_bounded_memxfer_range_t<value_type_of_t<Range>, allocator_type_of_t<Range>>;
+
+	constexpr auto xfer_dest = multi_functor_t
+	{
+		//
+		// pointer
+		//
+		[](auto* data)
+		{
+			using value_type = rmref_t<decltype(*data)>;
+			return dest_memxfer_range_t<value_type, std::allocator<value_type>>(data);
+		},
+
+		[](auto* data, size_t sz)
+		{
+			using value_type = rmref_t<decltype(*data)>;
+			return dest_memxfer_range_t<value_type, std::allocator<value_type>>(data, sz);
+		},
+		
+		//
+		// satisfies the contiguous-range concept (std::begin, std::end), AND std::size
+		//
+		[](auto&& range) ->
+			RETURN_TYPE_IF(dest_bounded_memxfer_range_of_t<decltype(range)>,
+				MODELS_ARGS(contiguous_range_concept, range),
+				MODELS_ARGS(sized_range_concept, range))
+		{
+			if constexpr (has_allocator_retrieval_v<decltype(range)>)
+				return {retrieve_allocator(range), std::addressof(*std::begin(range)), std::size(range)};
+			else
+				return {std::addressof(*std::begin(range)), std::size(range)};
+		},
+
+		//
+		// satisfies only the contiguous-range concept (std::begin, std::end)
+		//
+		[](auto&& range) ->
+			RETURN_TYPE_IF(dest_bounded_memxfer_range_of_t<decltype(range)>,
+				MODELS_ARGS(contiguous_range_concept, range))
+		{
+			auto sz = std::distance(std::begin(range), std::end(range));
+
+			if constexpr (has_allocator_retrieval_v<decltype(range)>)
+				return {retrieve_allocator(range), std::addressof(*std::begin(range)), sz};
+			else
+				return {std::addressof(*std::begin(range)), sz};
+		},
+
+		[](auto&& range, size_t size) ->
+			RETURN_TYPE_IF(dest_bounded_memxfer_range_of_t<decltype(range)>,
+				MODELS_ARGS(contiguous_range_concept, range))
+		{
+			if constexpr (has_allocator_retrieval_v<decltype(range)>)
+				return {retrieve_allocator(range), std::addressof(*std::begin(range)), size};
+			else
+				return {std::addressof(*std::begin(range)), size};
+		},
+
+		[](auto&& range, size_t offset, size_t size) ->
+			RETURN_TYPE_IF(dest_bounded_memxfer_range_of_t<decltype(range)>,
+				MODELS_ARGS(contiguous_range_concept, range))
+		{
+			if constexpr (has_allocator_retrieval_v<decltype(range)>)
+				return {retrieve_allocator(range), std::addressof(*std::begin(range)) + offset, size};
+			else
+				return {std::addressof(*std::begin(range)) + offset, size};
+		},
+
+		//
+		// satisfies memory_concept (std::data & retrieve_allocator)
+		//
+		[](auto&& memory) ->
+			RETURN_TYPE_IF(dest_memxfer_range_of_t<decltype(memory)>,
+				MODELS_ARGS(memory_concept, memory))
+		{
+			return {retrieve_allocator(memory), std::data(memory)};
+		},
+
+		[](auto&& memory, size_t size) ->
+			RETURN_TYPE_IF(dest_bounded_memxfer_range_of_t<decltype(memory)>,
+				MODELS_ARGS(memory_concept, memory))
+		{
+			return {retrieve_allocator(memory), std::data(memory), size};
+		}
+	};
+
+
 	// pointer
 	template <typename T, typename... Args>
 	inline constexpr auto dest_range(T* data)
@@ -750,8 +851,8 @@ namespace atma::memory2
 
 			using dest_allocator_traits = std::allocator_traits<allocator_type_of_t<decltype(dest)>>;
 
-			auto px = dest.data();
-			auto py = src.data();
+			auto px = std::data(dest);
+			auto py = std::data(src);
 			for (size_t i = 0; i != sz; ++i)
 				dest_allocator_traits::construct(retrieve_allocator(dest), px++, *py++);
 		},
