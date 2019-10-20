@@ -6,6 +6,8 @@
 #define RETURN_TYPE_IF(type, ...) \
 	std::enable_if_t<::atma::concepts::detail::all_true_v<__VA_ARGS__>, type>
 
+#define RETURN_TYPEN_IF(type, ...) \
+	std::enable_if_t<::atma::concepts::detail::all_true_v<__VA_ARGS__>, BOOST_PP_EXPAND##type>
 
 // functor-call
 namespace atma::detail

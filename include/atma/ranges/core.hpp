@@ -23,7 +23,7 @@ namespace atma
 		// returned itertor is random-access and it can be indexed by int
 		template <typename Range>
 		auto contract(Range&& range) -> concepts::specifies<
-			SPECIFIES_CONCEPT_MODELS(random_iterator_concept, decltype(range.begin())),
+			SPECIFIES_CONCEPT_MODELS(random_iterator_concept, decltype(std::begin(range))),
 			SPECIFIES_EXPR(range[0])
 		>;
 	};
@@ -33,7 +33,7 @@ namespace atma
 	{
 		template <typename Range>
 		auto contract(Range range) -> concepts::specifies<
-			SPECIFIES_CONCEPT_MODELS(contiguous_iterator_concept, decltype(range.begin())),
+			SPECIFIES_CONCEPT_MODELS(contiguous_iterator_concept, decltype(std::begin(range))),
 			SPECIFIES_EXPR(range[0])
 		>;
 	};
