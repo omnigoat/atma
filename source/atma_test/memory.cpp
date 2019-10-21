@@ -370,22 +370,22 @@ SCENARIO_OF("memory/operations", "range_copy_construct is called")
 
 				THEN("range_copy_construct can copy-construct the beginning of the range")
 				{
-					//atma::memory2::range_copy_construct(
-					//	atma::dest_range(dest_memory, 4),
-					//	atma::src_range(src_storage),
-					//	4);
+					dragon_t dragons_dest[4] = {};
+					dragon_t dragons[4] = { oliver, henry, marcie, rachael };
 
 					atma::memory2::range_copy_construct(
-						atma::xfer_dest(dest_memory),
-						atma::src_range(src_storage));
+						dragons_dest,
+						dragons);
+
+					atma::memory3::range_copy_construct(
+						atma::xfer_dest(dest_memory, 4),
+						atma::xfer_src(src_storage));
 
 					atma::memory2::range_copy_construct(
 						atma::xfer_dest(dest_storage, 4),
 						atma::src_range(src_storage));
 
-					atma::memory::range_copy_construct(
-						atma::dest_range(dest_memory, 4),
-						atma::src_range(src_storage));
+					
 
 					CHECK_MEMORY(dest_memory,
 						oliver, henry, marcie, rachael,
