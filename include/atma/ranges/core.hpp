@@ -10,10 +10,10 @@ namespace atma
 {
 	struct range_concept
 	{
-		template <typename T>
-		auto contract() -> concepts::specifies<
-			SPECIFIES_EXPR(std::begin(std::declval<T>())),
-			SPECIFIES_EXPR(std::end(std::declval<T>()))
+		template <typename Range>
+		auto contract(Range&& range) -> concepts::specifies<
+			SPECIFIES_EXPR(std::begin(range)),
+			SPECIFIES_EXPR(std::end(range))
 		>;
 	};
 
@@ -32,7 +32,7 @@ namespace atma
 		: concepts::refines<random_access_range_concept>
 	{
 		template <typename Range>
-		auto contract(Range range) -> concepts::specifies<
+		auto contract(Range&& range) -> concepts::specifies<
 			SPECIFIES_CONCEPT_MODELS(contiguous_iterator_concept, decltype(std::begin(range))),
 			SPECIFIES_EXPR(range[0])
 		>;
