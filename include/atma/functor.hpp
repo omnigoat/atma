@@ -20,7 +20,9 @@ namespace atma::detail
 		template <typename... Args, typename = std::enable_if_t<(!std::is_invocable_v<Fs, Args...> && ...)>>
 		constexpr auto operator ()(Args&&... args) const -> std::invoke_result_t<F, Args...>
 		{
-			return std::invoke(reinterpret_cast<F const&>(const_cast<functor_call_&>(*this)), std::forward<Args>(args)...);
+			// don't go through std::invoke because all empty functors should be callable
+			// through operator(), and it helps with debugging
+			return reinterpret_cast<F&>(const_cast<functor_call_&>(*this))(std::forward<Args>(args)...);
 		}
 	};
 }
@@ -48,6 +50,8 @@ namespace atma
 	struct multi_functor_t
 		: detail::multi_functor_<meta::list<>, meta::list<rmref_t<Fs>...>>
 	{
+		constexpr multi_functor_t() = default;
+
 		constexpr multi_functor_t(Fs&& ... fs)
 		{}
 	};
