@@ -554,8 +554,8 @@ namespace atma
 		static_assert(concepts::models_v<memory_concept, decltype(dest_range(imem_ + offset, rangesize))>);
 
 		memory::range_copy_construct(
-			dest_range(imem_ + offset, rangesize),
-			start);
+			xfer_dest(imem_ + offset, rangesize),
+			start, end);
 
 		size_ += rangesize;
 

@@ -373,19 +373,9 @@ SCENARIO_OF("memory/operations", "range_copy_construct is called")
 					dragon_t dragons_dest[4] = {};
 					dragon_t dragons[4] = { oliver, henry, marcie, rachael };
 
-					atma::memory2::range_copy_construct(
-						dragons_dest,
-						dragons);
-
-					atma::memory3::range_copy_construct(
-						atma::xfer_dest(dest_memory, 4),
-						atma::xfer_src(src_storage));
-
-					atma::memory2::range_copy_construct(
+					atma::memory::range_copy_construct(
 						atma::xfer_dest(dest_storage, 4),
 						atma::src_range(src_storage));
-
-					
 
 					CHECK_MEMORY(dest_memory,
 						oliver, henry, marcie, rachael,
