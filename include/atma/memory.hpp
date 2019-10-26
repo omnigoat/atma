@@ -872,30 +872,24 @@ namespace atma::memory
 }
 
 // copy_construct_range
-namespace atma::memory2
+namespace atma::memory::detail
 {
-	namespace detail
+	constexpr auto _range_copy_construct = [](auto allocator, auto* px, auto* py, size_t sz)
 	{
-		constexpr auto _range_copy_construct = [](auto allocator, auto* px, auto* py, size_t sz)
-		{
-			if (sz == 0)
-				return;
+		if (sz == 0)
+			return;
 
-			ATMA_ASSERT_MEMORY_PTR_DISJOINT(px, py, sz);
+		ATMA_ASSERT_MEMORY_PTR_DISJOINT(px, py, sz);
 
-			using dest_allocator_traits = std::allocator_traits<decltype(allocator)>;
+		using dest_allocator_traits = std::allocator_traits<decltype(allocator)>;
 
-			for (size_t i = 0; i != sz; ++i)
-				dest_allocator_traits::construct(allocator, px++, *py++);
-		};
+		for (size_t i = 0; i != sz; ++i)
+			dest_allocator_traits::construct(allocator, px++, *py++);
+	};
+}
 
-		constexpr auto _range_copy_construct_src = [](auto&& dest, auto&& src)
-		{
-			
-		};
-	}
-
-
+namespace atma::memory
+{
 	constexpr auto range_copy_construct = multi_functor_t
 	{
 		[](auto&& dest, auto&& src, size_t sz)
@@ -988,140 +982,22 @@ namespace atma::memory2
 				std::data(dest),
 				std::data(src),
 				std::size(src));
+		},
+
+		[](auto&& dest, auto begin, auto end)
+		-> RETURN_TYPE_IF(void,
+			MODELS_ARGS(memory_concept, dest),
+			MODELS_ARGS(iterator_concept, begin),
+			MODELS_ARGS(iterator_concept, end))
+		{
+			using dest_allocator_traits = std::allocator_traits<allocator_type_of_t<rmref_t<decltype(dest)>>>;
+
+			auto px = std::data(dest);
+			while (begin != end)
+				dest_allocator_traits::construct(retrieve_allocator(dest), px++, *begin++);
 		}
 
 	};
-}
-
-namespace atma::memory3
-{
-	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto range_copy_construct(dest_memxfer_range_t<DT, DA> dest, src_memxfer_range_t<ST, SA> src, size_t sz) -> void
-	{
-		if (sz == 0)
-			return;
-
-		ATMA_ASSERT(sz != unbounded_memory_size);
-		ATMA_ASSERT_MEMORY_DISJOINT(dest, src, sz);
-
-		using dest_allocator_traits = std::allocator_traits<allocator_type_of_t<decltype(dest)>>;
-
-		auto px = std::data(dest);
-		auto py = std::data(src);
-		for (size_t i = 0; i != sz; ++i)
-			dest_allocator_traits::construct(retrieve_allocator(dest), px++, *py++);
-	}
-
-	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto range_copy_construct(dest_bounded_memxfer_range_t<DT, DA> dest, src_bounded_memxfer_range_t<ST, SA> src, size_t sz) -> void
-	{
-		ATMA_ASSERT(dest.size() == src.size());
-
-		range_copy_construct(dest_memxfer_range_t<DT, DA>(dest), src_memxfer_range_t<ST, SA>(src), sz);
-	}
-
-	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto range_copy_construct(dest_bounded_memxfer_range_t<DT, DA> dest, src_memxfer_range_t<ST, SA> src, size_t sz) -> void
-	{
-		if (sz == 0)
-			return;
-
-		ATMA_ASSERT(dest.size() == sz);
-
-		range_copy_construct(dest_memxfer_range_t<DT, DA>(dest), src, sz);
-	}
-
-	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto range_copy_construct(dest_memxfer_range_t<DT, DA> dest, src_bounded_memxfer_range_t<ST, SA> src, size_t sz) -> void
-	{
-		if (sz == 0)
-			return;
-
-		ATMA_ASSERT(src.size() == sz);
-
-		range_copy_construct(dest, src_memxfer_range_t<ST, SA>(src), sz);
-	}
-
-	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto range_copy_construct(dest_bounded_memxfer_range_t<DT, DA> dest, src_bounded_memxfer_range_t<ST, SA> src) -> void
-	{
-		range_copy_construct(dest, src, dest.size());
-	}
-
-	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto range_copy_construct(dest_bounded_memxfer_range_t<DT, DA> dest, src_memxfer_range_t<ST, SA> src) -> void
-	{
-		range_copy_construct(dest, src, dest.size());
-	}
-
-	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto range_copy_construct(dest_memxfer_range_t<DT, DA> dest, src_bounded_memxfer_range_t<ST, SA> src) -> void
-	{
-		range_copy_construct(dest, src, src.size());
-	}
-}
-
-namespace atma::memory
-{
-	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto range_copy_construct(dest_memxfer_range_t<DT, DA> dest_range, src_memxfer_range_t<ST, SA> src_range, size_t sz) -> void
-	{
-		if (sz == 0)
-			return;
-
-		ATMA_ASSERT(sz != unbounded_memory_size);
-		//ATMA_ASSERT(dest_range.unbounded() || dest_range.size() == sz);
-		//ATMA_ASSERT(src_range.unbounded() || src_range.size() == sz);
-
-		//ATMA_ASSERT_MEMORY_RANGES_DISJOINT(
-		//	(dest_memxfer_range_t<DT, DA>(dest_range.begin(), dest_range.begin() + sz)),
-		//	(src_memxfer_range_t<ST, SA>(src_range.begin(), src_range.begin() + sz)));
-
-		auto px = dest_range.data();
-		auto py = src_range.data();
-		for (size_t i = 0; i != sz; ++i)
-			std::allocator_traits<DA>::construct(dest_range.allocator(), px++, *py++);
-	}
-
-	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto range_copy_construct(dest_memxfer_range_t<DT, DA> dest_range, src_memxfer_range_t<ST, SA> src_range) -> void
-	{
-		ATMA_ASSERT(!dest_range.unbounded() || !src_range.unbounded());
-
-		auto sz
-			= !dest_range.unbounded() ? dest_range.size()
-			: !src_range.unbounded() ? src_range.size()
-			: unbounded_memory_size;
-
-		range_copy_construct<DT, DA, ST, SA>(dest_range, src_range, sz);
-	}
-
-	template <typename DR, typename SR,
-		CONCEPT_MODELS_(bounded_memory_range_concept, rmref_t<DR>),
-		CONCEPT_MODELS_(bounded_memory_range_concept, rmref_t<SR>),
-		CONCEPT_MODELS_(copy_constructible_concept, typename rmref_t<DR>::value_type)>
-	inline auto range_copy_construct(DR&& dest_range, SR&& src_range) -> void
-	{
-		ATMA_ASSERT(std::size(dest_range) == std::size(src_range));
-
-		using dest_alloc_traits = std::allocator_traits<allocator_type_of_t<DR>>;
-
-		decltype(auto) alloc = retrieve_allocator(dest_range);
-		auto py = std::data(src_range);
-		for (auto& x : dest_range)
-			dest_alloc_traits::construct(alloc, &x, *py++);
-	}
-
-	template <typename DR, typename It,
-		CONCEPT_MODELS_(forward_iterator_concept, It)>
-		inline auto range_copy_construct(DR&& dest_range, It begin) -> void
-	{
-		using dest_alloc_traits = std::allocator_traits<allocator_type_of_t<DR>>;
-
-		decltype(auto) alloc = retrieve_allocator(dest_range);
-		for (auto& x : dest_range)
-			dest_alloc_traits::construct(alloc, &x, *begin++);
-	}
 }
 
 // relocate_range
