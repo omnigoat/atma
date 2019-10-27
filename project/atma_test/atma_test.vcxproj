@@ -69,6 +69,7 @@
       <DiagnosticsFormat>Caret</DiagnosticsFormat>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <EnforceTypeConversionRules>true</EnforceTypeConversionRules>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -98,6 +99,7 @@
       <OmitFramePointers>true</OmitFramePointers>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

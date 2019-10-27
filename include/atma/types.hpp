@@ -242,4 +242,7 @@ namespace atma
 {
 	template <typename T>
 	using rmref_t = std::remove_reference_t<T>;
+
+	template <typename T>
+	using rm_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 }

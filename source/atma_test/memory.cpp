@@ -296,8 +296,8 @@ SCENARIO_OF("memory/operations", "range_construct is called")
 
 			THEN("range_construct can construct the whole range with a direct constructor")
 			{
-				atma::memory::range_construct(
-					atma::dest_range(dest_memory, dest_storage.size()),
+				atma::memory_construct(
+					dest_storage,
 					"oliver", 33);
 
 				CHECK_MEMORY(dest_memory,
@@ -307,8 +307,8 @@ SCENARIO_OF("memory/operations", "range_construct is called")
 
 			THEN("a partial-range can be constructed via a direct constructor")
 			{
-				atma::memory::range_construct(
-					atma::dest_range(dest_memory, 4),
+				atma::memory_construct(
+					atma::xfer_dest(dest_memory, 4),
 					"oliver", 33);
 
 				CHECK_MEMORY(dest_memory,
@@ -318,8 +318,8 @@ SCENARIO_OF("memory/operations", "range_construct is called")
 
 			THEN("a partial-range can be constructed via a direct constructor")
 			{
-				atma::memory::range_construct(
-					atma::dest_range(dest_memory + 1, 4),
+				atma::memory_construct(
+					atma::xfer_dest(dest_memory + 1, 4),
 					"oliver", 33);
 
 				CHECK_MEMORY(dest_memory,
@@ -330,8 +330,8 @@ SCENARIO_OF("memory/operations", "range_construct is called")
 
 			THEN("a partial-range can be constructed via the copy-constructor")
 			{
-				atma::memory::range_construct(
-					atma::dest_range(dest_memory + 1, 4),
+				atma::memory_construct(
+					atma::xfer_dest(dest_memory + 1, 4),
 					oliver);
 
 				CHECK_MEMORY(dest_memory,
@@ -373,20 +373,20 @@ SCENARIO_OF("memory/operations", "range_copy_construct is called")
 					dragon_t dragons_dest[4] = {};
 					dragon_t dragons[4] = { oliver, henry, marcie, rachael };
 
-					atma::memory::range_copy_construct(
+					atma::memory_copy_construct(
 						atma::xfer_dest(dest_storage, 4),
-						atma::src_range(src_storage));
+						atma::xfer_src(src_storage));
 
 					CHECK_MEMORY(dest_memory,
 						oliver, henry, marcie, rachael,
 						empty_dragon, empty_dragon);
 				}
 
-				THEN("range_copy_construct can copy-construct the middle of the range")
+				THEN("memory_copy_construct can copy-construct the middle of the range")
 				{
-					atma::memory::range_copy_construct(
-						atma::dest_range(dest_memory + 1, 4),
-						atma::src_range(src_storage));
+					atma::memory_copy_construct(
+						atma::xfer_dest(dest_memory + 1, 4),
+						atma::xfer_src(src_storage));
 
 					CHECK_MEMORY(dest_memory,
 						empty_dragon,
@@ -394,11 +394,11 @@ SCENARIO_OF("memory/operations", "range_copy_construct is called")
 						empty_dragon);
 				}
 
-				THEN("range_copy_construct can copy-construct bits of both ranges")
+				THEN("memory_copy_construct can copy-construct bits of both ranges")
 				{
-					atma::memory::range_copy_construct(
-						atma::dest_range(dest_memory + 4, 2),
-						atma::src_range(src_storage, 2, 2));
+					atma::memory_copy_construct(
+						atma::xfer_dest(dest_memory + 4, 2),
+						atma::xfer_src(src_storage, 2, 2));
 
 					CHECK_MEMORY(dest_memory,
 						empty_dragon, empty_dragon, empty_dragon, empty_dragon,
@@ -412,7 +412,7 @@ SCENARIO_OF("memory/operations", "range_copy_construct is called")
 					//static_assert(atma::concepts::models<atma::assignable_concept, typename decltype(dest2_storage)::value_type>::value);
 					//static_assert(atma::concepts::models_v<atma::dest_memory_range_concept, decltype(dest2_storage)>);
 
-					atma::memory::range_copy_construct(dest2_storage, src_storage);
+					atma::memory_copy_construct(dest2_storage, src_storage);
 				}
 			}
 		}
@@ -452,11 +452,11 @@ SCENARIO_OF("memory/operations", "range_move_construct is called")
 					//MODELS_ARGS(bounded_memory_concept, dest),
 					//MODELS_ARGS(bounded_memory_concept, src))
 
-					static_assert(MODELS_ARGS(atma::dest_memory_concept, atma::dest_range(dest_memory, 4)));
+					static_assert(MODELS_ARGS(atma::dest_memory_concept, atma::xfer_dest(dest_memory, 4)));
 
-					atma::memory::range_move_construct(
-						atma::dest_range(dest_memory, 4),
-						atma::src_range(src_storage.data(), src_storage.size()));
+					atma::memory_move_construct(
+						atma::xfer_dest(dest_memory, 4),
+						atma::xfer_src(src_storage.data(), src_storage.size()));
 
 					CHECK_MEMORY(dest_memory,
 						oliver, henry, marcie, rachael,
@@ -468,9 +468,9 @@ SCENARIO_OF("memory/operations", "range_move_construct is called")
 
 				THEN("range_move_construct can move part of the range")
 				{
-					atma::memory::range_move_construct(
-						atma::dest_range(dest_memory, 2),
-						atma::src_range(src_storage, 0, 2));
+					atma::memory_move_construct(
+						atma::xfer_dest(dest_memory, 2),
+						atma::xfer_src(src_storage, 0, 2));
 
 					CHECK_MEMORY(dest_memory,
 						oliver, henry,
@@ -506,8 +506,8 @@ SCENARIO_OF("memory/operations", "destruct is called")
 
 		THEN("destruct calls the destructor of the whole range")
 		{
-			atma::memory::range_destruct(
-				atma::dest_range(dest_memory, 4));
+			atma::memory_destruct(
+				atma::xfer_dest(dest_memory, 4));
 
 			CHECK_VECTOR(dest_storage,
 				empty_dragon, empty_dragon, empty_dragon, empty_dragon);
@@ -537,8 +537,8 @@ SCENARIO_OF("memory/operations", "memcpy or memmove is called")
 			THEN("memcpy performs correctly")
 			{
 				atma::memory::memcpy(
-					atma::dest_range(dest_memory, 2),
-					atma::src_range(src_storage, 2, 2));
+					atma::xfer_dest(dest_memory, 2),
+					atma::xfer_src(src_storage, 2, 2));
 
 				CHECK_VECTOR(dest_storage,
 					7, 8, 3, 4);
@@ -547,8 +547,8 @@ SCENARIO_OF("memory/operations", "memcpy or memmove is called")
 			THEN("memmove performs overlapping regions correctly")
 			{
 				atma::memory::memmove(
-					atma::dest_range(dest_memory, 2),
-					atma::src_range(dest_memory + 1, 2));
+					atma::xfer_dest(dest_memory, 2),
+					atma::xfer_src(dest_memory + 1, 2));
 
 				CHECK_VECTOR(dest_storage,
 					2, 3, 3, 4);
