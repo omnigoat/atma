@@ -276,6 +276,40 @@ std::ostream& operator << (std::ostream& stream, dragon_t const& dragon)
 
 TYPE_TO_STRING(dragon_t);
 
+
+
+SCENARIO_OF("memory/operations", "memory_default_construct is called")
+{
+	GIVEN("an empty allocator and the dragon-type")
+	{
+		using value_type = dragon_t;
+		using allocator_type = atma::aligned_allocator_t<dragon_t>;
+		using memory_t = atma::basic_memory_t<value_type, allocator_type>;
+
+		static_assert(std::is_empty_v<allocator_type>, "allocator not empty!");
+
+		dragon_t const empty_dragon;
+		dragon_t const oliver{"oliver", 33};
+
+		GIVEN("memory pointing to uninitialized-memory")
+		{
+			auto dest_storage = std::unique_ptr<byte[]>(new byte[sizeof dragon_t * 6]);
+			auto dest_memory = memory_t(reinterpret_cast<dragon_t*>(dest_storage.get()));
+
+			THEN("memory_default_construct can construct the whole range")
+			{
+				atma::memory_default_construct(atma::xfer_dest(dest_memory, 6));
+
+				CHECK_MEMORY(dest_memory,
+					empty_dragon, empty_dragon, empty_dragon,
+					empty_dragon, empty_dragon, empty_dragon);
+			}
+		}
+	}
+}
+
+
+
 SCENARIO_OF("memory/operations", "range_construct is called")
 {
 	GIVEN("an empty allocator and the dragon-type")

@@ -542,7 +542,7 @@ namespace atma
 			}
 			else
 			{
-				memory::relocate_range(
+				memory_relocate_range(
 					xfer_dest(imem_ + reloc_offset),
 					xfer_src(imem_ + offset),
 					mvsz);
