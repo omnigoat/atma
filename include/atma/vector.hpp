@@ -427,7 +427,7 @@ namespace atma
 	{
 		IMEM_GUARD_LT(size_ + 1);
 
-		memory::construct(imem_ + size_, x);
+		memory_construct_at(imem_ + size_, x);
 
 		++size_;
 	}
@@ -474,7 +474,7 @@ namespace atma
 			xfer_src(imem_ + offset),
 			(size_ - offset) * sizeof value_type);
 
-		memory::construct(
+		memory_construct_at(
 			imem_ + offset,
 			x);
 
@@ -497,7 +497,7 @@ namespace atma
 			xfer_src(imem_ + offset),
 			(size_ - offset) * sizeof value_type);
 
-		memory::construct(
+		memory_construct_at(
 			imem_ + offset,
 			std::move(x));
 
