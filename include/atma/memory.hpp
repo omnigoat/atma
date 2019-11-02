@@ -752,11 +752,15 @@ namespace atma::detail
 
 		[](auto& f, auto&& dest, size_t sz)
 		LAMBDA_REQUIRES(MODELS_ARGS(dest_memory_concept, dest))
-			{ f(retrieve_allocator(dest), std::data(dest), sz); },
+		{
+			f(retrieve_allocator(dest), std::data(dest), sz);
+		},
 
 		[](auto& f, auto&& dest)
 		LAMBDA_REQUIRES(MODELS_ARGS(dest_bounded_memory_concept, dest))
-			{ f(retrieve_allocator(dest), std::data(dest), std::size(dest)); }
+		{
+			f(retrieve_allocator(dest), std::data(dest), std::size(dest));
+		}
 	};
 }
 
@@ -814,29 +818,77 @@ namespace atma
 // memory_copy_construct / memory_move_construct
 namespace atma::detail
 {
-	constexpr auto _memory_copy_construct = [](auto&& allocator, auto* px, auto* py, size_t sz)
+	constexpr auto _memory_copy_construct = multi_functor_t
 	{
-		if (sz == 0)
-			return;
+		[](auto&& allocator, auto* px, auto* py, size_t sz)
+		{
+			if (sz == 0)
+				return;
 
-		ATMA_ASSERT_MEMORY_PTR_DISJOINT(px, py, sz);
+			ATMA_ASSERT_MEMORY_PTR_DISJOINT(px, py, sz);
 
-		using dest_allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
+			using dest_allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
 
-		for (size_t i = 0; i != sz; ++i)
-			dest_allocator_traits::construct(allocator, px++, *py++);
+			for (size_t i = 0; i != sz; ++i)
+				dest_allocator_traits::construct(allocator, px++, *py++);
+		},
+
+		[](auto&& allocator, auto* px, auto begin, auto end)
+		{
+			using dest_allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
+
+			while (begin != end)
+				dest_allocator_traits::construct(allocator, px++, *begin++);
+		}
+	};
+
+	constexpr auto _memory_move_construct = multi_functor_t
+	{
+		[](auto&& allocator, auto* px, auto* py, size_t sz)
+		{
+			if (sz == 0)
+				return;
+
+			using dest_allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
+
+			// destination range is earlier, move forwards
+			if (px < py)
+			{
+				for (size_t i = 0; i != sz; ++i, ++px, ++py)
+				{
+					dest_allocator_traits::construct(allocator, px, std::move(*py));
+				}
+			}
+			// src range earlier, move backwards
+			else
+			{
+				auto pxe = px + sz;
+				auto pye = py + sz;
+				for (size_t i = 0; i != sz; ++i)
+				{
+					dest_allocator_traits::construct(allocator, --pxe, std::move(*--pye));
+				}
+			}
+		},
+
+		[](auto&& allocator, auto* px, auto begin, auto end)
+		{
+			using dest_allocator_traits = decltype(allocator_traits_of_allocator_(allocator));
+
+			while (begin != end)
+				dest_allocator_traits::construct(allocator, px, std::move(*begin++));
+		}
 	};
 }
 
 namespace atma::detail
 {
-}
-
-namespace atma
-{
-	constexpr auto memory_copy_construct = multi_functor_t
+	template <typename F>
+	constexpr auto _memory_copymove_ = multi_functor_t
 	{
-		[](auto&& dest, auto&& src, size_t sz)
+		functor_call_fwds_t<F>(),
+
+		[](auto& f, auto&& dest, auto&& src, size_t sz)
 		-> RETURN_TYPE_IF(void,
 			MODELS_ARGS(dest_memory_concept, dest),
 			MODELS_ARGS(src_memory_concept, src))
@@ -845,7 +897,7 @@ namespace atma
 			constexpr bool src_is_bounded = concepts::models_ref_v<bounded_memory_concept, decltype(src)>;
 
 			ATMA_ASSERT(sz != unbounded_memory_size);
-			
+
 			if constexpr (dest_is_bounded && src_is_bounded)
 				ATMA_ASSERT(dest.size() == src.size());
 
@@ -854,47 +906,43 @@ namespace atma
 
 			if constexpr (src_is_bounded)
 				ATMA_ASSERT(src.size() == sz);
-				
-			detail::_memory_copy_construct(
-				retrieve_allocator(dest),
+
+			f(retrieve_allocator(dest),
 				std::data(dest),
 				std::data(src),
 				sz);
 		},
 
-		[](auto&& dest, auto&& src)
+		[](auto& f, auto&& dest, auto&& src)
 		-> RETURN_TYPE_IF(void,
 			MODELS_ARGS(dest_bounded_memory_concept, dest),
 			MODELS_ARGS(src_bounded_memory_concept, src))
 		{
 			ATMA_ASSERT(std::size(dest) == std::size(src));
 
-			detail::_memory_copy_construct(
-				retrieve_allocator(dest),
+			f(retrieve_allocator(dest),
 				std::data(dest),
 				std::data(src),
 				std::size(dest));
 		},
 
-		[](auto&& dest, auto&& src)
+		[](auto& f, auto&& dest, auto&& src)
 		-> RETURN_TYPE_IF(void,
 			MODELS_ARGS(dest_bounded_memory_concept, dest),
 			MODELS_ARGS(src_memory_concept, src))
 		{
-			detail::_memory_copy_construct(
-				retrieve_allocator(dest),
+			f(retrieve_allocator(dest),
 				std::data(dest),
 				std::data(src),
 				std::size(dest));
 		},
 
-		[](auto&& dest, auto&& src)
+		[](auto& f, auto&& dest, auto&& src)
 		-> RETURN_TYPE_IF(void,
 			MODELS_ARGS(dest_memory_concept, dest),
 			MODELS_ARGS(src_bounded_memory_concept, src))
 		{
-			detail::_memory_copy_construct(
-				retrieve_allocator(dest),
+			f(retrieve_allocator(dest),
 				std::data(dest),
 				std::data(src),
 				std::size(src));
@@ -907,154 +955,45 @@ namespace atma
 		{
 			auto const sz = std::distance(std::begin(src), std::end(src));
 
-			detail::_memory_copy_construct(
-				retrieve_allocator(dest),
+			f(retrieve_allocator(dest),
 				std::data(dest),
 				std::addressof(*std::begin(src)),
 				sz);
 		},
 
-		[](auto&& dest, auto&& src)
+		[](auto& f, auto&& dest, auto&& src)
 		-> RETURN_TYPE_IF(void,
 			MODELS_ARGS(sized_range_concept, dest),
 			MODELS_ARGS(sized_range_concept, src))
 		{
 			using allocator_type = decltype(detail::allocator_type_of_range_(dest));
 
-			detail::_memory_copy_construct(
-				allocator_type(),
+			f(allocator_type(),
 				std::data(dest),
 				std::data(src),
 				std::size(src));
 		},
-
-		[](auto&& dest, auto begin, auto end)
+		
+		[](auto& f, auto&& dest, auto begin, auto end)
 		-> RETURN_TYPE_IF(void,
 			MODELS_ARGS(dest_memory_concept, dest),
 			MODELS_ARGS(iterator_concept, begin),
 			MODELS_ARGS(iterator_concept, end))
 		{
-			using dest_allocator_traits = std::allocator_traits<allocator_type_of_t<rmref_t<decltype(dest)>>>;
-
-			auto px = std::data(dest);
-			while (begin != end)
-				dest_allocator_traits::construct(retrieve_allocator(dest), px++, *begin++);
-		}
-
-	};
-}
-
-// memory_move_construct
-namespace atma::detail
-{
-	constexpr auto _memory_move_construct = [](auto&& allocator, auto* px, auto* py, size_t sz)
-	{
-		if (sz == 0)
-			return;
-
-		using dest_allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
-
-		// destination range is earlier, move forwards
-		if (px < py)
-		{
-			for (size_t i = 0; i != sz; ++i, ++px, ++py)
-			{
-				dest_allocator_traits::construct(allocator, px, std::move(*py));
-			}
-		}
-		// src range earlier, move backwards
-		else
-		{
-			auto pxe = px + sz;
-			auto pye = py + sz;
-			for (size_t i = 0; i != sz; ++i)
-			{
-				dest_allocator_traits::construct(allocator, --pxe, std::move(*--pye));
-			}
+			f(retrieve_allocator(dest),
+				std::data(dest),
+				begin, end);
 		}
 	};
 }
 
 namespace atma
 {
-	constexpr auto memory_move_construct = multi_functor_t
-	{
-		[](auto&& dest, auto&& src, size_t sz)
-			-> RETURN_TYPE_IF(void,
-				MODELS_ARGS(dest_memory_concept, dest),
-				MODELS_ARGS(src_memory_concept, src))
-		{
-			if (sz == 0)
-				return;
-
-			using dest_type = rmref_t<decltype(dest)>;
-			constexpr bool dest_is_bounded = concepts::models_v<bounded_memory_concept, dest_type>;
-
-			using src_type = rmref_t<decltype(src)>;
-			constexpr bool src_is_bounded = concepts::models_v<bounded_memory_concept, src_type>;
-
-			ATMA_ASSERT(sz != unbounded_memory_size);
-
-			if constexpr (dest_is_bounded && src_is_bounded)
-			{
-				ATMA_ASSERT(dest.size() == src.size());
-				ATMA_ASSERT_MEMORY_RANGES_DISJOINT(dest, src);
-			}
-
-			if constexpr (dest_is_bounded)
-				ATMA_ASSERT(dest.size() == sz);
-
-			if constexpr (src_is_bounded)
-				ATMA_ASSERT(src.size() == sz);
-
-			using dest_allocator_traits = std::allocator_traits<allocator_type_of_t<decltype(dest)>>;
-
-			detail::_memory_move_construct(
-				retrieve_allocator(dest),
-				std::data(dest),
-				std::data(src),
-				sz);
-		},
-
-		[](auto&& dest, auto&& src) -> RETURN_TYPE_IF(void,
-			MODELS_ARGS(dest_memory_concept, dest),
-			MODELS_ARGS(src_memory_concept, src),
-			MODELS_ARGS(bounded_memory_concept, dest))
-		{
-			detail::_memory_move_construct(
-				retrieve_allocator(dest),
-				std::data(dest),
-				std::data(src),
-				std::size(dest));
-		},
-
-		[](auto&& dest, auto&& src) -> RETURN_TYPE_IF(void,
-			MODELS_ARGS(dest_memory_concept, dest),
-			MODELS_ARGS(src_memory_concept, src),
-			MODELS_ARGS(bounded_memory_concept, src))
-		{
-			detail::_memory_move_construct(
-				retrieve_allocator(dest),
-				std::data(dest),
-				std::data(src),
-				std::size(src));
-		},
-
-		[](auto&& dest, auto&& src)
-		-> RETURN_TYPE_IF(void,
-			MODELS_ARGS(dest_memory_concept, dest),
-			MODELS_ARGS(contiguous_range_concept, src))
-		{
-			auto const sz = std::distance(std::begin(src), std::end(src));
-
-			detail::_memory_copy_construct(
-				retrieve_allocator(dest),
-				std::data(dest),
-				std::addressof(*std::begin(src)),
-				sz);
-		},
-	};
+	constexpr auto memory_copy_construct = detail::_memory_copymove_<decltype(detail::_memory_copy_construct)>;
+	constexpr auto memory_move_construct = detail::_memory_copymove_<decltype(detail::_memory_move_construct)>;
 }
+
+
 
 // destruct
 namespace atma

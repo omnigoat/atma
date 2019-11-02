@@ -46,7 +46,7 @@ namespace atma::detail
 	{
 		static_assert(std::is_empty_v<F>, "functor must be empty");
 
-		template <typename... Args, typename = std::enable_if_t<(!std::is_invocable_v<Fs, Args...> && ...)>>
+		template <typename... Args, typename = std::enable_if_t<(!std::is_invocable_v<Fs, Fwds..., Args...> && ...)>>
 		constexpr auto operator ()(Args&&... args) const -> std::invoke_result_t<F, Fwds..., Args...>
 		{
 			// don't go through std::invoke because all empty functors should be callable

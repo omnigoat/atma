@@ -433,6 +433,17 @@ SCENARIO_OF("memory/operations", "range_copy_construct is called")
 						marcie, rachael);
 				}
 
+				THEN("memory_copy_construct can copy-construct from iterateors")
+				{
+					atma::memory_copy_construct(
+						atma::xfer_dest(dest_memory + 2, 4),
+						src_storage.begin(), src_storage.end());
+
+					CHECK_MEMORY(dest_memory,
+						empty_dragon, empty_dragon,
+						oliver, henry, marcie, rachael);
+				}
+
 				THEN("")
 				{
 					auto dest2_storage = std::vector<value_type>(4, empty_dragon);
