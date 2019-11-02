@@ -45,6 +45,8 @@ namespace atma
 		auto operator [] (int) const -> T const&;
 		auto operator [] (int) -> T&;
 
+		auto get_allocator() const -> allocator_type;
+
 		auto size() const -> size_t;
 		auto capacity() const -> size_t;
 		auto cbegin() const -> T const*;
@@ -225,6 +227,12 @@ namespace atma
 	inline auto vector<T,A>::operator [] (int index) -> T&
 	{
 		return imem_[index];
+	}
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::get_allocator() const -> allocator_type
+	{
+		return this->imem_.get_allocator();
 	}
 
 	template <typename T, typename A>
