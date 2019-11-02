@@ -675,6 +675,8 @@ namespace atma::detail
 	template <typename tag_type>
 	using xfer_range_maker_ = multi_functor_t
 	<
+		functor_call_no_fwds_t,
+
 		// first match against pointer
 		xfer_make_from_ptr_<tag_type>,
 
@@ -699,24 +701,6 @@ namespace atma
 	constexpr auto xfer_src  = detail::xfer_range_maker_<src_memory_tag_t>();
 }
 
-
-// construct
-namespace atma::memory
-{
-	template <typename T, typename A, typename... Args>
-	inline auto construct(basic_memory_t<T, A> const& ptr, Args&&... args) -> void
-	{
-		basic_memory_t<T, A>::allocator_traits::construct(ptr.allocator(), (T*)ptr, std::forward<Args>(args)...);
-	}
-
-	template <typename T, typename... Args>
-	inline auto construct(T* ptr, Args&&... args) -> void
-	{
-		new (ptr) T(std::forward<Args>(args)...);
-	}
-}
-
-// memory_construct
 namespace atma::detail
 {
 	template <typename R>
@@ -727,8 +711,65 @@ namespace atma::detail
 
 	template <typename A>
 	constexpr auto allocator_traits_of_allocator_(A&& a) -> std::allocator_traits<rmref_t<A>>;
+}
+
+// memory_construct_at
+namespace atma
+{
+	constexpr auto memory_construct_at = [](auto&& dest, auto&&... args)
+		-> RETURN_TYPE_IF(void, MODELS_ARGS(memory_concept, dest))
+	{
+		decltype(auto) allocator = retrieve_allocator(dest);
+		using allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
+
+		allocator_traits::construct(allocator, std::data(dest), std::forward<decltype(args)>(args)...);
+	};
+}
+
+// memory_default_construct / memory_value_construct
+namespace atma::detail
+{
+	constexpr auto _memory_default_construct = [](auto&&, auto* px, size_t sz)
+	{
+		using value_type = rmref_t<decltype(*px)>;
+
+		// allocator is not capable of default-constructing
+		for (size_t i = 0; i != sz; ++i)
+			::new (px++) value_type;
+	};
+
+	constexpr auto _memory_value_construct = [](auto&& allocator, auto* px, size_t sz)
+	{
+		using allocator_traits = decltype(allocator_traits_of_allocator_(allocator));
+		for (size_t i = 0; i != sz; ++i)
+			allocator_traits::construct(allocator, px++);
+	};
+
+	template <typename F>
+	constexpr auto _memory_range_delegate = multi_functor_t
+	{
+		functor_call_fwds_t<F>{},
+
+		[](auto& f, auto&& dest, size_t sz)
+		LAMBDA_REQUIRES(MODELS_ARGS(dest_memory_concept, dest))
+			{ f(retrieve_allocator(dest), std::data(dest), sz); },
+
+		[](auto& f, auto&& dest)
+		LAMBDA_REQUIRES(MODELS_ARGS(dest_bounded_memory_concept, dest))
+			{ f(retrieve_allocator(dest), std::data(dest), std::size(dest)); }
+	};
+}
+
+namespace atma
+{
+	constexpr auto memory_default_construct = detail::_memory_range_delegate<decltype(detail::_memory_default_construct)>;
+	constexpr auto memory_value_construct = detail::_memory_range_delegate<decltype(detail::_memory_value_construct)>;
+}
 
 
+// memory_construct
+namespace atma::detail
+{
 	constexpr auto _memory_range_construct = [](auto&& allocator, auto* px, size_t sz, auto&&... args)
 	{
 		using dest_allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
@@ -742,7 +783,7 @@ namespace atma
 {
 	constexpr auto memory_construct = multi_functor_t
 	{
-		[](auto&& dest, auto&&... args)
+		[] (auto&& dest, auto&&... args)
 			-> RETURN_TYPE_IF(void,
 				MODELS_ARGS(dest_memory_concept, dest))
 		{
@@ -768,90 +809,9 @@ namespace atma
 	};
 }
 
-// memory_default_initialize
-namespace atma::detail
-{
-	constexpr auto _memory_default_construct = [](auto&& allocator, auto* px, size_t sz)
-	{
-		using value_type = rmref_t<decltype(*px)>;
-
-		for (size_t i = 0; i != sz; ++i)
-			::new (px++) value_type;
-	};
-
-	constexpr auto _memory_value_construct = [](auto&& allocator, auto* px, size_t sz)
-	{
-		using value_type = rmref_t<decltype(*px)>;
-
-		for (size_t i = 0; i != sz; ++i)
-			::new (px++) value_type();
-	};
-}
-
-namespace atma::detail
-{
-	template <typename F>
-	constexpr auto _memory_range_delegate = multi_functor_t
-	{
-		[](auto&& dest, size_t sz)
-			-> RETURN_TYPE_IF(void,
-				MODELS_ARGS(dest_memory_concept, dest))
-		{
-			static_assert(std::is_empty_v<F>, "functor must be empty a.k.a., non-capturing");
-
-			multi_functor_t<F>()(
-				retrieve_allocator(dest),
-				std::data(dest),
-				sz);
-		},
-
-		[](auto&& dest)
-			-> RETURN_TYPE_IF(void,
-				MODELS_ARGS(dest_bounded_memory_concept, dest))
-		{
-			multi_functor_t<F>()(
-				retrieve_allocator(dest),
-				std::data(dest),
-				std::size(dest));
-		}
-	};
-}
-
-namespace atma
-{
-	constexpr auto memory_default_construct = detail::_memory_range_delegate<decltype(detail::_memory_default_construct)>;
-	constexpr auto memory_value_construct = detail::_memory_range_delegate<decltype(detail::_memory_value_construct)>;
-
-#if 0
-	constexpr auto memory_default_construct = multi_functor_t
-	{
-		[](auto&& dest, size_t sz)
-			-> RETURN_TYPE_IF(void,
-				MODELS_ARGS(dest_memory_concept, dest))
-		{
-			detail::_memory_default_construct(
-				retrieve_allocator(dest),
-				std::data(dest),
-				sz);
-		},
-
-		[](auto&& dest)
-			-> RETURN_TYPE_IF(void,
-				MODELS_ARGS(dest_bounded_memory_concept, dest))
-		{
-			detail::_memory_default_construct(
-				retrieve_allocator(dest),
-				std::data(dest),
-				std::size(dest));
-		}
-	};
-#endif
-}
 
 
-
-
-// memory_copy_construct
+// memory_copy_construct / memory_move_construct
 namespace atma::detail
 {
 	constexpr auto _memory_copy_construct = [](auto&& allocator, auto* px, auto* py, size_t sz)
@@ -866,6 +826,10 @@ namespace atma::detail
 		for (size_t i = 0; i != sz; ++i)
 			dest_allocator_traits::construct(allocator, px++, *py++);
 	};
+}
+
+namespace atma::detail
+{
 }
 
 namespace atma
