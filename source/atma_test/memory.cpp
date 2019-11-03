@@ -132,6 +132,7 @@ SCENARIO_TEMPLATE("a memory-xfer-range is contructed ", range_type, atma::dest_b
 {
 	GIVEN("the types int & std::allocator<int>")
 	{
+#if 0
 		THEN("it is default constructible")
 		{
 			range_type d;
@@ -151,7 +152,6 @@ SCENARIO_TEMPLATE("a memory-xfer-range is contructed ", range_type, atma::dest_b
 			CHECK(d.end() == numbers + numsize);
 		}
 
-#if 0
 		THEN("it constructs from pointer, offset, and size")
 		{
 			int const offset = 2;

@@ -58,19 +58,19 @@ namespace atma::detail
 	};
 }
 
-// multi-functor
+// functor_list_t
 namespace atma::detail
 {
 	template <typename, typename, typename>
-	struct multi_functor_;
+	struct functor_list_;
 
 	template <typename Fwd, typename... Gs>
-	struct multi_functor_<Fwd, meta::list<Gs...>, meta::list<>>
+	struct functor_list_<Fwd, meta::list<Gs...>, meta::list<>>
 	{};
 
 	template <typename Fwd, typename... Gs, typename F, typename... Fs>
-	struct multi_functor_<Fwd, meta::list<Gs...>, meta::list<F, Fs...>>
-		: multi_functor_<Fwd, meta::list<Gs..., F>, meta::list<Fs...>>
+	struct functor_list_<Fwd, meta::list<Gs...>, meta::list<F, Fs...>>
+		: functor_list_<Fwd, meta::list<Gs..., F>, meta::list<Fs...>>
 		, functor_call_<Fwd, F, Gs...>
 	{};
 }
@@ -78,22 +78,22 @@ namespace atma::detail
 namespace atma
 {
 	template <typename Fwds, typename... Fs>
-	struct multi_functor_t
-		: detail::multi_functor_<Fwds, meta::list<>, meta::list<rmref_t<Fs>...>>
+	struct functor_list_t
+		: detail::functor_list_<Fwds, meta::list<>, meta::list<rmref_t<Fs>...>>
 	{
-		constexpr multi_functor_t() = default;
+		constexpr functor_list_t() = default;
 
 		// we don't actually care about the arguments
 		template <typename... Gs>
-		constexpr multi_functor_t(Gs&&...)
+		constexpr functor_list_t(Gs&&...)
 		{}
 	};
 
 	template <typename... Fwds, typename... Fs>
-	multi_functor_t(functor_call_fwds_t<Fwds...>, Fs&&...) -> multi_functor_t<functor_call_fwds_t<Fwds...>, Fs...>;
+	functor_list_t(functor_call_fwds_t<Fwds...>, Fs&&...) -> functor_list_t<functor_call_fwds_t<Fwds...>, Fs...>;
 
 	template <typename... Fs>
-	multi_functor_t(Fs&&...) -> multi_functor_t<functor_call_no_fwds_t, Fs...>;
+	functor_list_t(Fs&&...) -> functor_list_t<functor_call_no_fwds_t, Fs...>;
 }
 
 
