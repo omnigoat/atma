@@ -675,8 +675,8 @@ namespace atma::detail
 {
 	constexpr auto _memory_range_construct = [](auto&& allocator, auto* px, size_t sz, auto&&... args)
 	{
-		using dest_allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
-
+		using dest_allocator_traits = decltype(allocator_traits_of_allocator_(allocator));
+		
 		for (size_t i = 0; i != sz; ++i)
 			dest_allocator_traits::construct(allocator, px++, args...);
 	};
@@ -687,8 +687,7 @@ namespace atma
 	constexpr auto memory_construct = functor_list_t
 	{
 		[] (auto&& dest, auto&&... args)
-			-> RETURN_TYPE_IF(void,
-				MODELS_ARGS(dest_memory_concept, dest))
+		LAMBDA_REQUIRES(MODELS_ARGS(dest_memory_concept, dest))
 		{
 			detail::_memory_range_construct(
 				get_allocator(dest),
@@ -698,8 +697,7 @@ namespace atma
 		},
 
 		[](auto&& dest, auto&&... args)
-			-> RETURN_TYPE_IF(void,
-				MODELS_ARGS(sized_range_concept, dest))
+		LAMBDA_REQUIRES(MODELS_ARGS(sized_range_concept, dest))
 		{
 			using allocator_type = decltype(detail::allocator_type_of_range_(dest));
 
@@ -721,13 +719,10 @@ namespace atma::detail
 	{
 		[](auto&& allocator, auto* px, auto* py, size_t sz)
 		{
-			if (sz == 0)
-				return;
-
-			ATMA_ASSERT(px + sz <= py || py + sz <= px,
+			ATMA_ASSERT(sz == 0 || px + sz <= py && py + sz <= px,
 				"memory ranges must be disjoin");
 
-			using dest_allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
+			using dest_allocator_traits = decltype(allocator_traits_of_allocator_(allocator));
 
 			for (size_t i = 0; i != sz; ++i)
 				dest_allocator_traits::construct(allocator, px++, *py++);
@@ -789,9 +784,9 @@ namespace atma::detail
 		functor_call_fwds_t<F>(),
 
 		[](auto& f, auto&& dest, auto&& src, size_t sz)
-		-> RETURN_TYPE_IF(void,
-			MODELS_ARGS(dest_memory_concept, dest),
-			MODELS_ARGS(src_memory_concept, src))
+		LAMBDA_REQUIRES(
+		  MODELS_ARGS(dest_memory_concept, dest),
+		  MODELS_ARGS(src_memory_concept, src))
 		{
 			constexpr bool dest_is_bounded = concepts::models_ref_v<bounded_memory_concept, decltype(dest)>;
 			constexpr bool src_is_bounded = concepts::models_ref_v<bounded_memory_concept, decltype(src)>;
@@ -814,9 +809,9 @@ namespace atma::detail
 		},
 
 		[](auto& f, auto&& dest, auto&& src)
-		-> RETURN_TYPE_IF(void,
-			MODELS_ARGS(dest_bounded_memory_concept, dest),
-			MODELS_ARGS(src_bounded_memory_concept, src))
+		LAMBDA_REQUIRES(
+		  MODELS_ARGS(dest_bounded_memory_concept, dest),
+		  MODELS_ARGS(src_bounded_memory_concept, src))
 		{
 			ATMA_ASSERT(std::size(dest) == std::size(src));
 
