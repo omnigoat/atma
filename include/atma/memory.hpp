@@ -13,6 +13,8 @@
 #include <vector>
 #include <memory>
 
+
+// forward-declares
 namespace atma
 {
 	constexpr struct memory_allocate_copy_tag {} memory_allocate_copy;
@@ -22,37 +24,10 @@ namespace atma
 	struct src_memory_tag_t;
 	constexpr size_t unbounded_memory_size = ~size_t();
 
-	template <typename Tag> struct unbounded_size_t;
-
 	template <typename Tag, typename T, typename A = std::allocator<T>>
 	struct memxfer_range_t;
-
-	//
-	// convertible if:
-	//  - same tag, obviously
-	//  - To is the unbounded version of From
-	//    (bounded -> unbounded is fine, not the other way around)
-	//  - dest-range is being used as a source-range
-	//  - a bounded dest-range is being used as an unbounded source-range
-	//
-	template <typename To, typename From>
-	constexpr bool is_convertible_xfer_v
-		=  std::is_same_v<To, From>
-		|| std::is_same_v<To, unbounded_size_t<From>>
-		|| std::is_same_v<src_memory_tag_t, To> && std::is_same_v<dest_memory_tag_t, From>
-		|| std::is_same_v<unbounded_size_t<src_memory_tag_t>, To> && std::is_same_v<dest_memory_tag_t, From>
-		;
 }
 
-#define ATMA_ASSERT_MEMORY_RANGES_DISJOINT(lhs, rhs) \
-	ATMA_ASSERT(std::addressof(*std::end(lhs)) <= std::addressof(*std::begin(rhs)) || \
-		std::addressof(*std::end(rhs)) <= std::addressof(*std::begin(lhs)))
-
-#define ATMA_ASSERT_MEMORY_DISJOINT(lhs, rhs, sz) \
-	ATMA_ASSERT((lhs).data() + sz <= (rhs).data() || (rhs).data() + sz <= (lhs).data())
-
-#define ATMA_ASSERT_MEMORY_PTR_DISJOINT(lhs, rhs, sz) \
-	ATMA_ASSERT((lhs) + sz <= (rhs) || (rhs) + sz <= (lhs))
 
 //
 //  base_memory_t
@@ -64,7 +39,6 @@ namespace atma::detail
 {
 	template <typename Allocator, bool = std::is_empty_v<Allocator>>
 	struct base_memory_tx;
-
 
 	template <typename Allocator>
 	struct base_memory_tx<Allocator, false>
@@ -90,7 +64,6 @@ namespace atma::detail
 		Allocator allocator_;
 	};
 
-
 	template <typename Allocator>
 	struct base_memory_tx<Allocator, true>
 		: protected Allocator
@@ -112,7 +85,6 @@ namespace atma::detail
 
 		auto get_allocator() const -> allocator_type& { return const_cast<allocator_type&>(static_cast<allocator_type const&>(*this)); }
 	};
-
 
 	template <typename T, typename A>
 	using base_memory_t = base_memory_tx<typename std::allocator_traits<A>::template rebind_alloc<T>>;
@@ -282,24 +254,6 @@ namespace atma
 		allocate(capacity);
 	}
 
-#if 0
-	template <typename T, typename A>
-	inline auto allocatable_memory_t<T, A>::operator = (pointer rhs) -> allocatable_memory_t&
-	{
-		this->ptr_ = rhs;
-		return *this;
-	}
-
-	template <typename T, typename A>
-	template <typename B>
-	inline auto allocatable_memory_t<T, A>::operator = (allocatable_memory_t<T, B> const& rhs) -> allocatable_memory_t&
-	{
-		this->ptr_ = rhs.ptr_;
-		this->get_allocator() = rhs.get_allocator();
-		return *this;
-	}
-#endif
-
 	template <typename T, typename A>
 	inline auto basic_memory_t<T, A>::allocate(size_t size) -> bool
 	{
@@ -318,7 +272,7 @@ namespace atma
 // get_allocator
 namespace atma
 {
-	constexpr auto get_allocator = multi_functor_t
+	constexpr auto get_allocator = functor_list_t
 	{
 		[](auto&& r) -> decltype(r.get_allocator()) { return r.get_allocator(); },
 		[](auto&& r) { return std::allocator<value_type_of_t<decltype(r)>>(); }
@@ -398,22 +352,9 @@ namespace atma
 			SPECIFIES_EXPR(std::size(range))
 		>;
 	};
-
-	
-	struct value_type_copy_constructible_concept
-	{
-		template <typename Memory>
-		auto contract() -> concepts::specifies
-		<
-			// we can assign/copy-construct to elements in this range
-			//concepts::is_true<concepts::models<assignable_concept, typename std::remove_reference_t<Memory>::value_type>>,
-			concepts::models_v<copy_constructible_concept, typename Memory::value_type>
-		>;
-	};
 }
 
 
-//
 //
 // memxfer_range_t
 // -----------------
@@ -423,7 +364,6 @@ namespace atma
 //   stateful allocator. stateless allocators add no additional size to
 //   this type, so it's usually just the size of a pointer. stateful
 //   allocators will make the size of this type grow.
-//
 //
 namespace atma
 {
@@ -465,15 +405,13 @@ namespace atma
 
 
 //
-//
 // bounded_memxfer_range_t
-// -----------------
+// --------------------------
 //   a type used for transferring memory around.
 //
 //   this structure is just a memxfer_range_t but with a size. this allows 
 //   it to have empty(), size(), begin(), and end() methods. this allows
 //   us options for optimization in some algorithms
-//
 //
 namespace atma
 {
@@ -484,14 +422,6 @@ namespace atma
 		using value_type = typename base_type::value_type;
 		using allocator_type = typename base_type::allocator_type;
 		using tag_type = Tag;
-
-		// inherit constructors
-		using base_type::base_type;
-
-		// default-constructor only allowed if allocator doesn't hold state
-		CONCEPT_REQUIRES(std::is_empty_v<allocator_type>)
-		constexpr bounded_memxfer_range_t()
-		{}
 
 		constexpr bounded_memxfer_range_t(allocator_type allocator, T* ptr, size_t size)
 			: base_type(allocator, ptr)
@@ -642,14 +572,14 @@ namespace atma::detail
 namespace atma::detail
 {
 	template <typename tag_type>
-	using xfer_range_maker_ = multi_functor_t
+	using xfer_range_maker_ = functor_list_t
 	<
 		functor_call_no_fwds_t,
 
 		// first match against pointer
 		xfer_make_from_ptr_<tag_type>,
 
-		// then match against that satisfies the contiguous-range concept (std::begin,
+		// then match anything that satisfies the contiguous-range concept (std::begin,
 		// std::end), AND satisfies the sized-range concept (std::size)
 		xfer_make_from_sized_contiguous_range_<tag_type>,
 
@@ -715,7 +645,7 @@ namespace atma::detail
 	};
 
 	template <typename F>
-	constexpr auto _memory_range_delegate = multi_functor_t
+	constexpr auto _memory_range_delegate = functor_list_t
 	{
 		functor_call_fwds_t<F>{},
 
@@ -754,7 +684,7 @@ namespace atma::detail
 
 namespace atma
 {
-	constexpr auto memory_construct = multi_functor_t
+	constexpr auto memory_construct = functor_list_t
 	{
 		[] (auto&& dest, auto&&... args)
 			-> RETURN_TYPE_IF(void,
@@ -787,14 +717,15 @@ namespace atma
 // memory_copy_construct / memory_move_construct
 namespace atma::detail
 {
-	constexpr auto _memory_copy_construct = multi_functor_t
+	constexpr auto _memory_copy_construct = functor_list_t
 	{
 		[](auto&& allocator, auto* px, auto* py, size_t sz)
 		{
 			if (sz == 0)
 				return;
 
-			ATMA_ASSERT_MEMORY_PTR_DISJOINT(px, py, sz);
+			ATMA_ASSERT(px + sz <= py || py + sz <= px,
+				"memory ranges must be disjoin");
 
 			using dest_allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
 
@@ -811,7 +742,7 @@ namespace atma::detail
 		}
 	};
 
-	constexpr auto _memory_move_construct = multi_functor_t
+	constexpr auto _memory_move_construct = functor_list_t
 	{
 		[](auto&& allocator, auto* px, auto* py, size_t sz)
 		{
@@ -853,7 +784,7 @@ namespace atma::detail
 namespace atma::detail
 {
 	template <typename F>
-	constexpr auto _memory_copymove_ = multi_functor_t
+	constexpr auto _memory_copymove_ = functor_list_t
 	{
 		functor_call_fwds_t<F>(),
 
@@ -1115,7 +1046,7 @@ namespace atma::detail
 
 namespace atma
 {
-	constexpr auto memory_relocate_range = multi_functor_t
+	constexpr auto memory_relocate_range = functor_list_t
 	{
 		[] (auto&& dest, auto&& src, size_t sz)
 		-> RETURN_TYPE_IF(void,
