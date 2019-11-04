@@ -128,10 +128,16 @@ SCENARIO_OF("memory/basic_memory_t", "basic_memory_t behaves nicely")
 //TYPE_TO_STRING(atma::dest_memxfer_range_t<int>);
 //TYPE_TO_STRING(atma::src_memxfer_range_t<int>);
 
-SCENARIO_TEMPLATE("a memory-xfer-range is contructed ", range_type, atma::dest_bounded_memxfer_range_t<int, std::allocator<int>>, atma::src_bounded_memxfer_range_t<int, std::allocator<int>>)
+SCENARIO("a dest_memxfer_range_t is contructed")
 {
 	GIVEN("the types int & std::allocator<int>")
 	{
+		THEN("it is default constructible")
+		{
+			atma::dest_memxfer_range_t<int, std::allocator<int>> d;
+			ATMA_UNUSED(d);
+		}
+
 #if 0
 		THEN("it is default constructible")
 		{

@@ -449,7 +449,12 @@ namespace atma
 }
 
 
-// dest/src versions
+//
+// dest_/src_ versions of memory-ranges
+// --------------------------
+//
+//   SERIOUSLY write some docos
+//
 namespace atma
 {
 	// dest_memxfer_range_t
@@ -465,19 +470,27 @@ namespace atma
 
 	template <typename T, typename A>
 	using src_bounded_memxfer_range_t = bounded_memxfer_range_t<src_memory_tag_t, T, A>;
+}
 
+
+
+//
+//
+// xfer_dest / xfer_src
+// ----------------------
+//  implementations of how to make dest/src ranges from various arguments
+//
+//
+namespace atma::detail
+{
 	// memxfer_range_of
 	template <typename Tag, typename Range>
 	using memxfer_range_of_t = memxfer_range_t<Tag, value_type_of_t<Range>, allocator_type_of_t<Range>>;
 
 	template <typename Tag, typename Range>
 	using bounded_memxfer_range_of_t = bounded_memxfer_range_t<Tag, value_type_of_t<Range>, allocator_type_of_t<Range>>;
-}
 
 
-// implementations of how to make dest/src ranges from various arguments
-namespace atma::detail
-{
 	template <typename tag_type>
 	struct xfer_make_from_ptr_
 	{
@@ -600,11 +613,12 @@ namespace atma
 	constexpr auto xfer_src  = detail::xfer_range_maker_<src_memory_tag_t>();
 }
 
+
+
+
+
 namespace atma::detail
 {
-	template <typename R>
-	using allocator_traits_of_range_t = std::allocator_traits<std::allocator<rm_cvref_t<decltype(*std::begin(std::declval<R>()))>>>;
-
 	template <typename R>
 	constexpr auto allocator_type_of_range_(R&& a) -> std::allocator<rmref_t<decltype(*std::begin(a))>>;
 
@@ -612,11 +626,27 @@ namespace atma::detail
 	constexpr auto allocator_traits_of_allocator_(A&& a) -> std::allocator_traits<rmref_t<A>>;
 }
 
+
+
+
+
+
+//##################################
+//
+//  begin algorithms here
+//
+//##################################
+
+
+
+
+
+
 // memory_construct_at
 namespace atma
 {
 	constexpr auto memory_construct_at = [](auto&& dest, auto&&... args)
-		-> RETURN_TYPE_IF(void, MODELS_ARGS(memory_concept, dest))
+	LAMBDA_REQUIRES(MODELS_ARGS(memory_concept, dest))
 	{
 		decltype(auto) allocator = get_allocator(dest);
 		using allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
