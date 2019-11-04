@@ -405,7 +405,7 @@ namespace atma
 
 
 //
-// bounded_memxfer_range_t
+// bounded_memxfer_t
 // --------------------------
 //   a type used for transferring memory around.
 //
@@ -416,20 +416,20 @@ namespace atma
 namespace atma
 {
 	template <typename Tag, typename T, typename A>
-	struct bounded_memxfer_range_t : memxfer_t<Tag, T, A>
+	struct bounded_memxfer_t : memxfer_t<Tag, T, A>
 	{
 		using base_type = memxfer_t<Tag, T, A>;
 		using value_type = typename base_type::value_type;
 		using allocator_type = typename base_type::allocator_type;
 		using tag_type = Tag;
 
-		constexpr bounded_memxfer_range_t(allocator_type allocator, T* ptr, size_t size)
+		constexpr bounded_memxfer_t(allocator_type allocator, T* ptr, size_t size)
 			: base_type(allocator, ptr)
 			, size_(size)
 		{}
 
 		CONCEPT_REQUIRES(std::is_empty_v<allocator_type>)
-		constexpr bounded_memxfer_range_t(T* ptr, size_t size)
+		constexpr bounded_memxfer_t(T* ptr, size_t size)
 			: base_type(allocator_type(), ptr)
 			, size_(size)
 		{}
@@ -462,14 +462,14 @@ namespace atma
 	using dest_memxfer_range_t = memxfer_t<dest_memory_tag_t, T, A>;
 
 	template <typename T, typename A>
-	using dest_bounded_memxfer_range_t = bounded_memxfer_range_t<dest_memory_tag_t, T, A>;
+	using dest_bounded_memxfer_range_t = bounded_memxfer_t<dest_memory_tag_t, T, A>;
 
 	// src_memxfer_range_t
 	template <typename T, typename A>
 	using src_memxfer_range_t = memxfer_t<src_memory_tag_t, T, A>;
 
 	template <typename T, typename A>
-	using src_bounded_memxfer_range_t = bounded_memxfer_range_t<src_memory_tag_t, T, A>;
+	using src_bounded_memxfer_range_t = bounded_memxfer_t<src_memory_tag_t, T, A>;
 }
 
 
@@ -488,7 +488,7 @@ namespace atma::detail
 	using memxfer_range_of_t = memxfer_t<Tag, value_type_of_t<Range>, allocator_type_of_t<Range>>;
 
 	template <typename Tag, typename Range>
-	using bounded_memxfer_range_of_t = bounded_memxfer_range_t<Tag, value_type_of_t<Range>, allocator_type_of_t<Range>>;
+	using bounded_memxfer_range_of_t = bounded_memxfer_t<Tag, value_type_of_t<Range>, allocator_type_of_t<Range>>;
 
 
 	template <typename tag_type>
@@ -503,7 +503,7 @@ namespace atma::detail
 		template <typename T>
 		auto operator()(T* data, size_t sz) const
 		{
-			return bounded_memxfer_range_t<tag_type, T, std::allocator<T>>(data, sz);
+			return bounded_memxfer_t<tag_type, T, std::allocator<T>>(data, sz);
 		}
 	};
 
@@ -570,7 +570,7 @@ namespace atma::detail
 		template <typename It,
 			CONCEPT_MODELS_(contiguous_iterator_concept, It)>
 		auto operator ()(It begin, It end)
-			-> bounded_memxfer_range_t
+			-> bounded_memxfer_t
 			< type_tag
 			, std::remove_reference_t<decltype(*std::declval<It>())>
 			, std::allocator<std::remove_const_t<std::remove_reference_t<decltype(*std::declval<It>())>>>>
