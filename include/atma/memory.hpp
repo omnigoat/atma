@@ -25,7 +25,7 @@ namespace atma
 	constexpr size_t unbounded_memory_size = ~size_t();
 
 	template <typename Tag, typename T, typename A = std::allocator<T>>
-	struct memxfer_range_t;
+	struct memxfer_t;
 }
 
 
@@ -356,7 +356,7 @@ namespace atma
 
 
 //
-// memxfer_range_t
+// memxfer_t
 // -----------------
 //   a type used for transferring memory around.
 //
@@ -368,7 +368,7 @@ namespace atma
 namespace atma
 {
 	template <typename Tag, typename T, typename A>
-	struct memxfer_range_t
+	struct memxfer_t
 	{
 		using value_type = T;
 		using allocator_type = A;
@@ -376,22 +376,22 @@ namespace atma
 
 		// default-constructor only allowed if allocator doesn't hold state
 		CONCEPT_REQUIRES(std::is_empty_v<allocator_type>)
-		constexpr memxfer_range_t()
+		constexpr memxfer_t()
 			: alloc_and_ptr_(allocator_type(), nullptr)
 		{}
 
-		constexpr memxfer_range_t(allocator_type a, T* ptr)
+		constexpr memxfer_t(allocator_type a, T* ptr)
 			: alloc_and_ptr_(a, ptr)
 		{}
 
 		CONCEPT_REQUIRES(std::is_empty_v<allocator_type>)
-		constexpr memxfer_range_t(T* ptr)
+		constexpr memxfer_t(T* ptr)
 			: alloc_and_ptr_(allocator_type(), ptr)
 		{}
 
-		~memxfer_range_t() = default;
+		~memxfer_t() = default;
 
-		allocator_type& get_allocator() const { return const_cast<memxfer_range_t*>(this)->alloc_and_ptr_.first(); }
+		allocator_type& get_allocator() const { return const_cast<memxfer_t*>(this)->alloc_and_ptr_.first(); }
 
 		auto data() -> value_type* { return alloc_and_ptr_.second(); }
 		auto data() const -> value_type const* { return alloc_and_ptr_.second(); }
@@ -409,16 +409,16 @@ namespace atma
 // --------------------------
 //   a type used for transferring memory around.
 //
-//   this structure is just a memxfer_range_t but with a size. this allows 
+//   this structure is just a memxfer_t but with a size. this allows 
 //   it to have empty(), size(), begin(), and end() methods. this allows
 //   us options for optimization in some algorithms
 //
 namespace atma
 {
 	template <typename Tag, typename T, typename A>
-	struct bounded_memxfer_range_t : memxfer_range_t<Tag, T, A>
+	struct bounded_memxfer_range_t : memxfer_t<Tag, T, A>
 	{
-		using base_type = memxfer_range_t<Tag, T, A>;
+		using base_type = memxfer_t<Tag, T, A>;
 		using value_type = typename base_type::value_type;
 		using allocator_type = typename base_type::allocator_type;
 		using tag_type = Tag;
@@ -459,14 +459,14 @@ namespace atma
 {
 	// dest_memxfer_range_t
 	template <typename T, typename A>
-	using dest_memxfer_range_t = memxfer_range_t<dest_memory_tag_t, T, A>;
+	using dest_memxfer_range_t = memxfer_t<dest_memory_tag_t, T, A>;
 
 	template <typename T, typename A>
 	using dest_bounded_memxfer_range_t = bounded_memxfer_range_t<dest_memory_tag_t, T, A>;
 
 	// src_memxfer_range_t
 	template <typename T, typename A>
-	using src_memxfer_range_t = memxfer_range_t<src_memory_tag_t, T, A>;
+	using src_memxfer_range_t = memxfer_t<src_memory_tag_t, T, A>;
 
 	template <typename T, typename A>
 	using src_bounded_memxfer_range_t = bounded_memxfer_range_t<src_memory_tag_t, T, A>;
@@ -485,7 +485,7 @@ namespace atma::detail
 {
 	// memxfer_range_of
 	template <typename Tag, typename Range>
-	using memxfer_range_of_t = memxfer_range_t<Tag, value_type_of_t<Range>, allocator_type_of_t<Range>>;
+	using memxfer_range_of_t = memxfer_t<Tag, value_type_of_t<Range>, allocator_type_of_t<Range>>;
 
 	template <typename Tag, typename Range>
 	using bounded_memxfer_range_of_t = bounded_memxfer_range_t<Tag, value_type_of_t<Range>, allocator_type_of_t<Range>>;
@@ -497,7 +497,7 @@ namespace atma::detail
 		template <typename T>
 		auto operator()(T* data) const
 		{
-			return memxfer_range_t<tag_type, T, std::allocator<T>>(data);
+			return memxfer_t<tag_type, T, std::allocator<T>>(data);
 		}
 
 		template <typename T>
