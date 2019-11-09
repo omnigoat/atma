@@ -493,7 +493,7 @@ namespace atma
 	inline auto thread_pool_t::worker_thread_runloop(thread_pool_t* pool, std::atomic_bool& running) -> void
 	{
 		char buf[128];
-		sprintf(buf, "threadpool %#0jx worker\0", (uintmax_t)pool);
+		sprintf_s<128>(buf, "threadpool %#0jx worker\0", (uintmax_t)pool);
 		atma::this_thread::set_debug_name(buf);
 
 		atma::unique_memory_t mem;
