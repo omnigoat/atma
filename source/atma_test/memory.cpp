@@ -128,15 +128,78 @@ SCENARIO_OF("memory/basic_memory_t", "basic_memory_t behaves nicely")
 //TYPE_TO_STRING(atma::dest_memxfer_t<int>);
 //TYPE_TO_STRING(atma::src_memxfer_t<int>);
 
-SCENARIO("a dest_memxfer_t is contructed")
+SCENARIO_TEMPLATE("a dest_memxfer_t is directly constructed", tag_type, atma::dest_memory_tag_t, atma::src_memory_tag_t)
 {
-	GIVEN("the types int & std::allocator<int>")
+	GIVEN("the type 'int' & an empty allocator")
 	{
-		THEN("it is default constructible")
+		using allocator_type = std::allocator<int>;
+		using storage_type = std::unique_ptr<int[]>;
+		using dest_type = atma::memxfer_t<tag_type, int, allocator_type>;
+
+		allocator_type A;
+		static_assert(std::is_empty_v<allocator_type>);
+
+		auto data = storage_type(A.allocate(4));
+
+		THEN("it is constructible from solely pointer")
 		{
-			atma::dest_memxfer_t<int, std::allocator<int>> d;
-			ATMA_UNUSED(d);
+			[[maybe_unused]] auto d = dest_type(data.get());
+			
+			CHECK(std::data(d) == d.data());
+			CHECK(d.data() == data.get());
 		}
+
+		THEN("it is constructible from an allocator & pointer")
+		{
+			[[maybe_unused]] auto d = dest_type(A, data.get());
+
+			CHECK(std::data(d) == d.data());
+			CHECK(d.data() == data.get());
+		}
+	}
+
+	GIVEN("the type 'int' & a non-empty allocator")
+	{
+		using allocator_type = std::pmr::polymorphic_allocator<int>;
+		using storage_type = std::vector<int, allocator_type>;
+		using dest_type = atma::memxfer_t<tag_type, int, allocator_type>;
+		static_assert(!std::is_empty_v<allocator_type>);
+
+		atma::arena_memory_resource_t MR(64, 64);
+		allocator_type A{&MR};
+
+		auto data = storage_type{4, A};
+
+		THEN("it is constructible from an allocator & pointer")
+		{
+			[[maybe_unused]] auto d = dest_type(data.get_allocator(), data.data());
+
+			CHECK(d.data() == data.data());
+			CHECK(d.get_allocator() == data.get_allocator());
+		}
+	}
+}
+
+
+// allow us to test xfer_dest/xfer_src in one set of tests
+struct call_xfer_dest { constexpr static auto make = [](auto&&... args) { return atma::xfer_dest(std::forward<decltype(args)>(args)...); }; };
+struct call_xfer_src { constexpr static auto make = [](auto&&... args) { return atma::xfer_src(std::forward<decltype(args)>(args)...); }; };
+
+SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer_create, call_xfer_dest, call_xfer_src)
+{
+	//auto& xfer_make = xfer_create::make;
+
+	GIVEN("the type 'int' & an empty allocator")
+	{
+		using allocator_type = atma::aligned_allocator_t<int>;
+		using storage_type = std::unique_ptr<int[]>;
+
+		//allocator_type A;
+		//static_assert(std::is_empty_v<atma::aligned_allocator_t<int>>);
+		//
+		//auto data = storage_type(A.allocate(4));
+	}
+}
 
 #if 0
 		THEN("it is default constructible")
@@ -239,10 +302,9 @@ SCENARIO("a dest_memxfer_t is contructed")
 			CHECK(d.end() == mem.data() + numbers.size());
 			CHECK(d.begin() == numbers.data() + 2);
 		}
-#endif
-
 	}
 }
+#endif
 
 struct dragon_t
 {
