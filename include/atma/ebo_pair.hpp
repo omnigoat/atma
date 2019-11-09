@@ -26,8 +26,10 @@ namespace atma::detail
 			: first_(first), second_(second)
 		{}
 
-		first_type& first() const { return first_; }
-		second_type& second() const { return second_; }
+		first_type& first() { return first_; }
+		second_type& second() { return second_; }
+		first_type const& first() const { return first_; }
+		second_type const& second() const { return second_; }
 
 	private:
 		first_type first_;
