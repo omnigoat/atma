@@ -398,7 +398,7 @@ namespace atma
 
 	protected:
 		// store the allocator EBO-d with the vtable pointer
-		using alloc_and_ptr_type = ebo_pair_t<A, T* const, first_as_reference_transformer_t>;
+		using alloc_and_ptr_type = ebo_pair_t<A, T* const>;
 		alloc_and_ptr_type alloc_and_ptr_;
 	};
 }
@@ -749,8 +749,8 @@ namespace atma::detail
 	{
 		[](auto&& allocator, auto* px, auto* py, size_t sz)
 		{
-			ATMA_ASSERT(sz == 0 || px + sz <= py && py + sz <= px,
-				"memory ranges must be disjoin");
+			ATMA_ASSERT(sz == 0 || (px + sz <= py) || (py + sz <= px),
+				"memory ranges must be disjoint");
 
 			using dest_allocator_traits = decltype(allocator_traits_of_allocator_(allocator));
 
