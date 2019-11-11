@@ -136,8 +136,9 @@ SCENARIO_TEMPLATE("a dest_memxfer_t is directly constructed", tag_type, atma::de
 		using storage_type = std::unique_ptr<int[]>;
 		using dest_type = atma::memxfer_t<tag_type, int, allocator_type>;
 
-		allocator_type A;
 		static_assert(std::is_empty_v<allocator_type>);
+
+		allocator_type A;
 
 		auto data = storage_type(A.allocate(4));
 
@@ -153,6 +154,9 @@ SCENARIO_TEMPLATE("a dest_memxfer_t is directly constructed", tag_type, atma::de
 		{
 			[[maybe_unused]] auto d = dest_type(A, data.get());
 
+			CHECK(MODELS_ARGS(atma::memory_concept, d));
+			CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
+
 			CHECK(std::data(d) == d.data());
 			CHECK(d.data() == data.get());
 		}
@@ -163,6 +167,7 @@ SCENARIO_TEMPLATE("a dest_memxfer_t is directly constructed", tag_type, atma::de
 		using allocator_type = std::pmr::polymorphic_allocator<int>;
 		using storage_type = std::vector<int, allocator_type>;
 		using dest_type = atma::memxfer_t<tag_type, int, allocator_type>;
+
 		static_assert(!std::is_empty_v<allocator_type>);
 
 		atma::arena_memory_resource_t MR(64, 64);
@@ -174,6 +179,9 @@ SCENARIO_TEMPLATE("a dest_memxfer_t is directly constructed", tag_type, atma::de
 		{
 			[[maybe_unused]] auto d = dest_type(data.get_allocator(), data.data());
 
+			CHECK(MODELS_ARGS(atma::memory_concept, d));
+			CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
+
 			CHECK(d.data() == data.data());
 			CHECK(d.get_allocator() == data.get_allocator());
 		}
@@ -182,22 +190,60 @@ SCENARIO_TEMPLATE("a dest_memxfer_t is directly constructed", tag_type, atma::de
 
 
 // allow us to test xfer_dest/xfer_src in one set of tests
-struct call_xfer_dest { constexpr static auto make = [](auto&&... args) { return atma::xfer_dest(std::forward<decltype(args)>(args)...); }; };
-struct call_xfer_src { constexpr static auto make = [](auto&&... args) { return atma::xfer_src(std::forward<decltype(args)>(args)...); }; };
+template <typename Tag>
+struct xfer_maker
+{ 
+	template <typename T, typename A>
+	using memxfer_t = atma::memxfer_t<Tag, T, A>;
 
-SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer_create, call_xfer_dest, call_xfer_src)
+	template <typename T, typename A>
+	using bounded_memxfer_t = atma::bounded_memxfer_t<Tag, T, A>;
+
+	constexpr static auto make = [](auto&&... args)
+	{
+		if constexpr (std::is_same_v<Tag, atma::dest_memory_tag_t>)
+			return atma::xfer_dest(std::forward<decltype(args)>(args)...);
+		else
+			return atma::xfer_src(std::forward<decltype(args)>(args)...);
+	};
+};
+
+SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, xfer_maker<atma::dest_memory_tag_t>, xfer_maker<atma::src_memory_tag_t>)
 {
-	//auto& xfer_make = xfer_create::make;
+	auto& xfer_make = xfer::make;
 
 	GIVEN("the type 'int' & an empty allocator")
 	{
 		using allocator_type = atma::aligned_allocator_t<int>;
-		using storage_type = std::unique_ptr<int[]>;
+		using storage_type = std::vector<int, allocator_type>;
 
-		//allocator_type A;
-		//static_assert(std::is_empty_v<atma::aligned_allocator_t<int>>);
-		//
-		//auto data = storage_type(A.allocate(4));
+		static_assert(std::is_empty_v<atma::aligned_allocator_t<int>>);
+
+		auto storage = storage_type(4);
+
+		THEN("we can call with arguments {allocator, pointer}")
+		{
+			[[maybe_unused]] auto d = xfer_make(storage.get_allocator(), storage.data());
+
+			CHECK(MODELS_ARGS(atma::memory_concept, d));
+			CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
+
+			CHECK(atma::get_allocator(d) == d.get_allocator());
+			CHECK(d.get_allocator() == storage.get_allocator());
+			CHECK(std::data(d) == d.data());
+			CHECK(d.data() == storage.data());
+		}
+
+		THEN("we can call with arguments {pointer}")
+		{
+			[[maybe_unused]] auto d = xfer_make(storage.data());
+
+			CHECK(MODELS_ARGS(atma::memory_concept, d));
+			CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
+
+			CHECK(std::data(d) == d.data());
+			CHECK(d.data() == storage.data());
+		}
 	}
 }
 
