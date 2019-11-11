@@ -500,10 +500,22 @@ namespace atma::detail
 			return memxfer_t<tag_type, T, std::allocator<T>>(data);
 		}
 
+		template <typename T, typename A>
+		auto operator()(A&& allocator, T* data) const
+		{
+			return memxfer_t<tag_type, T, rmref_t<A>>(std::forward<A>(allocator), data);
+		}
+
 		template <typename T>
 		auto operator()(T* data, size_t sz) const
 		{
 			return bounded_memxfer_t<tag_type, T, std::allocator<T>>(data, sz);
+		}
+
+		template <typename T, typename A>
+		auto operator()(A&& allocator, T* data, size_t sz) const
+		{
+			return bounded_memxfer_t<tag_type, T, rmref_t<A>>(std::forward<A>(allocator), data, sz);
 		}
 	};
 
