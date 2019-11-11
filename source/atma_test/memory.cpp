@@ -15,6 +15,47 @@
 	CHECK_MEMORY_II(v, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
 
+
+struct dragon_t
+{
+	dragon_t() = default;
+
+	dragon_t(atma::string const& name, int age)
+		: name(name), age(age)
+	{}
+
+	dragon_t(dragon_t const&) = default;
+	dragon_t(dragon_t&& rhs)
+		: name(std::move(rhs.name))
+		, age(rhs.age)
+	{
+		rhs.age = 0;
+	}
+
+	~dragon_t()
+	{
+		name.clear();
+		age = 0;
+	}
+
+	atma::string name;
+	int age = 0;
+
+	bool operator == (dragon_t const& rhs) const
+	{
+		return name == rhs.name && age == rhs.age;
+	}
+};
+
+std::ostream& operator << (std::ostream& stream, dragon_t const& dragon)
+{
+	return stream << "dragon{" << dragon.name << ", " << dragon.age << '}';
+}
+
+TYPE_TO_STRING(dragon_t);
+
+dragon_t const empty_dragon;
+
 SCENARIO_OF("memory/base_memory_t", "base_memory_t EBO")
 {
 	GIVEN("an empty allocator")
@@ -190,14 +231,14 @@ SCENARIO_TEMPLATE("a dest_memxfer_t is directly constructed", tag_type, atma::de
 
 
 // allow us to test xfer_dest/xfer_src in one set of tests
-template <typename Tag>
+template <typename Tag, template <typename...> typename Allocator, typename Value>
 struct xfer_maker
-{ 
-	template <typename T, typename A>
-	using memxfer_t = atma::memxfer_t<Tag, T, A>;
+{
+	using allocator_type = Allocator<Value>;
+	using value_type = Value;
 
-	template <typename T, typename A>
-	using bounded_memxfer_t = atma::bounded_memxfer_t<Tag, T, A>;
+	using memxfer_t = atma::memxfer_t<Tag, Value, Allocator<Value>>;
+	using bounded_memxfer_t = atma::bounded_memxfer_t<Tag, Value, Allocator<Value>>;
 
 	constexpr static auto make = [](auto&&... args)
 	{
@@ -208,7 +249,15 @@ struct xfer_maker
 	};
 };
 
-SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, xfer_maker<atma::dest_memory_tag_t>, xfer_maker<atma::src_memory_tag_t>)
+#define xfer_type_list \
+	xfer_maker<atma::dest_memory_tag_t, std::allocator, int>, \
+	xfer_maker<atma::dest_memory_tag_t, std::allocator, dragon_t>
+
+	//std::tuple<xfer_maker<atma::dest_memory_tag_t>, 
+	//std::tuple<xfer_maker<atma::src_memory_tag_t>,
+	//std::tuple<xfer_maker<atma::src_memory_tag_t>,
+
+SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, xfer_type_list)
 {
 	auto& xfer_make = xfer::make;
 
@@ -243,6 +292,34 @@ SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, xfer_maker<atma::
 
 			CHECK(std::data(d) == d.data());
 			CHECK(d.data() == storage.data());
+		}
+
+		THEN("we can call with arguments {allocator, pointer, size}")
+		{
+			[[maybe_unused]] auto d = xfer_make(storage.get_allocator(), storage.data(), storage.size());
+
+			CHECK(MODELS_ARGS(atma::memory_concept, d));
+			CHECK(MODELS_ARGS(atma::bounded_memory_concept, d));
+
+			CHECK(atma::get_allocator(d) == d.get_allocator());
+			CHECK(d.get_allocator() == storage.get_allocator());
+			CHECK(std::data(d) == d.data());
+			CHECK(d.data() == storage.data());
+			CHECK(std::size(d) == d.size());
+			CHECK(d.size() == storage.size());
+		}
+
+		THEN("we can call with arguments {pointer, size}")
+		{
+			[[maybe_unused]] auto d = xfer_make(storage.data(), storage.size());
+
+			CHECK(MODELS_ARGS(atma::memory_concept, d));
+			CHECK(MODELS_ARGS(atma::bounded_memory_concept, d));
+
+			CHECK(std::data(d) == d.data());
+			CHECK(d.data() == storage.data());
+			CHECK(std::size(d) == d.size());
+			CHECK(d.size() == storage.size());
 		}
 	}
 }
@@ -352,45 +429,6 @@ SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, xfer_maker<atma::
 }
 #endif
 
-struct dragon_t
-{
-	dragon_t() = default;
-
-	dragon_t(atma::string const& name, int age)
-		: name(name), age(age)
-	{}
-
-	dragon_t(dragon_t const&) = default;
-	dragon_t(dragon_t&& rhs)
-		: name(std::move(rhs.name))
-		, age(rhs.age)
-	{
-		rhs.age = 0;
-	}
-
-	~dragon_t()
-	{
-		name.clear();
-		age = 0;
-	}
-
-	atma::string name;
-	int age = 0;
-
-	bool operator == (dragon_t const& rhs) const
-	{
-		return name == rhs.name && age == rhs.age;
-	}
-};
-
-std::ostream& operator << (std::ostream& stream, dragon_t const& dragon)
-{
-	return stream << "dragon{" << dragon.name << ", " << dragon.age << '}';
-}
-
-TYPE_TO_STRING(dragon_t);
-
-dragon_t const empty_dragon;
 
 SCENARIO_OF("memory/operations", "memory_default_construct is called")
 {
