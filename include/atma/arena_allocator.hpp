@@ -239,3 +239,35 @@ namespace atma
 	}
 
 }
+
+
+namespace atma
+{
+	template <typename T>
+	struct arena_allocator_t
+	{
+		using value_type = T;
+
+		arena_allocator_t()
+			: resource_(new arena_memory_resource_t(512, 1024))
+		{}
+
+		[[nodiscard]] value_type* allocate(std::size_t n)
+		{
+			return (value_type*)resource_->allocate(n * sizeof value_type);
+		}
+
+		void deallocate(value_type* p, std::size_t sz)
+		{
+			resource_->deallocate(p, sz);
+		}
+
+		bool operator == (arena_allocator_t const& rhs) const
+		{
+			return resource_ == rhs.resource_;
+		}
+
+	private:
+		std::shared_ptr<std::pmr::memory_resource> resource_;
+	};
+}
