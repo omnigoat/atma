@@ -58,7 +58,7 @@ namespace atma::detail
 			: allocator_(allocator)
 		{}
 
-		auto get_allocator() const -> allocator_type& { return allocator_; }
+		auto get_allocator() const -> allocator_type { return allocator_; }
 
 	private:
 		Allocator allocator_;
@@ -83,7 +83,7 @@ namespace atma::detail
 			: Allocator(allocator)
 		{}
 
-		auto get_allocator() const -> allocator_type& { return const_cast<allocator_type&>(static_cast<allocator_type const&>(*this)); }
+		auto get_allocator() const -> allocator_type { return static_cast<allocator_type const&>(*this); }
 	};
 
 	template <typename T, typename A>
@@ -257,14 +257,16 @@ namespace atma
 	template <typename T, typename A>
 	inline auto basic_memory_t<T, A>::allocate(size_t size) -> bool
 	{
-		this->ptr_= allocator_traits::allocate(this->get_allocator(), size);
+		auto allocator = this->get_allocator();
+		this->ptr_= allocator_traits::allocate(allocator, size);
 		return this->ptr_ != nullptr;
 	}
 
 	template <typename T, typename A>
 	inline auto basic_memory_t<T, A>::deallocate(size_t size) -> void
 	{
-		allocator_traits::deallocate(this->get_allocator(), this->ptr_, size);
+		auto allocator = this->get_allocator();
+		allocator_traits::deallocate(allocator, this->ptr_, size);
 	}
 
 }
