@@ -2457,11 +2457,12 @@ int registerReporter(const char* name, int priority, bool isReporter) {
 #define DOCTEST_SCENARIO_TEMPLATE(name, T, ...)  DOCTEST_TEST_CASE_TEMPLATE("  Scenario: " name, T, __VA_ARGS__)
 #define DOCTEST_SCENARIO_TEMPLATE_DEFINE(name, T, id) DOCTEST_TEST_CASE_TEMPLATE_DEFINE("  Scenario: " name, T, id)
 
-#define DOCTEST_GIVEN(name)     DOCTEST_SUBCASE("   Given: " name)
-#define DOCTEST_WHEN(name)      DOCTEST_SUBCASE("    When: " name)
-#define DOCTEST_AND_WHEN(name)  DOCTEST_SUBCASE("And when: " name)
-#define DOCTEST_THEN(name)      DOCTEST_SUBCASE("    Then: " name)
-#define DOCTEST_AND_THEN(name)  DOCTEST_SUBCASE("     And: " name)
+#define DOCTEST_GIVEN(name)     DOCTEST_SUBCASE("    Given: " name)
+#define DOCTEST_AND_GIVEN(name) DOCTEST_SUBCASE("And Given: " name)
+#define DOCTEST_WHEN(name)      DOCTEST_SUBCASE("     When: " name)
+#define DOCTEST_AND_WHEN(name)  DOCTEST_SUBCASE(" And when: " name)
+#define DOCTEST_THEN(name)      DOCTEST_SUBCASE("     Then: " name)
+#define DOCTEST_AND_THEN(name)  DOCTEST_SUBCASE("      And: " name)
 // clang-format on
 
 // == SHORT VERSIONS OF THE MACROS
@@ -2536,6 +2537,7 @@ int registerReporter(const char* name, int priority, bool isReporter) {
 #define SCENARIO_TEMPLATE DOCTEST_SCENARIO_TEMPLATE
 #define SCENARIO_TEMPLATE_DEFINE DOCTEST_SCENARIO_TEMPLATE_DEFINE
 #define GIVEN DOCTEST_GIVEN
+#define AND_GIVEN DOCTEST_AND_GIVEN
 #define WHEN DOCTEST_WHEN
 #define AND_WHEN DOCTEST_AND_WHEN
 #define THEN DOCTEST_THEN
