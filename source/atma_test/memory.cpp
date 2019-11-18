@@ -29,11 +29,52 @@
 //        gives:
 //          dragon_t<int, string>, dragon_t<int, char*>, dragon_t<float, string>, dragon_t<float, char*>
 //
-#define GENERATE_TEMPLATE_TYPE_COMBINATIONS_m(r, product) ((BOOST_PP_SEQ_ENUM(product)))
-#define GENERATE_TEMPLATE_TYPE_COMBINATIONS_op(s, data, elem) BOOST_PP_TUPLE_TO_SEQ(elem)
-#define GENERATE_TEMPLATE_TYPE_COMBINATIONS_f(r, d, i, x) BOOST_PP_COMMA_IF(i) d<BOOST_PP_TUPLE_REM_CTOR(x)>
-#define GENERATE_TEMPLATE_TYPE_COMBINATIONS(type_name, seq) BOOST_PP_SEQ_FOR_EACH_I(GENERATE_TEMPLATE_TYPE_COMBINATIONS_f, type_name, BOOST_PP_SEQ_FOR_EACH_PRODUCT(GENERATE_TEMPLATE_TYPE_COMBINATIONS_m, BOOST_PP_SEQ_TRANSFORM(GENERATE_TEMPLATE_TYPE_COMBINATIONS_op, ~, BOOST_PP_VARIADIC_SEQ_TO_SEQ(seq))))
+#define ATMA_PP_VARIADIC_EXPAND(...) __VA_ARGS__
 
+#define INTERNAL_TEMPLATE_TYPE_COMBINATIONS_m(r, product) ((BOOST_PP_SEQ_ENUM(product)))
+#define INTERNAL_TEMPLATE_TYPE_COMBINATIONS_op(s, data, elem) BOOST_PP_TUPLE_TO_SEQ(elem)
+
+#define GENERATE_COMBINATIONS_OF_TUPLES_m(r, product) BOOST_PP_SEQ_TO_TUPLE(product)
+#define GENERATE_COMBINATIONS_OF_TUPLES(tupleseqs) \
+	BOOST_PP_SEQ_FOR_EACH_PRODUCT(GENERATE_COMBINATIONS_OF_TUPLES_m, \
+			BOOST_PP_SEQ_TRANSFORM(INTERNAL_TEMPLATE_TYPE_COMBINATIONS_op, ~, \
+				BOOST_PP_VARIADIC_SEQ_TO_SEQ(tupleseqs)))
+
+#define INTERNAL_TEMPLATE_TYPE_COMBINATIONS_M(r, d, i, x) ((d<BOOST_PP_TUPLE_REM_CTOR(x)>))
+#define INTERNAL_TEMPLATE_TYPE_COMBINATIONS(type_name, seq) \
+	BOOST_PP_SEQ_FOR_EACH_I(INTERNAL_TEMPLATE_TYPE_COMBINATIONS_M, type_name, \
+		BOOST_PP_SEQ_FOR_EACH_PRODUCT(INTERNAL_TEMPLATE_TYPE_COMBINATIONS_m, \
+			BOOST_PP_SEQ_TRANSFORM(INTERNAL_TEMPLATE_TYPE_COMBINATIONS_op, ~, \
+				BOOST_PP_VARIADIC_SEQ_TO_SEQ(seq))))
+
+#define BLAMMO_m(r,d,x) BOOST_PP_TUPLE_PUSH_FRONT(x, d)
+#define BLAMMO(type_name, seq) \
+	BOOST_PP_SEQ_FOR_EACH(BLAMMO_m, type_name,\
+		BOOST_PP_VARIADIC_SEQ_TO_SEQ(GENERATE_COMBINATIONS_OF_TUPLES(seq)))
+
+#define ASDF_ff(...) BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__)
+#define ASDF_f(a) BOOST_PP_EXPAND(ASDF_ff a) //BOOST_PP_VARIADIC_TO_SEQ((__VA_ARGS__))
+	
+	//BOOST_PP_SEQ_FOR_EACH(ASDF_ff, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+
+#define ASDF_m(r,d,x) BOOST_PP_EXPAND(d x)
+
+#define FOR_EACH_COMBINATION(fn, seq) \
+	BOOST_PP_SEQ_FOR_EACH(ASDF_m, fn,\
+		BOOST_PP_VARIADIC_SEQ_TO_SEQ(GENERATE_COMBINATIONS_OF_TUPLES(seq)))
+
+#define GENERATE_TEMPLATE_TYPE_COMBINATIONS_M(r, d, i, x) BOOST_PP_COMMA_IF(i) BOOST_PP_CAT(ATMA_PP_VARIADIC_EXPAND, x)
+#define GENERATE_TEMPLATE_TYPE_COMBINATIONS(type_name, seq) \
+	BOOST_PP_SEQ_FOR_EACH_I(GENERATE_TEMPLATE_TYPE_COMBINATIONS_M, ~, INTERNAL_TEMPLATE_TYPE_COMBINATIONS(type_name, seq))
+
+#define WITH_TEMPLATE_TYPE_COMBINATIONS_M(r,d,i,x) BOOST_PP_CAT(d, x)
+#define WITH_TEMPLATE_TYPE_COMBINATIONS(fn, type_name, combination_seq) \
+	BOOST_PP_SEQ_FOR_EACH_I(WITH_TEMPLATE_TYPE_COMBINATIONS_M, fn, INTERNAL_TEMPLATE_TYPE_COMBINATIONS(type_name, combination_seq))
+
+	//GENERATE_TEMPLATE_TYPE_COMBINATIONS(type_name, combination_seq)
+
+
+	
 
 
 struct dragon_t
@@ -75,6 +116,29 @@ std::ostream& operator << (std::ostream& stream, dragon_t const& dragon)
 TYPE_TO_STRING(dragon_t);
 
 dragon_t const empty_dragon;
+
+
+// allow us to test xfer_dest/xfer_src in one set of tests
+template <typename Tag, template <typename...> typename Allocator, typename Value>
+struct xfer_maker
+{
+	using allocator_type = Allocator<Value>;
+	using value_type = Value;
+
+	using memxfer_t = atma::memxfer_t<Tag, Value, Allocator<Value>>;
+	using bounded_memxfer_t = atma::bounded_memxfer_t<Tag, Value, Allocator<Value>>;
+
+	constexpr static auto make = [](auto&&... args)
+	{
+		if constexpr (std::is_same_v<Tag, atma::dest_memory_tag_t>)
+			return atma::xfer_dest(std::forward<decltype(args)>(args)...);
+		else
+			return atma::xfer_src(std::forward<decltype(args)>(args)...);
+	};
+};
+
+
+
 
 SCENARIO_OF("memory/base_memory_t", "base_memory_t EBO")
 {
@@ -187,41 +251,67 @@ SCENARIO_OF("memory/basic_memory_t", "basic_memory_t behaves nicely")
 	}
 }
 
-//TYPE_TO_STRING(atma::dest_memxfer_t<int>);
-//TYPE_TO_STRING(atma::src_memxfer_t<int>);
+#define test_memory_tags (atma::dest_memory_tag_t, atma::src_memory_tag_t)
+#define test_allocators  (std::allocator, atma::arena_allocator_t)
+#define test_value_types (int, dragon_t)
+
+#define xfer_type_combinations test_memory_tags test_allocators test_value_types
 
 // test different allocators & simple/complex types in combination
-#define xfer_type_list GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, \
-	(atma::dest_memory_tag_t, atma::src_memory_tag_t)\
-	(std::allocator, atma::arena_allocator_t)\
-	(int, dragon_t))
+#define xfer_type_list GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations)
+
+#define TYPE_TO_STRING_VARAGS(...) TYPE_TO_STRING(__VA_ARGS__); BOOST_PP_TUPLE_ELEM()
+//WITH_TEMPLATE_TYPE_COMBINATIONS(TYPE_TO_STRING_VARAGS, xfer_maker, xfer_type_combinations)
 
 
-SCENARIO_TEMPLATE("a dest_memxfer_t is directly constructed", tag_type, atma::dest_memory_tag_t, atma::src_memory_tag_t)
+// GENERATE_COMBINATIONS_OF_TUPLES
+//GENERATE_COMBINATIONS_OF_TUPLES(xfer_type_combinations)
+
+// GENERATE_TEMPLATE_TYPE_COMBINATIONS
+//GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations)
+
+// INTERNAL_TEMPLATE_TYPE_COMBINATIONS
+//INTERNAL_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations)
+
+// BLAMMO
+//BLAMMO(xfer_make, xfer_type_combinations)
+
+// type-to-string all our used types
+#define TYPE_ALLOCATORS_TO_STRING(allocator_type, value_type) TYPE_TO_STRING(allocator_type<value_type>);
+FOR_EACH_COMBINATION(TYPE_ALLOCATORS_TO_STRING, test_allocators test_value_types)
+
+#if 1
+SCENARIO_TEMPLATE("a (dest|src)_memxfer_t is directly constructed", xfer, xfer_type_list)
 {
-	GIVEN("the type 'int' & an empty allocator")
+	using value_type     = typename xfer::value_type;
+	using allocator_type = typename xfer::allocator_type;
+	using memxfer_type   = typename xfer::memxfer_t;
+	using storage_type   = atma::vector<value_type, allocator_type>;
+
+	//char buf[256];
+	//snprintf(buf, 256, "the type '%s' and allocator '%s'", doctest::detail::type_to_string<value_type>(), doctest::detail::type_to_string<allocator_type>());
+
+	GIVEN("hello")
 	{
-		using allocator_type = std::allocator<int>;
-		using storage_type = std::unique_ptr<int[]>;
-		using dest_type = atma::memxfer_t<tag_type, int, allocator_type>;
-
-		static_assert(std::is_empty_v<allocator_type>);
-
 		allocator_type A;
 
-		auto data = storage_type(A.allocate(4));
+		auto data = storage_type(4);
 
-		THEN("it is constructible from solely pointer")
+		if constexpr (std::is_empty_v<allocator_type>)
 		{
-			[[maybe_unused]] auto d = dest_type(data.get());
+			THEN("it is constructible from solely pointer")
+			{
+				[[maybe_unused]] auto d = memxfer_type(data.data());
 			
-			CHECK(std::data(d) == d.data());
-			CHECK(d.data() == data.get());
+				CHECK(std::data(d) == d.data());
+				CHECK(d.data() == data.data());
+			}
 		}
 
+#if 0
 		THEN("it is constructible from an allocator & pointer")
 		{
-			[[maybe_unused]] auto d = dest_type(A, data.get());
+			[[maybe_unused]] auto d = memxfer_type(A, data.get());
 
 			CHECK(MODELS_ARGS(atma::memory_concept, d));
 			CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
@@ -229,8 +319,10 @@ SCENARIO_TEMPLATE("a dest_memxfer_t is directly constructed", tag_type, atma::de
 			CHECK(std::data(d) == d.data());
 			CHECK(d.data() == data.get());
 		}
+#endif
 	}
 
+#if 0
 	GIVEN("the type 'int' & a non-empty allocator")
 	{
 		using allocator_type = std::pmr::polymorphic_allocator<int>;
@@ -246,7 +338,7 @@ SCENARIO_TEMPLATE("a dest_memxfer_t is directly constructed", tag_type, atma::de
 
 		THEN("it is constructible from an allocator & pointer")
 		{
-			[[maybe_unused]] auto d = dest_type(data.get_allocator(), data.data());
+			[[maybe_unused]] auto d = memxfer_type(data.get_allocator(), data.data());
 
 			CHECK(MODELS_ARGS(atma::memory_concept, d));
 			CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
@@ -255,26 +347,9 @@ SCENARIO_TEMPLATE("a dest_memxfer_t is directly constructed", tag_type, atma::de
 			CHECK(d.get_allocator() == data.get_allocator());
 		}
 	}
+#endif
+
 }
-
-// allow us to test xfer_dest/xfer_src in one set of tests
-template <typename Tag, template <typename...> typename Allocator, typename Value>
-struct xfer_maker
-{
-	using allocator_type = Allocator<Value>;
-	using value_type = Value;
-
-	using memxfer_t = atma::memxfer_t<Tag, Value, Allocator<Value>>;
-	using bounded_memxfer_t = atma::bounded_memxfer_t<Tag, Value, Allocator<Value>>;
-
-	constexpr static auto make = [](auto&&... args)
-	{
-		if constexpr (std::is_same_v<Tag, atma::dest_memory_tag_t>)
-			return atma::xfer_dest(std::forward<decltype(args)>(args)...);
-		else
-			return atma::xfer_src(std::forward<decltype(args)>(args)...);
-	};
-};
 
 template <typename F>
 struct scope_guard_t
@@ -836,3 +911,4 @@ SCENARIO_OF("memory/operations", "memcpy or memmove is called")
 		}
 	}
 }
+#endif
