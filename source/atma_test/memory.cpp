@@ -18,6 +18,45 @@
 #define SCOPED_BASIC_MEMORY_ALLOCATION(memory_name, size) SCOPED_BASIC_MEMORY_ALLOCATION_II(temp_alloc_##__COUNTER__, memory_name, size)
 
 
+
+//
+// GENERATE_COMBINATIONS_OF_TUPLES
+// ---------------------------------
+//  takes a list of tuple-seqs and generates a sequence of tuples that corresponds
+//  to each product:
+//
+//    GENERATE_COMBINATIONS_OF_TUPLES((int, float)(string, char*))
+//
+//        gives:
+//          (int, string)(int, char*)(float, string)(float, char*)
+//
+#define GENERATE_COMBINATIONS_OF_TUPLES_m(r, product) (BOOST_PP_SEQ_TO_TUPLE(product))
+#define GENERATE_COMBINATIONS_OF_TUPLES_t(s, data, elem) BOOST_PP_TUPLE_TO_SEQ(elem)
+#define GENERATE_COMBINATIONS_OF_TUPLES(tupleseqs) \
+	BOOST_PP_SEQ_FOR_EACH_PRODUCT(GENERATE_COMBINATIONS_OF_TUPLES_m, \
+			BOOST_PP_SEQ_TRANSFORM(GENERATE_COMBINATIONS_OF_TUPLES_t, ~, \
+				BOOST_PP_VARIADIC_SEQ_TO_SEQ(tupleseqs)))
+
+//
+// FOR_EACH_COMBINATION(fn, data, tupleseq)
+// -----------------------------------------------------------------
+//  takes a template-typename from @type_name, and generates all possible combinations
+//  from the given seq. example:
+//
+//    FOR_EACH_COMBINATION(fn, data, (int, float)(string, char*))
+//
+//  NOTE: this is needlessly complex because MSVC is non-conformant :(
+//
+#define FOR_EACH_COMBINATION_EXPAND(x) x
+#define FOR_EACH_COMBINATION_PAREN(...) (__VA_ARGS__)
+#define FOR_EACH_COMBINATION_EXPAND_F(m, ...) FOR_EACH_COMBINATION_EXPAND(m FOR_EACH_COMBINATION_PAREN(__VA_ARGS__))
+#define FOR_EACH_COMBINATION_m3(f, i, d, ...) f(i, d, __VA_ARGS__)
+#define FOR_EACH_COMBINATION_m2(f, i, d, args) FOR_EACH_COMBINATION_EXPAND_F(FOR_EACH_COMBINATION_m3, f, i, d, args)
+#define FOR_EACH_COMBINATION_m(r,d,i,x) FOR_EACH_COMBINATION_m2(BOOST_PP_TUPLE_ELEM(2, 0, d), i, BOOST_PP_TUPLE_ELEM(2, 1, d), BOOST_PP_TUPLE_REM_CTOR(x))
+#define FOR_EACH_COMBINATION(fn, d, tupleseq) \
+	BOOST_PP_SEQ_FOR_EACH_I(FOR_EACH_COMBINATION_m, (fn, d), \
+		tupleseq)
+
 //
 // GENERATE_TEMPLATE_TYPE_COMBINATIONS(type_name, combination_seq)
 // -----------------------------------------------------------------
@@ -27,56 +66,63 @@
 //    GENERATE_TEMPLATE_TYPE_COMBINATIONS(dragon_t, (int, float)(string, char*))
 //
 //        gives:
-//          dragon_t<int, string>, dragon_t<int, char*>, dragon_t<float, string>, dragon_t<float, char*>
+//          (dragon_t<int, string>)(dragon_t<int, char*>)(dragon_t<float, string>)(dragon_t<float, char*>)
 //
-#define ATMA_PP_VARIADIC_EXPAND(...) __VA_ARGS__
-
-#define INTERNAL_TEMPLATE_TYPE_COMBINATIONS_m(r, product) ((BOOST_PP_SEQ_ENUM(product)))
-#define INTERNAL_TEMPLATE_TYPE_COMBINATIONS_op(s, data, elem) BOOST_PP_TUPLE_TO_SEQ(elem)
-
-#define GENERATE_COMBINATIONS_OF_TUPLES_m(r, product) BOOST_PP_SEQ_TO_TUPLE(product)
-#define GENERATE_COMBINATIONS_OF_TUPLES(tupleseqs) \
-	BOOST_PP_SEQ_FOR_EACH_PRODUCT(GENERATE_COMBINATIONS_OF_TUPLES_m, \
-			BOOST_PP_SEQ_TRANSFORM(INTERNAL_TEMPLATE_TYPE_COMBINATIONS_op, ~, \
-				BOOST_PP_VARIADIC_SEQ_TO_SEQ(tupleseqs)))
-
-#define INTERNAL_TEMPLATE_TYPE_COMBINATIONS_M(r, d, i, x) ((d<BOOST_PP_TUPLE_REM_CTOR(x)>))
-#define INTERNAL_TEMPLATE_TYPE_COMBINATIONS(type_name, seq) \
-	BOOST_PP_SEQ_FOR_EACH_I(INTERNAL_TEMPLATE_TYPE_COMBINATIONS_M, type_name, \
-		BOOST_PP_SEQ_FOR_EACH_PRODUCT(INTERNAL_TEMPLATE_TYPE_COMBINATIONS_m, \
-			BOOST_PP_SEQ_TRANSFORM(INTERNAL_TEMPLATE_TYPE_COMBINATIONS_op, ~, \
-				BOOST_PP_VARIADIC_SEQ_TO_SEQ(seq))))
-
-#define BLAMMO_m(r,d,x) BOOST_PP_TUPLE_PUSH_FRONT(x, d)
-#define BLAMMO(type_name, seq) \
-	BOOST_PP_SEQ_FOR_EACH(BLAMMO_m, type_name,\
-		BOOST_PP_VARIADIC_SEQ_TO_SEQ(GENERATE_COMBINATIONS_OF_TUPLES(seq)))
-
-#define ASDF_ff(...) BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__)
-#define ASDF_f(a) BOOST_PP_EXPAND(ASDF_ff a) //BOOST_PP_VARIADIC_TO_SEQ((__VA_ARGS__))
-	
-	//BOOST_PP_SEQ_FOR_EACH(ASDF_ff, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
-
-#define ASDF_m(r,d,x) BOOST_PP_EXPAND(d x)
-
-#define FOR_EACH_COMBINATION(fn, seq) \
-	BOOST_PP_SEQ_FOR_EACH(ASDF_m, fn,\
-		BOOST_PP_VARIADIC_SEQ_TO_SEQ(GENERATE_COMBINATIONS_OF_TUPLES(seq)))
-
-#define GENERATE_TEMPLATE_TYPE_COMBINATIONS_M(r, d, i, x) BOOST_PP_COMMA_IF(i) BOOST_PP_CAT(ATMA_PP_VARIADIC_EXPAND, x)
-#define GENERATE_TEMPLATE_TYPE_COMBINATIONS(type_name, seq) \
-	BOOST_PP_SEQ_FOR_EACH_I(GENERATE_TEMPLATE_TYPE_COMBINATIONS_M, ~, INTERNAL_TEMPLATE_TYPE_COMBINATIONS(type_name, seq))
-
-#define WITH_TEMPLATE_TYPE_COMBINATIONS_M(r,d,i,x) BOOST_PP_CAT(d, x)
-#define WITH_TEMPLATE_TYPE_COMBINATIONS(fn, type_name, combination_seq) \
-	BOOST_PP_SEQ_FOR_EACH_I(WITH_TEMPLATE_TYPE_COMBINATIONS_M, fn, INTERNAL_TEMPLATE_TYPE_COMBINATIONS(type_name, combination_seq))
-
-	//GENERATE_TEMPLATE_TYPE_COMBINATIONS(type_name, combination_seq)
+#define GENERATE_TEMPLATE_TYPE_COMBINATIONS_M(i, d, ...) ((d<__VA_ARGS__>))
+#define GENERATE_TEMPLATE_TYPE_COMBINATIONS(type_name, tupleseq) \
+	FOR_EACH_COMBINATION(GENERATE_TEMPLATE_TYPE_COMBINATIONS_M, type_name, \
+		GENERATE_COMBINATIONS_OF_TUPLES(tupleseq))
 
 
-	
+//
+// FOR_EACH_TEMPLATE_TYPE_COMBINATION(fn, type_name, combination_seq)
+// -----------------------------------------------------------------
+//  applies a function over every template-type-combination
+//
+//    #define BLAMMO(i, t1, t2) type1=t2, type2=t2
+//    GENERATE_TEMPLATE_TYPE_COMBINATIONS(dragon_t, (int, float)(string, char*))
+//
+#define FOR_EACH_TEMPLATE_TYPE_COMBINATION_F(r,d,i,x) FOR_EACH_COMBINATION_EXPAND_F(d, i, BOOST_PP_TUPLE_REM_CTOR(x))
+#define FOR_EACH_TEMPLATE_TYPE_COMBINATION(fn, tupleseq) \
+	BOOST_PP_SEQ_FOR_EACH_I(FOR_EACH_TEMPLATE_TYPE_COMBINATION_F, fn, tupleseq)
 
 
+
+#define test_memory_tags (atma::dest_memory_tag_t, atma::src_memory_tag_t)
+#define test_allocators  (std::allocator, atma::arena_allocator_t)
+#define test_value_types (int, dragon_t)
+
+#define xfer_type_combinations \
+	test_memory_tags \
+	test_allocators \
+	test_value_types
+
+// every combination of tags/allocator_types/value_types
+#define xfer_type_list GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations)
+
+
+// type-to-string all our allocators
+#define TYPE_ALLOCATORS_TO_STRING(i, d, sdf) ||sdf|| // TYPE_TO_STRING(allocator_type<value_type>);
+FOR_EACH_COMBINATION(TYPE_ALLOCATORS_TO_STRING, ~, GENERATE_COMBINATIONS_OF_TUPLES(test_allocators test_value_types))
+
+// type-to-string all our fully-qualified xfer_maker types
+#define TYPE_TO_STRING_VARIADIC(i, ...) TYPE_TO_STRING(__VA_ARGS__);
+FOR_EACH_TEMPLATE_TYPE_COMBINATION(TYPE_TO_STRING_VARIADIC, xfer_type_list)
+
+
+struct loci {};
+
+GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations)
+
+//FOR_EACH_TEMPLATE_TYPE_COMBINATION_F(fn, xfer_maker, BOOST_PP_EXPAND(test_memory_tags test_allocators test_value_types))
+//FOR_EACH_TEMPLATE_TYPE_COMBINATION(fn, xfer_maker, xfer_type_combinations)
+//GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations)
+
+
+
+
+
+#if 0
 struct dragon_t
 {
 	dragon_t() = default;
@@ -251,34 +297,9 @@ SCENARIO_OF("memory/basic_memory_t", "basic_memory_t behaves nicely")
 	}
 }
 
-#define test_memory_tags (atma::dest_memory_tag_t, atma::src_memory_tag_t)
-#define test_allocators  (std::allocator, atma::arena_allocator_t)
-#define test_value_types (int, dragon_t)
-
-#define xfer_type_combinations test_memory_tags test_allocators test_value_types
-
-// test different allocators & simple/complex types in combination
-#define xfer_type_list GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations)
-
-#define TYPE_TO_STRING_VARAGS(...) TYPE_TO_STRING(__VA_ARGS__); BOOST_PP_TUPLE_ELEM()
-//WITH_TEMPLATE_TYPE_COMBINATIONS(TYPE_TO_STRING_VARAGS, xfer_maker, xfer_type_combinations)
 
 
-// GENERATE_COMBINATIONS_OF_TUPLES
-//GENERATE_COMBINATIONS_OF_TUPLES(xfer_type_combinations)
 
-// GENERATE_TEMPLATE_TYPE_COMBINATIONS
-//GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations)
-
-// INTERNAL_TEMPLATE_TYPE_COMBINATIONS
-//INTERNAL_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations)
-
-// BLAMMO
-//BLAMMO(xfer_make, xfer_type_combinations)
-
-// type-to-string all our used types
-#define TYPE_ALLOCATORS_TO_STRING(allocator_type, value_type) TYPE_TO_STRING(allocator_type<value_type>);
-FOR_EACH_COMBINATION(TYPE_ALLOCATORS_TO_STRING, test_allocators test_value_types)
 
 #if 1
 SCENARIO_TEMPLATE("a (dest|src)_memxfer_t is directly constructed", xfer, xfer_type_list)
@@ -911,4 +932,5 @@ SCENARIO_OF("memory/operations", "memcpy or memmove is called")
 		}
 	}
 }
+#endif
 #endif
