@@ -55,6 +55,7 @@
     <ClInclude Include="..\..\include\atma\placeholders.hpp" />
     <ClInclude Include="..\..\include\atma\platform\allocation.hpp" />
     <ClInclude Include="..\..\include\atma\platform\interop.hpp" />
+    <ClInclude Include="..\..\include\atma\preprocessor.hpp" />
     <ClInclude Include="..\..\include\atma\ranges\core.hpp" />
     <ClInclude Include="..\..\include\atma\ranges\filter.hpp" />
     <ClInclude Include="..\..\include\atma\ranges\iota.hpp" />

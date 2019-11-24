@@ -2,11 +2,12 @@
 #include <atma/memory.hpp>
 #include <atma/string.hpp>
 #include <atma/functor.hpp>
+#include <atma/preprocessor.hpp>
 
 #include <numeric>
 
 #define CHECK_MEMORY_II_m(r, v, i, elem) \
-	CHECK_EQ(((decltype(v)::pointer)v)[i], elem);
+	CHECK_EQ(((typename decltype(v)::pointer)v)[i], elem);
 
 #define CHECK_MEMORY_II(v, seq) \
 	BOOST_PP_SEQ_FOR_EACH_I(CHECK_MEMORY_II_m, v, seq)
@@ -18,114 +19,53 @@
 #define SCOPED_BASIC_MEMORY_ALLOCATION(memory_name, size) SCOPED_BASIC_MEMORY_ALLOCATION_II(temp_alloc_##__COUNTER__, memory_name, size)
 
 
+template <typename T>
+struct xfer_type_info_t;
 
-//
-// GENERATE_COMBINATIONS_OF_TUPLES
-// ---------------------------------
-//  takes a list of tuple-seqs and generates a sequence of tuples that corresponds
-//  to each product:
-//
-//    GENERATE_COMBINATIONS_OF_TUPLES((int, float)(string, char*))
-//
-//        gives:
-//          (int, string)(int, char*)(float, string)(float, char*)
-//
-#define GENERATE_COMBINATIONS_OF_TUPLES_m(r, product) (BOOST_PP_SEQ_TO_TUPLE(product))
-#define GENERATE_COMBINATIONS_OF_TUPLES_t(s, data, elem) BOOST_PP_TUPLE_TO_SEQ(elem)
-#define GENERATE_COMBINATIONS_OF_TUPLES(tupleseqs) \
-	BOOST_PP_SEQ_FOR_EACH_PRODUCT(GENERATE_COMBINATIONS_OF_TUPLES_m, \
-			BOOST_PP_SEQ_TRANSFORM(GENERATE_COMBINATIONS_OF_TUPLES_t, ~, \
-				BOOST_PP_VARIADIC_SEQ_TO_SEQ(tupleseqs)))
+#define DEFINE_VALUE_TYPE_FOR_TESTING(value_type, ...) \
+	template <> struct xfer_type_info_t<value_type> \
+	{ \
+		inline static value_type const compar = value_type(__VA_ARGS__); \
+		\
+		constexpr static auto curry_direct_construct_args = [](auto&& f, auto&&... args) \
+		{ \
+			return f(std::forward<decltype(args)>(args)..., __VA_ARGS__); \
+		}; \
+	};
 
-//
-// FOR_EACH_COMBINATION(fn, data, tupleseq)
-// -----------------------------------------------------------------
-//  takes a template-typename from @type_name, and generates all possible combinations
-//  from the given seq. example:
-//
-//    FOR_EACH_COMBINATION(fn, data, (int, float)(string, char*))
-//
-//  NOTE: this is needlessly complex because MSVC is non-conformant :(
-//
-#define FOR_EACH_COMBINATION_EXPAND(x) x
-#define FOR_EACH_COMBINATION_PAREN(...) (__VA_ARGS__)
-#define FOR_EACH_COMBINATION_EXPAND_F(m, ...) FOR_EACH_COMBINATION_EXPAND(m FOR_EACH_COMBINATION_PAREN(__VA_ARGS__))
-#define FOR_EACH_COMBINATION_m3(f, i, d, ...) f(i, d, __VA_ARGS__)
-#define FOR_EACH_COMBINATION_m2(f, i, d, args) FOR_EACH_COMBINATION_EXPAND_F(FOR_EACH_COMBINATION_m3, f, i, d, args)
-#define FOR_EACH_COMBINATION_m(r,d,i,x) FOR_EACH_COMBINATION_m2(BOOST_PP_TUPLE_ELEM(2, 0, d), i, BOOST_PP_TUPLE_ELEM(2, 1, d), BOOST_PP_TUPLE_REM_CTOR(x))
-#define FOR_EACH_COMBINATION(fn, d, tupleseq) \
-	BOOST_PP_SEQ_FOR_EACH_I(FOR_EACH_COMBINATION_m, (fn, d), \
-		tupleseq)
+// allow us to test xfer_dest/xfer_src in one set of tests
+template <typename Tag, template <typename...> typename Allocator, typename Value>
+struct xfer_maker
+{
+	using allocator_type = Allocator<Value>;
+	using value_type = Value;
 
-//
-// GENERATE_TEMPLATE_TYPE_COMBINATIONS(type_name, combination_seq)
-// -----------------------------------------------------------------
-//  takes a template-typename from @type_name, and generates all possible combinations
-//  from the given seq. example:
-//
-//    GENERATE_TEMPLATE_TYPE_COMBINATIONS(dragon_t, (int, float)(string, char*))
-//
-//        gives:
-//          (dragon_t<int, string>)(dragon_t<int, char*>)(dragon_t<float, string>)(dragon_t<float, char*>)
-//
-#define GENERATE_TEMPLATE_TYPE_COMBINATIONS_M(i, d, ...) ((d<__VA_ARGS__>))
-#define GENERATE_TEMPLATE_TYPE_COMBINATIONS(type_name, tupleseq) \
-	FOR_EACH_COMBINATION(GENERATE_TEMPLATE_TYPE_COMBINATIONS_M, type_name, \
-		GENERATE_COMBINATIONS_OF_TUPLES(tupleseq))
+	using memxfer_t = atma::memxfer_t<Tag, Value, Allocator<Value>>;
+	using bounded_memxfer_t = atma::bounded_memxfer_t<Tag, Value, Allocator<Value>>;
+
+	constexpr static auto make = [](auto&&... args)
+	{
+		if constexpr (std::is_same_v<Tag, atma::dest_memory_tag_t>)
+			return atma::xfer_dest(std::forward<decltype(args)>(args)...);
+		else
+			return atma::xfer_src(std::forward<decltype(args)>(args)...);
+	};
+
+	inline static value_type const compar = xfer_type_info_t<value_type>::compar;
+	constexpr static auto curry_direct_construct_args = xfer_type_info_t<value_type>::curry_direct_construct_args;
+};
+
+
 
 
 //
-// FOR_EACH_TEMPLATE_TYPE_COMBINATION(fn, type_name, combination_seq)
-// -----------------------------------------------------------------
-//  applies a function over every template-type-combination
+// dragon_t
+// -----------
+//   test type
 //
-//    #define BLAMMO(i, t1, t2) type1=t2, type2=t2
-//    GENERATE_TEMPLATE_TYPE_COMBINATIONS(dragon_t, (int, float)(string, char*))
-//
-#define FOR_EACH_TEMPLATE_TYPE_COMBINATION_F(r,d,i,x) FOR_EACH_COMBINATION_EXPAND_F(d, i, BOOST_PP_TUPLE_REM_CTOR(x))
-#define FOR_EACH_TEMPLATE_TYPE_COMBINATION(fn, tupleseq) \
-	BOOST_PP_SEQ_FOR_EACH_I(FOR_EACH_TEMPLATE_TYPE_COMBINATION_F, fn, tupleseq)
-
-
-
-#define test_memory_tags (atma::dest_memory_tag_t, atma::src_memory_tag_t)
-#define test_allocators  (std::allocator, atma::arena_allocator_t)
-#define test_value_types (int, dragon_t)
-
-#define xfer_type_combinations \
-	test_memory_tags \
-	test_allocators \
-	test_value_types
-
-// every combination of tags/allocator_types/value_types
-#define xfer_type_list GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations)
-
-
-// type-to-string all our allocators
-#define TYPE_ALLOCATORS_TO_STRING(i, d, sdf) ||sdf|| // TYPE_TO_STRING(allocator_type<value_type>);
-FOR_EACH_COMBINATION(TYPE_ALLOCATORS_TO_STRING, ~, GENERATE_COMBINATIONS_OF_TUPLES(test_allocators test_value_types))
-
-// type-to-string all our fully-qualified xfer_maker types
-#define TYPE_TO_STRING_VARIADIC(i, ...) TYPE_TO_STRING(__VA_ARGS__);
-FOR_EACH_TEMPLATE_TYPE_COMBINATION(TYPE_TO_STRING_VARIADIC, xfer_type_list)
-
-
-struct loci {};
-
-GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations)
-
-//FOR_EACH_TEMPLATE_TYPE_COMBINATION_F(fn, xfer_maker, BOOST_PP_EXPAND(test_memory_tags test_allocators test_value_types))
-//FOR_EACH_TEMPLATE_TYPE_COMBINATION(fn, xfer_maker, xfer_type_combinations)
-//GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations)
-
-
-
-
-
-#if 0
 struct dragon_t
 {
-	dragon_t() = default;
+	constexpr dragon_t() = default;
 
 	dragon_t(atma::string const& name, int age)
 		: name(name), age(age)
@@ -164,26 +104,33 @@ TYPE_TO_STRING(dragon_t);
 dragon_t const empty_dragon;
 
 
-// allow us to test xfer_dest/xfer_src in one set of tests
-template <typename Tag, template <typename...> typename Allocator, typename Value>
-struct xfer_maker
-{
-	using allocator_type = Allocator<Value>;
-	using value_type = Value;
-
-	using memxfer_t = atma::memxfer_t<Tag, Value, Allocator<Value>>;
-	using bounded_memxfer_t = atma::bounded_memxfer_t<Tag, Value, Allocator<Value>>;
-
-	constexpr static auto make = [](auto&&... args)
-	{
-		if constexpr (std::is_same_v<Tag, atma::dest_memory_tag_t>)
-			return atma::xfer_dest(std::forward<decltype(args)>(args)...);
-		else
-			return atma::xfer_src(std::forward<decltype(args)>(args)...);
-	};
-};
+DEFINE_VALUE_TYPE_FOR_TESTING(dragon_t, "oliver", 33);
+DEFINE_VALUE_TYPE_FOR_TESTING(int, 1234);
 
 
+
+//
+//
+//
+//
+//
+#define test_memory_tags (atma::dest_memory_tag_t, atma::src_memory_tag_t)
+#define test_allocators  (std::allocator, atma::arena_allocator_t)
+#define test_value_types (int, dragon_t)
+
+#define xfer_type_combinations \
+	test_memory_tags \
+	test_allocators \
+	test_value_types
+
+// every combination of tags/allocator_types/value_types
+#define xfer_type_list_m(i, ...) BOOST_PP_COMMA_IF(i) __VA_ARGS__
+#define xfer_type_list FOR_EACH_TEMPLATE_TYPE_COMBINATION(xfer_type_list_m, \
+	GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations))
+
+// type-to-string all our allocators
+#define TYPE_ALLOCATORS_TO_STRING(i, d, allocator_type, value_type) TYPE_TO_STRING(allocator_type<value_type>);
+FOR_EACH_COMBINATION(TYPE_ALLOCATORS_TO_STRING, ~, GENERATE_COMBINATIONS_OF_TUPLES(test_allocators test_value_types))
 
 
 SCENARIO_OF("memory/base_memory_t", "base_memory_t EBO")
@@ -299,9 +246,6 @@ SCENARIO_OF("memory/basic_memory_t", "basic_memory_t behaves nicely")
 
 
 
-
-
-#if 1
 SCENARIO_TEMPLATE("a (dest|src)_memxfer_t is directly constructed", xfer, xfer_type_list)
 {
 	using value_type     = typename xfer::value_type;
@@ -309,67 +253,53 @@ SCENARIO_TEMPLATE("a (dest|src)_memxfer_t is directly constructed", xfer, xfer_t
 	using memxfer_type   = typename xfer::memxfer_t;
 	using storage_type   = atma::vector<value_type, allocator_type>;
 
-	//char buf[256];
-	//snprintf(buf, 256, "the type '%s' and allocator '%s'", doctest::detail::type_to_string<value_type>(), doctest::detail::type_to_string<allocator_type>());
-
-	GIVEN("hello")
+	GIVEN("reliable storage of a type")
 	{
-		allocator_type A;
-
-		auto data = storage_type(4);
+		auto storage = storage_type(4);
 
 		if constexpr (std::is_empty_v<allocator_type>)
 		{
-			THEN("it is constructible from solely pointer")
+			WHEN("it is constructible from solely pointer")
 			{
-				[[maybe_unused]] auto d = memxfer_type(data.data());
+				[[maybe_unused]] auto d = memxfer_type(storage.data());
 			
-				CHECK(std::data(d) == d.data());
-				CHECK(d.data() == data.data());
+				THEN("the result-type is conceptually an 'unbounded memory'")
+				{
+					CHECK(MODELS_ARGS(atma::memory_concept, d));
+					CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
+				}
+
+				THEN("the result has the same value")
+				{
+					CHECK(std::data(d) == d.data());
+					CHECK(d.data() == storage.data());
+				}
 			}
 		}
 
-#if 0
-		THEN("it is constructible from an allocator & pointer")
+		WHEN("it is directly constructed from an allocator & pointer")
 		{
-			[[maybe_unused]] auto d = memxfer_type(A, data.get());
+			[[maybe_unused]] auto d = memxfer_type(storage.get_allocator(), storage.data());
 
-			CHECK(MODELS_ARGS(atma::memory_concept, d));
-			CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
+			THEN("the result-type is conceptually an 'unbounded memory'")
+			{
+				CHECK(MODELS_ARGS(atma::memory_concept, d));
+				CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
+			}
 
-			CHECK(std::data(d) == d.data());
-			CHECK(d.data() == data.get());
-		}
-#endif
-	}
+			THEN("the result has the same allocator")
+			{
+				CHECK(atma::get_allocator(d) == d.get_allocator());
+				CHECK(d.get_allocator() == storage.get_allocator());
+			}
 
-#if 0
-	GIVEN("the type 'int' & a non-empty allocator")
-	{
-		using allocator_type = std::pmr::polymorphic_allocator<int>;
-		using storage_type = std::vector<int, allocator_type>;
-		using dest_type = atma::memxfer_t<tag_type, int, allocator_type>;
-
-		static_assert(!std::is_empty_v<allocator_type>);
-
-		atma::arena_memory_resource_t MR(64, 64);
-		allocator_type A{&MR};
-
-		auto data = storage_type{4, A};
-
-		THEN("it is constructible from an allocator & pointer")
-		{
-			[[maybe_unused]] auto d = memxfer_type(data.get_allocator(), data.data());
-
-			CHECK(MODELS_ARGS(atma::memory_concept, d));
-			CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
-
-			CHECK(d.data() == data.data());
-			CHECK(d.get_allocator() == data.get_allocator());
+			THEN("the result has the same value")
+			{
+				CHECK(std::data(d) == d.data());
+				CHECK(d.data() == storage.data());
+			}
 		}
 	}
-#endif
-
 }
 
 template <typename F>
@@ -396,316 +326,332 @@ SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, xfer_type_list)
 {
 	auto& xfer_make = xfer::make;
 
-	GIVEN("the type 'int' & an empty allocator")
+	GIVEN("an allocator & storage of a given type")
 	{
-		using allocator_type = atma::aligned_allocator_t<int>;
-		static_assert(std::is_empty_v<atma::aligned_allocator_t<int>>);
+		using value_type     = typename xfer::value_type;
+		using allocator_type = typename xfer::allocator_type;
+		using memxfer_type   = typename xfer::memxfer_t;
+		using storage_type   = atma::vector<value_type, allocator_type>;
 
-		AND_GIVEN("a vector of size 4")
+		WHEN("we call xfer_make with arguments {allocator, pointer}")
 		{
-			using storage_type = std::vector<int, allocator_type>;
 			auto storage = storage_type(4);
 
-			WHEN("we call xfer_make with arguments {allocator, pointer}")
+			[[maybe_unused]] auto d = xfer_make(storage.get_allocator(), storage.data());
+
+			THEN("the result-type is conceptually an 'unbounded memory'")
 			{
-				[[maybe_unused]] auto d = xfer_make(storage.get_allocator(), storage.data());
-
-				THEN("the result-type is conceptually an 'unbounded memory'")
-				{
-					CHECK(MODELS_ARGS(atma::memory_concept, d));
-					CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
-				}
-
-				THEN("the result has the same allocator")
-				{
-					CHECK(atma::get_allocator(d) == d.get_allocator());
-					CHECK(d.get_allocator() != storage.get_allocator());
-				}
-
-				THEN("the result has the same value")
-				{
-					CHECK(std::data(d) == d.data());
-					CHECK(d.data() == storage.data());
-				}
-			}
-
-			THEN("we can call with arguments {pointer}")
-			{
-				[[maybe_unused]] auto d = xfer_make(storage.data());
-
 				CHECK(MODELS_ARGS(atma::memory_concept, d));
 				CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
-
-				CHECK(std::data(d) == d.data());
-				CHECK(d.data() == storage.data());
 			}
 
-			THEN("we can call with arguments {allocator, pointer, size}")
+			THEN("the result has the same allocator")
 			{
-				[[maybe_unused]] auto d = xfer_make(storage.get_allocator(), storage.data(), storage.size());
-
-				CHECK(MODELS_ARGS(atma::memory_concept, d));
-				CHECK(MODELS_ARGS(atma::bounded_memory_concept, d));
-
 				CHECK(atma::get_allocator(d) == d.get_allocator());
 				CHECK(d.get_allocator() == storage.get_allocator());
-				CHECK(std::data(d) == d.data());
-				CHECK(d.data() == storage.data());
-				CHECK(std::size(d) == d.size());
-				CHECK(d.size() == storage.size());
-				CHECK_FALSE(d.empty());
 			}
 
-			THEN("we can call with arguments {pointer, size}")
+			THEN("the result has the same value")
 			{
-				[[maybe_unused]] auto d = xfer_make(storage.data(), storage.size());
-
-				CHECK(MODELS_ARGS(atma::memory_concept, d));
-				CHECK(MODELS_ARGS(atma::bounded_memory_concept, d));
-
 				CHECK(std::data(d) == d.data());
 				CHECK(d.data() == storage.data());
-				CHECK(std::size(d) == d.size());
-				CHECK(d.size() == storage.size());
-				CHECK_FALSE(d.empty());
 			}
+		}
 
+		WHEN("we call xfer_make with arguments {pointer}")
+		{
+			auto storage = storage_type(4);
 
-			THEN("we can call with arguments {basic-memory}")
+			[[maybe_unused]] auto d = xfer_make(storage.data());
+
+			THEN("the result-type is conceptually an 'unbounded memory'")
 			{
-				atma::basic_memory_t<xfer::value_type, xfer::allocator_type> memory;
-				SCOPED_BASIC_MEMORY_ALLOCATION(memory, 4);
-
-				[[maybe_unused]] auto d = xfer_make(memory);
-
 				CHECK(MODELS_ARGS(atma::memory_concept, d));
 				CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
-
-				CHECK(atma::get_allocator(d) == d.get_allocator());
-				CHECK(d.get_allocator() == memory.get_allocator());
-				CHECK(std::data(d) == d.data());
-				CHECK(d.data() == memory.data());
 			}
 
-			THEN("we can call with arguments {basic-memory, size}")
+			THEN("the result has the same value")
 			{
-				auto const test_size = 2;
+				CHECK(std::data(d) == d.data());
+				CHECK(d.data() == storage.data());
+			}
+		}
 
-				atma::basic_memory_t<xfer::value_type, xfer::allocator_type> memory;
-				SCOPED_BASIC_MEMORY_ALLOCATION(memory, 4);
+		WHEN("we call xfer_make with arguments {allocator, pointer, size}")
+		{
+			auto storage = storage_type(4);
 
-				[[maybe_unused]] auto d = xfer_make(memory, test_size);
+			[[maybe_unused]] auto d = xfer_make(storage.get_allocator(), storage.data(), storage.size());
 
+			THEN("the result-type is conceptually a 'bounded memory'")
+			{
 				CHECK(MODELS_ARGS(atma::memory_concept, d));
 				CHECK(MODELS_ARGS(atma::bounded_memory_concept, d));
+			}
 
+			THEN("the result has the same allocator")
+			{
+				CHECK(atma::get_allocator(d) == d.get_allocator());
+				CHECK(d.get_allocator() == storage.get_allocator());
+			}
+
+			THEN("the result has the same value")
+			{
+				CHECK(std::data(d) == d.data());
+				CHECK(d.data() == storage.data());
+			}
+
+			THEN("the result has the same size")
+			{
+				CHECK_FALSE(d.empty());
+				CHECK(std::size(d) == d.size());
+				CHECK(d.size() == storage.size());
+			}
+		}
+
+		THEN("we can call with arguments {pointer, size}")
+		{
+			auto storage = storage_type(4);
+
+			[[maybe_unused]] auto d = xfer_make(storage.data(), storage.size());
+
+			THEN("the result-type is conceptually a 'bounded memory'")
+			{
+				CHECK(MODELS_ARGS(atma::memory_concept, d));
+				CHECK(MODELS_ARGS(atma::bounded_memory_concept, d));
+			}
+
+			THEN("the result has the same value")
+			{
+				CHECK(std::data(d) == d.data());
+				CHECK(d.data() == storage.data());
+			}
+
+			THEN("the result has the same size")
+			{
+				CHECK_FALSE(d.empty());
+				CHECK(std::size(d) == d.size());
+				CHECK(d.size() == storage.size());
+			}
+		}
+
+
+		THEN("we can call with arguments {basic-memory}")
+		{
+			atma::basic_memory_t<xfer::value_type, xfer::allocator_type> memory;
+			SCOPED_BASIC_MEMORY_ALLOCATION(memory, 4);
+
+			[[maybe_unused]] auto d = xfer_make(memory);
+
+			THEN("the result-type is conceptually an 'unbounded memory'")
+			{
+				CHECK(MODELS_ARGS(atma::memory_concept, d));
+				CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
+			}
+
+			THEN("the result has the same allocator")
+			{
 				CHECK(atma::get_allocator(d) == d.get_allocator());
 				CHECK(d.get_allocator() == memory.get_allocator());
+			}
+
+			THEN("the result has the same value")
+			{
 				CHECK(std::data(d) == d.data());
 				CHECK(d.data() == memory.data());
-				CHECK(std::size(d) == 3);
-				CHECK(d.size() == test_size);
+			}
+		}
+
+		THEN("we can call with arguments {basic-memory, size}")
+		{
+			auto const test_size = 2;
+
+			auto memory = atma::basic_memory_t<value_type, allocator_type>();
+			SCOPED_BASIC_MEMORY_ALLOCATION(memory, 4);
+
+			[[maybe_unused]] auto d = xfer_make(memory, test_size);
+
+			CHECK(MODELS_ARGS(atma::memory_concept, d));
+			CHECK(MODELS_ARGS(atma::bounded_memory_concept, d));
+
+			THEN("the result has the same allocator")
+			{
+				CHECK(atma::get_allocator(d) == d.get_allocator());
+				CHECK(d.get_allocator() == memory.get_allocator());
+			}
+
+			THEN("the result has the same value")
+			{
+				CHECK(std::data(d) == d.data());
+				CHECK(d.data() == memory.data());
+			}
+
+			THEN("the result has the same size")
+			{
 				CHECK_FALSE(d.empty());
+				CHECK(std::size(d) == d.size());
+				CHECK(d.size() == test_size);
 			}
 		}
 	}
 }
 
-#if 0
-		THEN("it is default constructible")
-		{
-			range_type d;
-			ATMA_UNUSED(d);
-		}
 
-		THEN("it constructs from pointer and size")
-		{
-			int const numsize = 4;
-			int numbers[numsize] = { 1, 2, 3, 4 };
-
-			range_type d(numbers, numsize);
-			
-			CHECK(d.empty() == false);
-			CHECK(d.size() == numsize);
-			CHECK(d.begin() == numbers);
-			CHECK(d.end() == numbers + numsize);
-		}
-
-		THEN("it constructs from pointer, offset, and size")
-		{
-			int const offset = 2;
-			int const numsize = 4;
-			int numbers[numsize] = { 1, 2, 3, 4 };
-
-			int const range_size = numsize - offset;
-			range_type d(numbers, offset, range_size);
-
-			CHECK(d.empty() == false);
-			CHECK(d.size() == range_size);
-			CHECK(d.begin() == numbers + offset);
-			CHECK(d.end() == numbers + numsize);
-		}
-
-		THEN("it constructs from generic range (vector)")
-		{
-			auto numbers = std::vector<int>{1, 2, 3, 4};
-
-			range_type d(numbers);
-
-			CHECK(d.empty() == false);
-			CHECK(d.size() == numbers.size());
-			CHECK(d.begin() == numbers.data());
-			CHECK(d.end() == numbers.data() + numbers.size());
-			CHECK(d.begin() == &*numbers.begin());
-		}
-
-		THEN("it constructs from vector and size")
-		{
-			auto numbers = std::vector<int>{ 1, 2, 3, 4 };
-
-			range_type d(numbers, 3);
-
-			CHECK(d.empty() == false);
-			CHECK(d.size() == 3);
-			CHECK(d.begin() == numbers.data());
-			CHECK(d.end() == numbers.data() + 3);
-			CHECK(d.begin() == &*numbers.begin());
-		}
-
-		THEN("it constructs from vector, offset, and size")
-		{
-			auto numbers = std::vector<int>{ 1, 2, 3, 4 };
-
-			range_type d(numbers, 1, 3);
-
-			CHECK(d.empty() == false);
-			CHECK(d.size() == 3);
-			CHECK(d.begin() == numbers.data() + 1);
-			CHECK(d.end() == numbers.data() + 4);
-			CHECK(d.begin() == &*numbers.begin() + 1);
-		}
-
-		THEN("it constructs from a basic_memory_t & size")
-		{
-			auto numbers = std::vector<int>{ 1, 2, 3, 4 };
-			auto mem = atma::basic_memory_t<int>(numbers.data());
-
-			range_type d(mem, numbers.size());
-
-			CHECK(d.empty() == false);
-			CHECK(d.size() == numbers.size());
-			CHECK(d.begin() == mem.data());
-			CHECK(d.end() == mem.data() + numbers.size());
-			CHECK(d.begin() == numbers.data());
-		}
-
-		THEN("it constructs from a basic_memory_t, offset, and size")
-		{
-			auto numbers = std::vector<int>{ 1, 2, 3, 4 };
-			auto mem = atma::basic_memory_t<int>(numbers.data());
-
-			range_type d(mem + 2, numbers.size() - 2);
-
-			CHECK(d.empty() == false);
-			CHECK(d.size() == 2);
-			CHECK(d.begin() == mem.data() + 2);
-			CHECK(d.end() == mem.data() + numbers.size());
-			CHECK(d.begin() == numbers.data() + 2);
-		}
-	}
-}
-#endif
-
-
-SCENARIO_OF("memory/operations", "memory_default_construct is called")
+SCENARIO_TEMPLATE("memory_default_construct is called", xfer, xfer_type_list)
 {
-	GIVEN("an empty allocator and the dragon-type")
+	GIVEN("an allocator and memory-type")
 	{
-		using allocator_type = atma::aligned_allocator_t<dragon_t>;
-		using memory_t = atma::basic_memory_t<dragon_t, allocator_type>;
+		using value_type     = typename xfer::value_type;
+		using allocator_type = typename xfer::allocator_type;
+		using memxfer_type   = typename xfer::memxfer_t;
+		using storage_type   = atma::vector<value_type, allocator_type>;
 
-		static_assert(std::is_empty_v<allocator_type>, "allocator not empty!");
+		using memory_t = atma::basic_memory_t<value_type, allocator_type>;
 
 		GIVEN("memory pointing to uninitialized-memory")
 		{
-			auto dest_storage = std::unique_ptr<byte[]>(new byte[sizeof dragon_t * 6]);
-			auto dest_memory = memory_t(reinterpret_cast<dragon_t*>(dest_storage.get()));
+			const auto storage_size = 6u;
+			[[maybe_unused]] value_type defval;
 
-			THEN("memory_default_construct default-constructs the whole range")
+			auto dest_storage = std::unique_ptr<value_type[]>(new value_type[storage_size]);
+			auto dest_memory = memory_t(dest_storage.get());
+
+			// non-class types don't really make sense to default-construct, because
+			// their contents are undetermined, i.e., random
+			if constexpr (std::is_class_v<value_type>)
 			{
-				atma::memory_default_construct(atma::xfer_dest(dest_memory, 6));
+				WHEN("memory_default_construct is called on a class type")
+				{
+					atma::memory_default_construct(atma::xfer_dest(dest_memory, storage_size));
 
-				CHECK_MEMORY(dest_memory,
-					empty_dragon, empty_dragon, empty_dragon,
-					empty_dragon, empty_dragon, empty_dragon);
+					THEN("every element equates to the default-constructed value")
+					{
+						CHECK_MEMORY(dest_memory,
+							defval, defval, defval,
+							defval, defval, defval);
+					}
+				}
 			}
 		}
 	}
 }
 
-
-
-SCENARIO_OF("memory/operations", "range_construct is called")
+SCENARIO_TEMPLATE("memory_value_construct is called", xfer, xfer_type_list)
 {
-	GIVEN("an empty allocator and the dragon-type")
+	GIVEN("an allocator and memory-type")
 	{
-		using value_type = dragon_t;
-		using allocator_type = atma::aligned_allocator_t<dragon_t>;
+		using value_type     = typename xfer::value_type;
+		using allocator_type = typename xfer::allocator_type;
+		using memxfer_type   = typename xfer::memxfer_t;
+		using storage_type   = atma::vector<value_type, allocator_type>;
+
 		using memory_t = atma::basic_memory_t<value_type, allocator_type>;
 
-		static_assert(std::is_empty_v<allocator_type>, "allocator not empty!");
-
-		dragon_t const oliver{"oliver", 33};
-
-		GIVEN("memory pointing to an lvalue vector")
+		GIVEN("memory pointing to uninitialized-memory")
 		{
-			auto dest_storage = std::vector<value_type>(6, empty_dragon);
-			auto dest_memory = memory_t(dest_storage.data());
+			const auto storage_size = 6u;
+			const auto defval = value_type();
 
-			THEN("range_construct can construct the whole range with a direct constructor")
+			auto dest_storage = std::unique_ptr<byte[]>(new byte[sizeof value_type * storage_size]);
+			auto dest_memory = memory_t(reinterpret_cast<value_type*>(dest_storage.get()));
+
+			WHEN("memory_value_construct is called")
 			{
-				atma::memory_construct(
-					dest_storage,
-					"oliver", 33);
+				atma::memory_value_construct(atma::xfer_dest(dest_memory, storage_size));
 
+				THEN("the whole range is default-constructed")
+				{
+					CHECK_MEMORY(dest_memory,
+						defval, defval, defval,
+						defval, defval, defval);
+				}
+			}
+		}
+	}
+}
+
+SCENARIO_TEMPLATE("memory_construct is called", xfer, xfer_type_list)
+{
+	using value_type     = typename xfer::value_type;
+	using allocator_type = typename xfer::allocator_type;
+	using memxfer_type   = typename xfer::memxfer_t;
+	using storage_type   = atma::vector<value_type, allocator_type>;
+
+	using memory_t = atma::basic_memory_t<value_type, allocator_type>;
+
+
+	GIVEN("'defval', a value-initialized instance of our value_type")
+	GIVEN("'compar', a direct-initialized instance of our value_type, with a value known to us")
+	GIVEN("a vector of six (6) value-initialized elements")
+	{
+		auto const defval = value_type();
+		auto const compar = xfer::compar;
+
+		auto dest_storage = std::vector<value_type>(6, defval);
+		auto dest_memory = memory_t(dest_storage.data());
+
+		WHEN("memory_construct is called upon a vector with arguments for a direct constructor")
+		{
+			xfer::curry_direct_construct_args(atma::memory_construct, dest_storage);
+
+			THEN("every element in the vector equates to the compar")
+			{
 				CHECK_MEMORY(dest_memory,
-					oliver, oliver, oliver,
-					oliver, oliver, oliver);
+					compar, compar, compar,
+					compar, compar, compar);
+			}
+		}
+
+		GIVEN("a subrange of [0, 4)")
+		{
+			auto subrange = atma::xfer_dest(dest_memory, 4);
+
+			WHEN("memory_construct is called with arguments for a direct constructor")
+			{
+				xfer::curry_direct_construct_args(atma::memory_construct,
+					subrange);
+
+				THEN("elements [0, 4) equate to compar, and elements [4, 6) compare against defval")
+				{
+					CHECK_MEMORY(dest_memory,
+						compar, compar, compar, compar,
+						defval, defval);
+				}
+			}
+		}
+
+		GIVEN("a subrange of [1, 5)")
+		{
+			auto subrange = atma::xfer_dest(dest_memory + 1, 4);
+
+			WHEN("memory_construct is called with arguments for a direct constructor")
+			{
+				xfer::curry_direct_construct_args(atma::memory_construct, subrange);
+
+				THEN("element [0] equates to defval")
+				THEN("elements [1, 5) equate to compar")
+				THEN("element [5] equates to defval")
+				{
+					CHECK_MEMORY(dest_memory,
+						defval,
+						compar, compar, compar, compar,
+						defval);
+				}
 			}
 
-			THEN("a partial-range can be constructed via a direct constructor")
+			WHEN("memory_construct is called with arguments for the copy-constructor")
 			{
-				atma::memory_construct(
-					atma::xfer_dest(dest_memory, 4),
-					"oliver", 33);
+				atma::memory_construct(subrange, compar);
 
-				CHECK_MEMORY(dest_memory,
-					oliver, oliver, oliver, oliver,
-					empty_dragon, empty_dragon);
-			}
-
-			THEN("a partial-range can be constructed via a direct constructor")
-			{
-				atma::memory_construct(
-					atma::xfer_dest(dest_memory + 1, 4),
-					"oliver", 33);
-
-				CHECK_MEMORY(dest_memory,
-					empty_dragon,
-					oliver, oliver, oliver, oliver,
-					empty_dragon);
-			}
-
-			THEN("a partial-range can be constructed via the copy-constructor")
-			{
-				atma::memory_construct(
-					atma::xfer_dest(dest_memory + 1, 4),
-					oliver);
-
-				CHECK_MEMORY(dest_memory,
-					empty_dragon,
-					oliver, oliver, oliver, oliver,
-					empty_dragon);
+				THEN("element [0] equates to defval")
+				THEN("elements [1, 5) equate to compar")
+				THEN("element [5] equates to defval")
+				{
+					CHECK_MEMORY(dest_memory,
+						defval,
+						compar, compar, compar, compar,
+						defval);
+				}
 			}
 		}
 	}
@@ -932,5 +878,4 @@ SCENARIO_OF("memory/operations", "memcpy or memmove is called")
 		}
 	}
 }
-#endif
-#endif
+
