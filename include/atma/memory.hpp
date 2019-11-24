@@ -693,16 +693,16 @@ namespace atma::detail
 	{
 		functor_call_fwds_t<F>{},
 
-		[](auto& f, auto&& dest, size_t sz)
-		LAMBDA_REQUIRES(MODELS_ARGS(dest_memory_concept, dest))
-		{
-			f(get_allocator(dest), std::data(dest), sz);
-		},
-
 		[](auto& f, auto&& dest)
 		LAMBDA_REQUIRES(MODELS_ARGS(dest_bounded_memory_concept, dest))
 		{
 			f(get_allocator(dest), std::data(dest), std::size(dest));
+		},
+
+		[](auto& f, auto&& dest, size_t sz)
+		LAMBDA_REQUIRES(MODELS_ARGS(dest_memory_concept, dest))
+		{
+			f(get_allocator(dest), std::data(dest), sz);
 		}
 	};
 }
