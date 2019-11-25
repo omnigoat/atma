@@ -22,14 +22,20 @@
 template <typename T>
 struct xfer_type_info_t;
 
+#define DEFINE_VALUE_TYPE_FOR_TESTING_m(r,value_type,i,x) \
+	inline static value_type const compar##i = value_type(BOOST_PP_TUPLE_REM_CTOR(x)); \
+
 #define DEFINE_VALUE_TYPE_FOR_TESTING(value_type, ...) \
 	template <> struct xfer_type_info_t<value_type> \
 	{ \
-		inline static value_type const compar = value_type(__VA_ARGS__); \
+		BOOST_PP_SEQ_FOR_EACH_I(DEFINE_VALUE_TYPE_FOR_TESTING_m, value_type, BOOST_PP_VARIADIC_SEQ_TO_SEQ(__VA_ARGS__)) \
 		\
 		constexpr static auto curry_direct_construct_args = [](auto&& f, auto&&... args) \
 		{ \
-			return f(std::forward<decltype(args)>(args)..., __VA_ARGS__); \
+			return f(std::forward<decltype(args)>(args)...,  \
+				BOOST_PP_TUPLE_REM_CTOR( \
+					BOOST_PP_SEQ_HEAD( \
+						BOOST_PP_VARIADIC_SEQ_TO_SEQ(__VA_ARGS__)))); \
 		}; \
 	};
 
@@ -51,7 +57,7 @@ struct xfer_maker
 			return atma::xfer_src(std::forward<decltype(args)>(args)...);
 	};
 
-	inline static value_type const compar = xfer_type_info_t<value_type>::compar;
+	inline static value_type const compar = xfer_type_info_t<value_type>::compar0;
 	constexpr static auto curry_direct_construct_args = xfer_type_info_t<value_type>::curry_direct_construct_args;
 };
 
@@ -104,8 +110,13 @@ TYPE_TO_STRING(dragon_t);
 dragon_t const empty_dragon;
 
 
-DEFINE_VALUE_TYPE_FOR_TESTING(dragon_t, "oliver", 33);
-DEFINE_VALUE_TYPE_FOR_TESTING(int, 1234);
+DEFINE_VALUE_TYPE_FOR_TESTING(dragon_t, \
+	("oliver", 33) \
+	("henry", 21) \
+	("marcie", 27) \
+	("rachael", 19));
+
+DEFINE_VALUE_TYPE_FOR_TESTING(int, (1)(2)(3)(4));
 
 
 
@@ -127,6 +138,10 @@ DEFINE_VALUE_TYPE_FOR_TESTING(int, 1234);
 #define xfer_type_list_m(i, ...) BOOST_PP_COMMA_IF(i) __VA_ARGS__
 #define xfer_type_list FOR_EACH_TEMPLATE_TYPE_COMBINATION(xfer_type_list_m, \
 	GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations))
+
+// tuples of <allocator_type, value_type>
+#define allocator_value_tuples_m(i, d, allocator_type, value_type) BOOST_PP_COMMA_IF(i) std::tuple<allocator_type<value_type>, value_type>
+#define allocator_value_tuples FOR_EACH_COMBINATION(allocator_value_tuples_m, ~, GENERATE_COMBINATIONS_OF_TUPLES(test_allocators test_value_types))
 
 // type-to-string all our allocators
 #define TYPE_ALLOCATORS_TO_STRING(i, d, allocator_type, value_type) TYPE_TO_STRING(allocator_type<value_type>);
@@ -570,29 +585,27 @@ SCENARIO_TEMPLATE("memory_value_construct is called", xfer, xfer_type_list)
 	}
 }
 
-SCENARIO_TEMPLATE("memory_construct is called", xfer, xfer_type_list)
+SCENARIO_TEMPLATE("memory_construct is called", xfer, allocator_value_tuples)
 {
-	using value_type     = typename xfer::value_type;
-	using allocator_type = typename xfer::allocator_type;
-	using memxfer_type   = typename xfer::memxfer_t;
+	using allocator_type = std::tuple_element_t<0, xfer>;
+	using value_type     = std::tuple_element_t<1, xfer>;
 	using storage_type   = atma::vector<value_type, allocator_type>;
 
-	using memory_t = atma::basic_memory_t<value_type, allocator_type>;
-
+	using value_type_info = xfer_type_info_t<value_type>;
 
 	GIVEN("'defval', a value-initialized instance of our value_type")
 	GIVEN("'compar', a direct-initialized instance of our value_type, with a value known to us")
 	GIVEN("a vector of six (6) value-initialized elements")
 	{
 		auto const defval = value_type();
-		auto const compar = xfer::compar;
+		auto const compar = value_type_info::compar0;
 
 		auto dest_storage = std::vector<value_type>(6, defval);
-		auto dest_memory = memory_t(dest_storage.data());
+		auto dest_memory = atma::basic_memory_t<value_type, allocator_type>(dest_storage.data());
 
 		WHEN("memory_construct is called upon a vector with arguments for a direct constructor")
 		{
-			xfer::curry_direct_construct_args(atma::memory_construct, dest_storage);
+			value_type_info::curry_direct_construct_args(atma::memory_construct, dest_storage);
 
 			THEN("every element in the vector equates to the compar")
 			{
@@ -608,7 +621,7 @@ SCENARIO_TEMPLATE("memory_construct is called", xfer, xfer_type_list)
 
 			WHEN("memory_construct is called with arguments for a direct constructor")
 			{
-				xfer::curry_direct_construct_args(atma::memory_construct,
+				value_type_info::curry_direct_construct_args(atma::memory_construct,
 					subrange);
 
 				THEN("elements [0, 4) equate to compar, and elements [4, 6) compare against defval")
@@ -626,7 +639,7 @@ SCENARIO_TEMPLATE("memory_construct is called", xfer, xfer_type_list)
 
 			WHEN("memory_construct is called with arguments for a direct constructor")
 			{
-				xfer::curry_direct_construct_args(atma::memory_construct, subrange);
+				value_type_info::curry_direct_construct_args(atma::memory_construct, subrange);
 
 				THEN("element [0] equates to defval")
 				THEN("elements [1, 5) equate to compar")
@@ -657,87 +670,96 @@ SCENARIO_TEMPLATE("memory_construct is called", xfer, xfer_type_list)
 	}
 }
 
-SCENARIO_OF("memory/operations", "range_copy_construct is called")
+SCENARIO_TEMPLATE("memory_copy_construct is called", xfer, allocator_value_tuples)
 {
-	GIVEN("an empty allocator and the dragon-type")
+	using allocator_type = std::tuple_element_t<0, xfer>;
+	using value_type     = std::tuple_element_t<1, xfer>;
+	using storage_type   = atma::vector<value_type, allocator_type>;
+
+	using info = xfer_type_info_t<value_type>;
+
+	GIVEN("'defval', a value-initialized instance of our value_type")
+	GIVEN("a destination vector of six (6) value-initialized elements that equate to defval")
+	GIVEN("four (4) known values to compare against")
 	{
-		using value_type = dragon_t;
-		using allocator_type = atma::aligned_allocator_t<dragon_t>;
-		using memory_t = atma::basic_memory_t<value_type, allocator_type>;
+		auto const defval = value_type();
 
-		static_assert(std::is_empty_v<allocator_type>, "allocator not empty!");
+		auto const& compar0 = info::compar0;
+		auto const& compar1 = info::compar1;
+		auto const& compar2 = info::compar2;
+		auto const& compar3 = info::compar3;
 
-		dragon_t const oliver{"oliver", 33};
-		dragon_t const henry{"henry", 24};
-		dragon_t const marcie{"marcie", 27};
-		dragon_t const rachael{"rachael", 19};
+		auto dest_storage = std::vector<value_type>(6, defval);
+		auto dest_memory = atma::basic_memory_t<value_type, allocator_type>(dest_storage.data());
 
-		GIVEN("destination memory pointing to an lvalue vector")
+		GIVEN("a source array of those four values")
 		{
-			auto dest_storage = std::vector<value_type>(6, empty_dragon);
-			auto dest_memory = memory_t(dest_storage.data());
-
-			GIVEN("source memory pointing to a const-lvalue vector")
+			value_type source[4] = {info::compar0, info::compar1, info::compar2, info::compar3};
+			
+			WHEN("memory_copy_construct is called with dest being a subrange of the first four (4) elements")
 			{
-				auto const src_storage = std::vector<value_type>{oliver, henry, marcie, rachael};
+				atma::memory_copy_construct(
+					atma::xfer_dest(dest_storage, 4),
+					atma::xfer_src(source));
 
-				THEN("range_copy_construct can copy-construct the beginning of the range")
+				THEN("the first four elements equate to our known values")
 				{
-					dragon_t dragons_dest[4] = {};
-					dragon_t dragons[4] = { oliver, henry, marcie, rachael };
-
-					atma::memory_copy_construct(
-						atma::xfer_dest(dest_storage, 4),
-						atma::xfer_src(src_storage));
-
 					CHECK_MEMORY(dest_memory,
-						oliver, henry, marcie, rachael,
-						empty_dragon, empty_dragon);
+						compar0, compar1, compar2, compar3,
+						defval, defval);
 				}
+			}
+		}
 
-				THEN("memory_copy_construct can copy-construct the middle of the range")
+		GIVEN("a source vector of those four values")
+		{
+			auto const source = std::vector<value_type>{info::compar0, info::compar1, info::compar2, info::compar3};
+
+			WHEN("memory_copy_construct is called with destination subrange [1, 5)")
+			{
+				atma::memory_copy_construct(
+					atma::xfer_dest(dest_memory + 1, 4),
+					atma::xfer_src(source));
+
+				THEN("the middle four elements [1, 5) equate to our known values")
 				{
-					atma::memory_copy_construct(
-						atma::xfer_dest(dest_memory + 1, 4),
-						atma::xfer_src(src_storage));
-
 					CHECK_MEMORY(dest_memory,
-						empty_dragon,
-						oliver, henry, marcie, rachael,
-						empty_dragon);
+						defval,
+						compar0, compar1, compar2, compar3,
+						defval);
 				}
+			}
 
-				THEN("memory_copy_construct can copy-construct bits of both ranges")
-				{
-					atma::memory_copy_construct(
-						atma::xfer_dest(dest_memory + 4, 2),
-						atma::xfer_src(src_storage, 2, 2));
+			THEN("memory_copy_construct can copy-construct bits of both ranges")
+			{
+				atma::memory_copy_construct(
+					atma::xfer_dest(dest_memory + 4, 2),
+					atma::xfer_src(source, 2, 2));
 
-					CHECK_MEMORY(dest_memory,
-						empty_dragon, empty_dragon, empty_dragon, empty_dragon,
-						marcie, rachael);
-				}
+				CHECK_MEMORY(dest_memory,
+					defval, defval, defval, defval,
+					compar2, compar3);
+			}
 
-				THEN("memory_copy_construct can copy-construct from iterateors")
-				{
-					atma::memory_copy_construct(
-						atma::xfer_dest(dest_memory + 2, 4),
-						src_storage.begin(), src_storage.end());
+			THEN("memory_copy_construct can copy-construct from iterateors")
+			{
+				atma::memory_copy_construct(
+					atma::xfer_dest(dest_memory + 2, 4),
+					source.begin(), source.end());
 
-					CHECK_MEMORY(dest_memory,
-						empty_dragon, empty_dragon,
-						oliver, henry, marcie, rachael);
-				}
+				CHECK_MEMORY(dest_memory,
+					defval, defval,
+					compar0, compar1, compar2, compar3);
+			}
 
-				THEN("")
-				{
-					auto dest2_storage = std::vector<value_type>(4, empty_dragon);
+			THEN("")
+			{
+				auto dest2_storage = std::vector<value_type>(4, defval);
 
-					//static_assert(atma::concepts::models<atma::assignable_concept, typename decltype(dest2_storage)::value_type>::value);
-					//static_assert(atma::concepts::models_v<atma::dest_memory_range_concept, decltype(dest2_storage)>);
+				//static_assert(atma::concepts::models<atma::assignable_concept, typename decltype(dest2_storage)::value_type>::value);
+				//static_assert(atma::concepts::models_v<atma::dest_memory_range_concept, decltype(dest2_storage)>);
 
-					atma::memory_copy_construct(dest2_storage, src_storage);
-				}
+				atma::memory_copy_construct(dest2_storage, source);
 			}
 		}
 	}
