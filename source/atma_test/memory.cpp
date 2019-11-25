@@ -512,74 +512,68 @@ SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, xfer_type_list)
 }
 
 
-SCENARIO_TEMPLATE("memory_default_construct is called", xfer, xfer_type_list)
+SCENARIO_TEMPLATE("memory_default_construct is called", xfer, allocator_value_tuples)
 {
-	GIVEN("an allocator and memory-type")
+	using allocator_type = std::tuple_element_t<0, xfer>;
+	using value_type     = std::tuple_element_t<1, xfer>;
+	using storage_type   = atma::vector<value_type, allocator_type>;
+
+	using memory_t = atma::basic_memory_t<value_type, allocator_type>;
+
+	// non-class types don't really make sense to default-construct, because
+	// their contents are undetermined, i.e., random
+	if constexpr (std::is_class_v<value_type>)
 	{
-		using value_type     = typename xfer::value_type;
-		using allocator_type = typename xfer::allocator_type;
-		using memxfer_type   = typename xfer::memxfer_t;
-		using storage_type   = atma::vector<value_type, allocator_type>;
-
-		using memory_t = atma::basic_memory_t<value_type, allocator_type>;
-
-		GIVEN("memory pointing to uninitialized-memory")
+		GIVEN("'defval', a default-initialized value-type (value-type is a class-type)")
+		GIVEN("memory pointing to uninitialized-memory of six (6) elements")
 		{
 			const auto storage_size = 6u;
-			[[maybe_unused]] value_type defval;
+			[[maybe_unused]] value_type const defval;
 
 			auto dest_storage = std::unique_ptr<value_type[]>(new value_type[storage_size]);
 			auto dest_memory = memory_t(dest_storage.get());
 
-			// non-class types don't really make sense to default-construct, because
-			// their contents are undetermined, i.e., random
-			if constexpr (std::is_class_v<value_type>)
+			WHEN("memory_default_construct is called upon whole range")
 			{
-				WHEN("memory_default_construct is called on a class type")
-				{
-					atma::memory_default_construct(atma::xfer_dest(dest_memory, storage_size));
+				atma::memory_default_construct(atma::xfer_dest(dest_memory, storage_size));
 
-					THEN("every element equates to the default-constructed value")
-					{
-						CHECK_MEMORY(dest_memory,
-							defval, defval, defval,
-							defval, defval, defval);
-					}
+				THEN("every element equates to defval")
+				{
+					CHECK_MEMORY(dest_memory,
+						defval, defval, defval,
+						defval, defval, defval);
 				}
 			}
 		}
 	}
 }
 
-SCENARIO_TEMPLATE("memory_value_construct is called", xfer, xfer_type_list)
+SCENARIO_TEMPLATE("memory_value_construct is called", xfer, allocator_value_tuples)
 {
-	GIVEN("an allocator and memory-type")
+	using allocator_type = std::tuple_element_t<0, xfer>;
+	using value_type     = std::tuple_element_t<1, xfer>;
+	using storage_type   = atma::vector<value_type, allocator_type>;
+
+	using memory_t = atma::basic_memory_t<value_type, allocator_type>;
+
+	GIVEN("'valval', a value-initialized value-type")
+	GIVEN("memory pointing to uninitialized-memory of six (6) elements")
 	{
-		using value_type     = typename xfer::value_type;
-		using allocator_type = typename xfer::allocator_type;
-		using memxfer_type   = typename xfer::memxfer_t;
-		using storage_type   = atma::vector<value_type, allocator_type>;
+		const auto storage_size = 6u;
+		[[maybe_unused]] auto const valval = value_type();
 
-		using memory_t = atma::basic_memory_t<value_type, allocator_type>;
+		auto dest_storage = std::unique_ptr<value_type[]>(new value_type[storage_size]);
+		auto dest_memory = memory_t(dest_storage.get());
 
-		GIVEN("memory pointing to uninitialized-memory")
+		WHEN("memory_value_construct is called upon the whole range")
 		{
-			const auto storage_size = 6u;
-			const auto defval = value_type();
+			atma::memory_value_construct(atma::xfer_dest(dest_memory, storage_size));
 
-			auto dest_storage = std::unique_ptr<byte[]>(new byte[sizeof value_type * storage_size]);
-			auto dest_memory = memory_t(reinterpret_cast<value_type*>(dest_storage.get()));
-
-			WHEN("memory_value_construct is called")
+			THEN("the whole range is value-constructed")
 			{
-				atma::memory_value_construct(atma::xfer_dest(dest_memory, storage_size));
-
-				THEN("the whole range is default-constructed")
-				{
-					CHECK_MEMORY(dest_memory,
-						defval, defval, defval,
-						defval, defval, defval);
-				}
+				CHECK_MEMORY(dest_memory,
+					valval, valval, valval,
+					valval, valval, valval);
 			}
 		}
 	}
