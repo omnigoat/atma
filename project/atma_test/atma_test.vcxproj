@@ -112,9 +112,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\source\atma_test\bind_and_function.cpp" />
     <ClCompile Include="..\..\source\atma_test\entrypoint.cpp" />
-    <ClCompile Include="..\..\source\atma_test\memory.cpp">
-      <PreprocessToFile Condition="'$(Configuration)|$(Platform)'=='TestOpt|x64'">true</PreprocessToFile>
-    </ClCompile>
+    <ClCompile Include="..\..\source\atma_test\memory.cpp" />
     <ClCompile Include="..\..\source\atma_test\queue.cpp" />
     <ClCompile Include="..\..\source\atma_test\ranges.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_allocators.cpp" />
