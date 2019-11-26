@@ -15,8 +15,7 @@
 #define CHECK_MEMORY(v, ...) \
 	CHECK_MEMORY_II(v, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
-#define SCOPED_BASIC_MEMORY_ALLOCATION_II(allocation_name, memory_name, size) auto allocation_name = memory_name.allocate(size); SCOPE_GUARD([&]{memory_name.deallocate(allocation_name);})
-#define SCOPED_BASIC_MEMORY_ALLOCATION(memory_name, size) SCOPED_BASIC_MEMORY_ALLOCATION_II(temp_alloc_##__COUNTER__, memory_name, size)
+#define SCOPED_BASIC_MEMORY_ALLOCATION(memory_name, size) memory_name.allocate(size); SCOPE_GUARD([&memory_name]{memory_name.deallocate(size);})
 
 
 template <typename T>
@@ -527,19 +526,18 @@ SCENARIO_TEMPLATE("memory_default_construct is called", xfer, allocator_value_tu
 		GIVEN("'defval', a default-initialized value-type (value-type is a class-type)")
 		GIVEN("memory pointing to uninitialized-memory of six (6) elements")
 		{
-			const auto storage_size = 6u;
 			[[maybe_unused]] value_type const defval;
 
-			auto dest_storage = std::unique_ptr<value_type[]>(new value_type[storage_size]);
-			auto dest_memory = memory_t(dest_storage.get());
+			auto storage = std::unique_ptr<value_type[]>(new value_type[6]);
+			auto memory = memory_t(storage.get());
 
 			WHEN("memory_default_construct is called upon whole range")
 			{
-				atma::memory_default_construct(atma::xfer_dest(dest_memory, storage_size));
+				atma::memory_default_construct(atma::xfer_dest(memory, 6));
 
 				THEN("every element equates to defval")
 				{
-					CHECK_MEMORY(dest_memory,
+					CHECK_MEMORY(memory,
 						defval, defval, defval,
 						defval, defval, defval);
 				}
@@ -559,19 +557,18 @@ SCENARIO_TEMPLATE("memory_value_construct is called", xfer, allocator_value_tupl
 	GIVEN("'valval', a value-initialized value-type")
 	GIVEN("memory pointing to uninitialized-memory of six (6) elements")
 	{
-		const auto storage_size = 6u;
 		[[maybe_unused]] auto const valval = value_type();
 
-		auto dest_storage = std::unique_ptr<value_type[]>(new value_type[storage_size]);
-		auto dest_memory = memory_t(dest_storage.get());
+		auto storage = std::unique_ptr<value_type[]>(new value_type[6]);
+		auto memory = memory_t(storage.get());
 
 		WHEN("memory_value_construct is called upon the whole range")
 		{
-			atma::memory_value_construct(atma::xfer_dest(dest_memory, storage_size));
+			atma::memory_value_construct(atma::xfer_dest(memory, 6));
 
 			THEN("the whole range is value-constructed")
 			{
-				CHECK_MEMORY(dest_memory,
+				CHECK_MEMORY(memory,
 					valval, valval, valval,
 					valval, valval, valval);
 			}
@@ -587,62 +584,69 @@ SCENARIO_TEMPLATE("memory_construct is called", xfer, allocator_value_tuples)
 
 	using value_type_info = xfer_type_info_t<value_type>;
 
-	GIVEN("'defval', a value-initialized instance of our value_type")
+	auto const valval = value_type();
+	auto const compar = value_type_info::compar0;
+
+	GIVEN("'valval', a value-initialized instance of our value_type")
 	GIVEN("'compar', a direct-initialized instance of our value_type, with a value known to us")
 	GIVEN("a vector of six (6) value-initialized elements")
 	{
-		auto const defval = value_type();
-		auto const compar = value_type_info::compar0;
-
-		auto dest_storage = std::vector<value_type>(6, defval);
-		auto dest_memory = atma::basic_memory_t<value_type, allocator_type>(dest_storage.data());
+		auto storage = std::vector<value_type>(6, valval);
 
 		WHEN("memory_construct is called upon a vector with arguments for a direct constructor")
 		{
-			value_type_info::curry_direct_construct_args(atma::memory_construct, dest_storage);
+			value_type_info::curry_direct_construct_args(atma::memory_construct, storage);
 
 			THEN("every element in the vector equates to the compar")
 			{
-				CHECK_MEMORY(dest_memory,
+				CHECK_VECTOR(storage,
 					compar, compar, compar,
 					compar, compar, compar);
 			}
 		}
+	}
+
+	GIVEN("'valval', a value-initialized instance of our value_type")
+	GIVEN("'compar', a direct-initialized instance of our value_type, with a value known to us")
+	GIVEN("a basic_memory_t allocated with six (6) value-initialized elements")
+	{
+		auto memory = atma::basic_memory_t<value_type, allocator_type>();
+		SCOPED_BASIC_MEMORY_ALLOCATION(memory, 6);
+		atma::memory_value_construct(atma::xfer_dest(memory, 6));
 
 		GIVEN("a subrange of [0, 4)")
 		{
-			auto subrange = atma::xfer_dest(dest_memory, 4);
+			auto subrange = atma::xfer_dest(memory, 4);
 
 			WHEN("memory_construct is called with arguments for a direct constructor")
 			{
-				value_type_info::curry_direct_construct_args(atma::memory_construct,
-					subrange);
+				value_type_info::curry_direct_construct_args(atma::memory_construct, subrange);
 
-				THEN("elements [0, 4) equate to compar, and elements [4, 6) compare against defval")
+				THEN("elements [0, 4) equate to compar, and elements [4, 6) compare against valval")
 				{
-					CHECK_MEMORY(dest_memory,
+					CHECK_MEMORY(memory,
 						compar, compar, compar, compar,
-						defval, defval);
+						valval, valval);
 				}
 			}
 		}
 
 		GIVEN("a subrange of [1, 5)")
 		{
-			auto subrange = atma::xfer_dest(dest_memory + 1, 4);
+			auto subrange = atma::xfer_dest(memory + 1, 4);
 
 			WHEN("memory_construct is called with arguments for a direct constructor")
 			{
 				value_type_info::curry_direct_construct_args(atma::memory_construct, subrange);
 
-				THEN("element [0] equates to defval")
+				THEN("element [0] equates to valval")
 				THEN("elements [1, 5) equate to compar")
-				THEN("element [5] equates to defval")
+				THEN("element [5] equates to valval")
 				{
-					CHECK_MEMORY(dest_memory,
-						defval,
+					CHECK_MEMORY(memory,
+						valval,
 						compar, compar, compar, compar,
-						defval);
+						valval);
 				}
 			}
 
@@ -650,14 +654,14 @@ SCENARIO_TEMPLATE("memory_construct is called", xfer, allocator_value_tuples)
 			{
 				atma::memory_construct(subrange, compar);
 
-				THEN("element [0] equates to defval")
+				THEN("element [0] equates to valval")
 				THEN("elements [1, 5) equate to compar")
-				THEN("element [5] equates to defval")
+				THEN("element [5] equates to valval")
 				{
-					CHECK_MEMORY(dest_memory,
-						defval,
+					CHECK_MEMORY(memory,
+						valval,
 						compar, compar, compar, compar,
-						defval);
+						valval);
 				}
 			}
 		}
