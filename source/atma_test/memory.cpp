@@ -147,18 +147,31 @@ DEFINE_VALUE_TYPE_FOR_TESTING(int, (1)(2)(3)(4));
 FOR_EACH_COMBINATION(TYPE_ALLOCATORS_TO_STRING, ~, GENERATE_COMBINATIONS_OF_TUPLES(test_allocators test_value_types))
 
 
-SCENARIO_OF("memory/base_memory_t", "base_memory_t EBO")
+SCENARIO_TEMPLATE("base_memory_t performing EBO", xfer, allocator_value_tuples)
 {
-	GIVEN("an empty allocator")
+	using allocator_type = std::tuple_element_t<0, xfer>;
+	using value_type     = std::tuple_element_t<1, xfer>;
+
+	if constexpr (std::is_empty_v<allocator_type>)
 	{
-		using empty_allocator = atma::aligned_allocator_t<int>;
-		static_assert(std::is_empty_v<empty_allocator>, "empty_allocator must actually be empty");
-
-		THEN("sizeof memory_t is 1")
+		GIVEN("an empty allocator")
 		{
-			atma::detail::base_memory_t<byte, empty_allocator> memory;
-
-			CHECK(sizeof(memory) == 1);
+			THEN("sizeof base_memory_t is 1")
+			{
+				atma::detail::base_memory_t<value_type, allocator_type> memory;
+				CHECK(sizeof(memory) == 1);
+			}
+		}
+	}
+	else
+	{
+		GIVEN("a non-empty allocator")
+		{
+			THEN("sizeof base_memory_t is the size of the allocator")
+			{
+				atma::detail::base_memory_t<value_type, allocator_type> memory;
+				CHECK(sizeof(memory) == sizeof(allocator_type));
+			}
 		}
 	}
 }
