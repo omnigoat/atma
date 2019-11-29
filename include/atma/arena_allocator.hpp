@@ -252,6 +252,11 @@ namespace atma
 			: resource_(new arena_memory_resource_t(512, 1024))
 		{}
 
+		template <typename Y>
+		arena_allocator_t(arena_allocator_t<Y> const& rhs)
+			: resource_(rhs.resource_)
+		{}
+
 		[[nodiscard]] value_type* allocate(std::size_t n)
 		{
 			return (value_type*)resource_->allocate(n * sizeof value_type);
@@ -269,5 +274,7 @@ namespace atma
 
 	private:
 		std::shared_ptr<std::pmr::memory_resource> resource_;
+
+		template <typename> friend struct arena_allocator_t;
 	};
 }
