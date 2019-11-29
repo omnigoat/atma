@@ -176,8 +176,103 @@ SCENARIO_TEMPLATE("base_memory_t performing EBO", xfer, allocator_value_tuples)
 	}
 }
 
-SCENARIO_OF("memory/basic_memory_t", "basic_memory_t construction")
+SCENARIO_TEMPLATE("basic_memory_t can be constructed", xfer, allocator_value_tuples)
 {
+	using allocator_type = std::tuple_element_t<0, xfer>;
+	using value_type     = std::tuple_element_t<1, xfer>;
+
+	using xferti = xfer_type_info_t<value_type>;
+
+
+	using memory_t = atma::basic_memory_t<value_type, allocator_type>;
+	constexpr bool is_empty_allocator = std::is_empty_v<allocator_type>;
+
+	using storage_t = std::vector<value_type, allocator_type>;
+
+	GIVEN_IF_CONSTEXPR(is_empty_allocator, "the allocator is empty")
+	{
+		WHEN("basic_memory_t is default-constructed")
+		{
+			memory_t memory;
+
+			THEN("sizeof basic_memory_t is the size of a pointer")
+			{
+				CHECK(sizeof(memory) == sizeof(value_type*));
+			}
+		}
+	}
+
+	WHEN("basic_memory_t is default-constructed")
+	{
+		memory_t memory;
+
+		THEN("the memory equates to nullptr")
+		{
+			CHECK((value_type*)memory == nullptr);
+		}
+	}
+
+	GIVEN("a vector of four elements known to us")
+	{
+		auto storage = storage_t{xferti::compar0, xferti::compar1, xferti::compar2, xferti::compar3};
+		
+		#define CHECK_MEMORY_AGAINST_COMPARS(memory) \
+			CHECK((value_type*)memory == storage.data()); \
+			CHECK_MEMORY(memory, xferti::compar0, xferti::compar1, xferti::compar2, xferti::compar3);
+
+		WHEN("basic_memory_t is directly-constructed from a pointer & allocator")
+		{
+			auto memory = memory_t{storage.data(), storage.get_allocator()};
+
+			AND_WHEN_IF(is_empty_allocator, "the allocator is empty")
+			THEN("sizeof basic_memory_t equtes to the size of a pointer")
+			{
+				CHECK(sizeof(memory) == sizeof(value_type*));
+			}
+
+			THEN("the pointer & values match")
+			{
+				CHECK_MEMORY_AGAINST_COMPARS(memory);
+			}
+		}
+
+		WHEN("basic_memory_t is default-constructed, and then assigned a pointer")
+		{
+			memory_t memory;
+			memory = storage.data();
+
+			THEN("it evaluates to our known values")
+			{	
+				CHECK_MEMORY_AGAINST_COMPARS(memory);
+			}
+		}
+
+		WHEN("basic_memory_t is indexed")
+		{
+			memory_t memory{storage.data()};
+
+			THEN("it evaluates to our known values")
+			{
+				CHECK(memory[0] == xferti::compar0);
+				CHECK(memory[1] == xferti::compar1);
+				CHECK(memory[2] == xferti::compar2);
+				CHECK(memory[3] == xferti::compar3);
+			}
+		}
+
+		WHEN("basic_memory_t is used with fake arithmetic")
+		{
+			auto m1 = memory_t{storage.data()};
+			auto m2 = m1 + 2;
+			static_assert(std::is_same_v<decltype(m2), decltype(m1)>);
+
+			CHECK((value_type*)m2 == ((value_type*)m1 + 2));
+			CHECK(m2 == m1 + 2);
+			CHECK_MEMORY(m2, 3, 4);
+		}
+	}
+
+#if 0
 	GIVEN("an empty allocator")
 	{
 		using empty_allocator = atma::aligned_allocator_t<int>;
@@ -243,6 +338,8 @@ SCENARIO_OF("memory/basic_memory_t", "basic_memory_t construction")
 			CHECK_MEMORY(m2, 3, 4);
 		}
 	}
+#endif
+
 }
 
 SCENARIO_OF("memory/basic_memory_t", "basic_memory_t behaves nicely")
