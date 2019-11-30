@@ -260,110 +260,24 @@ SCENARIO_TEMPLATE("basic_memory_t can be constructed", xfer, allocator_value_tup
 			}
 		}
 
-		WHEN("basic_memory_t is used with fake arithmetic")
+		WHEN("a basic_memory_t is constructed from another with 'x + 2'")
 		{
 			auto m1 = memory_t{storage.data()};
 			auto m2 = m1 + 2;
 			static_assert(std::is_same_v<decltype(m2), decltype(m1)>);
 
-			CHECK((value_type*)m2 == ((value_type*)m1 + 2));
-			CHECK(m2 == m1 + 2);
-			CHECK_MEMORY(m2, 3, 4);
-		}
-	}
+			THEN("the pointers of both basic_memory_ts equal each other")
+			{
+				// test via conversion to pointer
+				CHECK((value_type*)m2 == ((value_type*)m1 + 2));
+				// test equality operator of memory
+				CHECK(m2 == (m1 + 2));
+			}
 
-#if 0
-	GIVEN("an empty allocator")
-	{
-		using empty_allocator = atma::aligned_allocator_t<int>;
-		using storage_t = std::vector<int>;
-		using int_memory_t = atma::basic_memory_t<int, empty_allocator>;
-
-		THEN("basic_memory_t can be default-constructed")
-		{
-			int_memory_t memory;
-
-			CHECK(sizeof(memory) == sizeof(int*));
-			CHECK((int*)memory == nullptr);
-		}
-
-		THEN("basic_memory_t can constructed from a pointer & allocator")
-		{
-			storage_t store{1, 2, 3, 4};
-			auto memory = int_memory_t{store.data(), empty_allocator()};
-
-			CHECK(sizeof(memory) == sizeof(int*));
-			CHECK((int*)memory == store.data());
-			CHECK_MEMORY(memory, 1, 2, 3, 4);
-		}
-
-		THEN("basic_memory_t has working deduction guides")
-		{
-			int* data = nullptr;
-			auto m1 = atma::basic_memory_t{data};
-			auto m2 = atma::basic_memory_t{data, empty_allocator()};
-		}
-
-		THEN("basic_memory_t can be assigned")
-		{
-			int_memory_t memory;
-			storage_t store{1, 2, 3, 4};
-
-			memory = store.data();
-
-			CHECK((int*)memory == store.data());
-			CHECK_MEMORY(memory, 1, 2, 3, 4);
-		}
-
-		THEN("basic_memory_t can be indexed")
-		{
-			storage_t store{1, 2, 3, 4};
-			int_memory_t memory{store.data()};
-
-			CHECK(memory[0] == 1);
-			CHECK(memory[1] == 2);
-			CHECK(memory[2] == 3);
-			CHECK(memory[3] == 4);
-		}
-
-		THEN("basic_memory_t can fake pointer arithmetic")
-		{
-			storage_t store{1, 2, 3, 4};
-
-			auto m1 = int_memory_t{store.data()};
-			auto m2 = m1 + 2;
-			static_assert(std::is_same_v<decltype(m2), decltype(m1)>);
-
-			CHECK((int*)m2 == ((int*)m1 + 2));
-			CHECK_MEMORY(m2, 3, 4);
-		}
-	}
-#endif
-
-}
-
-SCENARIO_OF("memory/basic_memory_t", "basic_memory_t behaves nicely")
-{
-	GIVEN("an empty allocator")
-	{
-		using empty_allocator = atma::aligned_allocator_t<byte>;
-		using memory_t = atma::basic_memory_t<byte, empty_allocator>;
-
-		THEN("basic_memory_t can be default-constructed")
-		{
-			auto memory = memory_t();
-		}
-
-		THEN("basic_memory_t can constructed from a pointer")
-		{
-			byte* ptr = nullptr;
-			auto memory = memory_t(ptr);
-		}
-
-		THEN("basic_memory_t can constructed from a pointer")
-		{
-			byte* ptr = nullptr;
-			auto memory = memory_t(ptr);
+			THEN("the values of the instantiated memory are the third and fourth elements")
+			{
+				CHECK_MEMORY(m2, xferti::compar2, xferti::compar3);
+			}
 		}
 	}
 }
@@ -377,13 +291,13 @@ SCENARIO_TEMPLATE("a (dest|src)_memxfer_t is directly constructed", xfer, xfer_t
 	using memxfer_type   = typename xfer::memxfer_t;
 	using storage_type   = atma::vector<value_type, allocator_type>;
 
-	GIVEN("reliable storage of a type")
+	GIVEN("storage of four value-initialized elements")
 	{
 		auto storage = storage_type(4);
 
 		if constexpr (std::is_empty_v<allocator_type>)
 		{
-			WHEN("it is constructible from solely pointer")
+			WHEN("it is constructible from solely a pointer")
 			{
 				[[maybe_unused]] auto d = memxfer_type(storage.data());
 			
