@@ -164,11 +164,25 @@ namespace atma
 	basic_memory_t(T*, A const&) -> basic_memory_t<T, A>;
 
 
+	// comparison
+	template <typename T, typename A>
+	inline auto operator == (basic_memory_t<T, A> const& lhs, basic_memory_t<T, A> const& rhs)
+	{
+		return lhs.data() == rhs.data();
+	}
+
+
 	// addition
 	template <typename T, typename A, typename D, CONCEPT_MODELS_(integral_concept, D)>
 	inline auto operator + (basic_memory_t<T, A> lhs, D d)
 	{
 		return basic_memory_t<T, A>(lhs.data() + d, lhs.get_allocator());
+	}
+
+	template <typename T, typename A>
+	inline decltype(auto) operator << (std::ostream& stream, basic_memory_t<T, A> const& x)
+	{
+		return stream << "memory{0x" << x.data() << "}";
 	}
 }
 
