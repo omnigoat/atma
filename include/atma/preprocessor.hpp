@@ -69,3 +69,27 @@
 	BOOST_PP_SEQ_FOR_EACH_I(FOR_EACH_TEMPLATE_TYPE_COMBINATION_F, fn, tupleseq)
 
 
+
+
+// idk dump this here for now
+
+template <typename F>
+struct scope_guard_t
+{
+	template <typename G>
+	scope_guard_t(G&& f)
+		: f(std::forward<G>(f))
+	{}
+
+	~scope_guard_t()
+	{
+		f();
+	}
+
+	F f;
+};
+
+template <typename F>
+scope_guard_t(F&& f) -> scope_guard_t<std::remove_reference_t<F>>;
+
+#define SCOPE_GUARD(f) scope_guard_t scope_guard_##__COUNTER__{f};
