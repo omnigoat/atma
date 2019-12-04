@@ -2464,11 +2464,14 @@ int registerReporter(const char* name, int priority, bool isReporter) {
 #define DOCTEST_THEN(name)      DOCTEST_SUBCASE("     Then: " name)
 #define DOCTEST_AND_THEN(name)  DOCTEST_SUBCASE("      And: " name)
 
-#define AND_WHEN_IF(expr, name) \
+#define AND_WHEN_IF_CONSTEXPR(expr, name) \
 	if constexpr (expr) DOCTEST_AND_WHEN(name)
 
 #define GIVEN_IF_CONSTEXPR(expr, name) \
 	if constexpr (expr) DOCTEST_GIVEN(name)
+
+#define THEN_IF_CONSTEXPR(expr, name) \
+	if constexpr (expr) DOCTEST_THEN(name)
 
 // clang-format on
 

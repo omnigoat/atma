@@ -263,7 +263,7 @@ SCENARIO_TEMPLATE("basic_memory_t can be constructed", xfer, ALLOCATOR_VALUE_TUP
 		{
 			auto memory = memory_t{storage.data(), storage.get_allocator()};
 
-			AND_WHEN_IF(is_empty_allocator, "the allocator is empty")
+			AND_WHEN_IF_CONSTEXPR(is_empty_allocator, "the allocator is empty")
 			THEN("sizeof basic_memory_t equtes to the size of a pointer")
 			{
 				CHECK(sizeof(memory) == sizeof(value_type*));
@@ -753,7 +753,7 @@ SCENARIO_TEMPLATE("memory_copy_construct is called", xfer, ALLOCATOR_VALUE_TUPLE
 			}
 		}
 
-		GIVEN("a source vector of those four values")
+		GIVEN("a source vector of those four known values")
 		{
 			auto const source = std::vector<value_type>{info::compar0, info::compar1, info::compar2, info::compar3};
 
@@ -808,64 +808,85 @@ SCENARIO_TEMPLATE("memory_copy_construct is called", xfer, ALLOCATOR_VALUE_TUPLE
 }
 
 
-SCENARIO_OF("memory/operations", "range_move_construct is called")
+SCENARIO_TEMPLATE("memory_move_construct is called", xfer, ALLOCATOR_VALUE_TUPLES)
 {
-	GIVEN("an empty allocator and the dragon-type")
+	using allocator_type = std::tuple_element_t<0, xfer>;
+	using value_type     = std::tuple_element_t<1, xfer>;
+	using storage_type   = atma::vector<value_type, allocator_type>;
+
+	using info = xfer_type_info_t<value_type>;
+
+	GIVEN("'defval', a value-initialized instance of our value_type")
+	GIVEN("a destination vector of six (6) value-initialized elements that equate to defval")
+	GIVEN("four (4) known values to compare against")
 	{
-		using value_type = dragon_t;
-		using allocator_type = atma::aligned_allocator_t<dragon_t>;
-		using memory_t = atma::basic_memory_t<value_type, allocator_type>;
+		auto const defval = value_type();
 
-		static_assert(std::is_empty_v<allocator_type>, "allocator not empty!");
+		auto const& compar0 = info::compar0;
+		auto const& compar1 = info::compar1;
+		auto const& compar2 = info::compar2;
+		auto const& compar3 = info::compar3;
 
-		dragon_t const oliver{"oliver", 33};
-		dragon_t const henry{"henry", 24};
-		dragon_t const marcie{"marcie", 27};
-		dragon_t const rachael{"rachael", 19};
+		auto dest_storage = std::vector<value_type>(6, defval);
+		auto dest_memory = atma::basic_memory_t<value_type, allocator_type>(dest_storage.data());
 
-		GIVEN("destination memory pointing to an lvalue vector")
+		GIVEN("source memory pointing to an lvalue vector")
 		{
-			auto dest_storage = std::vector<value_type>(6, empty_dragon);
-			auto dest_memory = memory_t(dest_storage.data());
+			auto src_storage = std::vector<value_type>{compar0, compar1, compar2, compar3};
 
-			GIVEN("source memory pointing to an lvalue vector")
+			GIVEN("a destination subrange of [0, 4)")
+			GIVEN("a source range of the full source vector")
 			{
-				auto src_storage = std::vector<value_type>{oliver, henry, marcie, rachael};
-
-				THEN("range_move_construct can move part of the range")
+				WHEN("memory_move_construct is called")
 				{
-					//MODELS_ARGS(dest_memory_concept, dest),
-					//MODELS_ARGS(src_memory_concept, src),
-					//MODELS_ARGS(bounded_memory_concept, dest),
-					//MODELS_ARGS(bounded_memory_concept, src))
-
-					static_assert(MODELS_ARGS(atma::dest_memory_concept, atma::xfer_dest(dest_memory, 4)));
-
 					atma::memory_move_construct(
 						atma::xfer_dest(dest_memory, 4),
-						atma::xfer_src(src_storage.data(), src_storage.size()));
+						atma::xfer_src(src_storage));
 
-					CHECK_MEMORY(dest_memory,
-						oliver, henry, marcie, rachael,
-						empty_dragon, empty_dragon);
+					THEN("the destination range has the four elements in positions [0, 4)")
+					{
+						CHECK_MEMORY(dest_memory,
+							compar0, compar1, compar2, compar3,
+							defval, defval);
+					}
 
-					CHECK_VECTOR(src_storage,
-						empty_dragon, empty_dragon, empty_dragon, empty_dragon);
+					THEN_IF_CONSTEXPR(std::is_class_v<value_type>, "the source range has now-empty elements")
+					{
+						CHECK_VECTOR(src_storage,
+							defval, defval, defval, defval);
+					}
 				}
+			}
 
-				THEN("range_move_construct can move part of the range")
+			GIVEN("a destination subrange of [2, 4)")
+			GIVEN("a source range of the first two elements")
+			{
+				WHEN("memory_move_construct is called")
 				{
 					atma::memory_move_construct(
-						atma::xfer_dest(dest_memory, 2),
+						atma::xfer_dest(dest_memory + 2, 2),
 						atma::xfer_src(src_storage, 0, 2));
 
-					CHECK_MEMORY(dest_memory,
-						oliver, henry,
-						empty_dragon, empty_dragon, empty_dragon, empty_dragon);
+					THEN("destination elements [0, 2) equate to defval")
+					THEN("destination elements [2, 4) equate to comparands 0 and 1")
+					THEN("destination elements [4, 6) equate to defval")
+					{
+						CHECK_MEMORY(dest_memory,
+							defval, defval,
+							compar0, compar1,
+							defval, defval);
+					}
 
-					CHECK_VECTOR(src_storage,
-						empty_dragon, empty_dragon,
-						marcie, rachael);
+					if constexpr (std::is_class_v<value_type>)
+					{
+						THEN("source elements [0, 2) equate to defval")
+						THEN("source elements [2, 4) remain untouched")
+						{
+							CHECK_VECTOR(src_storage,
+								defval, defval,
+								compar2, compar3);
+						}
+					}
 				}
 			}
 		}
