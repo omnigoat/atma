@@ -18,6 +18,12 @@
 #define SCOPED_BASIC_MEMORY_ALLOCATION(memory_name, size) memory_name.allocate(size); SCOPE_GUARD([&memory_name]{memory_name.deallocate(size);})
 
 
+
+
+//
+// xfer_type_info_t
+// --------------------
+//
 template <typename T>
 struct xfer_type_info_t;
 
@@ -109,6 +115,15 @@ TYPE_TO_STRING(dragon_t);
 dragon_t const empty_dragon;
 
 
+
+
+//
+//  TYPE USAGE INFORMATION
+//  -------------------------
+//    here we write out, for each value-type we wish to test against,
+//    four sets of construction arguments which will be our "known values"
+//    for comparisons
+//
 DEFINE_VALUE_TYPE_FOR_TESTING(dragon_t, \
 	("oliver", 33) \
 	("henry", 21) \
@@ -119,35 +134,59 @@ DEFINE_VALUE_TYPE_FOR_TESTING(int, (1)(2)(3)(4));
 
 
 
-//
-//
-//
-//
-//
-#define test_memory_tags (atma::dest_memory_tag_t, atma::src_memory_tag_t)
-#define test_allocators  (std::allocator, atma::arena_allocator_t)
-#define test_value_types (int, dragon_t)
 
-#define xfer_type_combinations \
-	test_memory_tags \
-	test_allocators \
-	test_value_types
+//
+// TEST TYPES SETUP
+// -------------------------
+// the tuple-seqs of types that we will make combinations out of for coverage
+//
+#define TEST_XFER_MEMORY_TAG_TYPES (atma::dest_memory_tag_t, atma::src_memory_tag_t)
+#define TEST_XFER_ALLOCATOR_TYPES  (std::allocator, atma::arena_allocator_t)
+#define TEST_XFER_VALUE_TYPES (int, dragon_t)
 
-// every combination of tags/allocator_types/value_types
-#define xfer_type_list_m(i, ...) BOOST_PP_COMMA_IF(i) __VA_ARGS__
-#define xfer_type_list FOR_EACH_TEMPLATE_TYPE_COMBINATION(xfer_type_list_m, \
-	GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, xfer_type_combinations))
-
-// tuples of <allocator_type, value_type>
-#define allocator_value_tuples_m(i, d, allocator_type, value_type) BOOST_PP_COMMA_IF(i) std::tuple<allocator_type<value_type>, value_type>
-#define allocator_value_tuples FOR_EACH_COMBINATION(allocator_value_tuples_m, ~, GENERATE_COMBINATIONS_OF_TUPLES(test_allocators test_value_types))
+#define MEMORYTAG_ALLOCATOR_VALUETYPE_SEQS \
+	TEST_XFER_MEMORY_TAG_TYPES \
+	TEST_XFER_ALLOCATOR_TYPES \
+	TEST_XFER_VALUE_TYPES
 
 // type-to-string all our allocators
 #define TYPE_ALLOCATORS_TO_STRING(i, d, allocator_type, value_type) TYPE_TO_STRING(allocator_type<value_type>);
-FOR_EACH_COMBINATION(TYPE_ALLOCATORS_TO_STRING, ~, GENERATE_COMBINATIONS_OF_TUPLES(test_allocators test_value_types))
+FOR_EACH_COMBINATION(TYPE_ALLOCATORS_TO_STRING, ~, GENERATE_COMBINATIONS_OF_TUPLES(TEST_XFER_ALLOCATOR_TYPES TEST_XFER_VALUE_TYPES))
 
 
-SCENARIO_TEMPLATE("base_memory_t performing EBO", xfer, allocator_value_tuples)
+//
+// XFER_TYPE_COMBINATIONS
+// -------------------------
+//   a list of 'xfer_maker<tag_type, allocator_type, value_type>' for every
+//   combination within MEMORYTAG_ALLOCATOR_VALUETYPE_SEQS
+//
+#define XFER_TYPE_COMBINATIONS_m(i, ...) BOOST_PP_COMMA_IF(i) __VA_ARGS__
+#define XFER_TYPE_COMBINATIONS FOR_EACH_TEMPLATE_TYPE_COMBINATION(XFER_TYPE_COMBINATIONS_m, \
+	GENERATE_TEMPLATE_TYPE_COMBINATIONS(xfer_maker, MEMORYTAG_ALLOCATOR_VALUETYPE_SEQS))
+
+//
+// ALLOCATOR_VALUE_TUPLES
+// -------------------------
+//   a list of 'std::tuple<allocator_type, value_type>' for every combination in
+//   our test coverage lists
+//
+#define ALLOCATOR_VALUE_TUPLES_m(i, d, allocator_type, value_type) BOOST_PP_COMMA_IF(i) std::tuple<allocator_type<value_type>, value_type>
+#define ALLOCATOR_VALUE_TUPLES FOR_EACH_COMBINATION(ALLOCATOR_VALUE_TUPLES_m, ~, GENERATE_COMBINATIONS_OF_TUPLES(TEST_XFER_ALLOCATOR_TYPES TEST_XFER_VALUE_TYPES))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SCENARIO_TEMPLATE("base_memory_t performing EBO", xfer, ALLOCATOR_VALUE_TUPLES)
 {
 	using allocator_type = std::tuple_element_t<0, xfer>;
 	using value_type     = std::tuple_element_t<1, xfer>;
@@ -176,7 +215,7 @@ SCENARIO_TEMPLATE("base_memory_t performing EBO", xfer, allocator_value_tuples)
 	}
 }
 
-SCENARIO_TEMPLATE("basic_memory_t can be constructed", xfer, allocator_value_tuples)
+SCENARIO_TEMPLATE("basic_memory_t can be constructed", xfer, ALLOCATOR_VALUE_TUPLES)
 {
 	using allocator_type = std::tuple_element_t<0, xfer>;
 	using value_type     = std::tuple_element_t<1, xfer>;
@@ -284,7 +323,7 @@ SCENARIO_TEMPLATE("basic_memory_t can be constructed", xfer, allocator_value_tup
 
 
 
-SCENARIO_TEMPLATE("a (dest|src)_memxfer_t is directly constructed", xfer, xfer_type_list)
+SCENARIO_TEMPLATE("a (dest|src)_memxfer_t is directly constructed", xfer, XFER_TYPE_COMBINATIONS)
 {
 	using value_type     = typename xfer::value_type;
 	using allocator_type = typename xfer::allocator_type;
@@ -340,27 +379,8 @@ SCENARIO_TEMPLATE("a (dest|src)_memxfer_t is directly constructed", xfer, xfer_t
 	}
 }
 
-template <typename F>
-struct scope_guard_t
-{
-	scope_guard_t(F f)
-		: f(f)
-	{}
 
-	~scope_guard_t()
-	{
-		f();
-	}
-
-	F f;
-};
-
-template <typename F>
-scope_guard_t(F f) -> scope_guard_t<F>;
-
-#define SCOPE_GUARD(f) scope_guard_t scope_guard_##__COUNTER__{f};
-
-SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, xfer_type_list)
+SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, XFER_TYPE_COMBINATIONS)
 {
 	auto& xfer_make = xfer::make;
 
@@ -535,7 +555,7 @@ SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, xfer_type_list)
 }
 
 
-SCENARIO_TEMPLATE("memory_default_construct is called", xfer, allocator_value_tuples)
+SCENARIO_TEMPLATE("memory_default_construct is called", xfer, ALLOCATOR_VALUE_TUPLES)
 {
 	using allocator_type = std::tuple_element_t<0, xfer>;
 	using value_type     = std::tuple_element_t<1, xfer>;
@@ -570,7 +590,7 @@ SCENARIO_TEMPLATE("memory_default_construct is called", xfer, allocator_value_tu
 	}
 }
 
-SCENARIO_TEMPLATE("memory_value_construct is called", xfer, allocator_value_tuples)
+SCENARIO_TEMPLATE("memory_value_construct is called", xfer, ALLOCATOR_VALUE_TUPLES)
 {
 	using allocator_type = std::tuple_element_t<0, xfer>;
 	using value_type     = std::tuple_element_t<1, xfer>;
@@ -600,7 +620,7 @@ SCENARIO_TEMPLATE("memory_value_construct is called", xfer, allocator_value_tupl
 	}
 }
 
-SCENARIO_TEMPLATE("memory_construct is called", xfer, allocator_value_tuples)
+SCENARIO_TEMPLATE("memory_construct is called", xfer, ALLOCATOR_VALUE_TUPLES)
 {
 	using allocator_type = std::tuple_element_t<0, xfer>;
 	using value_type     = std::tuple_element_t<1, xfer>;
@@ -692,7 +712,7 @@ SCENARIO_TEMPLATE("memory_construct is called", xfer, allocator_value_tuples)
 	}
 }
 
-SCENARIO_TEMPLATE("memory_copy_construct is called", xfer, allocator_value_tuples)
+SCENARIO_TEMPLATE("memory_copy_construct is called", xfer, ALLOCATOR_VALUE_TUPLES)
 {
 	using allocator_type = std::tuple_element_t<0, xfer>;
 	using value_type     = std::tuple_element_t<1, xfer>;
