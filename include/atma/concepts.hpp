@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atma/meta.hpp>
+#include <atma/types.hpp>
 
 #include <boost/preprocessor/variadic/to_seq.hpp>
 #include <boost/preprocessor/seq/for_each_i.hpp>
