@@ -219,7 +219,7 @@ namespace atma {
 	template <typename xs_t, typename x_t>
 	inline auto tuple_push_back(xs_t&& xs, x_t&& x) -> tuple_push_back_t<std::decay_t<xs_t>, std::decay_t<x_t>>
 	{
-		return atma::tuple_cat(std::forward<xs_t>(xs), std::forward_as_tuple(std::forward<x_t>(x)));
+		return std::tuple_cat(std::forward<xs_t>(xs), std::forward_as_tuple(std::forward<x_t>(x)));
 	}
 
 

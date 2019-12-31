@@ -1,10 +1,13 @@
 #pragma once
 
-#include <atma/function_traits.hpp>
-#include <atma/tuple.hpp>
 #include <atma/ranges/filter.hpp>
 #include <atma/ranges/map.hpp>
 #include <atma/ranges/zip.hpp>
+
+#include <atma/function_traits.hpp>
+#include <atma/tuple.hpp>
+#include <atma/vector.hpp>
+#include <atma/types.hpp>
 
 #include <algorithm>
 
