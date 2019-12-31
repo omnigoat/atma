@@ -415,12 +415,12 @@ namespace atma
 		
 		if (size < size_)
 		{
-			memory::destruct(
+			memory_destruct(
 				xfer_dest(imem_ + size, size_ - size));
 		}
 		else if (size_ < size)
 		{
-			memory::range_construct(
+			memory_construct(
 				xfer_dest(imem_ + size_, size - size_),
 				x);
 		}

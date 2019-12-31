@@ -420,6 +420,14 @@ namespace atma
 }
 
 
+
+namespace atma::detail
+{
+	inline event_system_t default_event_system;
+	inline event_binder_t default_event_binder;
+}
+
+
 // event
 namespace atma
 {
@@ -495,8 +503,3 @@ namespace atma
 
 }
 
-namespace atma::detail
-{
-	inline event_system_t default_event_system;
-	inline event_binder_t default_event_binder;
-}

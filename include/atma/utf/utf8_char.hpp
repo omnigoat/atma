@@ -173,6 +173,11 @@ namespace atma
 		return utf8_char_equality(lhs.data(), rhs.data());
 	}
 
+	inline auto operator == (utf8_char_t lhs, char const* rhs) -> bool
+	{
+		return utf8_char_equality(lhs.data(), rhs);
+	}
+
 	inline auto operator == (utf8_char_t lhs, char rhs) -> bool
 	{
 		return lhs[0] == rhs;
