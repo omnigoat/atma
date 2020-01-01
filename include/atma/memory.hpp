@@ -298,75 +298,60 @@ namespace atma
 // concept: memory-range
 namespace atma
 {
-	struct memory_concept
+	template <typename T>
+	concept memory_concept = requires(T x)
 	{
-		template <typename Memory>
-		auto contract(Memory memory) -> concepts::specifies
-		<
-			// range has allocator/data
-			SPECIFIES_TYPE(typename Memory::value_type),
-			SPECIFIES_TYPE(typename Memory::allocator_type),
-			SPECIFIES_EXPR(std::data(memory)),
-			SPECIFIES_EXPR(atma::get_allocator(memory))
-		>;
+		typename T::value_type;
+		typename T::allocator_type;
+		{ std::data(x) };
+		{ atma::get_allocator(x) };
 	};
 
-	struct bounded_memory_concept
-		: concepts::refines<memory_concept>
+	template <typename T>
+	concept bounded_memory_concept = requires(T x)
 	{
-		template <typename Memory>
-		auto contract() -> concepts::specifies
-		<
-			// range can provide size
-			SPECIFIES_EXPR(std::size(std::declval<Memory>()))
-		>;
+		{ std::size(x) };
+
+		requires memory_concept<T>;
 	};
 
-	struct dest_memory_concept
-		: concepts::refines<memory_concept>
+	template <typename T>
+	concept dest_memory_concept = requires(T x)
 	{
-		template <typename Memory>
-		auto contract() -> concepts::specifies<
-			std::is_same_v<dest_memory_tag_t, typename Memory::tag_type>
-		>;
+		memory_concept<T>;
+
+		std::is_same_v<typename T::tag_type, dest_memory_tag_t>;
 	};
 
-	struct src_memory_concept
-		: concepts::refines<memory_concept>
+	template <typename T>
+	concept src_memory_concept = requires(T x)
 	{
-		template <typename Memory>
-		auto contract() -> concepts::specifies<
-			std::is_same_v<src_memory_tag_t, typename Memory::tag_type>
-		>;
+		memory_concept<T>;
+
+		std::is_same_v<src_memory_tag_t, typename T::tag_type>;
 	};
 
-	struct dest_bounded_memory_concept
-		: concepts::refines<bounded_memory_concept>
+	template <typename T>
+	concept dest_bounded_memory_concept = requires(T x)
 	{
-		template <typename Memory>
-		auto contract() -> concepts::specifies<
-			std::is_same_v<dest_memory_tag_t, typename Memory::tag_type>
-		>;
+		requires bounded_memory_concept<T>;
+		requires std::same_as<typename rmref_t<T>::tag_type, dest_memory_tag_t>;
 	};
 
-	struct src_bounded_memory_concept
-		: concepts::refines<bounded_memory_concept>
+	template <typename T>
+	concept src_bounded_memory_concept = requires(T x)
 	{
-		template <typename Memory>
-		auto contract() -> concepts::specifies<
-			std::is_same_v<src_memory_tag_t, typename Memory::tag_type>
-		>;
+		requires bounded_memory_concept<T>;
+		{ std::size(x) } -> std::string;
+		requires std::same_as<src_memory_tag_t, typename T::tag_type>;
 	};
 
-	struct sized_range_concept
-		: concepts::refines<range_concept>
+	template <typename T>
+	concept sized_range_concept = requires(T&& x)
 	{
-		template <typename Range>
-		auto contract(Range&& range) -> concepts::specifies
-		<
-			// range can provide size
-			SPECIFIES_EXPR(std::size(range))
-		>;
+		models_v<range_concept, rmref_t<T>>;
+
+		{ std::size(x) };
 	};
 }
 
@@ -539,8 +524,8 @@ namespace atma::detail
 	struct xfer_make_from_sized_contiguous_range_
 	{
 		template <typename R,
-			CONCEPT_MODELS_(contiguous_range_concept, rmref_t<R>),
-			CONCEPT_MODELS_(sized_range_concept, rmref_t<R>)>
+			CONCEPT_MODELS_(contiguous_range_concept, rmref_t<R>)>
+		requires sized_range_concept<rmref_t<R>>
 		auto operator ()(R&& range) -> bounded_memxfer_range_of_t<tag_type, rmref_t<R>>
 		{
 			return {get_allocator(range), std::addressof(*std::begin(range)), std::size(range)};
@@ -577,15 +562,15 @@ namespace atma::detail
 	template <typename tag_type>
 	struct xfer_make_from_memory_
 	{
-		template <typename M,
-			CONCEPT_MODELS_(memory_concept, rmref_t<M>)>
+		template <typename M>
+		requires memory_concept<rmref_t<M>>
 		auto operator ()(M&& memory) -> memxfer_range_of_t<tag_type, rmref_t<M>>
 		{
 			return {get_allocator(memory), std::data(memory)};
 		}
 
-		template <typename M,
-			CONCEPT_MODELS_(memory_concept, rmref_t<M>)>
+		template <typename M>
+		requires memory_concept<rmref_t<M>>
 		auto operator ()(M&& memory, size_t size) -> bounded_memxfer_range_of_t<tag_type, rmref_t<M>>
 		{
 			return {get_allocator(memory), std::data(memory), size};
@@ -674,7 +659,7 @@ namespace atma::detail
 namespace atma
 {
 	constexpr auto memory_construct_at = [](auto&& dest, auto&&... args)
-	LAMBDA_REQUIRES(MODELS_ARGS(memory_concept, dest))
+	requires memory_concept<rmref_t<decltype(dest)>>
 	{
 		decltype(auto) allocator = get_allocator(dest);
 		using allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
@@ -708,13 +693,13 @@ namespace atma::detail
 		functor_call_fwds_t<F>{},
 
 		[](auto& f, auto&& dest)
-		LAMBDA_REQUIRES(MODELS_ARGS(dest_bounded_memory_concept, dest))
+		requires dest_bounded_memory_concept<decltype(dest)>
 		{
 			f(get_allocator(dest), std::data(dest), std::size(dest));
 		},
 
 		[](auto& f, auto&& dest, size_t sz)
-		LAMBDA_REQUIRES(MODELS_ARGS(dest_memory_concept, dest))
+		requires dest_bounded_memory_concept<decltype(dest)>
 		{
 			f(get_allocator(dest), std::data(dest), sz);
 		}
@@ -745,7 +730,7 @@ namespace atma
 	constexpr auto memory_construct = functor_list_t
 	{
 		[] (auto&& dest, auto&&... args)
-		LAMBDA_REQUIRES(MODELS_ARGS(dest_memory_concept, dest))
+		requires dest_bounded_memory_concept<decltype(dest)>
 		{
 			detail::_memory_range_construct(
 				get_allocator(dest),
@@ -755,7 +740,7 @@ namespace atma
 		},
 
 		[](auto&& dest, auto&&... args)
-		LAMBDA_REQUIRES(MODELS_ARGS(sized_range_concept, dest))
+		requires sized_range_concept<decltype(dest)>
 		{
 			using allocator_type = decltype(detail::allocator_type_of_range_(dest));
 
@@ -842,9 +827,9 @@ namespace atma::detail
 		functor_call_fwds_t<F>(),
 
 		[](auto& f, auto&& dest, auto&& src, size_t sz)
-		LAMBDA_REQUIRES(
-		  MODELS_ARGS(dest_memory_concept, dest),
-		  MODELS_ARGS(src_memory_concept, src))
+		requires
+			dest_memory_concept<decltype(dest)> &&
+			src_memory_concept<decltype(src)>
 		{
 			constexpr bool dest_is_bounded = concepts::models_ref_v<bounded_memory_concept, decltype(dest)>;
 			constexpr bool src_is_bounded = concepts::models_ref_v<bounded_memory_concept, decltype(src)>;
@@ -867,11 +852,9 @@ namespace atma::detail
 		},
 
 		[](auto& f, auto&& dest, auto&& src)
-		LAMBDA_REQUIRES(
-		  MODELS_ARGS(dest_bounded_memory_concept, dest),
-		  MODELS_ARGS(src_bounded_memory_concept, src))
+		requires dest_bounded_memory_concept<rmref_t<decltype(dest)>> && src_bounded_memory_concept<rmref_t<decltype(src)>>
 		{
-			ATMA_ASSERT(std::size(dest) == std::size(src));
+			//ATMA_ASSERT(std::size(dest) == std::size(src));
 
 			f(get_allocator(dest),
 				std::data(dest),
@@ -880,9 +863,9 @@ namespace atma::detail
 		},
 
 		[](auto& f, auto&& dest, auto&& src)
-		-> RETURN_TYPE_IF(void,
-			MODELS_ARGS(dest_bounded_memory_concept, dest),
-			MODELS_ARGS(src_memory_concept, src))
+		requires
+			dest_bounded_memory_concept<decltype(dest)>&&
+			src_memory_concept<decltype(src)>
 		{
 			f(get_allocator(dest),
 				std::data(dest),
@@ -891,9 +874,7 @@ namespace atma::detail
 		},
 
 		[](auto& f, auto&& dest, auto&& src)
-		-> RETURN_TYPE_IF(void,
-			MODELS_ARGS(dest_memory_concept, dest),
-			MODELS_ARGS(src_bounded_memory_concept, src))
+		requires src_bounded_memory_concept<rmref_t<decltype(src)>> && dest_memory_concept<decltype(dest)>
 		{
 			f(get_allocator(dest),
 				std::data(dest),
@@ -902,9 +883,7 @@ namespace atma::detail
 		},
 
 		[](auto&& dest, auto&& src)
-		-> RETURN_TYPE_IF(void,
-			MODELS_ARGS(dest_memory_concept, dest),
-			MODELS_ARGS(contiguous_range_concept, src))
+		requires std::ranges::contiguous_range<rmref_t<decltype(src)>>
 		{
 			auto const sz = std::distance(std::begin(src), std::end(src));
 
@@ -915,9 +894,9 @@ namespace atma::detail
 		},
 
 		[](auto& f, auto&& dest, auto&& src)
-		-> RETURN_TYPE_IF(void,
-			MODELS_ARGS(sized_range_concept, dest),
-			MODELS_ARGS(sized_range_concept, src))
+		requires
+			sized_range_concept<decltype(dest)> &&
+			sized_range_concept<decltype(src)>
 		{
 			using allocator_type = decltype(detail::allocator_type_of_range_(dest));
 
@@ -928,10 +907,10 @@ namespace atma::detail
 		},
 		
 		[](auto& f, auto&& dest, auto begin, auto end)
-		-> RETURN_TYPE_IF(void,
-			MODELS_ARGS(dest_memory_concept, dest),
-			MODELS_ARGS(iterator_concept, begin),
-			MODELS_ARGS(iterator_concept, end))
+		requires
+			dest_memory_concept<rmref_t<decltype(dest)>> && 
+			std::forward_iterator<decltype(begin)> &&
+			std::forward_iterator<decltype(end)>
 		{
 			f(get_allocator(dest),
 				std::data(dest),
@@ -1102,9 +1081,9 @@ namespace atma
 	constexpr auto memory_relocate_range = functor_list_t
 	{
 		[] (auto&& dest, auto&& src, size_t sz)
-		-> RETURN_TYPE_IF(void,
-			MODELS_ARGS(dest_memory_concept, dest),
-			MODELS_ARGS(src_memory_concept, src))
+		requires
+			dest_memory_concept<rmref_t<decltype(dest)>> &&
+			src_memory_concept<rmref_t<decltype(src)>>
 		{
 			constexpr bool dest_is_bounded = concepts::models_ref_v<bounded_memory_concept, decltype(dest)>;
 			constexpr bool src_is_bounded = concepts::models_ref_v<bounded_memory_concept, decltype(src)>;
@@ -1129,9 +1108,9 @@ namespace atma
 		},
 
 		[](auto&& dest, auto&& src)
-		-> RETURN_TYPE_IF(void,
-			MODELS_ARGS(dest_bounded_memory_concept, dest),
-			MODELS_ARGS(src_bounded_memory_concept, src))
+		requires
+			dest_bounded_memory_concept<decltype(dest)>&&
+			src_bounded_memory_concept<decltype(src)>
 		{
 			ATMA_ASSERT(std::size(dest) == std::size(src));
 
@@ -1144,9 +1123,9 @@ namespace atma
 		},
 
 		[](auto&& dest, auto&& src)
-		-> RETURN_TYPE_IF(void,
-			MODELS_ARGS(bounded_memory_concept, dest),
-			MODELS_ARGS(memory_concept, src))
+		requires
+			dest_bounded_memory_concept<decltype(dest)>&&
+			src_memory_concept<decltype(src)>
 		{
 			detail::_memory_relocate_range(
 				get_allocator(dest),
@@ -1157,9 +1136,9 @@ namespace atma
 		},
 
 		[](auto&& dest, auto&& src)
-		-> RETURN_TYPE_IF(void,
-			MODELS_ARGS(memory_concept, dest),
-			MODELS_ARGS(bounded_memory_concept, src))
+		requires
+			dest_memory_concept<decltype(dest)>&&
+			src_bounded_memory_concept<decltype(src)>
 		{
 			detail::_memory_relocate_range(
 				get_allocator(dest),
