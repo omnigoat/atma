@@ -98,7 +98,7 @@ namespace atma
 		while (queue.with_consumption([](auto& D) {
 			internal_function_t* f = (internal_function_t*)D.data();
 			(*f)(std::forward<Args>(args)...);
-			f->~internal_function_t();
+			f->~basic_relative_function_t();
 		}));
 	}
 }
