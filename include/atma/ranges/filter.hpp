@@ -172,6 +172,8 @@ namespace atma
 		filtered_range_iterator_t() = default;
 		filtered_range_iterator_t(filtered_range_iterator_t const&) = default;
 		filtered_range_iterator_t(filtered_range_iterator_t&&) = default;
+		
+		auto operator = (filtered_range_iterator_t const&) -> filtered_range_iterator_t&;
 
 		template <typename Iter> filtered_range_iterator_t(owner_t*, Iter&&);
 		template <typename Iter> filtered_range_iterator_t(filtered_range_iterator_t<Owner, Iter> const&);
@@ -255,6 +257,14 @@ namespace atma
 		: owner_{owner}
 		, pos_{std::forward<Iter>(begin)}
 	{}
+
+	template <typename O, typename I>
+	inline auto filtered_range_iterator_t<O, I>::operator = (filtered_range_iterator_t const& rhs) -> filtered_range_iterator_t&
+	{
+		ATMA_ASSERT(owner_ == rhs.owner_);
+		pos_ = rhs.pos_;
+		return *this;
+	}
 
 	template <typename O, typename I>
 	inline auto filtered_range_iterator_t<O, I>::operator *() -> reference

@@ -558,8 +558,31 @@ namespace atma
 		}
 
 		// maybe sanity check
-		static_assert(concepts::models_v<forward_iterator_concept, H>);
-		static_assert(concepts::models_v<memory_concept, decltype(xfer_dest(imem_ + offset, rangesize))>);
+		//static_assert(concepts::models_v<forward_iterator_concept, H>);
+		//static_assert(concepts::models_v<memory_concept, decltype(xfer_dest(imem_ + offset, rangesize))>);
+		//static_assert(std::forward_iterator<H>);
+		//static_assert(memory_concept<decltype(xfer_dest(imem_ + offset, rangesize))>);
+
+
+		static_assert(std::default_initializable<H>);
+		static_assert(std::copy_constructible<H>);
+		static_assert(std::is_object_v<H>);
+		static_assert(std::move_constructible<H>);
+		static_assert(std::assignable_from<H&, H>);
+		static_assert(std::swappable<H>);
+		static_assert(std::movable<H>);
+		static_assert(std::assignable_from<H&, H const&>);
+		static_assert(std::copyable<H>);
+		static_assert(std::semiregular<H>);
+		static_assert(std::equality_comparable<H>);
+		static_assert(std::regular<H>);
+		static_assert(std::movable<H>);
+		using Hdiff = std::iter_difference_t<H>;
+		static_assert(std::signed_integral<Hdiff>);
+		static_assert(std::weakly_incrementable<H>);
+		static_assert(std::incrementable<H>);
+		static_assert(std::forward_iterator<H>);
+
 
 		memory_copy_construct(
 			xfer_dest(imem_ + offset, rangesize),

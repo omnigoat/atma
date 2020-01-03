@@ -187,11 +187,11 @@ namespace atma::concepts
 
 
 #define MODELS_ARGS_M(r,d,i,x) BOOST_PP_COMMA_IF(i) ::std::remove_reference_t<decltype(x)>
-#define MODELS_ARGS(concept, ...) \
-	::atma::concepts::models_v<concept, BOOST_PP_SEQ_FOR_EACH_I(MODELS_ARGS_M, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))>
+#define MODELS_ARGS(conceptname, ...) \
+	::atma::concepts::models_v<conceptname, BOOST_PP_SEQ_FOR_EACH_I(MODELS_ARGS_M, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))>
 
-#define MODELS_NOT_ARGS(concept, ...) \
-	!::atma::concepts::models_v<concept, BOOST_PP_SEQ_FOR_EACH_I(MODELS_ARGS_M, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))>
+#define MODELS_NOT_ARGS(conceptname, ...) \
+	!::atma::concepts::models_v<conceptname, BOOST_PP_SEQ_FOR_EACH_I(MODELS_ARGS_M, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))>
 
 
 //

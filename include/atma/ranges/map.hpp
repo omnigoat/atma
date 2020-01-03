@@ -73,7 +73,6 @@ namespace atma
 		using difference_type = typename target_range_t::difference_type;
 		using size_type       = typename target_range_t::size_type;
 
-
 		mapped_range_t(mapped_range_t const&) = default;
 		mapped_range_t(mapped_range_t&&) = default;
 
@@ -156,6 +155,7 @@ namespace atma
 		using pointer           = value_type*;
 		using reference         = invoke_result_t;
 
+		mapped_range_iterator_t() = default;
 		mapped_range_iterator_t(R*, target_iterator_t const& begin, target_iterator_t const& end);
 
 		auto operator  *() const -> invoke_result_t;
@@ -163,7 +163,7 @@ namespace atma
 		auto operator ++(int) -> mapped_range_iterator_t;
 
 	private:
-		R* owner_;
+		R* owner_ = nullptr;
 		target_iterator_t pos_, end_;
 	};
 

@@ -38,6 +38,9 @@ namespace atma
 
 		zip_range_t(Ranges... ranges);
 
+		static_assert(std::forward_iterator<iterator>);
+		static_assert(std::forward_iterator<const_iterator>);
+
 		auto begin() -> iterator;
 		auto end() -> zip_range_sentinel_t<Ranges...>;
 		auto begin() const -> const_iterator;
@@ -78,10 +81,13 @@ namespace atma
 		using reference         = std::tuple<typename std::remove_reference_t<Ranges>::reference...>;
 		using iterator_category = std::forward_iterator_tag;
 
+		zip_range_iterator_t() = default;
+		zip_range_iterator_t(zip_range_iterator_t const&) = default;
 		zip_range_iterator_t(target_iters_tuple_t const&);
 
 		auto operator  *() const -> reference;
 		auto operator ++() -> zip_range_iterator_t&;
+		auto operator ++(int) -> zip_range_iterator_t;
 
 		auto base() const -> target_iters_tuple_t const& { return iters_; }
 		auto base() -> target_iters_tuple_t& { return iters_; }
@@ -157,6 +163,14 @@ namespace atma
 	}
 
 	template <typename... Ranges>
+	auto zip_range_iterator_t<Ranges...>::operator ++ (int) -> zip_range_iterator_t
+	{
+		auto r = *this;
+		++*this;
+		return r;
+	}
+
+	template <typename... Ranges>
 	auto zip_range_iterator_t<Ranges...>::operator *() const -> reference
 	{
 		return tuple_apply(atma::dereference_functor_t{}, base());
@@ -197,6 +211,20 @@ namespace atma
 	inline auto operator != (zip_range_sentinel_t<Ranges...> const& lhs, zip_range_iterator_t<Ranges...> const& rhs) -> bool
 	{
 		return !operator == (rhs, lhs);
+	}
+
+
+	// self-comparison for sentinel
+	template <typename... Ranges>
+	inline auto operator == (zip_range_sentinel_t<Ranges...> const& lhs, zip_range_sentinel_t<Ranges...> const& rhs) -> bool
+	{
+		return true;
+	}
+
+	template <typename... Ranges>
+	inline auto operator != (zip_range_sentinel_t<Ranges...> const& lhs, zip_range_sentinel_t<Ranges...> const& rhs) -> bool
+	{
+		return false;
 	}
 }
 

@@ -826,13 +826,11 @@ namespace atma::detail
 	{
 		functor_call_fwds_t<F>(),
 
-		[](auto& f, auto&& dest, auto&& src, size_t sz)
-		requires
-			dest_memory_concept<decltype(dest)> &&
-			src_memory_concept<decltype(src)>
+		[]<typename F, dest_memory_concept D, src_memory_concept S>
+		(F& f, D&& dest, S&& src, size_t sz)
 		{
-			constexpr bool dest_is_bounded = concepts::models_ref_v<bounded_memory_concept, decltype(dest)>;
-			constexpr bool src_is_bounded = concepts::models_ref_v<bounded_memory_concept, decltype(src)>;
+			constexpr bool dest_is_bounded = bounded_memory_concept<decltype(dest)>;
+			constexpr bool src_is_bounded = bounded_memory_concept<decltype(src)>;
 
 			ATMA_ASSERT(sz != unbounded_memory_size);
 
@@ -851,10 +849,10 @@ namespace atma::detail
 				sz);
 		},
 
-		[](auto& f, auto&& dest, auto&& src)
-		requires dest_bounded_memory_concept<rmref_t<decltype(dest)>> && src_bounded_memory_concept<rmref_t<decltype(src)>>
+		[]<typename F, dest_bounded_memory_concept D, src_bounded_memory_concept S>
+		(F& f, D&& dest, S&& src)
 		{
-			//ATMA_ASSERT(std::size(dest) == std::size(src));
+			ATMA_ASSERT(std::size(dest) == std::size(src));
 
 			f(get_allocator(dest),
 				std::data(dest),
@@ -862,10 +860,8 @@ namespace atma::detail
 				std::size(dest));
 		},
 
-		[](auto& f, auto&& dest, auto&& src)
-		requires
-			dest_bounded_memory_concept<decltype(dest)>&&
-			src_memory_concept<decltype(src)>
+		[]<typename F, dest_bounded_memory_concept D, src_memory_concept S>
+		(F& f, D&& dest, S&& src)
 		{
 			f(get_allocator(dest),
 				std::data(dest),
@@ -873,8 +869,8 @@ namespace atma::detail
 				std::size(dest));
 		},
 
-		[](auto& f, auto&& dest, auto&& src)
-		requires src_bounded_memory_concept<rmref_t<decltype(src)>> && dest_memory_concept<decltype(dest)>
+		[]<typename F, dest_memory_concept D, src_bounded_memory_concept S>
+		(F& f, D&& dest, S&& src)
 		{
 			f(get_allocator(dest),
 				std::data(dest),
@@ -882,8 +878,8 @@ namespace atma::detail
 				std::size(src));
 		},
 
-		[](auto&& dest, auto&& src)
-		requires std::ranges::contiguous_range<rmref_t<decltype(src)>>
+		[]<typename F, dest_memory_concept D, std::ranges::contiguous_range S>
+		(F& f, D&& dest, S&& src)
 		{
 			auto const sz = std::distance(std::begin(src), std::end(src));
 
@@ -893,10 +889,8 @@ namespace atma::detail
 				sz);
 		},
 
-		[](auto& f, auto&& dest, auto&& src)
-		requires
-			sized_range_concept<decltype(dest)> &&
-			sized_range_concept<decltype(src)>
+		[]<typename F, sized_range_concept D, sized_range_concept S>
+		(F& f, D&& dest, S&& src)
 		{
 			using allocator_type = decltype(detail::allocator_type_of_range_(dest));
 
@@ -906,11 +900,8 @@ namespace atma::detail
 				std::size(src));
 		},
 		
-		[](auto& f, auto&& dest, auto begin, auto end)
-		requires
-			dest_memory_concept<rmref_t<decltype(dest)>> && 
-			std::forward_iterator<decltype(begin)> &&
-			std::forward_iterator<decltype(end)>
+		[]<typename F, dest_memory_concept D, std::forward_iterator IterB, typename IterE>
+		(F& f, D&& dest, IterB begin, IterE end)
 		{
 			f(get_allocator(dest),
 				std::data(dest),
@@ -1085,8 +1076,8 @@ namespace atma
 			dest_memory_concept<rmref_t<decltype(dest)>> &&
 			src_memory_concept<rmref_t<decltype(src)>>
 		{
-			constexpr bool dest_is_bounded = concepts::models_ref_v<bounded_memory_concept, decltype(dest)>;
-			constexpr bool src_is_bounded = concepts::models_ref_v<bounded_memory_concept, decltype(src)>;
+			constexpr bool dest_is_bounded = bounded_memory_concept<decltype(dest)>;
+			constexpr bool src_is_bounded =  bounded_memory_concept<decltype(src)>;
 
 			ATMA_ASSERT(sz != unbounded_memory_size);
 
@@ -1107,10 +1098,8 @@ namespace atma
 				sz);
 		},
 
-		[](auto&& dest, auto&& src)
-		requires
-			dest_bounded_memory_concept<decltype(dest)>&&
-			src_bounded_memory_concept<decltype(src)>
+		[]<dest_bounded_memory_concept D, src_bounded_memory_concept S>
+		(D&& dest, S&& src)
 		{
 			ATMA_ASSERT(std::size(dest) == std::size(src));
 
