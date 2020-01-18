@@ -342,7 +342,6 @@ namespace atma
 	concept src_bounded_memory_concept = requires(T x)
 	{
 		requires bounded_memory_concept<T>;
-		{ std::size(x) } -> std::string;
 		requires std::same_as<src_memory_tag_t, typename T::tag_type>;
 	};
 
