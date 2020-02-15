@@ -83,6 +83,12 @@ namespace atma
 		T* data_ = nullptr;
 		size_t size_ = 0;
 	};
+
+	template <typename T>
+	inline auto pointer_range(T* begin, T* end) -> span_t<T>
+	{
+		return span_t{begin, end};
+	}
 }
 
 
