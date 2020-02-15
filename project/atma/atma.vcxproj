@@ -61,6 +61,7 @@
     <ClInclude Include="..\..\include\atma\ranges\iota.hpp" />
     <ClInclude Include="..\..\include\atma\ranges\map.hpp" />
     <ClInclude Include="..\..\include\atma\ranges\zip.hpp" />
+    <ClInclude Include="..\..\include\atma\rope.hpp" />
     <ClInclude Include="..\..\include\atma\shared_memory.hpp" />
     <ClInclude Include="..\..\include\atma\streams.hpp" />
     <ClInclude Include="..\..\include\atma\string.hpp" />
