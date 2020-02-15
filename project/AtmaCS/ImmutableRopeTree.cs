@@ -1,13 +1,84 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
+
+
 
 //==================================
 // 
 // ImmutableRopeTree<T>.Node
 // 
 //==================================
-namespace OmniEdit.Sourcing
+namespace Atma
+{
+	public partial class ImmutableRopeTree
+	{
+		protected unsafe struct InteralTextStorage
+		{
+			public fixed char data[512];
+		}
+
+		protected class TextStorage
+		{
+			public int size;
+			public InteralTextStorage storage;
+
+			//public void Concat(Array<char> str)
+			//{
+			//	unsafe
+			//	{
+			//		fixed (char* dest = storage.data)
+			//		{
+			//			var src = Marshal.StringToCoTaskMemUTF8(str);
+			//			var ptr = src.ToPointer();
+			//			Buffer.MemoryCopy(ptr, dest, 512, str.)
+			//		}
+			//	}
+			//}
+		}
+
+		public class TextNode
+		{
+			public Tuple<TextNode, TextNode> Split(int idx)
+			{
+				unsafe
+				{
+					TextStorage lhs = new TextStorage { size = this.size / 2 };
+					TextStorage rhs = new TextStorage { size = this.size - this.size / 2 };
+
+					fixed (char* src = storage.storage.data, lhsd = lhs.storage.data, rhsd = rhs.storage.data)
+					{
+						Buffer.MemoryCopy(src, lhsd, 512, lhs.size);
+						Buffer.MemoryCopy(src + lhs.size, rhsd, 512, rhs.size);
+					}
+
+					return Tuple.Create(
+						new TextNode { size = lhs.size, storage = lhs },
+						new TextNode { size = rhs.size, storage = rhs });
+				}
+			}
+
+			public void Add(string str)
+			{
+				// if we're 
+				if (size == storage.size)
+				{
+					//storage.Add
+				}
+			}
+
+			private int size;
+			private TextStorage storage;
+		}
+	}
+}
+//==================================
+// 
+// ImmutableRopeTree<T>.Node
+// 
+//==================================
+namespace Atma
 {
 	public partial class ImmutableRopeTree
 	{
@@ -141,7 +212,7 @@ namespace OmniEdit.Sourcing
 // ImmutableRopeTree<T>
 // 
 //==================================
-namespace OmniEdit.Sourcing
+namespace Atma
 {
 	public partial class ImmutableRopeTree<T>
 		where T : IComparable<T>

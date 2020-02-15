@@ -241,6 +241,9 @@
     <ClInclude Include="..\..\include\atma\preprocessor.hpp">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\atma\rope.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\resources\atma.natvis" />

@@ -61,7 +61,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_AMD64_;WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4201;4100;</DisableSpecificWarnings>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\vendor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -117,6 +117,7 @@
     <ClCompile Include="..\..\source\atma_test\ranges.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_allocators.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_events.cpp" />
+    <ClCompile Include="..\..\source\atma_test\test_rope.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_utf8_string.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_vector.cpp" />
   </ItemGroup>
