@@ -207,7 +207,6 @@ namespace atma::detail
 				auto [l_info, r_info] = child.node->edit_chunk_at_char(child_rel_idx, child, f);
 				auto result = x.clone_with(child_idx, l_info, r_info);
 				return result;
-				//return rope_edit_result_t(rope_node_info_t{info, shared_from_this()}, std::optional<rope_node_info_t>{});
 			},
 
 			[&, f = std::forward<F>(f)](rope_node_leaf_t const& x)
