@@ -40,6 +40,12 @@ namespace atma
 		{
 			return intrusive_ptr<T>{static_cast<T*>(this)};
 		}
+
+		template <typename Y>
+		auto shared_from_this_as() -> intrusive_ptr<Y>
+		{
+			return intrusive_ptr<Y>(static_cast<Y*>(this));
+		}
 	};
 
 	template <typename T, typename = std::void_t<>>
