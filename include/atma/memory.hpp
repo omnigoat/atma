@@ -484,7 +484,7 @@ namespace atma
 	template <typename T, typename A>
 	using src_memxfer_t = memxfer_t<src_memory_tag_t, T, A>;
 
-	template <typename T, typename A>
+	template <typename T, typename A = std::allocator<std::remove_const_t<T>>>
 	using src_bounded_memxfer_t = bounded_memxfer_t<src_memory_tag_t, T, A>;
 }
 
@@ -525,7 +525,7 @@ namespace atma::detail
 		template <typename T>
 		auto operator()(T* data, size_t sz) const
 		{
-			return bounded_memxfer_t<tag_type, T, std::allocator<T>>(data, sz);
+			return bounded_memxfer_t<tag_type, T, std::allocator<std::remove_const_t<T>>>(data, sz);
 		}
 
 		template <typename T, typename A>
