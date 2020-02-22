@@ -94,6 +94,16 @@ namespace atma
 		return detail::char_length_table[c] == 1;
 	}
 
+	inline auto utf8_char_is_newline(char const* leading) -> bool
+	{
+		return
+			*leading == 0x0a ||
+			*leading == 0x0b ||
+			*leading == 0x0c ||
+			*leading == 0x0d ||
+			*leading == 0x85;
+	}
+
 	// return how many bytes we need to advance, assuming we're at a leading byte
 	inline auto utf8_char_bytecount(char const* leading) -> int
 	{
@@ -223,7 +233,6 @@ namespace atma
 		return false;
 	}
 
-	template <typename T>
 	inline auto utf8_charseq_find(char const* seq, utf8_char_t x) -> char const*
 	{
 		ATMA_ASSERT(seq);
@@ -236,4 +245,16 @@ namespace atma
 		return nullptr;
 	}
 
+	inline auto utf8_charseq_idx_to_byte_idx(char const* seq, size_t sz, size_t char_idx) -> size_t
+	{
+		ATMA_ASSERT(seq);
+		ATMA_ASSERT(utf8_byte_is_leading(*seq));
+
+		size_t r = 0;
+		char const* i = seq;
+		for (auto ie = seq + sz; i != ie && r != char_idx; i += utf8_char_bytecount(i))
+			++r;
+
+		return (i - seq);
+	}
 }
