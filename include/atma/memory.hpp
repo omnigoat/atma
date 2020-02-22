@@ -291,7 +291,7 @@ namespace atma
 	constexpr auto get_allocator = functor_list_t
 	{
 		[](auto&& r) -> decltype(r.get_allocator()) { return r.get_allocator(); },
-		[](auto&& r) { return std::allocator<value_type_of_t<decltype(r)>>(); }
+		[](auto&& r) { return std::allocator<rm_cvref_t<value_type_of_t<decltype(r)>>>(); }
 	};
 }
 
@@ -439,6 +439,13 @@ namespace atma
 		using allocator_type = typename base_type::allocator_type;
 		using tag_type = Tag;
 
+		// we can always take a const version
+		CONCEPT_REQUIRES(std::is_const_v<T>)
+		bounded_memxfer_t(bounded_memxfer_t<Tag, std::remove_const_t<T>, A> const& rhs)
+			: base_type(rhs.get_allocator(), (T const*)rhs.data())
+			, size_(rhs.size())
+		{}
+
 		constexpr bounded_memxfer_t(allocator_type allocator, T* ptr, size_t size)
 			: base_type(allocator, ptr)
 			, size_(size)
@@ -513,7 +520,7 @@ namespace atma::detail
 		template <typename T>
 		auto operator()(T* data) const
 		{
-			return memxfer_t<tag_type, T, std::allocator<T>>(data);
+			return memxfer_t<tag_type, T, std::allocator<std::remove_const_t<T>>>(data);
 		}
 
 		template <typename T, typename A>
@@ -648,7 +655,7 @@ namespace atma
 namespace atma::detail
 {
 	template <typename R>
-	constexpr auto allocator_type_of_range_(R&& a) -> std::allocator<rmref_t<decltype(*std::begin(a))>>;
+	constexpr auto allocator_type_of_range_(R&& a) -> std::allocator<rm_cvref_t<decltype(*std::begin(a))>>;
 
 	template <typename A>
 	constexpr auto allocator_traits_of_allocator_(A&& a) -> std::allocator_traits<rmref_t<A>>;
