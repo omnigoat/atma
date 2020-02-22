@@ -2,67 +2,96 @@
 
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
-  <!-- MATH -->
-  <Type Name="atma::math::vector4f">
-    <DisplayString>{{ {x}, {y}, {z}, {w} }}</DisplayString>
-    <Expand>
-      <Item Name="x">x</Item>
-      <Item Name="y">y</Item>
-      <Item Name="z">z</Item>
-      <Item Name="w">w</Item>
-    </Expand>
-  </Type>
+	<!-- MATH -->
+	<Type Name="atma::math::vector4f">
+		<DisplayString>{{ {x}, {y}, {z}, {w} }}</DisplayString>
+		<Expand>
+			<Item Name="x">x</Item>
+			<Item Name="y">y</Item>
+			<Item Name="z">z</Item>
+			<Item Name="w">w</Item>
+		</Expand>
+	</Type>
 
-  <Type Name="atma::math::vector4i">
-    <DisplayString>{{ {x}, {y}, {z}, {w} }}</DisplayString>
-    <Expand>
-      <Item Name="x">x</Item>
-      <Item Name="y">y</Item>
-      <Item Name="z">z</Item>
-      <Item Name="w">w</Item>
-    </Expand>
-  </Type>
+	<Type Name="atma::math::vector4i">
+		<DisplayString>{{ {x}, {y}, {z}, {w} }}</DisplayString>
+		<Expand>
+			<Item Name="x">x</Item>
+			<Item Name="y">y</Item>
+			<Item Name="z">z</Item>
+			<Item Name="w">w</Item>
+		</Expand>
+	</Type>
 
-  <!-- GENERAL -->
-  <Type Name="atma::intrusive_ptr&lt;*&gt;">
-    <DisplayString>{px}</DisplayString>
-    <Expand>
-      <ExpandedItem>px</ExpandedItem>
-    </Expand>
-  </Type>
-  
-  <Type Name="atma::vector&lt;*,*&gt;">
-    <DisplayString>{{ size={size_} }}</DisplayString>
-    <Expand>
-      <Item Name="capacity">capacity_</Item>
-      <Item Name="size">size_</Item>
-      <ArrayItems>
-        <Size>size_</Size>
-        <ValuePointer>imem_.ptr_</ValuePointer>
-      </ArrayItems>
-    </Expand>
-  </Type>
+	<!-- GENERAL -->
+	<Type Name="atma::intrusive_ptr&lt;*&gt;">
+		<DisplayString>{px}</DisplayString>
+		<Expand>
+			<ExpandedItem>px</ExpandedItem>
+		</Expand>
+	</Type>
 
-  <Type Name="atma::base_lockfree_queue_t::housekeeping_t">
-    <DisplayString>{{ buffer-size={buffer_size_} }}</DisplayString>
-    <Expand>
-      <Synthetic Name="r">
-        <DisplayString>{r} ({r % buffer_size_} : {r / buffer_size_})</DisplayString>
-      </Synthetic>
-      <Synthetic Name="w">
-        <DisplayString>{w} ({w % buffer_size_} : {w / buffer_size_})</DisplayString>
-      </Synthetic>
-      <Synthetic Name="e">
-        <DisplayString>{e} ({e % buffer_size_} : {e / buffer_size_})</DisplayString>
-      </Synthetic>
-      <Synthetic Name="f">
-        <DisplayString>{f} ({f % buffer_size_} : {f / buffer_size_})</DisplayString>
-      </Synthetic>
-    </Expand>
-  </Type>
+	<Type Name="atma::vector&lt;*,*&gt;">
+		<DisplayString>{{ size={size_} }}</DisplayString>
+		<Expand>
+			<Item Name="capacity">capacity_</Item>
+			<Item Name="size">size_</Item>
+			<ArrayItems>
+				<Size>size_</Size>
+				<ValuePointer>imem_.ptr_</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+	<Type Name="atma::base_lockfree_queue_t::housekeeping_t">
+		<DisplayString>{{ buffer-size={buffer_size_} }}</DisplayString>
+		<Expand>
+			<Synthetic Name="r">
+				<DisplayString>{r} ({r % buffer_size_} : {r / buffer_size_})</DisplayString>
+			</Synthetic>
+			<Synthetic Name="w">
+				<DisplayString>{w} ({w % buffer_size_} : {w / buffer_size_})</DisplayString>
+			</Synthetic>
+			<Synthetic Name="e">
+				<DisplayString>{e} ({e % buffer_size_} : {e / buffer_size_})</DisplayString>
+			</Synthetic>
+			<Synthetic Name="f">
+				<DisplayString>{f} ({f % buffer_size_} : {f / buffer_size_})</DisplayString>
+			</Synthetic>
+		</Expand>
+	</Type>
+
+	<Type Name="atma::detail::rope_node_t">
+		<!-- internal-node -->
+		<DisplayString Condition="variant_._Which==0">{{ child-count={((atma::detail::rope_node_internal_t&amp;)variant_._Head).child_count_} }}</DisplayString>
+
+		<!-- introspect the variant to show only the bits of the storage we're valid for -->
+		<DisplayString Condition="variant_._Which==1">{{ {((atma::detail::rope_node_leaf_t&amp;)variant_._Tail).buf,s8} }}</DisplayString>
+
+		<Expand>
+			<Item Name="size">((atma::detail::rope_node_leaf_t&amp;)variant_._Tail).size</Item>
+			<Item Name="buf">((atma::detail::rope_node_leaf_t&amp;)variant_._Tail).buf,[((atma::detail::rope_node_leaf_t&amp;)variant_._Tail).size]s8</Item>
+		</Expand>
+	</Type>
 
 
+	<Type Name="atma::detail::rope_node_info_t">
+		<!-- internal-node -->
+		<DisplayString Condition="node.px &amp;&amp; node.px->variant_._Which==0">{{ chars={characters}, bytes={bytes}, internal-child-count={((atma::detail::rope_node_internal_t&amp;)node.px->variant_._Head).child_count_} }}</DisplayString>
+		<!-- introspect the variant to show only the bits of the storage we're valid for -->
+		<DisplayString Condition="node.px &amp;&amp; node.px->variant_._Which==1">{{ chars={characters}, bytes={bytes}, {((atma::detail::rope_node_leaf_t&amp;)node.px->variant_._Tail).buf,[characters]s8} }}</DisplayString>
 
+		<Expand>
+			<!-- internal-node members -->
+			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==0" Name="[child-count]">((atma::detail::rope_node_internal_t&amp;)node.px->variant_._Head).child_count_</Item>
+			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==0" Name="[children]">((atma::detail::rope_node_internal_t&amp;)node.px->variant_._Head).children_</Item>
 
+			<!-- leaf-node members -->
+			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==1" Name="[bytes]">bytes</Item>
+			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==1" Name="[characters]">characters</Item>
+			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==1" Name="[line-breaks]">line_breaks</Item>
+			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==1" Name="[text]">((atma::detail::rope_node_leaf_t&amp;)node.px->variant_._Tail).buf,[characters]s8</Item>
+		</Expand>
+	</Type>
 
 </AutoVisualizer>
