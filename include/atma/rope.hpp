@@ -1,21 +1,26 @@
 #pragma once
 
+#include <atma/utf/utf8_char.hpp>
+
 #include <atma/intrusive_ptr.hpp>
 #include <atma/ranges/core.hpp>
 #include <atma/memory.hpp>
 
 #include <variant>
 #include <optional>
+#include <array>
 
 
 namespace atma::detail
 {
-	constexpr size_t const branching_factor = 4;
-	constexpr size_t const character_chunk = 512;
+	constexpr size_t const rope_branching_factor = 4;
+	constexpr size_t const rope_buffer_size = 512;
+	constexpr size_t const rope_minimum_split_size = rope_buffer_size / 3;
 
 	struct rope_node_t;
 	using rope_node_ptr = intrusive_ptr<rope_node_t>;
 }
+
 
 
 //
@@ -30,7 +35,29 @@ namespace atma::detail
 		uint32_t line_breaks = 0;
 		uint32_t pad = 0;
 
-		auto is_full() const -> bool { return bytes == character_chunk; }
+		auto is_full() const -> bool { return bytes == rope_buffer_size; }
+
+		static text_info_t from_str(char const* str, size_t sz)
+		{
+			ATMA_ASSERT(str);
+
+			text_info_t r;
+			auto i = str;
+			while (i != str + sz)
+			{
+				ATMA_ASSERT(utf8_byte_is_leading(*str));
+
+				if (utf8_char_is_newline(str))
+					++r.line_breaks;
+
+				auto char_bytes = utf8_char_bytecount(i);
+				r.bytes += char_bytes;
+				++r.characters;
+				i += char_bytes;
+			}
+
+			return r;
+		}
 	};
 
 	inline auto operator + (text_info_t const& lhs, text_info_t const& rhs) -> text_info_t
@@ -49,7 +76,7 @@ namespace atma::detail
 			: node(node)
 		{}
 
-		rope_node_info_t(text_info_t const& info, rope_node_ptr const& node)
+		rope_node_info_t(text_info_t const& info, rope_node_ptr const& node = rope_node_ptr::null)
 			: text_info_t(info)
 			, node(node)
 		{}
@@ -57,10 +84,15 @@ namespace atma::detail
 		rope_node_ptr node;
 	};
 
+	inline auto operator + (rope_node_info_t const& lhs, text_info_t const& rhs) -> rope_node_info_t
+	{
+		return rope_node_info_t{(text_info_t&)lhs + rhs, lhs.node};
+	}
+
+
 	using rope_maybe_node_info_t = std::optional<rope_node_info_t>;
 	using rope_edit_result_t = std::tuple<rope_node_info_t, rope_maybe_node_info_t>;
 }
-
 
 
 
@@ -80,7 +112,7 @@ namespace atma::detail
 		
 		auto push(rope_node_info_t const&) const -> rope_node_ptr;
 		auto child_at(size_t idx) const -> rope_node_info_t const& { return children_[idx]; }
-		auto children_range() const { return atma::pointer_range(children_, children_ + child_count_); }
+		auto children_range() const -> decltype(auto) { return (children_); }
 
 		auto clone_with(size_t idx, rope_node_info_t const&, std::optional<rope_node_info_t> const&) const -> rope_edit_result_t;
 
@@ -96,7 +128,7 @@ namespace atma::detail
 
 	private:
 		size_t child_count_ = 0;
-		rope_node_info_t children_[branching_factor];
+		std::array<rope_node_info_t, rope_branching_factor> children_;
 	};
 
 }
@@ -107,11 +139,14 @@ namespace atma::detail
 {
 	struct rope_node_leaf_t
 	{
+		template <typename... Args>
+		rope_node_leaf_t(Args&&...);
+
 		// this buffer can only ever be appended to. nodes store how many
 		// characters/bytes they address inside this buffer, so we can append
 		// more data to this buffer and maintain an immutable data-structure
 		size_t size = 0;
-		char buf[character_chunk];
+		char buf[rope_buffer_size];
 	};
 }
 
@@ -123,7 +158,7 @@ namespace atma::detail
 {
 	struct rope_node_t : atma::ref_counted_of<rope_node_t>
 	{
-		rope_node_t() = default;
+		rope_node_t();
 
 		rope_node_t(rope_node_internal_t const& x)
 			: variant_(x)
@@ -137,14 +172,25 @@ namespace atma::detail
 		auto find_for_char_idx(size_t idx) const -> std::tuple<size_t, size_t>;
 
 		template <typename F>
-		auto edit_chunk_at_char(size_t char_idx, text_info_t const&, F&&) -> rope_edit_result_t;
+		auto edit_chunk_at_char(size_t char_idx, rope_node_info_t const&, F&&) -> rope_edit_result_t;
 
 		auto known_internal() const -> rope_node_internal_t const*
 		{
 			return &std::get<rope_node_internal_t>(variant_);
 		}
 
+		auto known_leaf() -> rope_node_leaf_t&
+		{
+			return std::get<rope_node_leaf_t>(variant_);
+		}
+
 	private:
+		template <typename... Args>
+		auto visit(Args&&... args)
+		{
+			return std::visit(visit_with{std::forward<Args>(args)...}, variant_);
+		}
+
 		template <typename... Args>
 		auto visit(Args&&... args) const
 		{
@@ -161,6 +207,10 @@ namespace atma::detail
 // rope_node_t implementation
 namespace atma::detail
 {
+	inline rope_node_t::rope_node_t()
+		: variant_(rope_node_leaf_t())
+	{}
+
 	inline auto rope_node_t::length() const -> size_t
 	{
 		return this->visit(
@@ -194,10 +244,10 @@ namespace atma::detail
 	}
 
 	template <typename F>
-	inline auto rope_node_t::edit_chunk_at_char(size_t char_idx, text_info_t const& info, F&& f) -> rope_edit_result_t
+	inline auto rope_node_t::edit_chunk_at_char(size_t char_idx, rope_node_info_t const& info, F&& f) -> rope_edit_result_t
 	{
 		return this->visit(
-			[&, f = std::forward<F>(f)](rope_node_internal_t const& x)
+			[&, f = std::forward<F>(f)](rope_node_internal_t& x)
 			{
 				// find child
 				auto [child_idx, child_rel_idx] = find_for_char_idx(char_idx);
@@ -209,19 +259,44 @@ namespace atma::detail
 				return result;
 			},
 
-			[&, f = std::forward<F>(f)](rope_node_leaf_t const& x)
+			[&, f = std::forward<F>(f)](rope_node_leaf_t& x) -> rope_edit_result_t
 			{
-				return std::invoke(f, char_idx, info, x.buf);
+				//auto y = const_cast<rope_node_leaf_t&>(x);
+				return std::invoke(f, char_idx, info, x.buf, x.size);
 			}
 		);
 	}
 }
 
+
+//
+// rope_node_leaf_t implementation
+//
 namespace atma::detail
 {
+	inline auto rope_node_leaf_construct_(size_t& buf_size, char* buf)
+	{}
 
+	template <typename... Args>
+	inline auto rope_node_leaf_construct_(size_t& buf_size, char* buf, src_bounded_memxfer_t<char const> x, Args&&... args)
+	{
+		atma::memory::memcpy(xfer_dest(buf + buf_size), x);
+		buf_size += x.size();
+
+		rope_node_leaf_construct_(buf_size, buf, std::forward<Args>(args)...);
+	}
+
+	template <typename... Args>
+	inline rope_node_leaf_t::rope_node_leaf_t(Args&&... args)
+	{
+		rope_node_leaf_construct_(size, buf, std::forward<Args>(args)...);
+	}
 }
 
+
+//
+// rope_node_internal_t implementation
+//
 namespace atma::detail
 {
 	template <typename... Args>
@@ -247,12 +322,15 @@ namespace atma::detail
 
 	template <typename... Args>
 	inline auto rope_node_internal_construct_(size_t& acc_count, rope_node_info_t* dest) -> void
-	{}
+	{
+		for (size_t i = acc_count; i != rope_branching_factor; ++i)
+			dest[i].node = rope_node_ptr::make();
+	}
 
 	template <typename... Args>
 	inline rope_node_internal_t::rope_node_internal_t(Args&&... args)
 	{
-		rope_node_internal_construct_(child_count_, children_, std::forward<Args>(args)...);
+		rope_node_internal_construct_(child_count_, children_.data(), std::forward<Args>(args)...);
 	}
 
 	inline auto rope_node_internal_t::length() const -> size_t
@@ -271,12 +349,12 @@ namespace atma::detail
 		{
 			auto const& r_info = *maybe_r_info;
 
-			if (child_count_ + 1 < branching_factor)
+			if (child_count_ + 1 < rope_branching_factor)
 			{
 				auto sn = rope_node_ptr::make(rope_node_internal_t(
 					xfer_src(children_, idx),
 					l_info, r_info,
-					xfer_src(children_ + idx + 1, child_count_ - 1)));
+					xfer_src(children_, idx + 1, child_count_ - 1)));
 
 				return rope_edit_result_t{
 					rope_node_info_t{l_info + r_info, sn},
@@ -285,20 +363,20 @@ namespace atma::detail
 			else
 			{
 				// something something split
-				auto left_size = branching_factor / 2 + 1;
-				auto right_size = branching_factor / 2;
+				auto left_size = rope_branching_factor / 2 + 1;
+				auto right_size = rope_branching_factor / 2;
 
 				rope_node_ptr ln, rn;
 
 				if (idx < left_size)
 				{
 					ln = rope_node_ptr::make(rope_node_internal_t(xfer_src(children_, idx), l_info, r_info));
-					rn = rope_node_ptr::make(rope_node_internal_t(xfer_src(children_ + idx, child_count_ - idx - 1)));
+					rn = rope_node_ptr::make(rope_node_internal_t(xfer_src(children_, idx, child_count_ - idx - 1)));
 				}
 				if (idx + 1 < left_size)
 				{
 					ln = rope_node_ptr::make(rope_node_internal_t(xfer_src(children_, idx), l_info));
-					rn = rope_node_ptr::make(rope_node_internal_t(r_info, xfer_src(children_ + idx + 1, right_size)));
+					rn = rope_node_ptr::make(rope_node_internal_t(r_info, xfer_src(children_, idx + 1, right_size)));
 				}
 				else
 				{
@@ -317,7 +395,7 @@ namespace atma::detail
 			auto s = rope_node_ptr::make(rope_node_internal_t{
 				xfer_src(children_, idx), 
 				l_info,
-				xfer_src(children_ + idx + 1, child_count_ - idx - 1)});
+				xfer_src(children_, idx + 1, child_count_ - idx - 1)});
 
 			return rope_edit_result_t{rope_node_info_t{l_info, s}, rope_maybe_node_info_t()};
 		}
@@ -325,7 +403,7 @@ namespace atma::detail
 
 	inline auto rope_node_internal_t::push(rope_node_info_t const& x) const -> rope_node_ptr
 	{
-		ATMA_ASSERT(child_count_ < branching_factor);
+		ATMA_ASSERT(child_count_ < rope_branching_factor);
 		return rope_node_ptr(); ///rope_node_internal_ptr::make(children_, child_count_, x);
 	}
 }
@@ -356,9 +434,76 @@ namespace atma
 	inline auto rope_t::insert(size_t char_idx, char const* str, size_t sz) -> void
 	{
 		auto [lhs_info, rhs_info] = root_.node->edit_chunk_at_char(char_idx, root_,
-			[str, sz](size_t char_idx, detail::text_info_t const& info, char const* buf)
+			[str, sz](size_t char_idx, detail::rope_node_info_t const& info, char* buf, size_t& buf_size)
 			{
-				return detail::rope_edit_result_t{};
+				auto byte_idx = utf8_charseq_idx_to_byte_idx(buf, buf_size, char_idx);
+
+				auto combined_bytes = info.bytes + sz;
+
+				// we will never have to split this node
+				if (combined_bytes <= detail::rope_buffer_size)
+				{
+					// todo: one loop for copy + info-calculation
+					auto affix_string_info = detail::text_info_t::from_str(str, sz);
+
+					// appending is possible
+					if (byte_idx == info.bytes)
+					{
+						std::memcpy(buf + info.bytes, str, sz);
+						buf_size += sz;
+						auto new_info = info + affix_string_info;
+
+						return detail::rope_edit_result_t{new_info, detail::rope_maybe_node_info_t{}};
+					}
+					// append is not possible, but the total new size is under
+					// the minimum splittable size. like, we don't want two characters
+					// here, two there. allocate one new leaf and insert it all
+					else if (combined_bytes < detail::rope_minimum_split_size)
+					{
+						auto new_info = info + affix_string_info;
+						new_info.node = detail::rope_node_ptr::make(
+							detail::rope_node_leaf_t{
+								xfer_src(buf, byte_idx),
+								xfer_src(str, sz),
+								xfer_src(buf + byte_idx, buf_size - byte_idx)});
+
+
+						return detail::rope_edit_result_t{new_info, {}};
+					}
+				}
+
+				// splitting is required
+				{
+					// we don't need a new node for lhs, just reference a subsequence
+					auto lhs_info = info;
+					lhs_info.characters = (uint32_t)char_idx;
+					lhs_info.bytes = (uint32_t)byte_idx;
+
+					detail::text_info_t rhs_info;
+					rhs_info.bytes = (uint32_t)(info.bytes - byte_idx);
+					rhs_info.characters = (uint32_t)(info.characters - char_idx);
+					auto rhs_node = detail::rope_node_ptr::make(detail::rope_node_leaf_t{
+						xfer_src(str, sz),
+						xfer_src(buf + byte_idx, buf_size - byte_idx)});
+					
+					return detail::rope_edit_result_t{lhs_info, detail::rope_node_info_t{rhs_info, rhs_node}};
+				}
 			});
+
+		if (rhs_info.has_value())
+		{
+			(detail::text_info_t&)root_ = lhs_info + *rhs_info;
+			if (!lhs_info.node)
+				lhs_info.node = root_.node;
+			root_.node = detail::rope_node_ptr::make(detail::rope_node_internal_t{lhs_info, *rhs_info});
+		}
+		else if (lhs_info.node)
+		{
+			root_ = lhs_info;
+		}
+		else
+		{
+			(detail::text_info_t&)root_ = lhs_info;
+		}
 	}
 }

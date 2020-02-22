@@ -9,7 +9,8 @@ SCENARIO("rope can be constructed")
 		THEN("")
 		{
 			atma::rope_t rope;
-			rope.push_back("lmao", 4);
+			rope.push_back("abcd", 4);
+			rope.insert(2, "ef", 2);
 		}
 	}
 }

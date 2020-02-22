@@ -239,6 +239,15 @@ namespace atma
 	using value_type_of_t = typename detail::value_type_of<R>::type;
 }
 
+namespace atma
+{
+	template <typename T>
+	using rmref_t = std::remove_reference_t<T>;
+
+	template <typename T>
+	using rm_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
+}
+
 
 //
 //  allocator_type_of
@@ -250,7 +259,7 @@ namespace atma
 	template <typename R, typename = std::void_t<>>
 	struct allocator_type_of
 	{
-		using type = std::allocator<value_type_of_t<R>>;
+		using type = std::allocator<rm_cvref_t<value_type_of_t<R>>>;
 	};
 
 	template <typename R>
@@ -263,11 +272,3 @@ namespace atma
 	using allocator_type_of_t = typename allocator_type_of<std::remove_reference_t<R>>::type;
 }
 
-namespace atma
-{
-	template <typename T>
-	using rmref_t = std::remove_reference_t<T>;
-
-	template <typename T>
-	using rm_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
-}
