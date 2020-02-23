@@ -344,7 +344,7 @@ namespace atma
 		, ch_{ptr}
 	{
 		ATMA_ASSERT(ptr);
-		ATMA_ASSERT(utf8_byte_is_leading(*ptr));
+		ATMA_ASSERT(utf8_byte_is_leading((byte)*ptr));
 	}
 
 	inline utf8_string_t::iterator_t::iterator_t(iterator_t const& rhs)
