@@ -88,7 +88,6 @@
     </Natvis>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\include\atma\rope.cpp" />
     <ClCompile Include="..\..\source\include_guide.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Distribution|x64'">true</ExcludedFromBuild>
