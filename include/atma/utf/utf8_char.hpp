@@ -79,7 +79,7 @@ namespace atma
 	}
 
 	// c is a valid utf8 byte and the leading byte of a sequence
-	inline auto utf8_byte_is_leading(char const c) -> bool
+	constexpr inline auto utf8_byte_is_leading(char const c) -> bool
 	{
 		return detail::char_length_table[c] >= 1;
 	}
@@ -151,30 +151,45 @@ namespace atma
 		return r;
 	}
 #endif
+}
 
 
-
+//
+// utf8_char_t
+// -------------
+//  does not own the backing byte sequence
+//
+namespace atma
+{
 	struct utf8_char_t
 	{
-		utf8_char_t(char const* c)
-			: c(c)
-		{}
+		using size_type = size_t;
 
-		auto operator [](int i) -> char { return c[i]; }
+		constexpr utf8_char_t() = default;
+		constexpr utf8_char_t(utf8_char_t const&) = default;
+
+		constexpr utf8_char_t(char const* c)
+			: c(c)
+		{
+			ATMA_ASSERT(c);
+			ATMA_ASSERT(utf8_byte_is_leading(*c));
+		}
+
+		auto operator [](size_type idx) -> char
+		{
+			ATMA_ASSERT(idx < bytecount());
+			return c[idx];
+		}
 
 		auto bytecount() const -> size_t { return utf8_char_bytecount(c); }
 		auto data() const -> char const* { return c; }
 
 		operator char const*() const { return c; }
 
-		auto operator = (utf8_char_t const& rhs) -> utf8_char_t&
-		{
-			c = rhs.c;
-			return *this;
-		}
+		auto operator = (utf8_char_t const&) -> utf8_char_t& = default;
 
 	private:
-		char const* c;
+		char const* c = "";
 	};
 
 	static_assert(sizeof(utf8_char_t) == sizeof(char const*), "what happened?");
@@ -200,6 +215,50 @@ namespace atma
 	}
 }
 
+
+
+
+//
+// utf8_iterator_t
+// -----------------
+//  given a sequence of chars, iterates character-by-character. this
+//  means that the amount of bytes traversed is variable, as utf8 is
+//  want to be
+//
+namespace atma
+{
+#if 0
+	struct utf8_iterator_t
+	{
+		utf8_iterator_t() = default;
+		utf8_iterator_t(utf8_iterator_t const&) = default;
+		utf8_iterator_t(char*);
+
+		// access
+		auto operator *() const -> char;
+
+		// travel
+		auto operator ++() -> utf8_iterator_t&;
+		auto operator --() -> utf8_iterator_t&;
+		auto operator ++(int) -> utf8_iterator_t;
+		auto operator --(int) -> utf8_iterator_t;
+
+	private:
+		char* here_ = nullptr;
+	};
+
+	inline auto utf8_iterator_t::operator++ () -> utf8_iterator_t&
+	{
+		here_ = utf8_next_char(here_);
+		return *this;
+	}
+
+	inline auto utf8_iterator_t::operator *() -> char
+	{
+		return *here_;
+	}
+#endif
+}
 
 
 

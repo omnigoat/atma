@@ -26,13 +26,13 @@ namespace atma
 		error
 	};
 
-	enum class log_style_t : byte
+	enum class log_style_t : uchar
 	{
 		oneline,
 		pretty_print,
 	};
 
-	enum class log_instruction_t : byte
+	enum class log_instruction_t : uchar
 	{
 		pad,
 		text,
@@ -53,11 +53,11 @@ namespace atma
 			: value()
 		{}
 
-		constexpr explicit colorbyte(byte v)
+		constexpr explicit colorbyte(uchar v)
 			: value(v)
 		{}
 
-		byte const value;
+		uchar const value;
 	};
 
 	struct logging_handler_t : ref_counted
@@ -367,19 +367,19 @@ namespace atma
 
 	inline auto logging_encoder_t::encode_header(log_style_t style) -> size_t
 	{
-		byte data[] = {(byte)style};
+		uchar data[] = {(uchar)style};
 		return dest_->write(data, 1).bytes_written;
 	}
 
 	inline auto logging_encoder_t::encode_color(colorbyte color) -> size_t
 	{
-		byte data[] = {(byte)log_instruction_t::color, color.value};
+		uchar data[] = {(uchar)log_instruction_t::color, color.value};
 		return dest_->write(data, 2).bytes_written;
 	}
 
 	inline auto logging_encoder_t::encode_cstr(char const* str, size_t size) -> size_t
 	{
-		byte header[] = {(byte)log_instruction_t::text, (byte)size, (byte)(size >> 8)};
+		uchar header[] = {(uchar)log_instruction_t::text, (uchar)size, (uchar)(size >> 8)};
 		auto R = dest_->write(header, 3).bytes_written;
 		R += dest_->write(str, size).bytes_written;
 		return R;
@@ -388,11 +388,11 @@ namespace atma
 	template <typename... Args>
 	inline auto logging_encoder_t::encode_sprintf(char const* fmt, Args&&... args) -> size_t
 	{
-		byte buf[2048];
+		uchar buf[2048];
 		int R = sprintf((char*)buf + 3, fmt, std::forward<Args>(args)...);
-		buf[0] = (byte)log_instruction_t::text;
-		buf[1] = (byte)R;
-		buf[2] = (byte)(R >> 8);
+		buf[0] = (uchar)log_instruction_t::text;
+		buf[1] = (uchar)R;
+		buf[2] = (uchar)(R >> 8);
 		auto R2 = dest_->write(buf, R + 3);
 		return R2.bytes_written;
 	}
@@ -400,7 +400,7 @@ namespace atma
 	template <typename MF, typename CF, typename TF>
 	inline auto decode_logging_data(unique_memory_t const& memory, MF&& mf, CF&& cf, TF&& tf) -> void
 	{
-		byte const* data = memory.begin();
+		uchar const* data = memory.begin();
 		size_t p = 0;
 
 		mf((log_style_t)data[0]);
@@ -409,12 +409,12 @@ namespace atma
 		while (p != memory.size())
 		{
 			// decode header
-			log_instruction_t id = (log_instruction_t)*(byte*)(data + p);
+			log_instruction_t id = (log_instruction_t)*(uchar*)(data + p);
 			p += 1;
 
 			if (id == log_instruction_t::color)
 			{
-				byte color = *(byte*)(data + p);
+				uchar color = *(uchar*)(data + p);
 				p += 1;
 
 				cf(color);
@@ -430,10 +430,10 @@ namespace atma
 		}
 	}
 
-	inline auto logging_encode_color(void* dest, byte color) -> size_t
+	inline auto logging_encode_color(void* dest, uchar color) -> size_t
 	{
-		*((byte*&)dest)++ = (int)log_instruction_t::color;
-		*((byte*&)dest)++ = color;
+		*((uchar*&)dest)++ = (int)log_instruction_t::color;
+		*((uchar*&)dest)++ = color;
 
 		return 3;
 	}
@@ -442,8 +442,8 @@ namespace atma
 	inline auto logging_encode_string(void* dest, char const* format, Args&&... args) -> size_t
 	{
 		auto r = sprintf((char*)dest + 3, format, std::forward<Args>(args)...);
-		*(byte*)((byte*)dest) = (int)log_instruction_t::text;
-		*(uint16*)((byte*)dest + 1) = r;
+		*(uchar*)((uchar*)dest) = (int)log_instruction_t::text;
+		*(uint16*)((uchar*)dest + 1) = r;
 		return r + 3;
 	}
 

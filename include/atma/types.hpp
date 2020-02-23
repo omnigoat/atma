@@ -23,7 +23,7 @@ using uint64 = uint64_t;
 using  intptr =  intptr_t;
 using uintptr = uintptr_t;
 
-using byte = uchar;
+using byte = std::byte;
 
 using size_t = std::size_t;
 
