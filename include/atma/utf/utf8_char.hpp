@@ -79,9 +79,9 @@ namespace atma
 	}
 
 	// c is a valid utf8 byte and the leading byte of a sequence
-	constexpr inline auto utf8_byte_is_leading(char const c) -> bool
+	constexpr inline auto utf8_byte_is_leading(byte const c) -> bool
 	{
-		return detail::char_length_table[c] >= 1;
+		return detail::char_length_table[(uint8)c] >= 1;
 	}
 
 	inline auto utf8_byte_is_run_on(char const c) -> bool
@@ -105,30 +105,31 @@ namespace atma
 			*leading == 0x85;
 	}
 
+
 	// return how many bytes we need to advance, assuming we're at a leading byte
-	inline auto utf8_char_bytecount(char const* leading) -> int
+	inline auto utf8_char_size_bytes(char const* leading) -> int
 	{
 		ATMA_ASSERT(leading);
-		ATMA_ENSURE(utf8_byte_is_leading(*leading));
+		ATMA_ENSURE(utf8_byte_is_leading((byte)*leading));
 		return detail::char_length_table[*leading];
 	}
 
 	inline auto utf8_char_advance(char const*& leading) -> void
 	{
-		leading += utf8_char_bytecount(leading);
+		leading += utf8_char_size_bytes(leading);
 	}
 
 	inline auto utf8_char_equality(char const* lhs, char const* rhs) -> bool
 	{
 		ATMA_ASSERT(lhs);
 		ATMA_ASSERT(rhs);
-		ATMA_ASSERT(utf8_byte_is_leading(*lhs));
-		ATMA_ASSERT(utf8_byte_is_leading(*rhs));
+		ATMA_ASSERT(utf8_byte_is_leading((byte)*lhs));
+		ATMA_ASSERT(utf8_byte_is_leading((byte)*rhs));
 
 		if (*lhs != *rhs)
 			return false;
 
-		return memcmp(lhs + 1, rhs + 1, utf8_char_bytecount(lhs) - 1) == 0;
+		return memcmp(lhs + 1, rhs + 1, utf8_char_size_bytes(lhs) - 1) == 0;
 	}
 
 #if 0
@@ -168,31 +169,91 @@ namespace atma
 		constexpr utf8_char_t() = default;
 		constexpr utf8_char_t(utf8_char_t const&) = default;
 
-		constexpr utf8_char_t(char const* c)
-			: c(c)
-		{
-			ATMA_ASSERT(c);
-			ATMA_ASSERT(utf8_byte_is_leading(*c));
-		}
+		constexpr utf8_char_t(byte const*);
+		constexpr utf8_char_t(char const*);
 
-		auto operator [](size_type idx) -> char
+		auto operator [](size_type idx) -> byte
 		{
-			ATMA_ASSERT(idx < bytecount());
+			ATMA_ASSERT(idx < size_bytes());
 			return c[idx];
 		}
 
-		auto bytecount() const -> size_t { return utf8_char_bytecount(c); }
-		auto data() const -> char const* { return c; }
+		auto data() const -> char const* { return reinterpret_cast<char const*>(c); }
+		auto size_bytes() const -> size_t { return utf8_char_size_bytes(data()); }
 
-		operator char const*() const { return c; }
+		//auto front() const { return utf8_char_t{here_}; }
+		//auto back() const { return utf8_char_t{here_ + size_bytes_() - 1}; }
 
-		auto operator = (utf8_char_t const&) -> utf8_char_t& = default;
+		operator char const*() const { return data(); }
+
+		//auto operator = (utf8_char_t const&) -> utf8_char_t& = default;
 
 	private:
-		char const* c = "";
+		byte const* c = reinterpret_cast<byte const*>("");
 	};
 
-	static_assert(sizeof(utf8_char_t) == sizeof(char const*), "what happened?");
+}
+
+
+//
+// basic_utf8_iterator_t
+// -----------------
+//  given a sequence of chars, iterates character-by-character. this
+//  means that the amount of bytes traversed is variable, as utf8 is
+//  want to be
+//
+namespace atma::detail
+{
+	template <typename T>
+	struct basic_utf8_iterator_t
+	{
+		using character_backing_type = T;
+		using value_type = transfer_const_t<character_backing_type, utf8_char_t>;
+
+		basic_utf8_iterator_t() = default;
+		basic_utf8_iterator_t(basic_utf8_iterator_t const&) = default;
+		basic_utf8_iterator_t(character_backing_type*);
+
+		// access
+		auto operator *() const { return value_type{here_}; }
+
+		// travel
+		auto operator ++() -> basic_utf8_iterator_t&;
+		auto operator ++(int) -> basic_utf8_iterator_t;
+		//auto operator --() -> basic_utf8_iterator_t&;
+		//auto operator --(int) -> basic_utf8_iterator_t;
+
+		auto char_data() const { return here_; }
+		auto char_size_bytes() const -> size_t { return utf8_char_size_bytes(here_); }
+
+	private:
+
+		character_backing_type* here_ = nullptr;
+	};
+}
+
+namespace atma
+{
+	using utf8_iterator_t = detail::basic_utf8_iterator_t<char>;
+	using utf8_const_iterator_t = detail::basic_utf8_iterator_t<char const>;
+}
+
+
+//
+// utf8_char_t implementation
+//
+namespace atma
+{
+	constexpr inline utf8_char_t::utf8_char_t(byte const* c)
+		: c(c)
+	{
+		ATMA_ASSERT(c);
+		ATMA_ASSERT(utf8_byte_is_leading(*c));
+	}
+
+	constexpr inline utf8_char_t::utf8_char_t(char const* c)
+		: utf8_char_t((byte const*)c)
+	{}
 
 	inline auto operator == (utf8_char_t lhs, utf8_char_t rhs) -> bool
 	{
@@ -206,60 +267,71 @@ namespace atma
 
 	inline auto operator == (utf8_char_t lhs, char rhs) -> bool
 	{
-		return lhs[0] == rhs;
+		ATMA_ASSERT(utf8_char_is_ascii(rhs));
+		return lhs[0] == byte{rhs};
 	}
 
 	inline auto operator != (utf8_char_t lhs, char rhs) -> bool
 	{
-		return lhs[0] != rhs;
+		ATMA_ASSERT(utf8_char_is_ascii(rhs));
+		return lhs[0] != byte{rhs};
 	}
 }
 
 
-
-
 //
-// utf8_iterator_t
-// -----------------
-//  given a sequence of chars, iterates character-by-character. this
-//  means that the amount of bytes traversed is variable, as utf8 is
-//  want to be
+// basic_utf8_iterator_t implementation
 //
-namespace atma
+namespace atma::detail
 {
-#if 0
-	struct utf8_iterator_t
+	template <typename T>
+	inline basic_utf8_iterator_t<T>::basic_utf8_iterator_t(character_backing_type* here)
+		: here_(here)
+	{}
+
+	template <typename T>
+	inline auto basic_utf8_iterator_t<T>::operator++ () -> basic_utf8_iterator_t&
 	{
-		utf8_iterator_t() = default;
-		utf8_iterator_t(utf8_iterator_t const&) = default;
-		utf8_iterator_t(char*);
-
-		// access
-		auto operator *() const -> char;
-
-		// travel
-		auto operator ++() -> utf8_iterator_t&;
-		auto operator --() -> utf8_iterator_t&;
-		auto operator ++(int) -> utf8_iterator_t;
-		auto operator --(int) -> utf8_iterator_t;
-
-	private:
-		char* here_ = nullptr;
-	};
-
-	inline auto utf8_iterator_t::operator++ () -> utf8_iterator_t&
-	{
-		here_ = utf8_next_char(here_);
+		here_ += char_size_bytes();
 		return *this;
 	}
 
-	inline auto utf8_iterator_t::operator *() -> char
+	template <typename T>
+	inline auto basic_utf8_iterator_t<T>::operator++ (int) -> basic_utf8_iterator_t
 	{
-		return *here_;
+		auto r = *this;
+		++r;
+		return r;
 	}
-#endif
+
+
+
+	template <typename T>
+	inline auto operator == (basic_utf8_iterator_t<T> const& lhs, basic_utf8_iterator_t<T> const& rhs)
+	{
+		return lhs.char_data() == rhs.char_data();
+	}
+
+	template <typename T>
+	inline auto operator != (basic_utf8_iterator_t<T> const& lhs, basic_utf8_iterator_t<T> const& rhs)
+	{
+		return !operator == (lhs, rhs);
+	}
 }
 
+
+
+namespace atma
+{
+	inline auto utf8_char_is_newline(utf8_char_t const& x) -> bool
+	{
+		return x[0] == '\x0a' ||
+			x[0] == '\x0b' ||
+			x[0] == '\x0c' ||
+			x[0] == '\x0d' ||
+			x[0] == '\x85';
+	}
+}
 
 
 //=====================================================================
@@ -274,7 +346,7 @@ namespace atma
 	inline auto utf8_charseq_for_each(char const* seq, FN&& fn) -> void
 	{
 		ATMA_ASSERT(seq);
-		ATMA_ASSERT(utf8_byte_is_leading(*seq));
+		ATMA_ASSERT(utf8_byte_is_leading((byte)*seq));
 
 		for (auto i = seq; *i; utf8_char_advance(i))
 			fn(i);
@@ -284,7 +356,7 @@ namespace atma
 	inline auto utf8_charseq_any_of(char const* seq, T&& pred) -> bool
 	{
 		ATMA_ASSERT(seq);
-		ATMA_ASSERT(utf8_byte_is_leading(*seq));
+		ATMA_ASSERT(utf8_byte_is_leading((byte)*seq));
 
 		for (auto i = seq; *i; utf8_char_advance(i))
 			if (pred(i))
@@ -296,7 +368,7 @@ namespace atma
 	inline auto utf8_charseq_find(char const* seq, utf8_char_t x) -> char const*
 	{
 		ATMA_ASSERT(seq);
-		ATMA_ASSERT(utf8_byte_is_leading(*seq));
+		ATMA_ASSERT(utf8_byte_is_leading((byte)*seq));
 
 		for (auto i = seq; *i; utf8_char_advance(i))
 			if (x == i)
@@ -308,11 +380,11 @@ namespace atma
 	inline auto utf8_charseq_idx_to_byte_idx(char const* seq, size_t sz, size_t char_idx) -> size_t
 	{
 		ATMA_ASSERT(seq);
-		ATMA_ASSERT(utf8_byte_is_leading(*seq));
+		ATMA_ASSERT(utf8_byte_is_leading((byte)*seq));
 
 		size_t r = 0;
 		char const* i = seq;
-		for (auto ie = seq + sz; i != ie && r != char_idx; i += utf8_char_bytecount(i))
+		for (auto ie = seq + sz; i != ie && r != char_idx; i += utf8_char_size_bytes(i))
 			++r;
 
 		return (i - seq);
@@ -321,38 +393,43 @@ namespace atma
 
 
 //
-namespace atma
+namespace atma::detail
 {
-	//struct utf8_span_t
-	//{
-	//	constexpr utf8_span_t() = default;
-	//	utf8_span_t(utf8_span_t const&) = default;
-	//	constexpr ~utf8_span_t() = default;
-	//
-	//	constexpr utf8_span_t(char const* data, size_t size);
-	//
-	//	// mutable access
-	//	constexpr auto begin() { return data_; }
-	//	constexpr auto end() { return data_ + size_; }
-	//	constexpr auto data() { return data_; }
-	//
-	//	// immutable access
-	//	auto begin() const { return data_; }
-	//	auto end() const { return data_ + size_; }
-	//	auto data() const { return data_; }
-	//
-	//	auto size() const { return size_; }
-	//	auto size_bytes() const { return size_; }
-	//	auto empty() const { return size_ == 0; }
-	//
-	//	//auto 
-	//
-	//private:
-	//	char const* data_ = "";
-	//	size_t size_ = 0;
-	//};
+	template <typename T>
+	struct basic_utf8_span_t
+	{
+		using char_type = T;
 
-	using utf8_span_t = span_t<char>;
-	using utf8_const_span_t = span_t<char const>;
+		constexpr basic_utf8_span_t() = default;
+		basic_utf8_span_t(basic_utf8_span_t const&) = default;
+
+		constexpr basic_utf8_span_t(char_type* data, size_t size)
+			: data_(data)
+			, size_(size)
+		{}
+
+		// mutable access
+		constexpr auto begin() { return basic_utf8_iterator_t<char_type>{data_}; }
+		constexpr auto end() { return basic_utf8_iterator_t<char_type>{data_ + size_}; }
+		constexpr auto data() { return basic_utf8_iterator_t<char_type>{data_}; }
+
+		// immutable access
+		auto begin() const { return utf8_iterator_t{data_}; }
+		auto end() const { return utf8_iterator_t{data_ + size_}; }
+		auto data() const { return utf8_iterator_t{data_}; }
+
+		auto size() const { return size_; }
+		auto size_bytes() const { return size_; }
+		auto empty() const { return size_ == 0; }
+
+	private:
+		char_type* data_ = nullptr;
+		size_t size_ = 0;
+	};
 }
 
+namespace atma
+{
+	using utf8_span_t = detail::basic_utf8_span_t<char>;
+	using utf8_const_span_t = detail::basic_utf8_span_t<char const>;
+}
