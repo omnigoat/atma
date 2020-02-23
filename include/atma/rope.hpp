@@ -40,18 +40,12 @@ namespace atma::detail
 			ATMA_ASSERT(str);
 
 			text_info_t r;
-			auto i = str;
-			while (i != str + sz)
+			for (auto x : utf8_const_span_t{str, sz})
 			{
-				ATMA_ASSERT(utf8_byte_is_leading(*str));
-
-				if (utf8_char_is_newline(str))
-					++r.line_breaks;
-
-				auto char_bytes = utf8_char_bytecount(i);
-				r.bytes += char_bytes;
+				r.bytes += (uint32_t)x.size_bytes();
 				++r.characters;
-				i += char_bytes;
+				if (utf8_char_is_newline(x))
+					++r.line_breaks;
 			}
 
 			return r;
