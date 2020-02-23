@@ -3,6 +3,7 @@
 #include <atma/types.hpp>
 #include <atma/assert.hpp>
 
+#include <atma/ranges/core.hpp>
 
 //=====================================================================
 //
@@ -258,3 +259,41 @@ namespace atma
 		return (i - seq);
 	}
 }
+
+
+//
+namespace atma
+{
+	//struct utf8_span_t
+	//{
+	//	constexpr utf8_span_t() = default;
+	//	utf8_span_t(utf8_span_t const&) = default;
+	//	constexpr ~utf8_span_t() = default;
+	//
+	//	constexpr utf8_span_t(char const* data, size_t size);
+	//
+	//	// mutable access
+	//	constexpr auto begin() { return data_; }
+	//	constexpr auto end() { return data_ + size_; }
+	//	constexpr auto data() { return data_; }
+	//
+	//	// immutable access
+	//	auto begin() const { return data_; }
+	//	auto end() const { return data_ + size_; }
+	//	auto data() const { return data_; }
+	//
+	//	auto size() const { return size_; }
+	//	auto size_bytes() const { return size_; }
+	//	auto empty() const { return size_ == 0; }
+	//
+	//	//auto 
+	//
+	//private:
+	//	char const* data_ = "";
+	//	size_t size_ = 0;
+	//};
+
+	using utf8_span_t = span_t<char>;
+	using utf8_const_span_t = span_t<char const>;
+}
+
