@@ -167,9 +167,9 @@ namespace atma::detail
 		template <typename F>
 		auto edit_chunk_at_char(size_t char_idx, rope_node_info_t const&, F&&) -> rope_edit_result_t;
 
-		auto known_internal() const -> rope_node_internal_t const*
+		auto known_internal() -> rope_node_internal_t&
 		{
-			return &std::get<rope_node_internal_t>(variant_);
+			return std::get<rope_node_internal_t>(variant_);
 		}
 
 		auto known_leaf() -> rope_node_leaf_t&
@@ -193,7 +193,17 @@ namespace atma::detail
 		std::variant<rope_node_internal_t, rope_node_leaf_t> variant_;
 	};
 
-	
+	template <typename... Args>
+	inline rope_node_ptr rope_make_leaf_ptr(Args&&... args)
+	{
+		return rope_node_ptr::make(rope_node_leaf_t{std::forward<Args>(args)...});
+	}
+
+	template <typename... Args>
+	inline rope_node_ptr rope_make_internal_ptr(Args&&... args)
+	{
+		return rope_node_ptr::make(rope_node_internal_t{std::forward<Args>(args)...});
+	}
 }
 
 
@@ -363,22 +373,22 @@ namespace atma::detail
 
 				if (idx < left_size)
 				{
-					ln = rope_node_ptr::make(rope_node_internal_t(xfer_src(children_, idx), l_info, r_info));
-					rn = rope_node_ptr::make(rope_node_internal_t(xfer_src(children_, idx, child_count_ - idx - 1)));
+					ln = rope_make_internal_ptr(xfer_src(children_, idx), l_info, r_info);
+					rn = rope_make_internal_ptr(xfer_src(children_, idx, child_count_ - idx - 1));
 				}
 				if (idx + 1 < left_size)
 				{
-					ln = rope_node_ptr::make(rope_node_internal_t(xfer_src(children_, idx), l_info));
-					rn = rope_node_ptr::make(rope_node_internal_t(r_info, xfer_src(children_, idx + 1, right_size)));
+					ln = rope_make_internal_ptr(xfer_src(children_, idx), l_info);
+					rn = rope_make_internal_ptr(r_info, xfer_src(children_, idx + 1, right_size));
 				}
 				else
 				{
-					ln = rope_node_ptr::make(rope_node_internal_t(xfer_src(children_, left_size)));
-					rn = rope_node_ptr::make(rope_node_internal_t(l_info, r_info));
+					ln = rope_make_internal_ptr(xfer_src(children_, left_size));
+					rn = rope_make_internal_ptr(l_info, r_info);
 				}
 
-				rope_node_info_t lni{ln->known_internal()->calculate_combined_info(), ln};
-				rope_node_info_t rni{rn->known_internal()->calculate_combined_info(), rn};
+				rope_node_info_t lni{ln->known_internal().calculate_combined_info(), ln};
+				rope_node_info_t rni{rn->known_internal().calculate_combined_info(), rn};
 
 				return rope_edit_result_t{lni, rni};
 			}
@@ -454,11 +464,10 @@ namespace atma
 					else if (combined_bytes < detail::rope_minimum_split_size)
 					{
 						auto new_info = info + affix_string_info;
-						new_info.node = detail::rope_node_ptr::make(
-							detail::rope_node_leaf_t{
+						new_info.node = detail::rope_make_leaf_ptr(
 								xfer_src(buf, byte_idx),
 								xfer_src(str, sz),
-								xfer_src(buf + byte_idx, buf_size - byte_idx)});
+								xfer_src(buf + byte_idx, buf_size - byte_idx));
 
 
 						return detail::rope_edit_result_t{new_info, {}};
@@ -475,9 +484,9 @@ namespace atma
 					detail::text_info_t rhs_info;
 					rhs_info.bytes = (uint32_t)(info.bytes - byte_idx);
 					rhs_info.characters = (uint32_t)(info.characters - char_idx);
-					auto rhs_node = detail::rope_node_ptr::make(detail::rope_node_leaf_t{
+					auto rhs_node = detail::rope_make_leaf_ptr(
 						xfer_src(str, sz),
-						xfer_src(buf + byte_idx, buf_size - byte_idx)});
+						xfer_src(buf + byte_idx, buf_size - byte_idx));
 					
 					return detail::rope_edit_result_t{lhs_info, detail::rope_node_info_t{rhs_info, rhs_node}};
 				}
