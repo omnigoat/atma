@@ -24,7 +24,7 @@ namespace atma::detail
 
 
 //
-// node/text-info
+// text-info
 //
 namespace atma::detail
 {
@@ -34,8 +34,6 @@ namespace atma::detail
 		uint32_t characters = 0;
 		uint32_t line_breaks = 0;
 		uint32_t pad = 0;
-
-		auto is_full() const -> bool { return bytes == rope_buffer_size; }
 
 		static text_info_t from_str(char const* str, size_t sz)
 		{
@@ -95,7 +93,6 @@ namespace atma::detail
 }
 
 
-
 //
 //  rope_node_internal_t
 //
@@ -134,6 +131,8 @@ namespace atma::detail
 }
 
 
+//
+// rope_node_leaf_t
 //
 namespace atma::detail
 {
