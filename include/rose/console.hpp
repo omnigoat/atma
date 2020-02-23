@@ -16,8 +16,8 @@ namespace rose
 		console_t();
 
 		uintptr console_handle_;
-		byte console_bg_ = 0x00;
-		byte console_fg_ = 0x07;
+		uchar console_bg_ = 0x00;
+		uchar console_fg_ = 0x07;
 
 		friend struct runtime_t;
 	};

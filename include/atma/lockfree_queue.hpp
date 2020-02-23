@@ -640,7 +640,7 @@ namespace atma
 
 #if ATMA_ENABLE_ASSERTS
 		for (uint i = header_size; i != header_size + size; ++i)
-			ATMA_ASSERT(hk->buffer()[(p + i) % hk->buffer_size()] == 0);
+			ATMA_ASSERT(hk->buffer()[(p + i) % hk->buffer_size()] == byte{0});
 #endif
 
 		return {p, allocerr_t::success, size};
@@ -756,8 +756,8 @@ namespace atma
 
 	inline auto base_lockfree_queue_t::allocation_t::encode_uint16(uint16 i) -> void
 	{
-		encode_byte(i & 0xff);
-		encode_byte(i >> 8);
+		encode_byte(byte{i & 0xff});
+		encode_byte(byte{i >> 8});
 	}
 
 	inline auto base_lockfree_queue_t::allocation_t::encode_uint32(uint32 i) -> void
@@ -790,7 +790,7 @@ namespace atma
 
 		encode_uint32(size);
 		for (uint32 i = 0; i != size; ++i)
-			encode_byte(reinterpret_cast<char const*>(data)[i]);
+			encode_byte(byte{reinterpret_cast<char const*>(data)[i]});
 	}
 
 	template <typename T>
