@@ -35,6 +35,8 @@ namespace atma::detail
 		uint32_t line_breaks = 0;
 		uint32_t pad = 0;
 
+		auto can_append_at(size_t byte_idx) const { return byte_idx == bytes; }
+
 		static text_info_t from_str(char const* str, size_t sz)
 		{
 			ATMA_ASSERT(str);
@@ -437,53 +439,66 @@ namespace atma
 	inline auto rope_t::insert(size_t char_idx, char const* str, size_t sz) -> void
 	{
 		auto [lhs_info, rhs_info] = root_.node->edit_chunk_at_char(char_idx, root_,
-			[str, sz](size_t char_idx, detail::rope_node_info_t const& info, char* buf, size_t& buf_size)
+			[str, sz](size_t char_idx, detail::rope_node_info_t const& leaf_info, char* buf, size_t& buf_size)
 			{
 				auto byte_idx = utf8_charseq_idx_to_byte_idx(buf, buf_size, char_idx);
 
-				auto combined_bytes = info.bytes + sz;
+				auto combined_bytes = leaf_info.bytes + sz;
 
-				// we will never have to split this node
+				// we will never have to split the resultant node
 				if (combined_bytes <= detail::rope_buffer_size)
 				{
 					// todo: one loop for copy + info-calculation
 					auto affix_string_info = detail::text_info_t::from_str(str, sz);
 
-					// appending is possible
-					if (byte_idx == info.bytes)
-					{
-						std::memcpy(buf + info.bytes, str, sz);
-						buf_size += sz;
-						auto new_info = info + affix_string_info;
+					detail::rope_node_info_t result_info;
 
-						return detail::rope_edit_result_t{new_info, detail::rope_maybe_node_info_t{}};
+					// appending is possible
+					if (leaf_info.can_append_at(byte_idx))
+					{
+						std::memcpy(buf + leaf_info.bytes, str, sz);
+						buf_size += sz;
+						result_info = leaf_info + affix_string_info;
+
+						//return detail::rope_edit_result_t{new_info, detail::rope_maybe_node_info_t{}};
 					}
 					// append is not possible, but the total new size is under
 					// the minimum splittable size. like, we don't want two characters
 					// here, two there. allocate one new leaf and insert it all
-					else if (combined_bytes < detail::rope_minimum_split_size)
+					else  //if (combined_bytes < detail::rope_minimum_split_size)
 					{
-						auto new_info = info + affix_string_info;
-						new_info.node = detail::rope_make_leaf_ptr(
-								xfer_src(buf, byte_idx),
-								xfer_src(str, sz),
-								xfer_src(buf + byte_idx, buf_size - byte_idx));
+						result_info = leaf_info + affix_string_info;
+						result_info.node = detail::rope_make_leaf_ptr(
+							xfer_src(buf, byte_idx),
+							xfer_src(str, sz),
+							xfer_src(buf + byte_idx, buf_size - byte_idx));
 
-
-						return detail::rope_edit_result_t{new_info, {}};
+						///return detail::rope_edit_result_t{new_info, {}};
 					}
+
+					ATMA_ASSERT(byte_idx < result_info.bytes);
+
+					//auto& result_leaf = result_info.node->known_leaf();
+
+					// fix up CRLF pairs
+					//if (0 < byte_idx)
+					//{
+					//	if (result_leaf.buf)
+					//}
+
+
 				}
 
 				// splitting is required
 				{
 					// we don't need a new node for lhs, just reference a subsequence
-					auto lhs_info = info;
+					auto lhs_info = leaf_info;
 					lhs_info.characters = (uint32_t)char_idx;
 					lhs_info.bytes = (uint32_t)byte_idx;
 
 					detail::text_info_t rhs_info;
-					rhs_info.bytes = (uint32_t)(info.bytes - byte_idx);
-					rhs_info.characters = (uint32_t)(info.characters - char_idx);
+					rhs_info.bytes = (uint32_t)(leaf_info.bytes - byte_idx);
+					rhs_info.characters = (uint32_t)(leaf_info.characters - char_idx);
 					auto rhs_node = detail::rope_make_leaf_ptr(
 						xfer_src(str, sz),
 						xfer_src(buf + byte_idx, buf_size - byte_idx));
@@ -499,13 +514,9 @@ namespace atma
 				lhs_info.node = root_.node;
 			root_.node = detail::rope_node_ptr::make(detail::rope_node_internal_t{lhs_info, *rhs_info});
 		}
-		else if (lhs_info.node)
-		{
-			root_ = lhs_info;
-		}
 		else
 		{
-			(detail::text_info_t&)root_ = lhs_info;
+			root_ = lhs_info;
 		}
 	}
 }
