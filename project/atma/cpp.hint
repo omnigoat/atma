@@ -1,3 +1,8 @@
+#define ATMA_ASSERT(...) do { \
+		if ( !(x) && ::atma::assert::detail::handle(msg, __FILE__, __LINE__) ) \
+			{ __debugbreak(); } \
+		break; \
+	} while(0)
 
 // hash_table
 #define hash_table_template_declaration <typename K, typename V, typename KX, typename VX, typename H, typename E, typename A>
