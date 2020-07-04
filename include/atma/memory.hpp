@@ -412,6 +412,11 @@ namespace atma
 		auto data() -> value_type* { return alloc_and_ptr_.second(); }
 		auto data() const -> value_type const* { return alloc_and_ptr_.second(); }
 
+		auto operator [](size_t idx) const -> value_type&
+		{
+			return data()[idx];
+		}
+
 	protected:
 		// store the allocator EBO-d with the vtable pointer
 		using alloc_and_ptr_type = ebo_pair_t<A, T* const>;
@@ -466,6 +471,13 @@ namespace atma
 		auto size() const -> size_t { return size_; }
 		auto byte_size() const -> size_t { return size_ * sizeof value_type; }
 
+		// immutable transforms
+		auto skip(size_t n) const -> bounded_memxfer_t<Tag, T, A>
+		{
+			ATMA_ASSERT(n < size_);
+			return bounded_memxfer_t<Tag, T, A>(this->get_allocator(), this->data() + n, this->size_ - n);
+		}
+
 	private:
 		size_t const size_ = unbounded_memory_size;
 	};
@@ -481,14 +493,14 @@ namespace atma
 namespace atma
 {
 	// dest_memxfer_t
-	template <typename T, typename A>
+	template <typename T, typename A = std::allocator<std::remove_const_t<T>>>
 	using dest_memxfer_t = memxfer_t<dest_memory_tag_t, T, A>;
 
-	template <typename T, typename A>
+	template <typename T, typename A = std::allocator<std::remove_const_t<T>>>
 	using dest_bounded_memxfer_t = bounded_memxfer_t<dest_memory_tag_t, T, A>;
 
 	// src_memxfer_t
-	template <typename T, typename A>
+	template <typename T, typename A = std::allocator<std::remove_const_t<T>>>
 	using src_memxfer_t = memxfer_t<src_memory_tag_t, T, A>;
 
 	template <typename T, typename A = std::allocator<std::remove_const_t<T>>>
