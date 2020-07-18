@@ -220,11 +220,10 @@ namespace atma::detail
 		// travel
 		auto operator ++() -> basic_utf8_iterator_t&;
 		auto operator ++(int) -> basic_utf8_iterator_t;
-		//auto operator --() -> basic_utf8_iterator_t&;
-		//auto operator --(int) -> basic_utf8_iterator_t;
+		auto operator --() -> basic_utf8_iterator_t&;
+		auto operator --(int) -> basic_utf8_iterator_t;
 
 		auto char_data() const { return here_; }
-		auto char_size_bytes() const -> size_t { return utf8_char_size_bytes(here_); }
 
 	private:
 
@@ -292,7 +291,7 @@ namespace atma::detail
 	template <typename T>
 	inline auto basic_utf8_iterator_t<T>::operator++ () -> basic_utf8_iterator_t&
 	{
-		here_ += char_size_bytes();
+		here_ += utf8_char_size_bytes(here_);
 		return *this;
 	}
 
@@ -304,7 +303,20 @@ namespace atma::detail
 		return r;
 	}
 
+	template <typename T>
+	inline auto basic_utf8_iterator_t<T>::operator-- () -> basic_utf8_iterator_t&
+	{
+		while (!utf8_byte_is_leading(*--here_));
+		return *this;
+	}
 
+	template <typename T>
+	inline auto basic_utf8_iterator_t<T>::operator-- (int) -> basic_utf8_iterator_t
+	{
+		auto r = *this;
+		--r;
+		return r;
+	}
 
 	template <typename T>
 	inline auto operator == (basic_utf8_iterator_t<T> const& lhs, basic_utf8_iterator_t<T> const& rhs)
