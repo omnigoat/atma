@@ -114,22 +114,22 @@ namespace rose
 	struct path_range_iter_t
 	{
 		path_range_iter_t(char const* begin, char const* end, char const* terminal)
-			:range_{begin, end}, terminal_(terminal)
+			: range_{begin, end}, terminal_(terminal)
 		{}
 
-		auto operator * () const -> atma::utf8_string_range_t const&
+		auto operator * () const -> atma::utf8_const_span_t const&
 		{
 			return range_;
 		}
 
-		auto operator -> () const -> atma::utf8_string_range_t const*
+		auto operator -> () const -> atma::utf8_const_span_t const*
 		{
 			return &range_;
 		}
 
 		auto operator ++ () -> path_range_iter_t&
 		{
-			range_ = atma::utf8_string_range_t{range_.end(), findinc_path_separator(range_.end(), terminal_)};
+			range_ = atma::utf8_const_span_t{range_.end(), findinc_path_separator(range_.end(), terminal_)};
 			return *this;
 		}
 
@@ -139,7 +139,7 @@ namespace rose
 		}
 
 	private:
-		atma::utf8_string_range_t range_;
+		atma::utf8_const_span_t range_;
 		char const* terminal_;
 	};
 

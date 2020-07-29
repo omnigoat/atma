@@ -1,6 +1,6 @@
 #pragma once
 
-#include <atma/utf/utf8_char.hpp>
+#include <atma/utf/utf8_string.hpp>
 
 #include <atma/intrusive_ptr.hpp>
 #include <atma/ranges/core.hpp>
@@ -89,7 +89,7 @@ namespace atma::detail
 			ATMA_ASSERT(str);
 
 			text_info_t r;
-			for (auto x : utf8_const_span_t{str, sz})
+			for (auto x : utf8_const_range_t{str, str + sz})
 			{
 				r.bytes += (uint32_t)x.size_bytes();
 				++r.characters;
