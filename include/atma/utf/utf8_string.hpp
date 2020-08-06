@@ -182,7 +182,19 @@ namespace atma
 }
 
 
+// concepts
+namespace atma::detail
+{
+	template <typename R, typename BackingType>
+	concept utf8_range_concept =
+		std::ranges::contiguous_range<R> &&
+		std::is_convertible_v<std::ranges::range_value_t<R>, BackingType>;
 
+	template <typename It, typename BackingType>
+	concept utf8_span_iterator_concept =
+		std::contiguous_iterator<It> &&
+		std::is_convertible_v<std::iter_value_t<It>*, BackingType* const>;
+}
 
 //=====================================================================
 //
@@ -291,42 +303,75 @@ namespace atma
 
 //=====================================================================
 //
-//  !utf8_span_t
-//  --------------
+//  @ utf8_span_t
+//  ---------------
+//  a utf8 span that is really just a span of char
+//
 //
 namespace atma::detail
 {
 	template <typename T>
 	struct basic_utf8_span_t
 	{
-		using char_type = T;
-		using iterator = char_type*;
+		// adhere to standard with all the types
+		using element_type = T;
+		using value_type = std::remove_cv_t<T>;
+		using size_type = std::size_t;
+		using difference_type = std::ptrdiff_t;
+		using pointer = T*;
+		using const_pointer = T const*;
+		using reference = T&;
+		using const_reference = T const&;
+		using iterator = element_type*;
+		using reverse_iterator = std::reverse_iterator<iterator>;
 
 		constexpr basic_utf8_span_t() = default;
 		basic_utf8_span_t(basic_utf8_span_t const&) = default;
 
-		constexpr basic_utf8_span_t(char_type* data, size_t size)
+		// construct from a range of compatible values
+		template <utf8_range_concept<T> Range>
+		constexpr basic_utf8_span_t(Range const& range)
+			: data_(std::data(range))
+			, size_(std::size(range))
+		{}
+
+		constexpr basic_utf8_span_t(element_type* data, size_t size)
 			: data_(data)
 			, size_(size)
 		{}
 
-		constexpr basic_utf8_span_t(char_type* begin, char_type* end)
+		constexpr basic_utf8_span_t(element_type* begin, element_type* end)
 			: data_(begin)
-			, size_(end - begin)
+			, size_(std::distance(begin, end))
 		{}
 
-		// immutable access
-		auto begin() const { return data_; }
-		auto end() const { return data_ + size_; }
-		auto data() const { return data_; }
+		auto operator = (basic_utf8_span_t const& rhs) -> basic_utf8_span_t& = default;
 
-		auto size() const { return size_; }
-		auto size_bytes() const { return size_; }
-		auto empty() const { return size_ == 0; }
+		// iterators
+		constexpr auto begin() const { return data_; }
+		constexpr auto end() const { return data_ + size_; }
+		constexpr auto rbegin() const { return reverse_iterator(end()); }
+		constexpr auto rend() const { return reverse_iterator(begin()); }
+
+		// access
+		constexpr auto data() const { return data_; }
+		constexpr auto front() const { return *data_; }
+		constexpr auto back() const { return data_[size_ - 1]; }
+		constexpr auto operator [](size_type idx) const { return data_[idx]; }
+
+		// observers
+		constexpr auto size() const { return size_; }
+		constexpr auto size_bytes() const { return size_; }
+		constexpr auto empty() const { return size_ == 0; }
+
+		// subviews
+		constexpr auto first(size_type count) const { return basic_utf8_span_t(data_, count); }
+		constexpr auto last(size_type count) const { return basic_utf8_span_t(data_ + size_ - count, count); }
+		constexpr auto subspan(size_type offset, size_type count) const { return basic_utf8_span_t(data_ + offset, count); }
 
 	private:
-		char_type* data_ = nullptr;
-		size_t size_ = 0;
+		element_type* data_ = nullptr;
+		size_type size_ = 0;
 	};
 }
 
@@ -339,8 +384,8 @@ namespace atma
 
 //=====================================================================
 //
-//  !utf8_iterator_t
-//  ------------------
+//  @ utf8_iterator_t
+//  -------------------
 //  given a sequence of chars, iterates character-by-character. this
 //  means that the amount of bytes traversed is variable, as utf8 is
 //  want to be
@@ -382,7 +427,7 @@ namespace atma
 
 //=====================================================================
 //
-//  !basic_utf8_range_t
+//  @ basic_utf8_range_t
 //  ---------------------------
 //  A string-range that does not allocate any memory, but instead points
 //  to external, contiguous memory that is expected to be valid for the
@@ -397,16 +442,6 @@ namespace atma
 //=====================================================================
 namespace atma::detail
 {
-	template <typename R, typename BackingType>
-	concept utf8_range_concept =
-		std::ranges::contiguous_range<R> &&
-		std::is_convertible_v<std::ranges::range_value_t<R>, BackingType>;
-
-	template <typename It, typename BackingType>
-	concept utf8_span_iterator_concept =
-		std::contiguous_iterator<It> &&
-		std::is_convertible_v<std::iter_value_t<It>*, BackingType* const>;
-
 	template <typename BackingType>
 	struct basic_utf8_range_t
 	{
