@@ -182,25 +182,33 @@ namespace atma
 }
 
 
-// concepts
+//=====================================================================
+//
+//  CONCEPTS
+//
 namespace atma::detail
 {
+	// a standards-compliant contiguous range that contains
+	// elements of type BackingType
 	template <typename R, typename BackingType>
 	concept utf8_range_concept =
 		std::ranges::contiguous_range<R> &&
 		std::is_convertible_v<std::ranges::range_value_t<R>, BackingType>;
 
+	// a standards-compliant contiguous iterator that
+	// dereferences to a value-type of BackingType
 	template <typename It, typename BackingType>
-	concept utf8_span_iterator_concept =
+	concept utf8_iterator_concept =
 		std::contiguous_iterator<It> &&
 		std::is_convertible_v<std::iter_value_t<It>*, BackingType* const>;
 }
 
+
 //=====================================================================
 //
-//  !utf8_char_t
-//  --------------
-//  does not own the backing byte sequence
+//  @ utf8_char_t
+//  ---------------
+//  
 //
 namespace atma
 {
@@ -210,8 +218,10 @@ namespace atma
 		constexpr utf8_char_t(utf8_char_t const&) = default;
 
 		constexpr utf8_char_t(char const*);
+		//constexpr explicit utf8_char_t(char32_t);
+		//constexpr utf8_char_t(char16_t, char16_t = 0);
 
-		auto operator [](size_t idx) const -> byte
+		constexpr auto operator [](size_t idx) const -> byte
 		{
 			ATMA_ASSERT(idx < size_bytes());
 			return bytes_[idx];
@@ -220,12 +230,12 @@ namespace atma
 		auto data() const -> char const* { return reinterpret_cast<char const*>(bytes_); }
 		constexpr auto size_bytes() const -> size_t { return utf8_leading_byte_length(bytes_[0]); }
 
-		operator char const* () const { return data(); }
+		explicit operator char const* () const { return data(); }
 
-		auto operator = (utf8_char_t const&) -> utf8_char_t & = default;
+		auto operator = (utf8_char_t const&) -> utf8_char_t& = default;
 
 	private:
-		byte bytes_[4] ={byte(), byte(), byte(), byte()};
+		byte bytes_[4] = {byte(), byte(), byte(), byte()};
 	};
 
 }
@@ -233,8 +243,8 @@ namespace atma
 
 //=====================================================================
 //
-//  !charseq
-//  ---------
+//  @ charseq
+//  -----------
 //  operations on a sequence of utf8-chars. "char const*" is
 //  indistinguishable when used as both a single char or many
 //
@@ -269,7 +279,7 @@ namespace atma
 		ATMA_ASSERT(utf8_byte_is_leading((byte)*seq));
 
 		for (auto i = seq; *i; utf8_char_advance(i))
-			if (x == i)
+			if (strncmp(x.data(), i, x.size_bytes()) == 0)
 				return i;
 
 		return nullptr;
@@ -326,7 +336,7 @@ namespace atma::detail
 		using reverse_iterator = std::reverse_iterator<iterator>;
 
 		constexpr basic_utf8_span_t() = default;
-		basic_utf8_span_t(basic_utf8_span_t const&) = default;
+		constexpr basic_utf8_span_t(basic_utf8_span_t const&) = default;
 
 		// construct from a range of compatible values
 		template <utf8_range_concept<T> Range>
@@ -340,9 +350,10 @@ namespace atma::detail
 			, size_(size)
 		{}
 
-		constexpr basic_utf8_span_t(element_type* begin, element_type* end)
-			: data_(begin)
-			, size_(std::distance(begin, end))
+		template <utf8_iterator_concept<T> Iterator>
+		constexpr basic_utf8_span_t(Iterator begin, Iterator end)
+			: data_(std::to_address(begin))
+			, size_(end - begin)
 		{}
 
 		auto operator = (basic_utf8_span_t const& rhs) -> basic_utf8_span_t& = default;
@@ -377,7 +388,7 @@ namespace atma::detail
 
 namespace atma
 {
-	using utf8_span_t   = detail::basic_utf8_span_t<char>;
+	using utf8_span_t       = detail::basic_utf8_span_t<char>;
 	using utf8_const_span_t = detail::basic_utf8_span_t<char const>;
 }
 
@@ -396,7 +407,8 @@ namespace atma::detail
 	struct basic_utf8_iterator_t
 	{
 		using character_backing_type = T;
-		using value_type = transfer_const_t<character_backing_type, utf8_char_t>;
+		using element_type = transfer_const_t<character_backing_type, utf8_char_t>; 
+		using value_type = std::remove_cv_t<element_type>;
 
 		basic_utf8_iterator_t() = default;
 		basic_utf8_iterator_t(basic_utf8_iterator_t const&) = default;
@@ -454,15 +466,12 @@ namespace atma::detail
 		basic_utf8_range_t();
 		basic_utf8_range_t(basic_utf8_range_t const&);
 
-		// construct from backing type
-		basic_utf8_range_t(backing_type* begin, backing_type* end);
-
 		// construct from a range of compatible values
 		template <utf8_range_concept<BackingType> Range>
 		explicit basic_utf8_range_t(Range const&);
 
 		// conversion from iterator-pairs
-		template <utf8_span_iterator_concept<BackingType> IteratorType>
+		template <utf8_iterator_concept<BackingType> IteratorType>
 		basic_utf8_range_t(IteratorType, IteratorType);
 
 		auto raw_size() const -> size_t;
@@ -602,6 +611,7 @@ namespace atma
 		using iterator_category = std::forward_iterator_tag;
 		using difference_type   = ptrdiff_t;
 		using value_type        = utf8_char_t;
+		using element_type      = utf8_char_t;
 		using pointer           = utf8_char_t*;
 		using reference         = utf8_char_t const&;
 
@@ -642,22 +652,6 @@ namespace atma
 //
 namespace atma
 {
-#if 0
-	constexpr inline utf8_char_t::utf8_char_t(byte const* c)
-	{
-		ATMA_ASSERT(c != nullptr);
-		ATMA_ASSERT(utf8_byte_is_leading(*c));
-
-		auto sz = detail::char_length_table[*c];
-
-		// take advantage of short circuiting here
-		(sz-- && bytes_[0] = (char)*c++) &&
-		(sz-- && bytes_[1] = (char)*c++) &&
-		(sz-- && bytes_[2] = (char)*c++) &&
-		(sz-- && bytes_[3] = (char)*c++);
-	}
-#endif
-
 	constexpr inline utf8_char_t::utf8_char_t(char const* c)
 	{
 		ATMA_ASSERT(c != nullptr);
@@ -771,7 +765,7 @@ namespace atma::detail
 
 
 //=====================================================================
-// !basic_utf8_range_t implementation
+// @ basic_utf8_range_t implementation
 //=====================================================================
 namespace atma::detail
 {
@@ -781,20 +775,15 @@ namespace atma::detail
 	{}
 
 	template <typename BT>
-	inline basic_utf8_range_t<BT>::basic_utf8_range_t(backing_type* begin, backing_type* end)
-		: begin_(begin), end_(end)
-	{}
-
-	template <typename BT>
 	template <utf8_range_concept<BT> Range>
 	inline basic_utf8_range_t<BT>::basic_utf8_range_t(Range const& range)
 	{
 	}
 
 	template <typename BT>
-	template <utf8_span_iterator_concept<BT> IteratorType>
+	template <utf8_iterator_concept<BT> IteratorType>
 	inline basic_utf8_range_t<BT>::basic_utf8_range_t(IteratorType begin, IteratorType end)
-		: begin_(&*begin), end_(&*end)
+		: begin_(std::to_address(begin)), end_(std::to_address(end))
 	{}
 
 	template <typename BT>
@@ -953,7 +942,7 @@ namespace atma
 	}
 
 	inline utf8_string_t::utf8_string_t(const_iterator const& begin, const_iterator const& end)
-		: utf8_string_t(*begin, *end)
+		: utf8_string_t(begin->data(), end->data() - begin->data())
 	{
 	}
 
