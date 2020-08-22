@@ -678,7 +678,7 @@ namespace atma
 
 
 //=====================================================================
-// utf8_char_t implementation
+// @utf8_char_t implementation
 //=====================================================================
 namespace atma
 {
@@ -733,7 +733,7 @@ namespace atma
 
 
 //=====================================================================
-// basic_utf8_iterator_t implementation
+// @basic_utf8_iterator_t implementation
 //=====================================================================
 namespace atma::detail
 {
@@ -785,6 +785,7 @@ namespace atma::detail
 	}
 }
 
+
 //=====================================================================
 // @utf8_span_t implementation
 //=====================================================================
@@ -802,7 +803,6 @@ namespace atma::detail
 		return !operator == (lhs, rhs);
 	}
 }
-
 
 
 //=====================================================================
@@ -949,11 +949,8 @@ namespace atma::detail
 }
 
 
-
 //=====================================================================
-//
-// utf8_string implementation
-//
+// @utf8_string_t implementation
 //=====================================================================
 namespace atma
 {
@@ -981,21 +978,11 @@ namespace atma
 
 	inline utf8_string_t::utf8_string_t(const_iterator const& begin, const_iterator const& end)
 		: utf8_string_t(begin->data(), end->data() - begin->data())
-	{
-	}
+	{}
 
 	inline utf8_string_t::utf8_string_t(utf8_string_t const& str)
 		: utf8_string_t(str.raw_begin(), str.size_bytes())
-	{
-	}
-
-#if 0
-	inline utf8_string_t::utf8_string_t(utf8_const_span_t const& range)
-		: utf8_string_t{range.begin(), range.size_bytes()}
-	{
-	}
-#endif // 0
-
+	{}
 
 #if 0
 	utf8_string_t::utf8_string_t(const utf16_string_t& rhs)
@@ -1020,7 +1007,7 @@ namespace atma
 
 	inline utf8_string_t::~utf8_string_t()
 	{
-		delete data_;
+		delete [] data_;
 		capacity_ = 0;
 		size_ = 0;
 		data_ = nullptr;
@@ -1213,11 +1200,11 @@ namespace atma
 			data_ = new char[capacity_];
 			memcpy(data_, tmp, size_);
 			data_[size_] = '\0';
-			delete tmp;
+			delete [] tmp;
 		}
 		else
 		{
-			delete data_;
+			delete [] data_;
 			capacity_ = capacity;
 			data_ = new char[capacity_];
 		}
