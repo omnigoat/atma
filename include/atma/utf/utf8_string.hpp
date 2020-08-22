@@ -334,21 +334,20 @@ namespace atma::detail
 	struct basic_utf8_span_t
 	{
 		// adhere to standard with all the types
-		using element_type = T;
-		using value_type = std::remove_cv_t<T>;
+		using value_type = T;
 		using size_type = std::size_t;
 		using difference_type = std::ptrdiff_t;
 		using pointer = T*;
 		using const_pointer = T const*;
 		using reference = T&;
 		using const_reference = T const&;
-		using iterator = element_type*;
+		using iterator = value_type*;
 		using reverse_iterator = std::reverse_iterator<iterator>;
 
 		constexpr basic_utf8_span_t() = default;
 		constexpr basic_utf8_span_t(basic_utf8_span_t const&) = default;
 
-		constexpr basic_utf8_span_t(element_type* data, size_t size)
+		constexpr basic_utf8_span_t(value_type* data, size_t size)
 			: data_(data)
 			, size_(size)
 		{}
@@ -362,7 +361,7 @@ namespace atma::detail
 
 		// if something is not a contiguous-range but provides data & size_bytes accessors
 		// then we will assume it is a contiguous byte-array "underneath"
-		template <utf8_data_size_bytes_concept<element_type> Range>
+		template <utf8_data_size_bytes_concept<value_type> Range>
 		requires !utf8_range_concept<value_type, Range>
 		constexpr basic_utf8_span_t(Range const& range)
 			: data_(std::data(range))
@@ -401,7 +400,7 @@ namespace atma::detail
 		constexpr auto subspan(size_type offset, size_type count) const { return basic_utf8_span_t(data_ + offset, count); }
 
 	private:
-		element_type* data_ = nullptr;
+		value_type* data_ = nullptr;
 		size_type size_ = 0;
 	};
 }
@@ -427,8 +426,7 @@ namespace atma::detail
 	struct basic_utf8_iterator_t
 	{
 		using character_backing_type = T;
-		using element_type = transfer_const_t<character_backing_type, utf8_char_t>; 
-		using value_type = std::remove_cv_t<element_type>;
+		using value_type = transfer_const_t<character_backing_type, utf8_char_t>;
 
 		basic_utf8_iterator_t() = default;
 		basic_utf8_iterator_t(basic_utf8_iterator_t const&) = default;
@@ -527,14 +525,12 @@ namespace atma
 	{
 		struct iterator_t;
 
-		using value_t                = char;
-		using value_type             = char;
-		using element_type           = char;
+		using value_type = char;
 		using size_type = size_t;
 		using difference_type = ptrdiff_t;
-		using iterator               = iterator_t;
-		using const_iterator         = iterator_t;
-		using reverse_iterator       = std::reverse_iterator<iterator>;
+		using iterator = iterator_t;
+		using const_iterator = iterator_t;
+		using reverse_iterator = std::reverse_iterator<iterator>;
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 		utf8_string_t();
@@ -543,9 +539,9 @@ namespace atma
 		utf8_string_t(char const* str);
 		utf8_string_t(const_iterator const&, const_iterator const&);
 
-		//template <typename T>
-		//requires 
-		//utf8_string_t(utf8_const_span_t const&);
+		// construct from any char-based range
+		template <detail::utf8_range_concept<char const> Range>
+		explicit utf8_string_t(Range const&);
 
 		utf8_string_t(utf8_string_t const&);
 		utf8_string_t(utf8_string_t&&);
@@ -636,7 +632,6 @@ namespace atma
 		using iterator_category = std::forward_iterator_tag;
 		using difference_type   = ptrdiff_t;
 		using value_type        = utf8_char_t;
-		using element_type      = utf8_char_t;
 		using pointer           = utf8_char_t*;
 		using reference         = utf8_char_t&;
 
@@ -673,9 +668,9 @@ namespace atma
 
 
 
-//
+//=====================================================================
 // utf8_char_t implementation
-//
+//=====================================================================
 namespace atma
 {
 	constexpr inline utf8_char_t::utf8_char_t(char const* c)
@@ -717,9 +712,9 @@ namespace atma
 }
 
 
-//
+//=====================================================================
 // basic_utf8_iterator_t implementation
-//
+//=====================================================================
 namespace atma::detail
 {
 	template <typename T>
@@ -961,13 +956,16 @@ namespace atma
 
 	inline utf8_string_t::utf8_string_t(char const* begin, char const* end)
 		: utf8_string_t(begin, end - begin)
-	{
-	}
+	{}
 
 	inline utf8_string_t::utf8_string_t(char const* str)
 		: utf8_string_t(str, strlen(str))
-	{
-	}
+	{}
+
+	template <detail::utf8_range_concept<char const> Range>
+	inline utf8_string_t::utf8_string_t(Range const& range)
+		: utf8_string_t(std::data(range), std::size(range))
+	{}
 
 	inline utf8_string_t::utf8_string_t(const_iterator const& begin, const_iterator const& end)
 		: utf8_string_t(begin->data(), end->data() - begin->data())
