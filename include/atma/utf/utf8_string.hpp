@@ -693,16 +693,19 @@ namespace atma
 		if (c == nullptr)
 			return;
 
-		ATMA_ASSERT(utf8_byte_is_leading((byte)*c));
+		uint idx = 0;
+		switch (detail::char_length_table[*c])
+		{
+			case 4: bytes_[idx++] = (byte)*c++; [[fallthrough]];
+			case 3: bytes_[idx++] = (byte)*c++; [[fallthrough]];
+			case 2: bytes_[idx++] = (byte)*c++; [[fallthrough]];
+			case 1: bytes_[idx++] = (byte)*c++;
+				break;
 
-		auto sz = detail::char_length_table[*c];
-
-		// take advantage of short circuiting here, as no byte
-		// in a valid utf8 sequence should equate to zero
-		(sz-- && (bool)(bytes_[0] = (byte)*c++)) &&
-		(sz-- && (bool)(bytes_[1] = (byte)*c++)) &&
-		(sz-- && (bool)(bytes_[2] = (byte)*c++)) &&
-		(sz-- && (bool)(bytes_[3] = (byte)*c++));
+			default:
+				ATMA_HALT("bad leading-byte of a utf8-char");
+				break;
+		}
 	}
 
 	inline auto operator == (utf8_char_t lhs, utf8_char_t rhs) -> bool
