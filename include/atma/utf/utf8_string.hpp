@@ -225,6 +225,7 @@ namespace atma
 		constexpr utf8_char_t() = default;
 		constexpr utf8_char_t(utf8_char_t const&) = default;
 
+		constexpr utf8_char_t(char);
 		constexpr utf8_char_t(char const*);
 		//constexpr explicit utf8_char_t(char32_t);
 		//constexpr utf8_char_t(char16_t, char16_t = 0);
@@ -516,7 +517,12 @@ namespace atma
 
 //=====================================================================
 //
-// @utf8_string_t
+//  @utf8_string_t
+//  -----------------
+//  conceptually this is a forward-range of utf8_char_ts.
+//  implementation-wise, it is a standard char-based string. the access
+//  to its underlying representation is something of an open question
+//  at the moment.
 //
 //=====================================================================
 namespace atma
@@ -525,7 +531,7 @@ namespace atma
 	{
 		struct iterator_t;
 
-		using value_type = char;
+		using value_type = utf8_char_t;
 		using size_type = size_t;
 		using difference_type = ptrdiff_t;
 		using iterator = iterator_t;
@@ -553,12 +559,15 @@ namespace atma
 		auto operator += (utf8_string_t const& rhs) -> utf8_string_t&;
 		auto operator += (char const*) -> utf8_string_t&;
 
-
-		auto empty() const -> bool;
+		// element access
 		auto c_str() const -> char const*;
-		auto size_bytes() const -> size_t;
 		auto data() const { return data_; }
 
+		// observers
+		auto size_bytes() const -> size_t;
+		[[nodiscard]] auto empty() const -> bool;
+
+		// iterators
 		auto begin() const -> const_iterator;
 		auto end() const -> const_iterator;
 		auto rbegin() const -> const_reverse_iterator;
@@ -569,14 +578,14 @@ namespace atma
 
 		auto raw_iter_of(const_iterator const&) const -> char const*;
 
+		// operations
 		auto push_back(char) -> void;
 		auto push_back(utf8_char_t) -> void;
 
-		auto append(char const*, char const*) -> void;
-		auto append(char const*) -> void;
-		auto append(utf8_string_t const&) -> void;
-
-		auto append(utf8_const_span_t const&) -> void;
+		auto append(char const*, char const*) -> utf8_string_t&;
+		auto append(char const*) -> utf8_string_t&;
+		auto append(utf8_string_t const&) -> utf8_string_t&;
+		auto append(utf8_const_span_t const&) -> utf8_string_t&;
 
 		auto clear() -> void;
 
@@ -673,7 +682,13 @@ namespace atma
 //=====================================================================
 namespace atma
 {
-	constexpr inline utf8_char_t::utf8_char_t(char const* c)
+	constexpr utf8_char_t::utf8_char_t(char c)
+		: bytes_{(byte)c, byte(), byte(), byte()}
+	{
+		ATMA_ASSERT(utf8_char_is_ascii(c));
+	}
+
+	constexpr utf8_char_t::utf8_char_t(char const* c)
 	{
 		ATMA_ASSERT(c != nullptr);
 		ATMA_ASSERT(utf8_byte_is_leading((byte)*c));
@@ -1118,42 +1133,44 @@ namespace atma
 
 	inline auto utf8_string_t::push_back(utf8_char_t c) -> void
 	{
-#if 0
-		auto sz = std::distance(c.begin, c.end);
-		imem_quantize_grow(sz);
+		imem_quantize_grow(c.size_bytes());
 
-		memcpy(data_ + size_, c.begin, sz);
-		size_ += sz;
+		memcpy(data_ + size_, c.data(), c.size_bytes());
+		size_ += c.size_bytes();
 		data_[size_] = '\0';
-#endif
 	}
 
-	inline auto utf8_string_t::append(char const* begin, char const* end) -> void
+	inline auto utf8_string_t::append(char const* begin, char const* end) -> utf8_string_t&
 	{
-		auto sz = end - begin;
-		if (sz == 0)
-			return;
-		imem_quantize_grow(sz);
+		if (auto sz = end - begin)
+		{
+			imem_quantize_grow(sz);
 
-		memcpy(data_ + size_, begin, sz);
-		size_ += sz;
-		data_[size_] = '\0';
+			memcpy(data_ + size_, begin, sz);
+			size_ += sz;
+			data_[size_] = '\0';
+		}
+
+		return *this;
 	}
 
-	inline auto utf8_string_t::append(char const* str) -> void
+	inline auto utf8_string_t::append(char const* str) -> utf8_string_t&
 	{
 		append(str, str + strlen(str));
+		return *this;
 	}
 
-	inline auto utf8_string_t::append(utf8_string_t const& str) -> void
+	inline auto utf8_string_t::append(utf8_string_t const& str) -> utf8_string_t&
 	{
 		append(str.raw_begin(), str.raw_end());
+		return *this;
 	}
 
 #if 0
-	inline auto utf8_string_t::append(utf8_const_span_t const& str) -> void
+	inline auto utf8_string_t::append(utf8_const_span_t const& str) -> utf8_string_t&
 	{
 		append(str.begin(), str.end());
+		return *this;
 	}
 #endif // 0
 
@@ -1173,6 +1190,7 @@ namespace atma
 
 	inline auto utf8_string_t::imem_quantize_grow(size_t size) -> void
 	{
+		// less-than *or equal* so that we always have space for our null-terminator
 		if (capacity_ <= size_ + size)
 			imem_realloc(imem_quantize_capacity(size_ + size), true);
 	}
