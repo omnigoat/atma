@@ -188,25 +188,33 @@ namespace atma
 //
 namespace atma::detail
 {
-	// a standards-compliant contiguous range that contains
-	// elements of type BackingType
+	// a standards-compliant contiguous range that contains elements of type BackingType
 	template <typename R, typename BackingType>
 	concept utf8_range_concept =
 		std::ranges::contiguous_range<R> &&
 		std::is_convertible_v<std::ranges::range_value_t<R>, BackingType>;
+
+	// hmm...
+	template <typename R, typename ElementType>
+	concept utf8_data_size_bytes_concept =
+		requires (R const& r)
+		{
+			{ r.size_bytes() };
+			{ std::data(r) } -> std::convertible_to<ElementType*>;
+		};
 
 	// a standards-compliant contiguous iterator that
 	// dereferences to a value-type of BackingType
 	template <typename It, typename BackingType>
 	concept utf8_iterator_concept =
 		std::contiguous_iterator<It> &&
-		std::is_convertible_v<std::iter_value_t<It>*, BackingType* const>;
+		std::is_convertible_v<std::iter_value_t<It>*, BackingType*>;
 }
 
 
 //=====================================================================
 //
-//  @ utf8_char_t
+//  @utf8_char_t
 //  ---------------
 //  
 //
@@ -220,6 +228,8 @@ namespace atma
 		constexpr utf8_char_t(char const*);
 		//constexpr explicit utf8_char_t(char32_t);
 		//constexpr utf8_char_t(char16_t, char16_t = 0);
+
+		auto as_bytes() const { return std::span<byte, 4>((byte*)bytes_, 4); }
 
 		constexpr auto operator [](size_t idx) const -> byte
 		{
@@ -243,7 +253,7 @@ namespace atma
 
 //=====================================================================
 //
-//  @ charseq
+//  @charseq
 //  -----------
 //  operations on a sequence of utf8-chars. "char const*" is
 //  indistinguishable when used as both a single char or many
@@ -313,7 +323,7 @@ namespace atma
 
 //=====================================================================
 //
-//  @ utf8_span_t
+//  @utf8_span_t
 //  ---------------
 //  a utf8 span that is really just a span of char
 //
@@ -338,18 +348,28 @@ namespace atma::detail
 		constexpr basic_utf8_span_t() = default;
 		constexpr basic_utf8_span_t(basic_utf8_span_t const&) = default;
 
-		// construct from a range of compatible values
-		template <utf8_range_concept<T> Range>
-		constexpr basic_utf8_span_t(Range const& range)
-			: data_(std::data(range))
-			, size_(std::size(range))
-		{}
-
 		constexpr basic_utf8_span_t(element_type* data, size_t size)
 			: data_(data)
 			, size_(size)
 		{}
 
+		// construct from a range of compatible values
+		template <utf8_range_concept<value_type> Range>
+		constexpr basic_utf8_span_t(Range const& range)
+			: data_(std::data(range))
+			, size_(std::size(range))
+		{}
+
+		// if something is not a contiguous-range but provides data & size_bytes accessors
+		// then we will assume it is a contiguous byte-array "underneath"
+		template <utf8_data_size_bytes_concept<element_type> Range>
+		requires !utf8_range_concept<value_type, Range>
+		constexpr basic_utf8_span_t(Range const& range)
+			: data_(std::data(range))
+			, size_(range.size_bytes())
+		{}
+
+		// construct from a pair of contiguous iterators
 		template <utf8_iterator_concept<T> Iterator>
 		constexpr basic_utf8_span_t(Iterator begin, Iterator end)
 			: data_(std::to_address(begin))
@@ -395,7 +415,7 @@ namespace atma
 
 //=====================================================================
 //
-//  @ utf8_iterator_t
+//  @utf8_iterator_t
 //  -------------------
 //  given a sequence of chars, iterates character-by-character. this
 //  means that the amount of bytes traversed is variable, as utf8 is
@@ -439,7 +459,7 @@ namespace atma
 
 //=====================================================================
 //
-//  @ basic_utf8_range_t
+//  @basic_utf8_range_t
 //  ---------------------------
 //  A string-range that does not allocate any memory, but instead points
 //  to external, contiguous memory that is expected to be valid for the
@@ -474,7 +494,7 @@ namespace atma::detail
 		template <utf8_iterator_concept<BackingType> IteratorType>
 		basic_utf8_range_t(IteratorType, IteratorType);
 
-		auto raw_size() const -> size_t;
+		auto size_bytes() const -> size_t;
 		auto empty() const -> bool;
 
 		auto begin() const -> iterator;
@@ -498,7 +518,7 @@ namespace atma
 
 //=====================================================================
 //
-// utf8_string
+// @utf8_string_t
 //
 //=====================================================================
 namespace atma
@@ -508,6 +528,10 @@ namespace atma
 		struct iterator_t;
 
 		using value_t                = char;
+		using value_type             = char;
+		using element_type           = char;
+		using size_type = size_t;
+		using difference_type = ptrdiff_t;
 		using iterator               = iterator_t;
 		using const_iterator         = iterator_t;
 		using reverse_iterator       = std::reverse_iterator<iterator>;
@@ -536,7 +560,8 @@ namespace atma
 
 		auto empty() const -> bool;
 		auto c_str() const -> char const*;
-		auto raw_size() const -> size_t;
+		auto size_bytes() const -> size_t;
+		auto data() const { return data_; }
 
 		auto begin() const -> const_iterator;
 		auto end() const -> const_iterator;
@@ -613,8 +638,9 @@ namespace atma
 		using value_type        = utf8_char_t;
 		using element_type      = utf8_char_t;
 		using pointer           = utf8_char_t*;
-		using reference         = utf8_char_t const&;
+		using reference         = utf8_char_t&;
 
+		iterator_t() = default;
 		iterator_t(iterator_t const&);
 
 		auto operator = (iterator_t const&) -> iterator_t&;
@@ -630,8 +656,8 @@ namespace atma
 		iterator_t(owner_t const*, char const*);
 
 	private:
-		owner_t const* owner_;
-		char const* ptr_;
+		owner_t const* owner_ = nullptr;
+		char const* ptr_ = nullptr;
 		mutable utf8_char_t ch_;
 
 		friend auto operator == (utf8_string_t::iterator_t const&, utf8_string_t::iterator_t const&) -> bool;
@@ -745,7 +771,7 @@ namespace atma::detail
 }
 
 //=====================================================================
-// !utf8_span_t implementation
+// @utf8_span_t implementation
 //=====================================================================
 namespace atma::detail
 {
@@ -765,7 +791,7 @@ namespace atma::detail
 
 
 //=====================================================================
-// @ basic_utf8_range_t implementation
+// @basic_utf8_range_t implementation
 //=====================================================================
 namespace atma::detail
 {
@@ -792,7 +818,7 @@ namespace atma::detail
 	{}
 
 	template <typename BT>
-	inline auto basic_utf8_range_t<BT>::raw_size() const -> size_t
+	inline auto basic_utf8_range_t<BT>::size_bytes() const -> size_t
 	{
 		return end_ - begin_;
 	}
@@ -821,10 +847,11 @@ namespace atma::detail
 //=====================================================================
 namespace atma::detail
 {
+#if 0
 	template <typename BT>
 	inline auto operator == (basic_utf8_range_t<BT> const& lhs, basic_utf8_range_t<BT> const& rhs) -> bool
 	{
-		return lhs.raw_size() == rhs.raw_size() && memcmp(lhs.begin(), rhs.begin(), lhs.raw_size()) == 0;
+		return lhs.size_bytes() == rhs.size_bytes() && memcmp(lhs.begin(), rhs.begin(), lhs.size_bytes()) == 0;
 	}
 
 	template <typename BT>
@@ -836,13 +863,13 @@ namespace atma::detail
 	template <typename BT>
 	inline auto operator == (basic_utf8_range_t<BT> const& lhs, utf8_string_t const& rhs) -> bool
 	{
-		return lhs.raw_size() == rhs.raw_size() && memcmp(lhs.begin(), rhs.raw_begin(), lhs.raw_size()) == 0;
+		return lhs.size_bytes() == rhs.size_bytes() && memcmp(lhs.begin(), rhs.raw_begin(), lhs.size_bytes()) == 0;
 	}
 
 	template <typename BT>
 	inline auto operator == (utf8_string_t const& lhs, basic_utf8_range_t<BT> const& rhs) -> bool
 	{
-		return lhs.raw_size() == rhs.raw_size() && memcmp(lhs.raw_begin(), rhs.begin(), lhs.raw_size()) == 0;
+		return lhs.size_bytes() == rhs.size_bytes() && memcmp(lhs.raw_begin(), rhs.begin(), lhs.size_bytes()) == 0;
 	}
 
 	template <typename BT>
@@ -860,7 +887,7 @@ namespace atma::detail
 	template <typename BT>
 	inline auto operator == (basic_utf8_range_t<BT> const& lhs, char const* rhs) -> bool
 	{
-		return strncmp(lhs.begin(), rhs, lhs.raw_size()) == 0;
+		return strncmp(lhs.begin(), rhs, lhs.size_bytes()) == 0;
 	}
 
 	template <typename BT>
@@ -868,12 +895,13 @@ namespace atma::detail
 	{
 		auto cmp = ::strncmp(
 			lhs.begin(), rhs.begin(),
-			std::min(lhs.raw_size(), rhs.raw_size()));
+			std::min(lhs.size_bytes(), rhs.size_bytes()));
 
 		return
 			cmp < 0 || (!(0 < cmp) && (
-				lhs.raw_size() < rhs.raw_size()));
+				lhs.size_bytes() < rhs.size_bytes()));
 	}
+#endif
 
 	template <typename BT>
 	inline auto operator << (std::ostream& stream, basic_utf8_range_t<BT> const& xs) -> std::ostream&
@@ -947,13 +975,13 @@ namespace atma
 	}
 
 	inline utf8_string_t::utf8_string_t(utf8_string_t const& str)
-		: utf8_string_t(str.raw_begin(), str.raw_size())
+		: utf8_string_t(str.raw_begin(), str.size_bytes())
 	{
 	}
 
 #if 0
 	inline utf8_string_t::utf8_string_t(utf8_const_span_t const& range)
-		: utf8_string_t{range.begin(), range.raw_size()}
+		: utf8_string_t{range.begin(), range.size_bytes()}
 	{
 	}
 #endif // 0
@@ -1035,7 +1063,7 @@ namespace atma
 		return size_ == 0;
 	}
 
-	inline auto utf8_string_t::raw_size() const -> size_t
+	inline auto utf8_string_t::size_bytes() const -> size_t
 	{
 		return size_;
 	}
@@ -1190,7 +1218,7 @@ namespace atma
 	//=====================================================================
 	inline auto operator == (utf8_string_t const& lhs, utf8_string_t const& rhs) -> bool
 	{
-		return lhs.raw_size() == rhs.raw_size() && ::memcmp(lhs.raw_begin(), rhs.raw_begin(), lhs.raw_size()) == 0;
+		return lhs.size_bytes() == rhs.size_bytes() && ::memcmp(lhs.raw_begin(), rhs.raw_begin(), lhs.size_bytes()) == 0;
 	}
 
 	inline auto operator != (utf8_string_t const& lhs, utf8_string_t const& rhs) -> bool
@@ -1242,7 +1270,7 @@ namespace atma
 	inline auto operator << (std::ostream& out, utf8_string_t const& rhs) -> std::ostream&
 	{
 		if (!rhs.empty())
-			out.write(rhs.raw_begin(), rhs.raw_size());
+			out.write(rhs.raw_begin(), rhs.size_bytes());
 		return out;
 	}
 
@@ -1335,7 +1363,7 @@ namespace atma
 #if 0
 	inline auto strcpy(utf8_string_t& dest, utf8_string_t const& src) -> void
 	{
-		ATMA_ASSERT(dest.raw_size() >= src.raw_size());
+		ATMA_ASSERT(dest.size_bytes() >= src.size_bytes());
 
 		auto i = dest.begin();
 		for (auto& x : src)
