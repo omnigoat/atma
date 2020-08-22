@@ -539,7 +539,7 @@ namespace atma
 		using reverse_iterator = std::reverse_iterator<iterator>;
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-		utf8_string_t();
+		constexpr utf8_string_t() = default;
 		utf8_string_t(char const* str, size_t size);
 		utf8_string_t(char const* str_begin, char const* str_end);
 		utf8_string_t(char const* str);
@@ -683,14 +683,16 @@ namespace atma
 namespace atma
 {
 	constexpr utf8_char_t::utf8_char_t(char c)
-		: bytes_{(byte)c, byte(), byte(), byte()}
+		: bytes_{byte(c), byte(), byte(), byte()}
 	{
 		ATMA_ASSERT(utf8_char_is_ascii(c));
 	}
 
 	constexpr utf8_char_t::utf8_char_t(char const* c)
 	{
-		ATMA_ASSERT(c != nullptr);
+		if (c == nullptr)
+			return;
+
 		ATMA_ASSERT(utf8_byte_is_leading((byte)*c));
 
 		auto sz = detail::char_length_table[*c];
@@ -952,14 +954,6 @@ namespace atma::detail
 //=====================================================================
 namespace atma
 {
-	inline utf8_string_t::utf8_string_t()
-		: capacity_(8)
-		, size_()
-		, data_(new char[capacity_])
-	{
-		memset(data_, 0, capacity_);
-	}
-
 	inline utf8_string_t::utf8_string_t(char const* str, size_t size)
 		: capacity_(imem_quantize_capacity(size))
 		, size_(size)
@@ -1301,8 +1295,10 @@ namespace atma
 		, ptr_(ptr)
 		, ch_{ptr}
 	{
-		ATMA_ASSERT(ptr);
-		ATMA_ASSERT(utf8_byte_is_leading((byte)*ptr));
+		if (ptr)
+		{
+			ATMA_ASSERT(utf8_byte_is_leading((byte)*ptr));
+		}
 	}
 
 	inline utf8_string_t::iterator_t::iterator_t(iterator_t const& rhs)
