@@ -421,11 +421,9 @@ namespace atma
 //
 namespace atma::detail
 {
-	template <typename T>
 	struct basic_utf8_iterator_t
 	{
-		using character_backing_type = T;
-		using value_type = transfer_const_t<character_backing_type, utf8_char_t>;
+		using value_type = utf8_char_t;
 		using difference_type = std::ptrdiff_t;
 		using reference = value_type;
 		using pointer = value_type*;
@@ -433,7 +431,7 @@ namespace atma::detail
 
 		basic_utf8_iterator_t() = default;
 		basic_utf8_iterator_t(basic_utf8_iterator_t const&) = default;
-		basic_utf8_iterator_t(character_backing_type*);
+		basic_utf8_iterator_t(char const*);
 
 		// access
 		auto operator *() const { return value_type{here_}; }
@@ -448,14 +446,13 @@ namespace atma::detail
 		auto char_data() const { return here_; }
 
 	private:
-		character_backing_type* here_ = nullptr;
+		char const* here_ = nullptr;
 	};
 }
 
 namespace atma
 {
-	using utf8_iterator_t = detail::basic_utf8_iterator_t<char>;
-	using utf8_const_iterator_t = detail::basic_utf8_iterator_t<char const>;
+	using utf8_iterator_t = detail::basic_utf8_iterator_t;
 }
 
 
@@ -483,7 +480,7 @@ namespace atma::detail
 
 		using backing_type = BackingType;
 		using value_type = transfer_const_t<backing_type, utf8_char_t>;
-		using iterator = detail::basic_utf8_iterator_t<backing_type>;
+		using iterator = utf8_iterator_t;
 
 		basic_utf8_range_t();
 		basic_utf8_range_t(basic_utf8_range_t const&);
@@ -536,7 +533,7 @@ namespace atma
 		using size_type = size_t;
 		using difference_type = ptrdiff_t;
 		using iterator = utf8_iterator_t;
-		using const_iterator = utf8_const_iterator_t;
+		using const_iterator = utf8_iterator_t;
 		using reverse_iterator = std::reverse_iterator<iterator>;
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
@@ -684,49 +681,42 @@ namespace atma
 //=====================================================================
 namespace atma::detail
 {
-	template <typename T>
-	inline basic_utf8_iterator_t<T>::basic_utf8_iterator_t(character_backing_type* here)
+	inline basic_utf8_iterator_t::basic_utf8_iterator_t(char const* here)
 		: here_(here)
 	{}
 
-	template <typename T>
-	inline auto basic_utf8_iterator_t<T>::operator++ () -> basic_utf8_iterator_t&
+	inline auto basic_utf8_iterator_t::operator++ () -> basic_utf8_iterator_t&
 	{
 		here_ += utf8_char_size_bytes(here_);
 		return *this;
 	}
 
-	template <typename T>
-	inline auto basic_utf8_iterator_t<T>::operator++ (int) -> basic_utf8_iterator_t
+	inline auto basic_utf8_iterator_t::operator++ (int) -> basic_utf8_iterator_t
 	{
 		auto r = *this;
 		++r;
 		return r;
 	}
 
-	template <typename T>
-	inline auto basic_utf8_iterator_t<T>::operator-- () -> basic_utf8_iterator_t&
+	inline auto basic_utf8_iterator_t::operator-- () -> basic_utf8_iterator_t&
 	{
 		while (!utf8_byte_is_leading(byte(*--here_)));
 		return *this;
 	}
 
-	template <typename T>
-	inline auto basic_utf8_iterator_t<T>::operator-- (int) -> basic_utf8_iterator_t
+	inline auto basic_utf8_iterator_t::operator-- (int) -> basic_utf8_iterator_t
 	{
 		auto r = *this;
 		--r;
 		return r;
 	}
 
-	template <typename T>
-	inline auto operator == (basic_utf8_iterator_t<T> const& lhs, basic_utf8_iterator_t<T> const& rhs)
+	inline auto operator == (basic_utf8_iterator_t const& lhs, basic_utf8_iterator_t const& rhs)
 	{
 		return lhs.char_data() == rhs.char_data();
 	}
 
-	template <typename T>
-	inline auto operator != (basic_utf8_iterator_t<T> const& lhs, basic_utf8_iterator_t<T> const& rhs)
+	inline auto operator != (basic_utf8_iterator_t const& lhs, basic_utf8_iterator_t const& rhs)
 	{
 		return !operator == (lhs, rhs);
 	}
