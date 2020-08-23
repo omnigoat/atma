@@ -227,8 +227,6 @@ namespace atma
 
 		constexpr utf8_char_t(char);
 		constexpr utf8_char_t(char const*);
-		//constexpr explicit utf8_char_t(char32_t);
-		//constexpr utf8_char_t(char16_t, char16_t = 0);
 
 		auto as_bytes() const { return std::span<byte, 4>((byte*)bytes_, 4); }
 
@@ -428,6 +426,10 @@ namespace atma::detail
 	{
 		using character_backing_type = T;
 		using value_type = transfer_const_t<character_backing_type, utf8_char_t>;
+		using difference_type = std::ptrdiff_t;
+		using reference = value_type;
+		using pointer = value_type*;
+		using iterator_category = std::forward_iterator_tag;
 
 		basic_utf8_iterator_t() = default;
 		basic_utf8_iterator_t(basic_utf8_iterator_t const&) = default;
@@ -435,6 +437,7 @@ namespace atma::detail
 
 		// access
 		auto operator *() const { return value_type{here_}; }
+		auto operator ->() const { return value_type{here_}; }
 
 		// travel
 		auto operator ++() -> basic_utf8_iterator_t&;
@@ -529,13 +532,11 @@ namespace atma
 {
 	struct utf8_string_t
 	{
-		struct iterator_t;
-
 		using value_type = utf8_char_t;
 		using size_type = size_t;
 		using difference_type = ptrdiff_t;
-		using iterator = iterator_t;
-		using const_iterator = iterator_t;
+		using iterator = utf8_iterator_t;
+		using const_iterator = utf8_const_iterator_t;
 		using reverse_iterator = std::reverse_iterator<iterator>;
 		using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
@@ -575,8 +576,6 @@ namespace atma
 
 		auto raw_begin() const -> char const*;
 		auto raw_end() const -> char const*;
-
-		auto raw_iter_of(const_iterator const&) const -> char const*;
 
 		// operations
 		auto push_back(char) -> void;
@@ -621,58 +620,6 @@ namespace atma
 
 	auto operator << (std::ostream&, utf8_string_t const&) -> std::ostream&;
 }
-
-
-//=====================================================================
-//
-// utf8_string::iterator
-//
-//=====================================================================
-namespace atma
-{
-	struct utf8_string_t::iterator_t
-	{
-	private:
-		friend struct utf8_string_t;
-
-		using owner_t = utf8_string_t;
-
-	public:
-		using iterator_category = std::forward_iterator_tag;
-		using difference_type   = ptrdiff_t;
-		using value_type        = utf8_char_t;
-		using pointer           = utf8_char_t*;
-		using reference         = utf8_char_t&;
-
-		iterator_t() = default;
-		iterator_t(iterator_t const&);
-
-		auto operator = (iterator_t const&) -> iterator_t&;
-		auto operator ++ () -> iterator_t&;
-		auto operator ++ (int) -> iterator_t;
-		auto operator -- () -> iterator_t&;
-		auto operator -- (int) -> iterator_t;
-
-		auto operator * () const -> reference;
-		auto operator -> () const -> pointer;
-
-	private:
-		iterator_t(owner_t const*, char const*);
-
-	private:
-		owner_t const* owner_ = nullptr;
-		char const* ptr_ = nullptr;
-		mutable utf8_char_t ch_;
-
-		friend auto operator == (utf8_string_t::iterator_t const&, utf8_string_t::iterator_t const&) -> bool;
-	};
-
-
-	inline auto operator == (utf8_string_t::iterator_t const&, utf8_string_t::iterator_t const&) -> bool;
-	inline auto operator != (utf8_string_t::iterator_t const&, utf8_string_t::iterator_t const&) -> bool;
-}
-
-
 
 
 
@@ -760,7 +707,7 @@ namespace atma::detail
 	template <typename T>
 	inline auto basic_utf8_iterator_t<T>::operator-- () -> basic_utf8_iterator_t&
 	{
-		while (!utf8_byte_is_leading(*--here_));
+		while (!utf8_byte_is_leading(byte(*--here_)));
 		return *this;
 	}
 
@@ -977,7 +924,7 @@ namespace atma
 	{}
 
 	inline utf8_string_t::utf8_string_t(const_iterator const& begin, const_iterator const& end)
-		: utf8_string_t(begin->data(), end->data() - begin->data())
+		: utf8_string_t(begin.char_data(), end.char_data() - begin.char_data())
 	{}
 
 	inline utf8_string_t::utf8_string_t(utf8_string_t const& str)
@@ -1082,12 +1029,12 @@ namespace atma
 
 	inline auto utf8_string_t::begin() const -> const_iterator
 	{
-		return const_iterator(this, raw_begin());
+		return const_iterator(raw_begin());
 	}
 
 	inline auto utf8_string_t::end() const -> const_iterator
 	{
-		return const_iterator(this, raw_end());
+		return const_iterator(raw_end());
 	}
 
 	inline auto utf8_string_t::rbegin() const -> const_reverse_iterator
@@ -1098,11 +1045,6 @@ namespace atma
 	inline auto utf8_string_t::rend() const -> const_reverse_iterator
 	{
 		return const_reverse_iterator(begin());
-	}
-
-	inline auto utf8_string_t::raw_iter_of(const_iterator const& iter) const -> char const*
-	{
-		return iter.ptr_;
 	}
 
 	inline auto utf8_string_t::push_back(char c) -> void
@@ -1273,91 +1215,6 @@ namespace atma
 			out.write(rhs.raw_begin(), rhs.size_bytes());
 		return out;
 	}
-
-
-
-
-	//=====================================================================
-	// iterator
-	//=====================================================================
-	inline utf8_string_t::iterator_t::iterator_t(owner_t const* owner, char const* ptr)
-		: owner_(owner)
-		, ptr_(ptr)
-		, ch_{ptr}
-	{
-		if (ptr)
-		{
-			ATMA_ASSERT(utf8_byte_is_leading((byte)*ptr));
-		}
-	}
-
-	inline utf8_string_t::iterator_t::iterator_t(iterator_t const& rhs)
-		: owner_(rhs.owner_)
-		, ptr_(rhs.ptr_)
-		, ch_{rhs.ptr_}
-	{}
-
-	inline auto utf8_string_t::iterator_t::operator = (iterator_t const& rhs) -> iterator_t&
-	{
-		owner_ = rhs.owner_;
-		ptr_ = rhs.ptr_;
-		return *this;
-	}
-
-	inline auto utf8_string_t::iterator_t::operator ++ () -> iterator_t&
-	{
-		utf8_char_advance(ptr_);
-		return *this;
-	}
-
-	inline auto utf8_string_t::iterator_t::operator ++ (int) -> iterator_t
-	{
-		auto t = *this;
-		++*this;
-		return t;
-	}
-
-	inline auto utf8_string_t::iterator_t::operator -- () -> iterator_t&
-	{
-		if (ptr_ == owner_->data_)
-			return *this;
-
-		while (--ptr_ != owner_->data_ && utf8_byte_is_run_on((byte)*ptr_))
-			;
-
-		return *this;
-	}
-
-	inline auto utf8_string_t::iterator_t::operator -- (int) -> iterator_t
-	{
-		auto t = *this;
-		--*this;
-		return t;
-	}
-
-	inline auto utf8_string_t::iterator_t::operator * () const -> reference
-	{
-		ch_ = utf8_char_t{ptr_};
-		return ch_;
-	}
-
-	inline auto utf8_string_t::iterator_t::operator -> () const -> pointer
-	{
-		ch_ = utf8_char_t{ptr_};
-		return &ch_;
-	}
-
-	inline auto operator == (utf8_string_t::iterator_t const& lhs, utf8_string_t::iterator_t const& rhs) -> bool
-	{
-		return lhs.ptr_ == rhs.ptr_;
-	}
-
-	inline auto operator != (utf8_string_t::iterator_t const& lhs, utf8_string_t::iterator_t const& rhs) -> bool
-	{
-		return !operator == (lhs, rhs);
-	}
-
-
 
 	//=====================================================================
 	// functions
