@@ -25,7 +25,12 @@
 //  information to make informed decisions.
 //
 //=====================================================================
-
+namespace atma
+{
+	struct utf8_char_t;
+	//struct utf8_iterator_t;
+	struct utf8_string_t;
+}
 
 
 //=====================================================================
@@ -90,95 +95,48 @@ namespace atma::detail
 
 
 //=====================================================================
-// functions
+// utf8-byte functions
 //=====================================================================
 namespace atma
 {
-	// there are a few values that are just not allowed anywhere in an utf8 encoding.
-	constexpr auto utf8_byte_is_valid(byte const c) -> bool
-	{
-		return detail::char_length_table[(uint8)c] != -1;
-	}
+	constexpr auto utf8_byte_is_valid(byte const) -> bool;
+	constexpr auto utf8_byte_is_leading(byte const) -> bool;
+	constexpr auto utf8_byte_is_run_on(byte const) -> bool;
+	constexpr auto utf8_byte_length(byte const) -> int;
+}
 
-	// c is a valid utf8 byte and the leading byte of a sequence
-	constexpr auto utf8_byte_is_leading(byte const c) -> bool
-	{
-		return detail::char_length_table[(uint8)c] >= 1;
-	}
+//=====================================================================
+// utf8-char functions
+//=====================================================================
+namespace atma
+{
+	constexpr auto utf8_char_is_ascii(char const c) -> bool;
+	constexpr auto utf8_char_is_newline(char const* leading) -> bool;
+	constexpr auto utf8_char_size_bytes(char const* leading) -> int;
+	constexpr auto utf8_char_equality(char const* lhs, char const* rhs) -> bool;
 
-	constexpr auto utf8_byte_is_run_on(byte const c) -> bool
-	{
-		return detail::char_length_table[(uint8)c] == 0;
-	}
+	constexpr auto utf8_char_advance(char const*& leading) -> void;
+}
 
-	// c in codepoint [0, 128), a.k.a: ascii
-	constexpr auto utf8_char_is_ascii(char const c) -> bool
-	{
-		return detail::char_length_table[c] == 1;
-	}
+//=====================================================================
+//
+//  @utf8-charseq functions
+//  ----------------------------
+//  operations on a sequence of utf8-chars. "char const*" is
+//  indistinguishable when used as both a single char or many
+//
+namespace atma
+{
+	template <typename FN>
+	auto utf8_charseq_for_each(char const* seq, FN&& fn) -> void;
 
-	constexpr auto utf8_leading_byte_length(byte const c) -> int
-	{
-		return detail::char_length_table[(uint8)c];
-	}
+	template <typename T>
+	auto utf8_charseq_any_of(char const* seq, T&& pred) -> bool;
 
-	constexpr auto utf8_char_is_newline(char const* leading) -> bool
-	{
-		return
-			*leading == 0x0a ||
-			*leading == 0x0b ||
-			*leading == 0x0c ||
-			*leading == 0x0d ||
-			*leading == 0x85;
-	}
+	auto utf8_charseq_find(char const* seq, utf8_char_t x) -> char const*;
 
-
-	// return how many bytes we need to advance, assuming we're at a leading byte
-	inline auto utf8_char_size_bytes(char const* leading) -> int
-	{
-		ATMA_ASSERT(leading);
-		ATMA_ENSURE(utf8_byte_is_leading((byte)*leading));
-		return detail::char_length_table[*leading];
-	}
-
-	inline auto utf8_char_advance(char const*& leading) -> void
-	{
-		leading += utf8_char_size_bytes(leading);
-	}
-
-	inline auto utf8_char_equality(char const* lhs, char const* rhs) -> bool
-	{
-		ATMA_ASSERT(lhs);
-		ATMA_ASSERT(rhs);
-		ATMA_ASSERT(utf8_byte_is_leading((byte)*lhs));
-		ATMA_ASSERT(utf8_byte_is_leading((byte)*rhs));
-
-		if (*lhs != *rhs)
-			return false;
-
-		return memcmp(lhs + 1, rhs + 1, utf8_char_size_bytes(lhs) - 1) == 0;
-	}
-
-#if 0
-	inline auto utf8_char_codepoint(utf8_char_t x) -> codepoint
-	{
-		ATMA_ASSERT(x);
-		ATMA_ASSERT(utf8_byte_is_leading(*x));
-
-		codepoint r = 0;
-
-		if ((x[0] & 0x80) == 0)
-			r = *x;
-		else if ((x[0] & 0xe0) == 0xc0)
-			r = ((x[0] & 0x1f) << 6) | (x[1] & 0x3f);
-		else if ((x[0] & 0xf0) == 0xe0)
-			r = ((x[0] & 0x0f) << 12) | ((x[1] & 0x3f) << 6) | (x[2] & 0x3f);
-		else if ((x[0] & 0xf8) == 0xf0)
-			r = ((x[0] & 0x07) << 18) | ((x[1] & 0x3f) << 12) | ((x[2] & 0x3f) << 6) | (x[3] & 0x3f);
-
-		return r;
-	}
-#endif
+	// returns how many bytes we traversed to get to char-idx
+	auto utf8_charseq_idx_to_byte_idx(char const* seq, size_t sz, size_t char_idx) -> size_t;
 }
 
 
@@ -237,7 +195,7 @@ namespace atma
 		}
 
 		auto data() const -> char const* { return reinterpret_cast<char const*>(bytes_); }
-		constexpr auto size_bytes() const -> size_t { return utf8_leading_byte_length(bytes_[0]); }
+		constexpr auto size_bytes() const -> size_t { return utf8_byte_length(bytes_[0]); }
 
 		explicit operator char const* () const { return data(); }
 
@@ -248,66 +206,6 @@ namespace atma
 	};
 
 }
-
-
-//=====================================================================
-//
-//  @charseq
-//  -----------
-//  operations on a sequence of utf8-chars. "char const*" is
-//  indistinguishable when used as both a single char or many
-//
-namespace atma
-{
-	template <typename FN>
-	inline auto utf8_charseq_for_each(char const* seq, FN&& fn) -> void
-	{
-		ATMA_ASSERT(seq);
-		ATMA_ASSERT(utf8_byte_is_leading((byte)*seq));
-
-		for (auto i = seq; *i; utf8_char_advance(i))
-			fn(i);
-	}
-
-	template <typename T>
-	inline auto utf8_charseq_any_of(char const* seq, T&& pred) -> bool
-	{
-		ATMA_ASSERT(seq);
-		ATMA_ASSERT(utf8_byte_is_leading((byte)*seq));
-
-		for (auto i = seq; *i; utf8_char_advance(i))
-			if (pred(i))
-				return true;
-
-		return false;
-	}
-
-	inline auto utf8_charseq_find(char const* seq, utf8_char_t x) -> char const*
-	{
-		ATMA_ASSERT(seq);
-		ATMA_ASSERT(utf8_byte_is_leading((byte)*seq));
-
-		for (auto i = seq; *i; utf8_char_advance(i))
-			if (strncmp(x.data(), i, x.size_bytes()) == 0)
-				return i;
-
-		return nullptr;
-	}
-
-	inline auto utf8_charseq_idx_to_byte_idx(char const* seq, size_t sz, size_t char_idx) -> size_t
-	{
-		ATMA_ASSERT(seq);
-		ATMA_ASSERT(utf8_byte_is_leading((byte)*seq));
-
-		size_t r = 0;
-		char const* i = seq;
-		for (auto ie = seq + sz; i != ie && r != char_idx; i += utf8_char_size_bytes(i))
-			++r;
-
-		return (i - seq);
-	}
-}
-
 
 
 namespace atma
@@ -1205,6 +1103,175 @@ namespace atma
 			out.write(rhs.raw_begin(), rhs.size_bytes());
 		return out;
 	}
+}
+
+
+//=====================================================================
+// utf8-byte functions
+//=====================================================================
+namespace atma
+{
+	// there are a few values that are just not allowed anywhere in an utf8 encoding
+	constexpr auto utf8_byte_is_valid(byte const c) -> bool
+	{
+		return detail::char_length_table[(uint8)c] != -1;
+	}
+
+	constexpr auto utf8_byte_is_leading(byte const c) -> bool
+	{
+		return detail::char_length_table[(uint8)c] >= 1;
+	}
+
+	constexpr auto utf8_byte_is_run_on(byte const c) -> bool
+	{
+		return detail::char_length_table[(uint8)c] == 0;
+	}
+
+	constexpr auto utf8_byte_length(byte const c) -> int
+	{
+		ATMA_ASSERT(utf8_byte_is_leading(c));
+		return detail::char_length_table[(uint8)c];
+	}
+}
+
+//=====================================================================
+// utf8-char functions
+//=====================================================================
+namespace atma
+{
+	// c in codepoint [0, 128), a.k.a: ascii
+	constexpr auto utf8_char_is_ascii(char const c) -> bool
+	{
+		return detail::char_length_table[c] == 1;
+	}
+
+	constexpr auto utf8_char_is_newline(char const* leading) -> bool
+	{
+		ATMA_ASSERT(leading);
+
+		return
+			*leading == 0x0a ||
+			*leading == 0x0b ||
+			*leading == 0x0c ||
+			*leading == 0x0d ||
+			*leading == 0x85;
+	}
+
+	// return how many bytes we need to advance, assuming we're at a leading byte
+	constexpr auto utf8_char_size_bytes(char const* leading) -> int
+	{
+		ATMA_ASSERT(leading);
+		ATMA_ENSURE(utf8_byte_is_leading((byte)*leading));
+
+		return detail::char_length_table[*leading];
+	}
+
+	constexpr auto utf8_char_advance(char const*& leading) -> void
+	{
+		ATMA_ASSERT(leading);
+
+		leading += utf8_char_size_bytes(leading);
+	}
+
+	constexpr auto utf8_char_equality(char const* lhs, char const* rhs) -> bool
+	{
+		ATMA_ASSERT(lhs);
+		ATMA_ASSERT(rhs);
+		ATMA_ASSERT(utf8_byte_is_leading((byte)*lhs));
+		ATMA_ASSERT(utf8_byte_is_leading((byte)*rhs));
+
+		if (*lhs != *rhs)
+			return false;
+
+		return memcmp(lhs + 1, rhs + 1, utf8_char_size_bytes(lhs) - 1) == 0;
+	}
+
+#if 0
+	inline auto utf8_char_codepoint(utf8_char_t x) -> codepoint
+	{
+		ATMA_ASSERT(x);
+		ATMA_ASSERT(utf8_byte_is_leading(*x));
+
+		codepoint r = 0;
+
+		if ((x[0] & 0x80) == 0)
+			r = *x;
+		else if ((x[0] & 0xe0) == 0xc0)
+			r = ((x[0] & 0x1f) << 6) | (x[1] & 0x3f);
+		else if ((x[0] & 0xf0) == 0xe0)
+			r = ((x[0] & 0x0f) << 12) | ((x[1] & 0x3f) << 6) | (x[2] & 0x3f);
+		else if ((x[0] & 0xf8) == 0xf0)
+			r = ((x[0] & 0x07) << 18) | ((x[1] & 0x3f) << 12) | ((x[2] & 0x3f) << 6) | (x[3] & 0x3f);
+
+		return r;
+	}
+#endif
+}
+
+
+
+//=====================================================================
+//
+//  @charseq
+//  -----------
+//  operations on a sequence of utf8-chars. "char const*" is
+//  indistinguishable when used as both a single char or many
+//
+namespace atma
+{
+	template <typename FN>
+	inline auto utf8_charseq_for_each(char const* seq, FN&& fn) -> void
+	{
+		ATMA_ASSERT(seq);
+		ATMA_ASSERT(utf8_byte_is_leading((byte)*seq));
+
+		for (auto i = seq; *i; utf8_char_advance(i))
+			fn(i);
+	}
+
+	template <typename T>
+	inline auto utf8_charseq_any_of(char const* seq, T&& pred) -> bool
+	{
+		ATMA_ASSERT(seq);
+		ATMA_ASSERT(utf8_byte_is_leading((byte)*seq));
+
+		for (auto i = seq; *i; utf8_char_advance(i))
+			if (pred(i))
+				return true;
+
+		return false;
+	}
+
+	inline auto utf8_charseq_find(char const* seq, utf8_char_t x) -> char const*
+	{
+		ATMA_ASSERT(seq);
+		ATMA_ASSERT(utf8_byte_is_leading((byte)*seq));
+
+		for (auto i = seq; *i; utf8_char_advance(i))
+			if (strncmp(x.data(), i, x.size_bytes()) == 0)
+				return i;
+
+		return nullptr;
+	}
+
+	inline auto utf8_charseq_idx_to_byte_idx(char const* seq, size_t sz, size_t char_idx) -> size_t
+	{
+		ATMA_ASSERT(seq);
+		ATMA_ASSERT(utf8_byte_is_leading((byte)*seq));
+
+		size_t r = 0;
+		char const* i = seq;
+		for (auto ie = seq + sz; i != ie && r != char_idx; i += utf8_char_size_bytes(i))
+			++r;
+
+		return (i - seq);
+	}
+}
+
+
+
+namespace atma
+{
 
 	//=====================================================================
 	// functions
