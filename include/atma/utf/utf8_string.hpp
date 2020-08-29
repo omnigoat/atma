@@ -144,21 +144,21 @@ namespace atma
 //
 //  CONCEPTS
 //
-namespace atma::detail
+namespace atma
 {
-	// a standards-compliant contiguous range that contains elements of type BackingType
-	template <typename R, typename BackingType>
+	// forward-range of utf8_char_t
+	template <typename R>
 	concept utf8_range_concept =
+		std::ranges::forward_range<R> &&
+		std::is_convertible_v<std::ranges::range_value_t<R>, utf8_char_t>;
+
+	// contiguous-range of chars
+	template <typename BackingType, typename R>
+	concept utf8_charseq_range_concept =
 		std::ranges::contiguous_range<R> &&
 		std::is_convertible_v<std::ranges::range_value_t<R>, BackingType>;
 
-	// a standards-compliant *forward* range that contains elements of type BackingType
-	template <typename R, typename BackingType>
-	concept utf8_forward_range_concept =
-		std::ranges::forward_range<R> &&
-		std::is_convertible_v<std::ranges::range_value_t<R>, BackingType>;
-
-	// hmm...
+	// std::data + .size_bytes  =>  acceptable
 	template <typename R, typename ElementType>
 	concept utf8_data_size_bytes_concept =
 		requires (R const& r)
@@ -182,15 +182,11 @@ namespace atma::detail
 			{ std::to_address(it) } -> std::convertible_to<char const*>;
 		};
 
+	// sometimes we pass iterators to algorithms that later make the distinction
 	template <typename It>
-	concept utf8_charable_iterator_concept =
-		std::forward_iterator<It> &&
-		(std::is_convertible_v<std::iter_value_t<It>, char const> ||
-		 std::is_convertible_v<std::iter_value_t<It>, utf8_char_t>);
-}
+	concept utf8_fwding_iterator_concept =
+		utf8_iterator_concept<It> || utf8_charseq_iterator_concept;
 
-namespace atma
-{
 	template <typename F>
 	concept utf8_char_fn_concept = std::is_invocable_v<F, utf8_char_t>;
 }
@@ -276,7 +272,7 @@ namespace atma::detail
 		{}
 
 		// construct from a range of compatible values
-		template <utf8_range_concept<value_type> Range>
+		template <utf8_charseq_range_concept<T> Range>
 		constexpr basic_utf8_span_t(Range const& range)
 			: data_(std::data(range))
 			, size_(std::size(range))
@@ -285,7 +281,7 @@ namespace atma::detail
 		// if something is not a contiguous-range but provides data & size_bytes accessors
 		// then we will assume it is a contiguous byte-array "underneath"
 		template <utf8_data_size_bytes_concept<value_type> Range>
-		requires !utf8_range_concept<value_type, Range>
+		requires !utf8_charseq_range_concept<T, Range>
 		constexpr basic_utf8_span_t(Range const& range)
 			: data_(std::data(range))
 			, size_(range.size_bytes())
@@ -412,7 +408,7 @@ namespace atma::detail
 		basic_utf8_range_t(basic_utf8_range_t const&);
 
 		// construct from a range of compatible values
-		template <utf8_range_concept<BackingType> Range>
+		template <utf8_charseq_range_concept<BackingType> Range>
 		explicit basic_utf8_range_t(Range const&);
 
 		// conversion from iterator-pairs
@@ -470,7 +466,7 @@ namespace atma
 		utf8_string_t(const_iterator const&, const_iterator const&);
 
 		// construct from any char-based range
-		template <detail::utf8_range_concept<char const> Range>
+		template <utf8_charseq_range_concept<char const> Range>
 		explicit utf8_string_t(Range const&);
 
 		utf8_string_t(utf8_string_t const&);
@@ -679,7 +675,7 @@ namespace atma::detail
 	{}
 
 	template <typename BT>
-	template <utf8_range_concept<BT> Range>
+	template <utf8_charseq_range_concept<BT> Range>
 	inline basic_utf8_range_t<BT>::basic_utf8_range_t(Range const& range)
 	{
 	}
@@ -834,7 +830,7 @@ namespace atma
 		: utf8_string_t(str, strlen(str))
 	{}
 
-	template <detail::utf8_range_concept<char const> Range>
+	template <utf8_charseq_range_concept<char const> Range>
 	inline utf8_string_t::utf8_string_t(Range const& range)
 		: utf8_string_t(std::data(range), std::size(range))
 	{}
@@ -1319,13 +1315,13 @@ namespace atma
 	//
 	// find_if
 	//
-	template <detail::utf8_forward_range_concept<char const> Range, typename Predicate>
+	template <utf8_charseq_range_concept<char const> Range, typename Predicate>
 	inline auto find_if(Range const& range, Predicate&& pred)
 	{
 		return find_if(std::begin(range), std::end(range), std::forward<Predicate>(pred));
 	}
 
-	template <detail::utf8_charseq_iterator_concept Iterator, utf8_char_fn_concept Predicate>
+	template <utf8_charseq_iterator_concept Iterator, utf8_char_fn_concept Predicate>
 	inline auto find_if(Iterator begin, Iterator end, Predicate&& pred) -> Iterator
 	{
 		auto i = begin;
@@ -1336,7 +1332,7 @@ namespace atma
 		return i;
 	}
 
-	template <detail::utf8_iterator_concept Iterator, typename Predicate>
+	template <utf8_iterator_concept Iterator, utf8_char_fn_concept Predicate>
 	inline auto find_if(Iterator begin, Iterator end, Predicate&& pred) -> Iterator
 	{
 		auto i = begin;
@@ -1352,7 +1348,7 @@ namespace atma
 	//
 	// find_first_of
 	//
-	template <detail::utf8_charable_iterator_concept Iterator>
+	template <utf8_fwding_iterator_concept Iterator>
 	inline auto find_first_of(Iterator begin, Iterator end, char const* delims) -> Iterator
 	{
 		ATMA_ASSERT(delims);
@@ -1362,23 +1358,23 @@ namespace atma
 				return lhs == delim; }); });
 	}
 
-	template <detail::utf8_forward_range_concept<char const> Range>
+	template <utf8_charseq_range_concept Range>
 	inline auto find_first_of(Range const& range, char const* delims)
 	{
 		return find_first_of(std::begin(range), std::end(range), delims);
 	}
 
-	template <detail::utf8_forward_range_concept<utf8_char_t> Range>
+	template <utf8_range_concept Range>
 	inline auto find_first_of(Range const& range, char const* delims)
 	{
 		return find_first_of(std::begin(range), std::end(range), delims);
 	}
 
-	template <detail::utf8_forward_range_concept<char const> Range>
-	inline auto find_first_of(Range const& str, char x)
+	template <typename Range>
+	inline auto find_first_of(Range const& range, char x)
 	{
 		char delims[] = {x, '\0'};
-		return find_first_of(str, delims);
+		return find_first_of(range, delims);
 	}
 
 
