@@ -145,7 +145,7 @@ SCENARIO_OF("utf8_string_t", "utf8-strings can be constructed")
 		THEN("we can find-first-of \"ao\" at index 4 if starting late enough")
 		{
 			auto b = ++++++++s.begin(); // 'g'
-			auto i = atma::find_first_of(s, b, "ao");
+			auto i = atma::find_first_of(b, s.end(), "ao");
 			CHECK(i != s.end());
 			CHECK(std::distance(s.begin(), i) == 4);
 			CHECK(*i == 'o');
