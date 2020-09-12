@@ -154,8 +154,7 @@ namespace atma::concepts
 #define CONCEPT_REQUIRES(...) \
     template <                                                   \
         CONCEPT_REQUIRES_(__VA_ARGS__)                           \
-    >                                                            \
-    /**/
+    >                                                            
 
 
 //

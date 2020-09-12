@@ -14,7 +14,7 @@ namespace atma {
 
 	// bam.
 	using string = utf8_string_t;
-	using string_range_t = utf8_string_range_t;
+	//using string_range_t = utf8_string_range_t;
 
 
 
