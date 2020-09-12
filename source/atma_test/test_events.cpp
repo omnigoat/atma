@@ -4,7 +4,7 @@
 #include <atma/lockfree_list.hpp>
 #include <atma/logging.hpp>
 
-#include <rose/runtime.hpp>
+//#include <rose/runtime.hpp>
 
 //#include "../../shiny/include/lion/console_log_handler.hpp"
 
