@@ -178,15 +178,11 @@ namespace atma
 	template <typename... Fs>
 	struct visit_with : Fs...
 	{
-		template <typename... Ts>
-		visit_with(Ts&&... ts) : Fs{std::forward<Ts>(ts)}...
-		{}
-
 		using Fs::operator()...;
 	};
 
 	template <typename... Ts>
-	visit_with(Ts&&...) -> visit_with<std::remove_reference_t<Ts>...>;
+	visit_with(Ts&&...) -> visit_with<Ts...>;
 }
 
 

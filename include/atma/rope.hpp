@@ -1,6 +1,6 @@
 #pragma once
 
-#include <atma/utf/utf8_char.hpp>
+#include <atma/utf/utf8_string.hpp>
 
 #include <atma/intrusive_ptr.hpp>
 #include <atma/ranges/core.hpp>
@@ -14,19 +14,55 @@
 namespace atma::detail
 {
 	//constexpr size_t const rope_branching_factor = 4;
-	//constexpr size_t const rope_buf_max_size = 512;
-	//constexpr size_t const rope_buf_min_size = rope_buf_max_size / 3;
+	//constexpr size_t const rope_buf_size = 512;
+	//constexpr size_t const rope_buf_min_size = rope_buf_size / 3;
 
+	// how many children an internal node has
 	constexpr size_t const rope_branching_factor = 4;
 
-	// a rope-buffer
-	constexpr size_t const rope_buf_max_size = 9;
-	constexpr size_t const rope_buf_min_size = (rope_buf_max_size / 2) - (rope_buf_max_size / 32);
+	// rope-buffer size
+	constexpr size_t const rope_buf_size = 9;
+
+	// when we are making modifications to a buffer, there are several
+	// breakpoints which determine our behaviour. those breakpoints
+	// are as follows:
+	//
+	//  - rope_buf_edit_max_size
+	//    ----------------------
+	//    a maximum edit-size, which is the size of the buffer
+	//    minus two bytes. this means if we're inserting a seam,
+	//    we are guaranteed to be able to fit CRLF into the previous
+	//    logical leaf-node. exceeding this requires splitting.
+	//
+	//  - rope_buf_edit_split_size
+	//    ------------------------
+	//    a size that when exceeded causes a split anyhow, which is
+	//    used to prevent large memory allocations when many small
+	//    edits are made in a row. edits made that result in a size
+	//    smaller than this breakpoint result in the whole buffer
+	//    being reallocated and updated
+	//
+	//  - rope_buf_edit_split_drift_size
+	//    ------------------------------
+	//    if we're editing (in the real-world case, inserting) a very
+	//    short string into roughly the middle of the buffer, we'll
+	//    allow the split point to drift a little so that we split
+	//    after the inserted text. we're predicting that more insert-
+	//    operations are going to happen afterwards (like someone
+	//    typing).
+	//
+	constexpr size_t rope_buf_edit_max_size = rope_buf_size - 2;
+	constexpr size_t rope_buf_edit_split_size = (rope_buf_size / 2) - (rope_buf_size / 32);
+	constexpr size_t rope_buf_edit_split_drift_size = (rope_buf_size / 32);
 
 	struct rope_node_t;
 	using rope_node_ptr = intrusive_ptr<rope_node_t>;
 
-
+	namespace rope_utils
+	{
+		constexpr char CR = 0x0d;
+		constexpr char LF = 0x0a;
+	}
 
 	using rope_dest_buf_t = dest_bounded_memxfer_t<char>;
 	using rope_src_buf_t = src_bounded_memxfer_t<char const>;
@@ -53,7 +89,7 @@ namespace atma::detail
 			ATMA_ASSERT(str);
 
 			text_info_t r;
-			for (auto x : utf8_const_span_t{str, sz})
+			for (auto x : utf8_const_range_t{str, str + sz})
 			{
 				r.bytes += (uint32_t)x.size_bytes();
 				++r.characters;
@@ -103,7 +139,7 @@ namespace atma::detail
 
 
 	using rope_maybe_node_info_t = std::optional<rope_node_info_t>;
-	using rope_edit_result_t = struct { rope_node_info_t left; rope_maybe_node_info_t right; bool seam; }; // std::tuple<rope_node_info_t, rope_maybe_node_info_t, bool>;
+	struct rope_edit_result_t { rope_node_info_t left; rope_maybe_node_info_t right; bool seam = false; }; // std::tuple<rope_node_info_t, rope_maybe_node_info_t, bool>;
 }
 
 
@@ -153,7 +189,7 @@ namespace atma::detail
 		// characters/bytes they address inside this buffer, so we can append
 		// more data to this buffer and maintain an immutable data-structure
 		size_t size = 0;
-		char buf[rope_buf_max_size];
+		char buf[rope_buf_size];
 	};
 }
 
@@ -220,6 +256,100 @@ namespace atma::detail
 	}
 }
 
+// something
+namespace atma::detail
+{
+	inline auto is_break(rope_src_buf_t buf, size_t byte_idx) -> bool
+	{
+		ATMA_ASSERT(byte_idx < buf.size());
+
+		return byte_idx == 0
+			|| byte_idx == buf.size()
+			|| (buf[byte_idx] >> 6 != !0b10) && (buf[byte_idx - 1] != 0x0d || buf[byte_idx] != 0x0a);
+	}
+
+	inline auto prev_break(rope_src_buf_t buf, size_t byte_idx) -> size_t
+	{
+		ATMA_ASSERT(byte_idx <= buf.size());
+
+		if (byte_idx == 0)
+			return 0;
+		
+		size_t i = byte_idx - 1;
+		while (!is_break(buf, i))
+			--i;
+		return i;
+	}
+
+	inline auto next_break(rope_src_buf_t buf, size_t byte_idx) -> size_t
+	{
+		ATMA_ASSERT(byte_idx <= buf.size());
+
+		if (byte_idx == buf.size())
+			return buf.size();
+
+		size_t i = byte_idx + 1;
+		while (!is_break(buf, i))
+			++i;
+		return i;
+	}
+
+	inline auto find_split_point(rope_src_buf_t buf, size_t byte_idx) -> size_t
+	{
+		size_t left = (is_break(buf, byte_idx) && byte_idx != buf.size())
+			? byte_idx
+			: prev_break(buf, byte_idx);
+
+		size_t right = next_break(buf, left);
+
+		if (left == 0 || right != buf.size() && (byte_idx - left) >= (right - byte_idx))
+			return right;
+		else
+			return left;
+	}
+
+	inline auto split_infos(text_info_t const& x, rope_src_buf_t buf, size_t byte_idx)
+	{
+		ATMA_ASSERT(!buf.empty());
+		ATMA_ASSERT(buf.size() >= 8);
+		ATMA_ASSERT(byte_idx < buf.size());
+		ATMA_ASSERT(utf8_byte_is_leading((byte const)buf[byte_idx]));
+
+		// clamp the byte_idx
+		byte_idx = std::max(4ull, byte_idx);
+		byte_idx = std::min(buf.size() - 4, byte_idx);
+
+		// determine split point
+		size_t split_idx = 0;
+		{
+			auto start_idx = byte_idx - 4;
+			auto split_buf = rope_src_buf_t{buf.begin() + start_idx, 8};
+			auto result_idx = find_split_point(split_buf, 4);
+			ATMA_ASSERT(utf8_byte_is_leading((byte const)buf[split_idx]));
+			split_idx = start_idx + result_idx;
+		}
+
+		uint32_t left_chars = 0, left_breaks = 0;
+		for (auto iter = buf.begin(); iter < buf.begin() + split_idx; utf8_char_advance(iter))
+		{
+			// don't count LF if it's preceded by CR
+			left_breaks += (*iter == rope_utils::CR) || (*iter == rope_utils::LF && (left_chars > 0 && iter[-1] != rope_utils::CR));
+			++left_chars;
+		}
+
+		//size_t right_chars = 0, right_breaks = 0;
+		//for (auto iter = buf.begin() + byte_idx; iter < buf.end(); utf8_char_advance(iter))
+		//{
+		//	// don't count LF if it's preceded by CR
+		//	left_breaks += (*iter == rope_utils::CR) || (*iter == rope_utils::LF && (left_chars > 0 && iter[-1] != rope_utils::CR));
+		//	++left_chars;
+		//}
+
+		return std::make_tuple(
+			text_info_t{(uint32_t)split_idx, left_chars, left_breaks},
+			text_info_t{x.bytes - (uint32_t)split_idx, x.characters - left_chars, x.line_breaks - left_breaks});
+	}
+}
 
 // rope_node_t implementation
 namespace atma::detail
@@ -260,27 +390,87 @@ namespace atma::detail
 			});
 	}
 
+	inline auto fix_seam(size_t char_idx, detail::rope_node_info_t const& leaf_info, char* buf, size_t& buf_size)
+	{
+		//auto cr = detail::rope_src_buf_t("\015", 1);
+
+		auto const new_buf_size = buf_size + 1;
+
+		// by definition, we should have enough space in any leaf-node to fix a seam
+		ATMA_ASSERT(new_buf_size <= detail::rope_buf_size);
+
+		// append if possible
+		if (leaf_info.bytes == buf_size)
+		{
+			buf[buf_size++] = rope_utils::LF;
+
+			// don't increment linecount if we appended onto a CR character, giving CRLF
+			auto new_leaf_info = text_info_t{
+				leaf_info.bytes + 1,
+				leaf_info.characters + 1,
+				leaf_info.line_breaks + (buf[leaf_info.bytes] != rope_utils::CR)};
+
+			return detail::rope_edit_result_t{new_leaf_info};
+		}
+		// buffer-size small enough to reallocate the node
+		else if (new_buf_size < rope_buf_edit_split_size)
+		{
+			auto byte_idx = utf8_charseq_idx_to_byte_idx(buf, buf_size, char_idx);
+
+			auto new_text_info = text_info_t{
+				leaf_info.bytes + 1,
+				leaf_info.characters + 1,
+				leaf_info.line_breaks + (buf[leaf_info.bytes] != rope_utils::CR)};
+
+			auto new_node = detail::rope_make_leaf_ptr(
+				xfer_src(buf, byte_idx),
+				rope_src_buf_t("\n", 1),
+				xfer_src(buf + byte_idx, buf_size - byte_idx));
+
+			auto new_leaf_info = rope_node_info_t{new_text_info, new_node};
+
+			return detail::rope_edit_result_t{new_leaf_info};
+		}
+		// split the node
+		else
+		{
+			auto byte_idx = utf8_charseq_idx_to_byte_idx(buf, buf_size, char_idx);
+
+			auto [lhs_info, rhs_info] = split_infos(leaf_info, xfer_src(buf, buf_size), byte_idx); // leaf_info.characters, byte_idx, leaf_info.bytes);
+
+			//lhs_info.characters = (uint32_t)char_idx;
+			//lhs_info.bytes = (uint32_t)byte_idx;
+			//
+			//rhs_info.bytes = (uint32_t)(leaf_info.bytes - byte_idx);
+			//rhs_info.characters = (uint32_t)(leaf_info.characters - char_idx);
+			auto rhs_node = detail::rope_make_leaf_ptr(
+				xfer_src(buf + lhs_info.bytes, rhs_info.bytes));
+
+			return detail::rope_edit_result_t{lhs_info, detail::rope_node_info_t{rhs_info, rhs_node}};
+		}
+		
+	}
+
+
 	template <typename F>
 	inline auto rope_node_t::edit_chunk_at_char(size_t char_idx, rope_node_info_t const& info, F&& f) -> rope_edit_result_t
 	{
 		return this->visit(
-			[&, f = std::forward<F>(f)](rope_node_internal_t& x)
+			[&](rope_node_internal_t& x)
 			{
 				// find child
 				auto [child_idx, child_rel_idx] = find_for_char_idx(char_idx);
 				auto const& child = x.child_at(child_idx);
 
 				// recurse
-				auto [l_info, r_info, tore_seam] = child.node->edit_chunk_at_char(child_rel_idx, child, f);
+				auto [l_info, r_info, has_seam] = child.node->edit_chunk_at_char(child_rel_idx, child, f);
 				auto result = x.clone_with(child_idx, l_info, r_info);
 
 				// if we can fix a torn seam here, do so
-				if (tore_seam && child_idx > 0)
+				if (has_seam && child_idx > 0)
 				{
-					//auto& seamchild = x.child_at(child_idx - 1);
-					//seamchild.node->edit_chunk_at_char(seamchild.characters, seamchild,
-					//	[]()
-					//	{});
+					auto const& seamchild = x.child_at(child_idx - 1);
+					seamchild.node->edit_chunk_at_char(seamchild.characters, seamchild, fix_seam);
 				}
 				// we can not, pass the seam up a level
 				else
@@ -451,6 +641,8 @@ namespace atma::detail
 
 namespace atma
 {
+	auto insert_impl(size_t char_idx, detail::rope_node_info_t const&, char* buf, size_t& buf_size, detail::rope_src_buf_t) -> detail::rope_edit_result_t;
+
 	struct rope_t
 	{
 		rope_t();
@@ -459,7 +651,6 @@ namespace atma
 		auto insert(size_t char_idx, char const* str, size_t sz) -> void;
 
 	private:
-		auto insert_impl(size_t char_idx, detail::rope_node_info_t const&, char* buf, size_t& buf_size, detail::rope_src_buf_t) -> detail::rope_edit_result_t;
 
 	private:
 		detail::rope_node_info_t root_;
@@ -476,10 +667,12 @@ namespace atma
 	
 	inline auto rope_t::insert(size_t char_idx, char const* str, size_t sz) -> void
 	{
+		//auto src = detail::rope_src_buf_t(str, sz);
+
 		auto [lhs_info, rhs_info, seam] = root_.node->edit_chunk_at_char(char_idx, root_,
-			[&, src = detail::rope_src_buf_t(str, sz)](size_t char_idx, detail::rope_node_info_t const& leaf_info, char* buf, size_t& buf_size)
+			[str, sz](size_t char_idx, detail::rope_node_info_t const& leaf_info, char* buf, size_t& buf_size)
 			{
-				return insert_impl(char_idx, leaf_info, buf, buf_size, src);
+				return insert_impl(char_idx, leaf_info, buf, buf_size, xfer_src(str, sz));
 			});
 
 		if (rhs_info.has_value())
@@ -495,7 +688,7 @@ namespace atma
 		}
 	}
 
-	inline auto rope_t::insert_impl(size_t char_idx, detail::rope_node_info_t const& leaf_info, char* buf, size_t& buf_size, detail::rope_src_buf_t src_text) -> detail::rope_edit_result_t
+	inline auto insert_impl(size_t char_idx, detail::rope_node_info_t const& leaf_info, char* buf, size_t& buf_size, detail::rope_src_buf_t src_text) -> detail::rope_edit_result_t
 	{
 		ATMA_ASSERT(!src_text.empty());
 
@@ -512,7 +705,7 @@ namespace atma
 		auto combined_bytes_size = leaf_info.bytes + src.size();
 
 		// we will never have to split the resultant node
-		if (combined_bytes_size <= detail::rope_buf_max_size)
+		if (combined_bytes_size <= detail::rope_buf_size)
 		{
 			// todo: one loop for copy + info-calculation
 			auto affix_string_info = detail::text_info_t::from_str(src.data(), src.size());
@@ -531,6 +724,7 @@ namespace atma
 
 				return detail::rope_edit_result_t{result_info, {}, has_seam};
 			}
+#if 0
 			// append is not possible, but the total new size is under
 			// the minimum splittable size. like, we don't want two characters
 			// here, two there. allocate one new leaf and insert it all
@@ -544,18 +738,13 @@ namespace atma
 
 				return detail::rope_edit_result_t{result_info, {}, has_seam};
 			}
+#endif
 		}
-		// splitting is required
-		else
-		{
-			// we don't need a new node for lhs, just reference a subsequence
-			auto lhs_info = leaf_info;
-			lhs_info.characters = (uint32_t)char_idx;
-			lhs_info.bytes = (uint32_t)byte_idx;
 
-			detail::text_info_t rhs_info;
-			rhs_info.bytes = (uint32_t)(leaf_info.bytes - byte_idx);
-			rhs_info.characters = (uint32_t)(leaf_info.characters - char_idx);
+		// splitting is required
+		{
+			auto [lhs_info, rhs_info] = detail::split_infos(leaf_info, src, byte_idx);
+
 			auto rhs_node = detail::rope_make_leaf_ptr(
 				src,
 				xfer_src(buf + byte_idx, buf_size - byte_idx));
