@@ -471,6 +471,8 @@ namespace atma
 		auto size() const -> size_t { return size_; }
 		auto byte_size() const -> size_t { return size_ * sizeof value_type; }
 
+		constexpr auto subspan(size_t offset, size_t count) const { return bounded_memxfer_t(this->get_allocator(), this->data() + offset, count); }
+
 		// immutable transforms
 		auto skip(size_t n) const -> bounded_memxfer_t<Tag, T, A>
 		{
