@@ -75,9 +75,21 @@
 	</Type>
 
 
+	<Type Name="atma::detail::rope_node_leaf_t">
+		<!-- internal-node -->
+		<DisplayString>{buf,[size]s8}</DisplayString>
+	</Type>
+
+	<Type Name="atma::detail::rope_node_t">
+		<!-- internal-node -->
+		<DisplayString Condition="variant_._Which==0">{{ child-count={variant_._Head.child_count_} }}</DisplayString>
+		<!-- introspect the variant to show only the bits of the storage we're valid for -->
+		<DisplayString Condition="variant_._Which==1">{{ leaf={(atma::detail::rope_node_leaf_t&amp;)variant_._Tail} }}</DisplayString>
+	</Type>
+
 	<Type Name="atma::detail::rope_node_info_t">
 		<!-- internal-node -->
-		<DisplayString Condition="node.px &amp;&amp; node.px->variant_._Which==0">{{ chars={characters}, bytes={bytes}, internal-child-count={((atma::detail::rope_node_internal_t&amp;)node.px->variant_._Head).child_count_} }}</DisplayString>
+		<DisplayString Condition="node.px &amp;&amp; node.px->variant_._Which==0">{{ chars={characters}, bytes={bytes}, child-count={((atma::detail::rope_node_internal_t&amp;)node.px->variant_._Head).child_count_} }}</DisplayString>
 		<!-- introspect the variant to show only the bits of the storage we're valid for -->
 		<DisplayString Condition="node.px &amp;&amp; node.px->variant_._Which==1">{{ chars={characters}, bytes={bytes}, {((atma::detail::rope_node_leaf_t&amp;)node.px->variant_._Tail).buf,[characters]s8} }}</DisplayString>
 
@@ -91,6 +103,8 @@
 			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==1" Name="[characters]">characters</Item>
 			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==1" Name="[line-breaks]">line_breaks</Item>
 			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==1" Name="[text]">((atma::detail::rope_node_leaf_t&amp;)node.px->variant_._Tail).buf,[characters]s8</Item>
+
+			<Item Name="[node]">node</Item>
 		</Expand>
 	</Type>
 
