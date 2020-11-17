@@ -16,7 +16,7 @@ namespace atma::functors
 	inline constexpr struct add_fn
 	{
 		template <typename A, typename B>
-		requires requires(A a, B b) { {a + b}; }
+		//requires requires(A a, B b) { {a + b}; }
 		auto operator ()(A&& a, B&& b) const
 		{
 			return a + b;
