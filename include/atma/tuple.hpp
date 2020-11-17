@@ -479,6 +479,14 @@ namespace atma {
 		}
 	};
 
+	struct assign_functor_t
+	{
+		template <typename LHS, typename RHS>
+		decltype(auto) operator ()(LHS&& lhs, RHS&& rhs) const {
+			return std::forward<LHS>(lhs) = std::forward<RHS>(rhs);
+		}
+	};
+
 	struct dereference_functor_t
 	{
 		template <typename T>

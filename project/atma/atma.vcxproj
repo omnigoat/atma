@@ -150,7 +150,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\vendor;$(ProjectDir)..\..\include;</AdditionalIncludeDirectories>
       <ConformanceMode>true</ConformanceMode>
       <EnforceTypeConversionRules>true</EnforceTypeConversionRules>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

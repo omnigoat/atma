@@ -165,13 +165,20 @@ namespace atma
 		// concept: Iterator
 		using iterator_category = std::forward_iterator_tag;
 		using value_type        = typename std::iterator_traits<target_iterator_t>::value_type;
-		using difference_type   = typename std::iterator_traits<target_iterator_t>::difference_type;
+		using difference_type   = ptrdiff_t;
 		using pointer           = typename std::iterator_traits<target_iterator_t>::pointer;
 		using reference         = typename std::iterator_traits<target_iterator_t>::reference; // std::conditional_t<is_const, typename owner_t::const_reference, typename owner_t::reference>;
 
 		filtered_range_iterator_t() = default;
 		filtered_range_iterator_t(filtered_range_iterator_t const&) = default;
 		filtered_range_iterator_t(filtered_range_iterator_t&&) = default;
+
+		auto operator = (filtered_range_iterator_t const& rhs) -> filtered_range_iterator_t&
+		{
+			owner_ = rhs.owner_;
+			pos_ = rhs.pos_;
+			return *this;
+		}
 
 		template <typename Iter> filtered_range_iterator_t(owner_t*, Iter&&);
 		template <typename Iter> filtered_range_iterator_t(filtered_range_iterator_t<Owner, Iter> const&);
@@ -308,11 +315,9 @@ namespace atma
 // non-member operators
 namespace atma
 {
-	template <typename R, typename F,
-		CONCEPT_REQUIRES_(
-			(concepts::models_v<range_concept, R>),
-			detail::is_filter_functor_v<remove_cvref_t<F>>)>
+	template <typename R, typename F>
 	inline auto operator | (R&& range, F&& functor)
+	requires std::ranges::range<R> && detail::is_filter_functor_v<remove_cvref_t<F>>
 	{
 		if constexpr (detail::is_filtered_range_v<remove_cvref_t<R>>)
 		{
@@ -327,10 +332,8 @@ namespace atma
 		}
 	}
 
-	template <typename F, typename G,
-		CONCEPT_REQUIRES_(
-			detail::is_filter_functor_v<remove_cvref_t<F>>,
-			detail::is_filter_functor_v<remove_cvref_t<G>>)>
+	template <typename F, typename G>
+	requires detail::is_filter_functor_v<remove_cvref_t<F>> && detail::is_filter_functor_v<remove_cvref_t<G>>
 	inline auto operator * (F&& lhs, G&& rhs)
 	{
 		auto predicate = [f=lhs.predicate(), g=rhs.predicate()](auto&& x) {
@@ -346,20 +349,20 @@ namespace atma
 namespace atma
 {
 	// filter: f vs r
-	template <typename F, typename R,
-	CONCEPT_REQUIRES_((concepts::models_v<range_concept, R>), !detail::is_filtered_range_v<R>)>
+	template <typename F, typename R>
+	requires std::ranges::range<R> && !detail::is_filtered_range_v<R>
 	inline auto filter(F&& predicate, R&& range) {
 		return filtered_range_t{std::forward<R>(range), std::forward<F>(predicate)}; }
 
 	// filter: f vs filtered-range<r, g>
-	template <typename F, typename R,
-	CONCEPT_REQUIRES_(detail::is_filtered_range_v<R>)>
+	template <typename F, typename R>
+	requires detail::is_filtered_range_v<R>
 	inline auto filter(F&& predicate, R&& range) {
 		return std::forward<R>(range) | filter_functor_t{std::forward<F>(predicate)}; }
 
 	// filter: member vs r
-	template <typename M, typename C, typename R,
-	CONCEPT_REQUIRES_(is_range_v<R>)>
+	template <typename M, typename C, typename R>
+	requires std::ranges::range<R>
 	inline auto filter(M C::*m, R&& range)
 	{
 		auto f = [m](auto&& x) -> bool { return x.*m; };
