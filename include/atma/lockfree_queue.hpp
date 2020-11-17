@@ -756,8 +756,8 @@ namespace atma
 
 	inline auto base_lockfree_queue_t::allocation_t::encode_uint16(uint16 i) -> void
 	{
-		encode_byte(byte{i & 0xff});
-		encode_byte(byte{i >> 8});
+		encode_byte(byte(i & 0xff));
+		encode_byte(byte(i >> 8));
 	}
 
 	inline auto base_lockfree_queue_t::allocation_t::encode_uint32(uint32 i) -> void
@@ -790,7 +790,7 @@ namespace atma
 
 		encode_uint32(size);
 		for (uint32 i = 0; i != size; ++i)
-			encode_byte(byte{reinterpret_cast<char const*>(data)[i]});
+			encode_byte(byte(reinterpret_cast<char const*>(data)[i]));
 	}
 
 	template <typename T>
