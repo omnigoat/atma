@@ -78,10 +78,14 @@ namespace atma
 		using reference         = std::tuple<typename std::remove_reference_t<Ranges>::reference...>;
 		using iterator_category = std::forward_iterator_tag;
 
+		zip_range_iterator_t();
 		zip_range_iterator_t(target_iters_tuple_t const&);
+
+		auto operator = (zip_range_iterator_t const&) -> zip_range_iterator_t&;
 
 		auto operator  *() const -> reference;
 		auto operator ++() -> zip_range_iterator_t&;
+		auto operator ++(int) -> zip_range_iterator_t;
 
 		auto base() const -> target_iters_tuple_t const& { return iters_; }
 		auto base() -> target_iters_tuple_t& { return iters_; }
@@ -145,15 +149,34 @@ namespace atma
 namespace atma
 {
 	template <typename... Ranges>
+	zip_range_iterator_t<Ranges...>::zip_range_iterator_t()
+	{}
+
+	template <typename... Ranges>
 	zip_range_iterator_t<Ranges...>::zip_range_iterator_t(target_iters_tuple_t const& iters)
 		: iters_{iters}
 	{}
+
+	template <typename... Ranges>
+	auto zip_range_iterator_t<Ranges...>::operator = (zip_range_iterator_t const& rhs) -> zip_range_iterator_t&
+	{
+		atma::tuple_binary_apply(assign_functor_t(), base(), rhs.base());
+		return *this;
+	}
 
 	template <typename... Ranges>
 	auto zip_range_iterator_t<Ranges...>::operator ++ () -> zip_range_iterator_t&
 	{
 		atma::tuple_apply(atma::increment_functor_t(), base());
 		return *this;
+	}
+
+	template <typename... Ranges>
+	auto zip_range_iterator_t<Ranges...>::operator ++ (int) -> zip_range_iterator_t
+	{
+		auto r = *this;
+		++*this;
+		return r;
 	}
 
 	template <typename... Ranges>

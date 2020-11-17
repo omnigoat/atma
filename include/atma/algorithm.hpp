@@ -16,7 +16,7 @@ namespace atma::functors
 	inline constexpr struct add_fn
 	{
 		template <typename A, typename B>
-		//requires requires(A a, B b) { {a + b}; }
+		requires requires(A a, B b) { {a + b}; }
 		auto operator ()(A&& a, B&& b) const
 		{
 			return a + b;
@@ -121,6 +121,7 @@ namespace atma
 
 	template <typename R>
 	inline auto operator | (R&& range, as_vector_t const&)
+	requires std::ranges::range<R>
 	{
 		return atma::vector<typename std::remove_reference_t<R>::value_type>{range.begin(), range.end()};
 	}

@@ -4,10 +4,12 @@
 #include <atma/concepts.hpp>
 
 #include <functional>
+#include <ranges>
 
 // range
 namespace atma
 {
+#if 0
 	struct range_concept
 	{
 		template <typename Range>
@@ -37,6 +39,7 @@ namespace atma
 			SPECIFIES_EXPR(range[0])
 		>;
 	};
+#endif
 }
 
 // span
@@ -248,8 +251,8 @@ namespace atma
 		F f_;
 	};
 
-	template <typename R, typename F,
-		CONCEPT_MODELS_(range_concept, remove_cvref_t<R>)>
+	template <typename R, typename F>
+	requires std::ranges::range<R>
 	inline auto operator | (R&& range, for_each_fn<F> const& f) -> void
 	{
 		f(std::forward<R>(range));

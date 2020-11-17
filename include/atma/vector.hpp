@@ -558,8 +558,8 @@ namespace atma
 		}
 
 		// maybe sanity check
-		static_assert(concepts::models_v<forward_iterator_concept, H>);
-		static_assert(concepts::models_v<memory_concept, decltype(xfer_dest(imem_ + offset, rangesize))>);
+		//static_assert(, H>);
+		static_assert(memory_concept<decltype(xfer_dest(imem_ + offset, rangesize))>);
 
 		memory_copy_construct(
 			xfer_dest(imem_ + offset, rangesize),
