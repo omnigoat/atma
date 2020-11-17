@@ -342,8 +342,8 @@ SCENARIO_TEMPLATE("a (dest|src)_memxfer_t is directly constructed", xfer, XFER_T
 			
 				THEN("the result-type is conceptually an 'unbounded memory'")
 				{
-					CHECK(MODELS_ARGS(atma::memory_concept, d));
-					CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
+					CHECK(atma::memory_concept<decltype(d)>);
+					CHECK(!atma::bounded_memory_concept<decltype(d)>);
 				}
 
 				THEN("the result has the same value")
@@ -360,8 +360,8 @@ SCENARIO_TEMPLATE("a (dest|src)_memxfer_t is directly constructed", xfer, XFER_T
 
 			THEN("the result-type is conceptually an 'unbounded memory'")
 			{
-				CHECK(MODELS_ARGS(atma::memory_concept, d));
-				CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
+				CHECK(atma::memory_concept<decltype(d)>);
+				CHECK(!atma::bounded_memory_concept<decltype(d)>);
 			}
 
 			THEN("the result has the same allocator")
@@ -399,8 +399,8 @@ SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, XFER_TYPE_COMBINA
 
 			THEN("the result-type is conceptually an 'unbounded memory'")
 			{
-				CHECK(MODELS_ARGS(atma::memory_concept, d));
-				CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
+				CHECK(atma::memory_concept<decltype(d)>);
+				CHECK(!atma::bounded_memory_concept<decltype(d)>);
 			}
 
 			THEN("the result has the same allocator")
@@ -424,8 +424,8 @@ SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, XFER_TYPE_COMBINA
 
 			THEN("the result-type is conceptually an 'unbounded memory'")
 			{
-				CHECK(MODELS_ARGS(atma::memory_concept, d));
-				CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
+				CHECK(atma::memory_concept<decltype(d)>);
+				CHECK(!atma::bounded_memory_concept<decltype(d)>);
 			}
 
 			THEN("the result has the same value")
@@ -443,8 +443,8 @@ SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, XFER_TYPE_COMBINA
 
 			THEN("the result-type is conceptually a 'bounded memory'")
 			{
-				CHECK(MODELS_ARGS(atma::memory_concept, d));
-				CHECK(MODELS_ARGS(atma::bounded_memory_concept, d));
+				CHECK(atma::memory_concept<decltype(d)>);
+				CHECK(atma::bounded_memory_concept<decltype(d)>);
 			}
 
 			THEN("the result has the same allocator")
@@ -475,8 +475,8 @@ SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, XFER_TYPE_COMBINA
 
 			THEN("the result-type is conceptually a 'bounded memory'")
 			{
-				CHECK(MODELS_ARGS(atma::memory_concept, d));
-				CHECK(MODELS_ARGS(atma::bounded_memory_concept, d));
+				CHECK(atma::memory_concept<decltype(d)>);
+				CHECK(atma::bounded_memory_concept<decltype(d)>);
 			}
 
 			THEN("the result has the same value")
@@ -503,8 +503,8 @@ SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, XFER_TYPE_COMBINA
 
 			THEN("the result-type is conceptually an 'unbounded memory'")
 			{
-				CHECK(MODELS_ARGS(atma::memory_concept, d));
-				CHECK(MODELS_NOT_ARGS(atma::bounded_memory_concept, d));
+				CHECK(atma::memory_concept<decltype(d)>);
+				CHECK(!atma::bounded_memory_concept<decltype(d)>);
 			}
 
 			THEN("the result has the same allocator")
@@ -529,8 +529,11 @@ SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, XFER_TYPE_COMBINA
 
 			[[maybe_unused]] auto d = xfer_make(memory, test_size);
 
-			CHECK(MODELS_ARGS(atma::memory_concept, d));
-			CHECK(MODELS_ARGS(atma::bounded_memory_concept, d));
+			THEN("the result-type is conceptually a 'bounded memory'")
+			{
+				CHECK(atma::memory_concept<decltype(d)>);
+				CHECK(atma::bounded_memory_concept<decltype(d)>);
+			}
 
 			THEN("the result has the same allocator")
 			{

@@ -94,12 +94,25 @@ SCENARIO_OF("ranges/filter_t", "ranges can be filtered")
 	GIVEN("a non-const lvalue vector of numbers")
 	{
 		auto numbers = atma::vector<int>{1, 2, 3, 4};
-		static_assert(atma::concepts::models<atma::range_concept, decltype(numbers)>::value);
-		static_assert(!atma::concepts::models<atma::range_concept, int>::value );
+		static_assert(std::ranges::range<decltype(numbers)>);
 
 		THEN("cvrefness is preserved")
 		{
 			auto result = atma::filter(is_even, numbers);
+			using iter = decltype(result.begin());
+			static_assert(std::default_initializable<iter>);
+			
+			static_assert(std::move_constructible<iter>);
+			static_assert(std::assignable_from<iter&, iter>);
+			static_assert(std::swappable<iter>);
+
+			static_assert(std::movable<iter>);
+
+			static_assert(std::weakly_incrementable<iter>);
+
+			auto rb = std::ranges::begin(result);
+			auto re = std::ranges::end(result);
+			static_assert(std::ranges::range<decltype(result)>, "filtered range not a std::ranges::range");
 			static_assert(std::is_same_v<typename decltype(result)::storage_range_t, atma::vector<int>&>);
 		}
 
@@ -181,7 +194,19 @@ SCENARIO_OF("ranges/map", "ranges can be mapped")
 
 		THEN("basic mapping works")
 		{
-			auto numbers_plus10 = atma::as_vector | atma::map(plus_10, numbers);
+			auto r = atma::map(plus_10, numbers);
+			using MR = decltype(r);
+
+			// iterator is an iterator
+			    static_assert(std::default_initializable<MR::iterator>);
+			    static_assert(std::movable<MR::iterator>);
+			  static_assert(std::weakly_incrementable<MR::iterator>);
+			static_assert(std::input_or_output_iterator<MR::iterator>);
+
+			// range is a range
+			static_assert(std::ranges::range<MR>);
+
+			auto numbers_plus10 = atma::map(plus_10, numbers) | atma::as_vector;
 			
 			CHECK_WHOLE_VECTOR(numbers_plus10, 11, 12, 13, 14);
 		}
@@ -280,6 +305,18 @@ SCENARIO_OF("ranges/zip", "ranges can be zipped")
 	{
 		atma::vector<int> numbers{1, 2, 3, 4};
 		atma::vector<std::string> strings{"hello", "mr", "radio"};
+
+		auto r = atma::zip(numbers, strings);
+		using MR = decltype(r);
+
+		// iterator is an iterator
+			static_assert(std::default_initializable<MR::iterator>);
+		static_assert(std::movable<MR::iterator>);
+		static_assert(std::weakly_incrementable<MR::iterator>);
+		static_assert(std::input_or_output_iterator<MR::iterator>);
+
+		// range is a range
+		static_assert(std::ranges::range<MR>);
 
 		{
 			int count = 0;

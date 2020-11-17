@@ -156,7 +156,16 @@ namespace atma
 		using pointer           = value_type*;
 		using reference         = invoke_result_t;
 
+		mapped_range_iterator_t();
 		mapped_range_iterator_t(R*, target_iterator_t const& begin, target_iterator_t const& end);
+
+		auto operator = (mapped_range_iterator_t const& rhs) -> mapped_range_iterator_t&
+		{
+			owner_ = rhs.owner_;
+			pos_ = rhs.pos_;
+			end_ = rhs.end_;
+			return *this;
+		}
 
 		auto operator  *() const -> invoke_result_t;
 		auto operator ++() -> mapped_range_iterator_t&;
@@ -211,6 +220,13 @@ namespace atma
 	// ITERATOR IMPLEMENTATION
 	//======================================================================
 	template <typename R>
+	inline mapped_range_iterator_t<R>::mapped_range_iterator_t()
+		: owner_()
+		, pos_()
+		, end_()
+	{}
+
+	template <typename R>
 	inline mapped_range_iterator_t<R>::mapped_range_iterator_t(owner_t* owner, target_iterator_t const& begin, target_iterator_t const& end)
 		: owner_(owner), pos_(begin), end_(end)
 	{}
@@ -253,10 +269,8 @@ namespace atma
 	//======================================================================
 	// operators
 	//======================================================================
-	template <typename R, typename F,
-		CONCEPT_REQUIRES_(
-			is_range_v<remove_cvref_t<R>>,
-			detail::is_map_functor_v<remove_cvref_t<F>>)>
+	template <typename R, typename F>
+	requires std::ranges::range<R> && detail::is_map_functor_v<remove_cvref_t<F>>
 	inline auto operator | (R&& range, F&& functor)
 	{
 		if constexpr (detail::is_mapped_range_v<remove_cvref_t<R>>)
@@ -280,6 +294,7 @@ namespace atma
 	inline auto map(F&& f, R&& xs)
 	{
 		return mapped_range_t<decltype(xs), F>{std::forward<R>(xs), std::forward<F>(f)};
+		//return std::ranges::for_each(std::forward<R>(xs), std::forward<F>(f));
 	}
 
 	template <typename F>
