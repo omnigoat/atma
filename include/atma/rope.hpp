@@ -5,11 +5,11 @@
 #include <atma/intrusive_ptr.hpp>
 #include <atma/ranges/core.hpp>
 #include <atma/memory.hpp>
+#include <atma/algorithm.hpp>
 
 #include <variant>
 #include <optional>
 #include <array>
-
 
 namespace atma::detail
 {
@@ -328,9 +328,8 @@ namespace atma::detail
 	inline auto insert_and_redistribute(text_info_t const& host, rope_src_buf_t hostbuf, rope_src_buf_t insbuf, size_t byte_idx)
 		-> std::tuple<rope_node_info_t, rope_node_info_t>
 	{
-		//ATMA_ASSERT(!insbuf.empty());
-		//ATMA_ASSERT(insbuf.size() >= 8);
-		//ATMA_ASSERT(byte_idx < (x.bytes + buf.size()));
+		ATMA_ASSERT(!insbuf.empty());
+		ATMA_ASSERT(byte_idx < hostbuf.size());
 		ATMA_ASSERT(utf8_byte_is_leading((byte const)hostbuf[byte_idx]));
 
 		// determine split point
@@ -360,63 +359,53 @@ namespace atma::detail
 			split_idx = bufcopy_start + find_split_point(xfer_src(splitbuf, splitbuf_size), midpoint - bufcopy_start);
 
 			insbuf_split_idx
-				= (ins_end_idx < split_idx) ? 0
-				: (split_idx < byte_idx) ? insbuf.size()
+				= (ins_end_idx <= split_idx) ? 0
+				: (split_idx <= byte_idx) ? insbuf.size()
 				: midpoint - byte_idx
 				;
 
 			ATMA_ASSERT(utf8_byte_is_leading((byte const)splitbuf[split_idx]));
 		}
 
-		// we need to know if we're splitting in the middle of the inserted characters,
-		// so that we count the breaks & characters correctly
+		rope_node_info_t new_lhs, new_rhs;
 
-
-		// inserted text is in lhs
+		// inserted text is pre-split
 		if (insbuf_split_idx == 0)
 		{
-			auto new_lhs = detail::rope_make_leaf_ptr(
+			new_lhs = detail::rope_make_leaf_ptr(
 				hostbuf.subspan(0, byte_idx),
 				insbuf,
-				hostbuf.subspan(byte_idx, split_idx - byte_idx));
+				hostbuf.subspan(byte_idx, split_idx - byte_idx - insbuf.size()));
 
-			auto new_rhs = detail::rope_make_leaf_ptr(
-				hostbuf.subspan(split_idx, hostbuf.size() - split_idx));
-
-			return std::make_tuple(
-				rope_node_info_t{new_lhs},
-				rope_node_info_t{new_rhs});
+			new_rhs = detail::rope_make_leaf_ptr(
+				hostbuf.subspan(split_idx - insbuf.size(), hostbuf.size() - split_idx + insbuf.size()));
 		}
-		// inserted text is in rhs
+		// inserted text is post-split
 		else if (insbuf_split_idx == insbuf.size())
 		{
+			new_lhs = detail::rope_make_leaf_ptr(
+				hostbuf.subspan(0, split_idx));
+
+			new_rhs = detail::rope_make_leaf_ptr(
+				hostbuf.subspan(split_idx, (byte_idx - split_idx)),
+				insbuf,
+				hostbuf.subspan(byte_idx, hostbuf.size() - byte_idx));
 		}
 		// inserted text is split in both halves
-		//if (insbuf_split_idx < insbuf.size())
 		else
 		{
-			
-		}
-		
-		uint32_t left_chars = 0, left_breaks = 0;
-		for (auto iter = insbuf.begin(); iter < insbuf.begin() + split_idx; utf8_char_advance(iter))
-		{
-			// don't count LF if it's preceded by CR
-			left_breaks += (*iter == rope_utils::CR) || (*iter == rope_utils::LF && (left_chars > 0 && iter[-1] != rope_utils::CR));
-			++left_chars;
-		}
+			new_lhs = detail::rope_make_leaf_ptr(
+				hostbuf.subspan(0, split_idx - insbuf_split_idx),
+				insbuf.subspan(0, insbuf_split_idx));
 
-		//size_t right_chars = 0, right_breaks = 0;
-		//for (auto iter = insbuf.begin() + byte_idx; iter < insbuf.end(); utf8_char_advance(iter))
-		//{
-		//	// don't count LF if it's preceded by CR
-		//	left_breaks += (*iter == rope_utils::CR) || (*iter == rope_utils::LF && (left_chars > 0 && iter[-1] != rope_utils::CR));
-		//	++left_chars;
-		//}
+			new_rhs = detail::rope_make_leaf_ptr(
+				insbuf.subspan(insbuf_split_idx, insbuf.size() - insbuf_split_idx),
+				hostbuf.subspan(split_idx - insbuf_split_idx, hostbuf.size() - split_idx + insbuf_split_idx));
+		}
 
 		return std::make_tuple(
-			text_info_t{(uint32_t)split_idx, left_chars, left_breaks},
-			text_info_t{host.bytes - (uint32_t)split_idx, host.characters - left_chars, host.line_breaks - left_breaks});
+			rope_node_info_t{new_lhs},
+			rope_node_info_t{new_rhs});
 	}
 }
 
@@ -464,10 +453,7 @@ namespace atma::detail
 		return this->visit(
 			[](rope_node_internal_t const& x)
 			{
-				text_info_t result;
-				for (auto const& child : x.children_range())
-					result = result + child;
-				return result;
+				return x.calculate_combined_info();
 			},
 
 			[](rope_node_leaf_t const& x)
@@ -696,10 +682,9 @@ namespace atma::detail
 					rn = rope_make_internal_ptr(l_info, r_info);
 				}
 
-				rope_node_info_t lni{ln->known_internal().calculate_combined_info(), ln};
-				rope_node_info_t rni{rn->known_internal().calculate_combined_info(), rn};
-
-				return rope_edit_result_t{lni, rni};
+				return rope_edit_result_t{
+					rope_node_info_t{ln},
+					rope_node_info_t{rn}};
 			}
 		}
 		else
@@ -715,10 +700,7 @@ namespace atma::detail
 
 	inline auto rope_node_internal_t::calculate_combined_info() const -> text_info_t
 	{
-		text_info_t r;
-		for (auto const& x : children_range())
-			r = r + x;
-		return r;
+		return atma::foldl(children_range(), text_info_t(), functors::add);
 	}
 
 	inline auto rope_node_internal_t::push(rope_node_info_t const& x) const -> rope_node_ptr
@@ -729,56 +711,9 @@ namespace atma::detail
 }
 
 
-namespace atma
+namespace atma::detail
 {
-	auto insert_impl(size_t char_idx, detail::rope_node_info_t const&, char* buf, size_t& buf_size, detail::rope_src_buf_t) -> detail::rope_edit_result_t;
-
-	struct rope_t
-	{
-		rope_t();
-
-		auto push_back(char const*, size_t) -> void;
-		auto insert(size_t char_idx, char const* str, size_t sz) -> void;
-
-	private:
-
-	private:
-		detail::rope_node_info_t root_;
-	};
-
-	inline rope_t::rope_t()
-		: root_(detail::rope_node_ptr::make())
-	{}
-
-	inline auto rope_t::push_back(char const* str, size_t sz) -> void
-	{
-		this->insert(root_.node->length(), str, sz);
-	}
-	
-	inline auto rope_t::insert(size_t char_idx, char const* str, size_t sz) -> void
-	{
-		//auto src = detail::rope_src_buf_t(str, sz);
-
-		auto [lhs_info, rhs_info, seam] = root_.node->edit_chunk_at_char(char_idx, root_,
-			[str, sz](size_t char_idx, detail::rope_node_info_t const& leaf_info, char* buf, size_t& buf_size)
-			{
-				return insert_impl(char_idx, leaf_info, buf, buf_size, xfer_src(str, sz));
-			});
-
-		if (rhs_info.has_value())
-		{
-			(detail::text_info_t&)root_ = lhs_info + *rhs_info;
-			if (!lhs_info.node)
-				lhs_info.node = root_.node;
-			root_.node = detail::rope_node_ptr::make(detail::rope_node_internal_t{lhs_info, *rhs_info});
-		}
-		else
-		{
-			root_ = lhs_info;
-		}
-	}
-
-	inline auto insert_impl(size_t char_idx, detail::rope_node_info_t const& leaf_info, char* buf, size_t& buf_size, detail::rope_src_buf_t src_text) -> detail::rope_edit_result_t
+	inline auto rope_insert_(size_t char_idx, detail::rope_node_info_t const& leaf_info, char* buf, size_t& buf_size, detail::rope_src_buf_t src_text) -> detail::rope_edit_result_t
 	{
 		ATMA_ASSERT(!src_text.empty());
 
@@ -844,6 +779,52 @@ namespace atma
 			return detail::rope_edit_result_t{lhs_info, detail::rope_node_info_t{rhs_info, rhs_node}};
 		}
 	}
+}
+
+namespace atma
+{
+	struct rope_t
+	{
+		rope_t();
+
+		auto push_back(char const*, size_t) -> void;
+		auto insert(size_t char_idx, char const* str, size_t sz) -> void;
+
+	private:
+		detail::rope_node_info_t root_;
+	};
+
+	inline rope_t::rope_t()
+		: root_(detail::rope_node_ptr::make())
+	{}
+
+	inline auto rope_t::push_back(char const* str, size_t sz) -> void
+	{
+		this->insert(root_.node->length(), str, sz);
+	}
+	
+	inline auto rope_t::insert(size_t char_idx, char const* str, size_t sz) -> void
+	{
+		auto [lhs_info, rhs_info, seam] = root_.node->edit_chunk_at_char(char_idx, root_,
+			[str, sz](size_t char_idx, detail::rope_node_info_t const& leaf_info, char* buf, size_t& buf_size)
+			{
+				return detail::rope_insert_(char_idx, leaf_info, buf, buf_size, xfer_src(str, sz));
+			});
+
+		if (rhs_info.has_value())
+		{
+			(detail::text_info_t&)root_ = lhs_info + *rhs_info;
+			if (!lhs_info.node)
+				lhs_info.node = root_.node;
+			root_.node = detail::rope_node_ptr::make(detail::rope_node_internal_t{lhs_info, *rhs_info});
+		}
+		else
+		{
+			root_ = lhs_info;
+		}
+	}
+
+	
 	
 
 }

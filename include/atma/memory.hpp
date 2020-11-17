@@ -444,6 +444,8 @@ namespace atma
 		using allocator_type = typename base_type::allocator_type;
 		using tag_type = Tag;
 
+		constexpr static size_t dynamic_extent = ~size_t();
+
 		// we can always take a const version
 		CONCEPT_REQUIRES(std::is_const_v<T>)
 		bounded_memxfer_t(bounded_memxfer_t<Tag, std::remove_const_t<T>, A> const& rhs)
@@ -469,9 +471,10 @@ namespace atma
 
 		auto empty() const -> bool { return size_ == 0; }
 		auto size() const -> size_t { return size_; }
-		auto byte_size() const -> size_t { return size_ * sizeof value_type; }
+		auto size_bytes() const -> size_t { return size_ * sizeof value_type; }
 
-		constexpr auto subspan(size_t offset, size_t count) const { return bounded_memxfer_t(this->get_allocator(), this->data() + offset, count); }
+		constexpr auto subspan(size_t offset, size_t count = dynamic_extent) const { 
+			return bounded_memxfer_t(this->get_allocator(), this->data() + offset, (count == dynamic_extent) ? size() - offset : count); }
 
 		// immutable transforms
 		auto skip(size_t n) const -> bounded_memxfer_t<Tag, T, A>
@@ -984,50 +987,50 @@ namespace atma
 namespace atma::memory
 {
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto memcpy(dest_memxfer_t<DT, DA> dest_range, src_memxfer_t<ST, SA> src_range, size_t byte_size) -> void
+	inline auto memcpy(dest_memxfer_t<DT, DA> dest_range, src_memxfer_t<ST, SA> src_range, size_t size_bytes) -> void
 	{
 		static_assert(sizeof DT == sizeof ST);
 
-		ATMA_ASSERT(byte_size != unbounded_memory_size);
-		ATMA_ASSERT(byte_size % sizeof DT == 0);
-		ATMA_ASSERT(byte_size % sizeof ST == 0);
+		ATMA_ASSERT(size_bytes != unbounded_memory_size);
+		ATMA_ASSERT(size_bytes % sizeof DT == 0);
+		ATMA_ASSERT(size_bytes % sizeof ST == 0);
 
-		std::memcpy(dest_range.data(), src_range.data(), byte_size);
+		std::memcpy(dest_range.data(), src_range.data(), size_bytes);
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
 	inline auto memcpy(dest_bounded_memxfer_t<DT, DA> dest_range, src_bounded_memxfer_t<ST, SA> src_range) -> void
 	{
-		ATMA_ASSERT(dest_range.byte_size() == src_range.byte_size());
-		auto sz = dest_range.byte_size();
+		ATMA_ASSERT(dest_range.size_bytes() == src_range.size_bytes());
+		auto sz = dest_range.size_bytes();
 		memcpy(dest_range, src_range, sz);
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
 	inline auto memcpy(dest_bounded_memxfer_t<DT, DA> dest_range, src_memxfer_t<ST, SA> src_range) -> void
 	{
-		auto sz = dest_range.byte_size();
+		auto sz = dest_range.size_bytes();
 		memcpy(dest_range, src_range, sz);
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
 	inline auto memcpy(dest_memxfer_t<DT, DA> dest_range, src_bounded_memxfer_t<ST, SA> src_range) -> void
 	{
-		auto sz = src_range.byte_size();
+		auto sz = src_range.size_bytes();
 		memcpy(dest_range, src_range, sz);
 	}
 
 #if 1
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto memmove(dest_memxfer_t<DT, DA> dest_range, src_memxfer_t<ST, SA> src_range, size_t byte_size) -> void
+	inline auto memmove(dest_memxfer_t<DT, DA> dest_range, src_memxfer_t<ST, SA> src_range, size_t size_bytes) -> void
 	{
 		static_assert(sizeof DT == sizeof ST);
 
-		ATMA_ASSERT(byte_size != unbounded_memory_size);
-		ATMA_ASSERT(byte_size % sizeof DT == 0);
-		ATMA_ASSERT(byte_size % sizeof ST == 0);
+		ATMA_ASSERT(size_bytes != unbounded_memory_size);
+		ATMA_ASSERT(size_bytes % sizeof DT == 0);
+		ATMA_ASSERT(size_bytes % sizeof ST == 0);
 
-		std::memmove(dest_range.data(), src_range.data(), byte_size);
+		std::memmove(dest_range.data(), src_range.data(), size_bytes);
 	}
 
 #else
@@ -1051,22 +1054,22 @@ namespace atma::memory
 	template <typename DT, typename DA, typename ST, typename SA>
 	inline auto memmove(dest_bounded_memxfer_t<DT, DA> dest_range, src_bounded_memxfer_t<ST, SA> src_range) -> void
 	{
-		ATMA_ASSERT(dest_range.byte_size() == src_range.byte_size());
-		auto sz = dest_range.byte_size();
+		ATMA_ASSERT(dest_range.size_bytes() == src_range.size_bytes());
+		auto sz = dest_range.size_bytes();
 		memmove(dest_range, src_range, sz);
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
 	inline auto memmove(dest_bounded_memxfer_t<DT, DA> dest_range, src_memxfer_t<ST, SA> src_range) -> void
 	{
-		auto sz = dest_range.byte_size();
+		auto sz = dest_range.size_bytes();
 		memmove(dest_range, src_range, sz);
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
 	inline auto memmove(dest_memxfer_t<DT, DA> dest_range, src_bounded_memxfer_t<ST, SA> src_range) -> void
 	{
-		auto sz = src_range.byte_size();
+		auto sz = src_range.size_bytes();
 		memmove(dest_range, src_range, sz);
 	}
 
