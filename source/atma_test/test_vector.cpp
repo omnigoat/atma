@@ -10,7 +10,12 @@ SCENARIO_OF("vector", "vectors can be constructed")
 {
 	GIVEN("a default-constructed vector")
 	{
-		atma::vector<int> v;
+		using vector_type = atma::vector<int>;
+
+		vector_type v;
+
+		static_assert(std::is_nothrow_default_constructible_v<typename vector_type::allocator_type>);
+		static_assert(std::is_nothrow_constructible_v<vector_type>);
 
 		THEN("the vector is empty")
 		{

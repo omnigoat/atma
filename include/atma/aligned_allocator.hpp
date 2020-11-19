@@ -19,10 +19,10 @@ namespace atma
 		template <typename U>
 		struct rebind { using other = aligned_allocator_t<U, A>; };
 
-		aligned_allocator_t() {}
+		aligned_allocator_t() noexcept {}
 
 		template <typename U>
-		aligned_allocator_t(aligned_allocator_t<U, A> const&) {}
+		aligned_allocator_t(aligned_allocator_t<U, A> const&) noexcept {}
 
 		auto allocate(size_type) -> pointer;
 		auto deallocate(pointer, size_type) -> void;
