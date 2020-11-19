@@ -18,26 +18,30 @@ namespace atma
 	template <typename T, typename Allocator = atma::aligned_allocator_t<T, 4>>
 	struct vector
 	{
+	private:
+		using allocator_traits = std::allocator_traits<Allocator>;
+
+	public:
 		using value_type      = T;
-		using allocator_type  = Allocator;
+		using allocator_type  = typename allocator_traits::template rebind_alloc<value_type>;
 		using size_type       = std::size_t;
 		using difference_type = std::ptrdiff_t;
 		using reference       = value_type&;
 		using const_reference = value_type const&;
-		using pointer         = typename std::allocator_traits<Allocator>::pointer;
-		using const_pointer   = typename std::allocator_traits<Allocator>::const_pointer;
+		using pointer         = typename allocator_traits::pointer;
+		using const_pointer   = typename allocator_traits::const_pointer;
 		using iterator        = T*;
 		using const_iterator  = T const*;
 		using buffer_type     = atma::basic_unique_memory_t<byte, Allocator>;
 		
-		vector();
+		vector() noexcept(std::is_nothrow_default_constructible_v<allocator_type>);
 		explicit vector(size_t size);
 		explicit vector(size_t size, T const&);
 		vector(std::initializer_list<T>);
 		template <typename I, typename = detail::valid_iterator_t<I>>
 		vector(I begin, I end);
 		vector(vector const&);
-		vector(vector&&);
+		vector(vector&&) noexcept;
 		~vector();
 
 		auto operator = (vector const&) -> vector&;
@@ -124,7 +128,7 @@ namespace atma
 
 
 	template <typename T, typename A>
-	inline vector<T,A>::vector()
+	inline vector<T,A>::vector() noexcept(std::is_nothrow_default_constructible_v<allocator_type>)
 		: capacity_()
 		, size_()
 	{
@@ -184,7 +188,7 @@ namespace atma
 	}
 
 	template <typename T, typename A>
-	inline vector<T,A>::vector(vector&& rhs)
+	inline vector<T,A>::vector(vector&& rhs) noexcept
 		: imem_(rhs.imem_)
 		, capacity_(rhs.capacity_)
 		, size_(rhs.size_)
