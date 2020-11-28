@@ -291,10 +291,10 @@ namespace atma
 	// FUNCTIONS
 	//======================================================================
 	template <typename R, typename F>
-	inline auto map(F&& f, R&& xs)
+	requires std::ranges::range<R>
+	inline auto map(F f, R&& range)
 	{
-		return mapped_range_t<decltype(xs), F>{std::forward<R>(xs), std::forward<F>(f)};
-		//return std::ranges::for_each(std::forward<R>(xs), std::forward<F>(f));
+		return mapped_range_t{std::forward<R>(range), std::forward<F>(f)};
 	}
 
 	template <typename F>
