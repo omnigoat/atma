@@ -194,17 +194,18 @@ SCENARIO_OF("ranges/map", "ranges can be mapped")
 
 		THEN("basic mapping works")
 		{
-			auto r = atma::map(plus_10, numbers);
-			using MR = decltype(r);
-
-			// iterator is an iterator
-			    static_assert(std::default_initializable<MR::iterator>);
-			    static_assert(std::movable<MR::iterator>);
-			  static_assert(std::weakly_incrementable<MR::iterator>);
-			static_assert(std::input_or_output_iterator<MR::iterator>);
+			using ttt = std::ranges::range_reference_t<decltype(numbers)>;
 
 			// range is a range
+			using MR = decltype(atma::map(plus_10, numbers));
 			static_assert(std::ranges::range<MR>);
+
+			// iterator is an iterator
+			using MRI = std::ranges::iterator_t<MR>;
+			    static_assert(std::default_initializable<MRI>);
+			    static_assert(std::movable<MRI>);
+			  static_assert(std::weakly_incrementable<MRI>);
+			static_assert(std::input_or_output_iterator<MRI>);
 
 			auto numbers_plus10 = atma::map(plus_10, numbers) | atma::as_vector;
 			
@@ -267,12 +268,14 @@ SCENARIO_OF("ranges/map", "ranges can be mapped")
 
 	GIVEN("an rvalue vector of numbers")
 	{
-		auto numbers = []() { return atma::vector<int>{1, 2, 3, 4}; };
+		using vector_type = atma::vector<int>;
 
+		auto numbers = []() { return vector_type{1, 2, 3, 4}; };
+		
 		THEN("transfer of ownership occurs")
 		{
 			auto result = atma::map(plus_10, numbers());
-			static_assert(std::is_same_v<typename decltype(result)::target_range_t, atma::vector<int>>);
+			static_assert(std::is_same_v<typename decltype(result)::target_range_t, vector_type>);
 		}
 	}
 
