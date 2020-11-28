@@ -115,7 +115,7 @@ namespace atma
 		template <typename R>
 		auto operator | (R&& range) const
 		{
-			return atma::vector<typename std::remove_reference_t<R>::value_type>{range.begin(), range.end()};
+			return atma::vector<std::ranges::range_value_t<R>>{range.begin(), range.end()};
 		}
 	} as_vector;
 
@@ -123,7 +123,7 @@ namespace atma
 	inline auto operator | (R&& range, as_vector_t const&)
 	requires std::ranges::range<R>
 	{
-		return atma::vector<typename std::remove_reference_t<R>::value_type>{range.begin(), range.end()};
+		return atma::vector<std::ranges::range_value_t<R>>{range.begin(), range.end()};
 	}
 
 
