@@ -46,7 +46,7 @@ namespace atma::detail
 		using allocator_type = Allocator;
 		using allocator_traits = std::allocator_traits<allocator_type>;
 
-		base_memory_tx()
+		base_memory_tx() noexcept(std::is_nothrow_default_constructible_v<allocator_type>)
 		{}
 
 		template <typename U>
@@ -71,7 +71,7 @@ namespace atma::detail
 		using allocator_type = Allocator;
 		using allocator_traits = std::allocator_traits<allocator_type>;
 
-		base_memory_tx()
+		base_memory_tx() noexcept(std::is_nothrow_default_constructible_v<allocator_type>)
 		{}
 
 		template <typename U>
@@ -186,7 +186,6 @@ namespace atma
 	}
 }
 
-
 namespace atma
 {
 	using memory_t = basic_memory_t<byte>;
@@ -194,6 +193,36 @@ namespace atma
 
 
 
+//
+//  sized_basic_memory_t
+//  ------------------------
+//
+//
+//
+namespace atma
+{
+	template <typename T, typename Allocator = std::allocator<T>>
+	struct sized_basic_memory_t : basic_memory_t<T, Allocator>
+	{
+		using base_type = basic_memory_t<T, Allocator>;
+
+		using allocator_type   = typename base_type::allocator_type;
+		using allocator_traits = typename base_type::allocator_traits;
+		using value_type       = typename allocator_traits::value_type;
+		using pointer          = typename allocator_traits::pointer;
+		using const_pointer    = typename allocator_traits::const_pointer;
+		using reference        = typename allocator_traits::value_type&;
+
+		using base_type::base_type;
+	
+		sized_basic_memory_t() = default;
+
+		auto size() const { return size_; }
+
+	private:
+		size_t size_ = 0;
+	};
+}
 
 namespace atma
 {
