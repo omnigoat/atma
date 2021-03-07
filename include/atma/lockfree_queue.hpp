@@ -888,7 +888,7 @@ namespace atma
 	{
 		uint32 size;
 		decode_uint32(size);
-		unique_memory_t um{size};
+		unique_memory_t um(atma::allocate_n, size);
 
 		bool is_contiguous = (p_ + size) < buffer_size();
 

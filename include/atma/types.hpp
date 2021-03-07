@@ -139,6 +139,28 @@ namespace atma
 	//
 	template <typename T>
 	using storage_type_t = std::conditional_t<std::is_rvalue_reference_v<T>, std::remove_reference_t<T>, T>;
+
+	//
+	//  is_implicitly_constructible_v
+	//
+	namespace detail
+	{
+		template <class T, class = void>
+		struct is_implicitly_default_constructible_impl : std::false_type {
+			// determine whether T can be copy-initialized with {}
+		};
+
+		template <class T>
+		void is_implicitly_default_constructible_impl_fn(const T&);
+
+		template <class T>
+		struct is_implicitly_default_constructible_impl<T, void_t<decltype(is_implicitly_default_constructible_impl_fn<T>({}))>> : std::true_type {
+		};
+	}
+
+	template <typename T>
+	constexpr bool is_implicitly_default_constructible_v =
+		detail::is_implicitly_default_constructible_impl<T>::value;
 }
 
 //======================================================================
