@@ -9,20 +9,23 @@ namespace atma::detail
 		template <typename, typename> typename StorageTransformer,
 		bool = std::is_empty_v<First>, bool = std::is_empty_v<Second>
 	>
-	struct ebo_pair_tx;
+	struct ebo_pair_impl;
 
 	template <typename First, typename Second, template <typename, typename> typename StorageTransformer>
-	struct ebo_pair_tx<First, Second, StorageTransformer, false, false>
+	struct ebo_pair_impl<First, Second, StorageTransformer, false, false>
 	{
 		using first_type = typename StorageTransformer<First, Second>::first_type;
 		using second_type = typename StorageTransformer<First, Second>::second_type;
 
-		ebo_pair_tx() = default;
-		ebo_pair_tx(ebo_pair_tx const&) = default;
-		~ebo_pair_tx() = default;
+		constexpr explicit(is_implicitly_default_constructible_v<First> && is_implicitly_default_constructible_v<Second>)
+		ebo_pair_impl() = default;
+
+		ebo_pair_impl(ebo_pair_impl const&) = default;
+		ebo_pair_impl(ebo_pair_impl&&) = default;
+		~ebo_pair_impl() = default;
 
 		template <typename F, typename S>
-		ebo_pair_tx(F&& first, S&& second)
+		constexpr ebo_pair_impl(F&& first, S&& second)
 			: first_(first), second_(second)
 		{}
 
@@ -37,18 +40,19 @@ namespace atma::detail
 	};
 
 	template <typename First, typename Second, template <typename, typename> typename StorageTransformer>
-	struct ebo_pair_tx<First, Second, StorageTransformer, true, false>
+	struct ebo_pair_impl<First, Second, StorageTransformer, true, false>
 		: protected First
 	{
 		using first_type = typename StorageTransformer<First, Second>::first_type;
 		using second_type = typename StorageTransformer<First, Second>::second_type;
 
-		ebo_pair_tx() = default;
-		ebo_pair_tx(ebo_pair_tx const&) = default;
-		~ebo_pair_tx() = default;
+		constexpr ebo_pair_impl() = default;
+		ebo_pair_impl(ebo_pair_impl const&) = default;
+		ebo_pair_impl(ebo_pair_impl&&) = default;
+		~ebo_pair_impl() = default;
 
 		template <typename F, typename S>
-		ebo_pair_tx(F&& first, S&& second)
+		ebo_pair_impl(F&& first, S&& second)
 			: First(first), second_(second)
 		{}
 
@@ -62,18 +66,19 @@ namespace atma::detail
 	};
 
 	template <typename First, typename Second, template <typename, typename> typename Tr>
-	struct ebo_pair_tx<First, Second, Tr, false, true>
+	struct ebo_pair_impl<First, Second, Tr, false, true>
 		: protected First
 	{
 		using first_type = First;
 		using second_type = Second;
 
-		ebo_pair_tx() = default;
-		ebo_pair_tx(ebo_pair_tx const&) = default;
-		~ebo_pair_tx() = default;
+		constexpr ebo_pair_impl() = default;
+		ebo_pair_impl(ebo_pair_impl const&) = default;
+		ebo_pair_impl(ebo_pair_impl&&) = default;
+		~ebo_pair_impl() = default;
 
 		template <typename F, typename S>
-		ebo_pair_tx(F&& first, S&& second)
+		ebo_pair_impl(F&& first, S&& second)
 			: Second(second), first_(first)
 		{}
 
@@ -88,8 +93,8 @@ namespace atma::detail
 
 	// if they're both zero-size, just inherit from second
 	template <typename First, typename Second, template <typename, typename> typename Tr>
-	struct ebo_pair_tx<First, Second, Tr, true, true>
-		: ebo_pair_tx<First, Second, Tr, false, true>
+	struct ebo_pair_impl<First, Second, Tr, true, true>
+		: ebo_pair_impl<First, Second, Tr, false, true>
 	{};
 }
 
@@ -110,7 +115,7 @@ namespace atma
 	};
 
 	template <typename First, typename Second, template <typename, typename> typename Transformer = default_storage_transformer_t>
-	using ebo_pair_t = detail::ebo_pair_tx<First, Second, Transformer>;
+	using ebo_pair_t = detail::ebo_pair_impl<First, Second, Transformer>;
 }
 
 
