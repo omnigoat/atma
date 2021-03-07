@@ -7,7 +7,7 @@
 #include <numeric>
 
 #define CHECK_MEMORY_II_m(r, v, i, elem) \
-	CHECK_EQ(((typename decltype(v)::pointer)v)[i], elem);
+	CHECK_EQ(((typename decltype(v)::pointer)v.data())[i], elem);
 
 #define CHECK_MEMORY_II(v, seq) \
 	BOOST_PP_SEQ_FOR_EACH_I(CHECK_MEMORY_II_m, v, seq)
@@ -15,7 +15,7 @@
 #define CHECK_MEMORY(v, ...) \
 	CHECK_MEMORY_II(v, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
-#define SCOPED_BASIC_MEMORY_ALLOCATION(memory_name, size) memory_name.allocate(size); SCOPE_GUARD([&memory_name]{memory_name.deallocate(size);})
+#define SCOPED_BASIC_MEMORY_ALLOCATION(memory_name, size) memory_name.self_allocate(size); SCOPE_GUARD([&memory_name]{memory_name.self_deallocate(size);})
 
 
 
@@ -247,7 +247,7 @@ SCENARIO_TEMPLATE("basic_memory_t can be constructed", xfer, ALLOCATOR_VALUE_TUP
 
 		THEN("the memory equates to nullptr")
 		{
-			CHECK((value_type*)memory == nullptr);
+			CHECK(memory.data() == nullptr);
 		}
 	}
 
@@ -256,7 +256,7 @@ SCENARIO_TEMPLATE("basic_memory_t can be constructed", xfer, ALLOCATOR_VALUE_TUP
 		auto storage = storage_t{xferti::compar0, xferti::compar1, xferti::compar2, xferti::compar3};
 		
 		#define CHECK_MEMORY_AGAINST_COMPARS(memory) \
-			CHECK((value_type*)memory == storage.data()); \
+			CHECK(memory.data() == storage.data()); \
 			CHECK_MEMORY(memory, xferti::compar0, xferti::compar1, xferti::compar2, xferti::compar3);
 
 		WHEN("basic_memory_t is directly-constructed from a pointer & allocator")
@@ -275,10 +275,9 @@ SCENARIO_TEMPLATE("basic_memory_t can be constructed", xfer, ALLOCATOR_VALUE_TUP
 			}
 		}
 
-		WHEN("basic_memory_t is default-constructed, and then assigned a pointer")
+		WHEN("basic_memory_t is constructed with a pointer")
 		{
-			memory_t memory;
-			memory = storage.data();
+			memory_t memory{storage.data()};
 
 			THEN("it evaluates to our known values")
 			{	
@@ -292,10 +291,10 @@ SCENARIO_TEMPLATE("basic_memory_t can be constructed", xfer, ALLOCATOR_VALUE_TUP
 
 			THEN("it evaluates to our known values")
 			{
-				CHECK(memory[0] == xferti::compar0);
-				CHECK(memory[1] == xferti::compar1);
-				CHECK(memory[2] == xferti::compar2);
-				CHECK(memory[3] == xferti::compar3);
+				CHECK(memory.data()[0] == xferti::compar0);
+				CHECK(memory.data()[1] == xferti::compar1);
+				CHECK(memory.data()[2] == xferti::compar2);
+				CHECK(memory.data()[3] == xferti::compar3);
 			}
 		}
 
@@ -308,7 +307,7 @@ SCENARIO_TEMPLATE("basic_memory_t can be constructed", xfer, ALLOCATOR_VALUE_TUP
 			THEN("the pointers of both basic_memory_ts equal each other")
 			{
 				// test via conversion to pointer
-				CHECK((value_type*)m2 == ((value_type*)m1 + 2));
+				CHECK(m2.data() == (m1.data() + 2));
 				// test equality operator of memory
 				CHECK(m2 == (m1 + 2));
 			}

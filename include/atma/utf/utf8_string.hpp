@@ -1281,7 +1281,7 @@ namespace atma
 	inline auto utf8_charseq_idx_to_byte_idx(char const* seq, size_t sz, size_t char_idx) -> size_t
 	{
 		ATMA_ASSERT(seq);
-		ATMA_ASSERT(utf8_byte_is_leading((byte)*seq));
+		ATMA_ASSERT((sz == 0 && char_idx == 0) || utf8_byte_is_leading((byte)*seq));
 
 		size_t r = 0;
 		char const* i = seq;

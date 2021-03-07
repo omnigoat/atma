@@ -14,15 +14,40 @@
 #include <memory>
 
 
+
+
+// thoughts on memory things
+//
+//  a structure that combines an allocator & a pointer
+//    - after a lot of back-and-forth, I have come to the conclusion
+//      that this structure is too low-level for any reasonable
+//      abstraction. the moment we start adding operators etc., we
+//      begin to approach the more complex structures that were
+//      using this structure internally
+//
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // forward-declares
 namespace atma
 {
-	constexpr struct memory_allocate_copy_tag {} memory_allocate_copy;
-	constexpr struct memory_take_ownership_tag {} memory_take_ownership;
-
 	struct dest_memory_tag_t;
 	struct src_memory_tag_t;
 	constexpr size_t unbounded_memory_size = ~size_t();
+
+	constexpr struct allocate_n_tag {} allocate_n;
 
 	template <typename Tag, typename T, typename A = std::allocator<T>>
 	struct memxfer_t;
@@ -46,16 +71,18 @@ namespace atma::detail
 		using allocator_type = Allocator;
 		using allocator_traits = std::allocator_traits<allocator_type>;
 
-		base_memory_tx() noexcept(std::is_nothrow_default_constructible_v<allocator_type>)
+		base_memory_tx() = default;
+		base_memory_tx(base_memory_tx const&) = default;
+
+		base_memory_tx(Allocator const& allocator)
+			noexcept(std::is_nothrow_copy_constructible_v<allocator_type>)
+			: allocator_(allocator)
 		{}
 
 		template <typename U>
 		base_memory_tx(base_memory_tx<U> const& rhs)
+			noexcept(noexcept(Allocator(rhs.get_allocator())))
 			: allocator_(rhs.get_allocator())
-		{}
-
-		base_memory_tx(Allocator const& allocator)
-			: allocator_(allocator)
 		{}
 
 		auto get_allocator() const -> allocator_type { return allocator_; }
@@ -71,16 +98,17 @@ namespace atma::detail
 		using allocator_type = Allocator;
 		using allocator_traits = std::allocator_traits<allocator_type>;
 
-		base_memory_tx() noexcept(std::is_nothrow_default_constructible_v<allocator_type>)
+		base_memory_tx() = default;
+		base_memory_tx(base_memory_tx const&) = default;
+
+		base_memory_tx(Allocator const& allocator)
+			: Allocator(allocator)
 		{}
 
 		template <typename U>
 		base_memory_tx(base_memory_tx<U> const& rhs)
+			noexcept(noexcept(Allocator(rhs.get_allocator())))
 			: Allocator(rhs.get_allocator())
-		{}
-
-		base_memory_tx(Allocator const& allocator)
-			: Allocator(allocator)
 		{}
 
 		auto get_allocator() const -> allocator_type { return static_cast<allocator_type const&>(*this); }
@@ -126,33 +154,25 @@ namespace atma
 		using const_pointer    = typename allocator_traits::const_pointer;
 		using reference        = typename allocator_traits::value_type&;
 
-		basic_memory_t() = default;
-		explicit basic_memory_t(allocator_type const&);
-		explicit basic_memory_t(pointer, allocator_type const& = allocator_type());
-		basic_memory_t(memory_allocate_copy_tag, const_pointer, size_t size, allocator_type const& = allocator_type());
-		explicit basic_memory_t(size_t capacity, allocator_type const& = allocator_type());
-		template <typename B> basic_memory_t(basic_memory_t<T, B> const&);
+		// inherit constructors
+		using base_type::base_type;
 
-		auto operator = (basic_memory_t const&) -> basic_memory_t& = default;
-		auto operator = (pointer) -> basic_memory_t&;
-		template <typename B> auto operator = (basic_memory_t<T, B> const&) -> basic_memory_t&;
-
-		operator bool() const { return ptr_ != nullptr; }
-		operator pointer() const { return ptr_; }
-		operator const_pointer() const { return ptr_; }
-
-		auto operator *  () const -> reference;
-		auto operator [] (intptr) const -> reference;
-		auto operator -> () const -> pointer;
-
-		auto data() const -> pointer { return ptr_; }
+		basic_memory_t(basic_memory_t const&)
+		requires std::allocator_traits<Allocator>::is_always_equal::value
+			= default;
+		
+		explicit basic_memory_t(pointer, allocator_type const& = allocator_type())
+			noexcept(std::is_nothrow_copy_constructible_v<allocator_type>);
 
 		// allocator interface
-		auto allocate(size_t) -> bool;
-		auto deallocate(size_t = 0) -> void;
+		auto self_allocate(size_t) -> bool;
+		auto self_deallocate(size_t = 0) -> void;
 
-	protected:
-		value_type* ptr_ = nullptr;
+		// "data" interface
+		auto data() const { return ptr; }
+		operator pointer() const { return ptr; }
+
+		pointer ptr = nullptr;
 	};
 
 
@@ -168,21 +188,21 @@ namespace atma
 	template <typename T, typename A>
 	inline auto operator == (basic_memory_t<T, A> const& lhs, basic_memory_t<T, A> const& rhs)
 	{
-		return lhs.data() == rhs.data();
+		return lhs.ptr == rhs.ptr;
 	}
 
-
-	// addition
-	template <typename T, typename A, typename D, CONCEPT_MODELS_(integral_concept, D)>
-	inline auto operator + (basic_memory_t<T, A> lhs, D d)
-	{
-		return basic_memory_t<T, A>(lhs.data() + d, lhs.get_allocator());
-	}
-
+	// std::ostream
 	template <typename T, typename A>
 	inline decltype(auto) operator << (std::ostream& stream, basic_memory_t<T, A> const& x)
 	{
-		return stream << "memory{0x" << x.data() << "}";
+		return stream << "memory{0x" << x.ptr << "}";
+	}
+
+	// addition
+	template <typename T, typename A>
+	inline auto operator + (basic_memory_t<T, A> const& lhs, std::integral auto rhs)
+	{
+		return basic_memory_t<T, A>{lhs.ptr + rhs, lhs.get_allocator()};
 	}
 }
 
@@ -194,125 +214,368 @@ namespace atma
 
 
 //
-//  sized_basic_memory_t
-//  ------------------------
+//  unique_memory_t
+//  -----------------
 //
 //
 //
 namespace atma
 {
-	template <typename T, typename Allocator = std::allocator<T>>
-	struct sized_basic_memory_t : basic_memory_t<T, Allocator>
+	template <typename T, typename Alloc>
+	struct basic_unique_memory_t
 	{
-		using base_type = basic_memory_t<T, Allocator>;
+		using value_type = T;
+		using pointer = value_type*;
+		using const_pointer = value_type const*;
+		using allocator_type = Alloc;
+		using backing_t = atma::basic_memory_t<std::remove_cv_t<T>, allocator_type>;
 
-		using allocator_type   = typename base_type::allocator_type;
-		using allocator_traits = typename base_type::allocator_traits;
-		using value_type       = typename allocator_traits::value_type;
-		using pointer          = typename allocator_traits::pointer;
-		using const_pointer    = typename allocator_traits::const_pointer;
-		using reference        = typename allocator_traits::value_type&;
+		basic_unique_memory_t() noexcept = default;
+		basic_unique_memory_t(basic_unique_memory_t const&) = delete;
+		basic_unique_memory_t(basic_unique_memory_t&&);
+		~basic_unique_memory_t();
 
-		using base_type::base_type;
-	
-		sized_basic_memory_t() = default;
+		// converting constructors
+		explicit basic_unique_memory_t(allocator_type const& alloc)
+			noexcept(noexcept(backing_t(alloc)));
 
-		auto size() const { return size_; }
+		explicit basic_unique_memory_t(pointer data, size_t size, allocator_type const& alloc = allocator_type())
+			noexcept(noexcept(backing_t(data, alloc)));
+
+		// named constructors
+		explicit basic_unique_memory_t(allocate_n_tag, size_t size, allocator_type const& alloc = allocator_type());
+
+
+		auto operator = (basic_unique_memory_t const&) -> basic_unique_memory_t & = delete;
+		template <typename U> auto operator = (basic_unique_memory_t<T, U>&&) -> basic_unique_memory_t&;
+
+		auto empty() const -> bool;
+		auto size() const -> size_t;
+
+		auto count() const -> size_t;
+
+		auto begin() const -> value_type const*;
+		auto end() const -> value_type const*;
+		auto begin() -> value_type*;
+		auto end() -> value_type*;
+
+		auto reset(void* mem, size_t size) -> void;
+		auto reset(size_t) -> void;
+
+		auto swap(basic_unique_memory_t&) -> void;
+
+		auto detach_memory() -> backing_t;
+
+		auto memory_operations() -> backing_t& { return memory_; }
 
 	private:
+		//static constexpr struct unique_memory_allocate_copy_tag copy_tag;
+		//static constexpr struct unique_memory_take_ownership_tag own_tag;
+		//
+		//basic_unique_memory_t(unique_memory_allocate_copy_tag, void const* data, size_t size_bytes);
+		//basic_unique_memory_t(unique_memory_take_ownership_tag, void* data, size_t size_bytes);
+
+	private:
+		backing_t memory_;
 		size_t size_ = 0;
+
+		template <typename, typename> friend struct basic_unique_memory_t;
 	};
 }
 
 namespace atma
 {
-	template <typename T, typename A>
-	inline basic_memory_t<T, A>::basic_memory_t(allocator_type const& allocator)
-		: base_type(allocator)
-	{}
+	using unique_memory_t = basic_unique_memory_t<byte, atma::aligned_allocator_t<byte, 4>>;
 
+	template <typename T>
+	using typed_unique_memory_t = basic_unique_memory_t<T, atma::aligned_allocator_t<byte, 4>>;
+}
+
+
+
+
+
+
+//
+// basic_memory_t implementation
+//
+namespace atma
+{
 	template <typename T, typename A>
 	inline basic_memory_t<T, A>::basic_memory_t(pointer data, allocator_type const& alloc)
+		noexcept(std::is_nothrow_copy_constructible_v<allocator_type>)
 		: base_type(alloc)
-		, ptr_(data)
+		, ptr(data)
 	{}
 
+#if 0
 	template <typename T, typename A>
 	template <typename B>
 	inline basic_memory_t<T, A>::basic_memory_t(basic_memory_t<T, B> const& rhs)
 		: detail::base_memory_t<T, A>(rhs.get_allocator())
-		, ptr_(rhs.ptr_)
+		, data(rhs.data)
 	{}
 
 	template <typename T, typename A>
-	inline auto basic_memory_t<T, A>::operator = (pointer rhs) -> basic_memory_t &
+	inline auto basic_memory_t<T, A>::operator = (pointer rhs) -> basic_memory_t&
 	{
-		ptr_ = rhs;
+		data = rhs;
 		return *this;
 	}
 
 	template <typename T, typename A>
 	template <typename B>
-	inline auto basic_memory_t<T, A>::operator = (basic_memory_t<T, B> const& rhs) -> basic_memory_t &
+	inline auto basic_memory_t<T, A>::operator = (basic_memory_t<T, B> const& rhs) -> basic_memory_t&
 	{
-		ptr_ = rhs.ptr_;
+		data = rhs.data;
 		this->get_allocator() = rhs.get_allocator();
 		return *this;
 	}
+#endif
 
+#if 0
 	template <typename T, typename A>
 	inline auto basic_memory_t<T, A>::operator *  () const -> reference
 	{
-		return *ptr_;
+		return *data;
 	}
 
 	template <typename T, typename A>
 	inline auto basic_memory_t<T, A>::operator [] (intptr idx) const -> reference
 	{
-		return ptr_[idx];
+		return data[idx];
 	}
 
 	template <typename T, typename A>
 	inline auto basic_memory_t<T, A>::operator -> () const -> pointer
 	{
-		return ptr_;
+		return data;
 	}
+#endif
 }
 
 
 namespace atma
 {
+#if 0
 	template <typename T, typename A>
 	inline basic_memory_t<T, A>::basic_memory_t(memory_allocate_copy_tag, const_pointer data, size_t size, allocator_type const& alloc)
 		: base_type(alloc)
 	{
 		allocate(size);
-		std::memcpy(this->ptr_, data, size * sizeof(value_type));
+		std::memcpy(this->data, data, size * sizeof(value_type));
 	}
+#endif // 0
 
+
+#if 0
 	template <typename T, typename A>
 	inline basic_memory_t<T, A>::basic_memory_t(size_t capacity, allocator_type const& alloc)
 		: base_type(alloc)
 	{
 		allocate(capacity);
 	}
+#endif // 0
 
 	template <typename T, typename A>
-	inline auto basic_memory_t<T, A>::allocate(size_t size) -> bool
+	inline auto basic_memory_t<T, A>::self_allocate(size_t size) -> bool
 	{
 		auto allocator = this->get_allocator();
-		this->ptr_= allocator_traits::allocate(allocator, size);
-		return this->ptr_ != nullptr;
+		this->ptr = allocator_traits::allocate(allocator, size);
+		return this->ptr != nullptr;
 	}
 
 	template <typename T, typename A>
-	inline auto basic_memory_t<T, A>::deallocate(size_t size) -> void
+	inline auto basic_memory_t<T, A>::self_deallocate(size_t size) -> void
 	{
 		auto allocator = this->get_allocator();
-		allocator_traits::deallocate(allocator, this->ptr_, size);
+		allocator_traits::deallocate(allocator, this->ptr, size);
 	}
 
 }
+
+
+
+
+
+
+
+
+
+
+namespace atma
+{
+	template <typename T, typename A>
+	inline basic_unique_memory_t<T, A>::basic_unique_memory_t(allocator_type const& alloc)
+		noexcept(noexcept(backing_t(alloc)))
+		: memory_(alloc)
+	{}
+
+	template <typename T, typename A>
+	inline basic_unique_memory_t<T, A>::basic_unique_memory_t(basic_unique_memory_t&& rhs)
+		: memory_{rhs.memory_}
+		, size_{rhs.size_}
+	{
+		rhs.memory_.ptr = nullptr;
+		rhs.size_ = 0;
+	}
+
+	template <typename T, typename A>
+	inline basic_unique_memory_t<T, A>::~basic_unique_memory_t()
+	{
+		memory_.self_deallocate(size_);
+	}
+
+	template <typename T, typename A>
+	inline basic_unique_memory_t<T, A>::basic_unique_memory_t(pointer data, size_t size, allocator_type const& alloc)
+		noexcept(noexcept(backing_t(data, alloc)))
+		: memory_(data, alloc)
+		, size_(size)
+	{}
+
+	template <typename T, typename A>
+	inline basic_unique_memory_t<T, A>::basic_unique_memory_t(allocate_n_tag, size_t size, allocator_type const& alloc)
+		: memory_(alloc)
+		, size_(size)
+	{
+		if (size_ > 0)
+		{
+			memory_.self_allocate(size_);
+		}
+	}
+
+	template <typename T, typename A>
+	template <typename U>
+	inline auto basic_unique_memory_t<T, A>::operator = (basic_unique_memory_t<T, U>&& rhs) -> basic_unique_memory_t&
+	{
+		this->~basic_unique_memory_t();
+		memory_ = rhs.memory_;
+		size_ = rhs.size_;
+		rhs.memory_ = nullptr;
+		return *this;
+	}
+
+	template <typename T, typename A>
+	inline auto basic_unique_memory_t<T, A>::empty() const -> bool
+	{
+		return size() == 0;
+	}
+
+	template <typename T, typename A>
+	inline auto basic_unique_memory_t<T, A>::size() const -> size_t
+	{
+		return size_;
+	}
+
+	template <typename T, typename A>
+	inline auto basic_unique_memory_t<T, A>::count() const -> size_t
+	{
+		return size_ / sizeof(T);
+	}
+
+	template <typename T, typename A>
+	inline auto basic_unique_memory_t<T, A>::begin() const -> value_type const*
+	{
+		return memory_.ptr;
+	}
+
+	template <typename T, typename A>
+	inline auto basic_unique_memory_t<T, A>::end() const -> value_type const*
+	{
+		return memory_.ptr + size_;
+	}
+
+	template <typename T, typename A>
+	inline auto basic_unique_memory_t<T, A>::begin() -> value_type*
+	{
+		return memory_.ptr;
+	}
+
+	template <typename T, typename A>
+	inline auto basic_unique_memory_t<T, A>::end() -> value_type*
+	{
+		return memory_.ptr + size_;
+	}
+
+	template <typename T, typename A>
+	inline auto basic_unique_memory_t<T, A>::reset(void* mem, size_t size) -> void
+	{
+		memory_.self_deallocate(size_);
+		memory_.self_allocate(size);
+		memory_.memcpy(0, mem, size);
+		size_ = size;
+	}
+
+	template <typename T, typename A>
+	inline auto basic_unique_memory_t<T, A>::reset(size_t size) -> void
+	{
+		if (size != size_)
+		{
+			memory_.self_deallocate(size_);
+			memory_.self_allocate(size);
+			size_ = size;
+		}
+	}
+
+	template <typename T, typename A>
+	inline auto basic_unique_memory_t<T, A>::swap(basic_unique_memory_t& rhs) -> void
+	{
+		auto tmp = std::move(*this);
+		*this = std::move(rhs);
+		rhs = std::move(tmp);
+	}
+
+	template <typename T, typename A>
+	inline auto basic_unique_memory_t<T, A>::detach_memory() -> backing_t
+	{
+		auto tmp = memory_;
+		memory_.ptr = nullptr;
+		return tmp;
+	}
+
+	template <typename E>
+	struct memory_view_t
+	{
+		template <typename T>
+		memory_view_t(T&& c, size_t offset, size_t size)
+			: begin_{reinterpret_cast<E*>(c.begin() + offset)}
+			, end_{reinterpret_cast<E*>(c.begin() + offset + size)}
+		{}
+
+		template <typename T>
+		memory_view_t(T&& c)
+			: memory_view_t(c, 0, c.size())
+		{}
+
+		memory_view_t(E* begin, E* end)
+			: begin_(begin)
+			, end_(end)
+		{}
+
+		auto size() const -> size_t { return end_ - begin_; }
+		auto begin() const -> E* { return begin_; }
+		auto end() const -> E* { return end_; }
+
+		auto operator [](size_t idx) const -> E&
+		{
+			return begin_[idx];
+		}
+
+	private:
+		E* begin_;
+		E* end_;
+	};
+
+	template <typename R>
+	memory_view_t(R&& range) -> memory_view_t<typename std::remove_reference_t<R>::value_type>;
+}
+
+
+
+
+
+
+
 
 // get_allocator
 namespace atma
@@ -1167,4 +1430,4 @@ namespace atma
 				std::size(src));
 		},
 	};
-	}
+}
