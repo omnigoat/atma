@@ -2,17 +2,6 @@
 
 #include <type_traits>
 
-#define LAMBDA_REQUIRES(...) \
-	-> std::enable_if_t<::atma::concepts::detail::all_true_v<__VA_ARGS__>, void>
-
-#define RETURN_TYPE_IF(type, ...) \
-	std::enable_if_t<::atma::concepts::detail::all_true_v<__VA_ARGS__>, type>
-
-#define RETURN_TYPEN_IF(type, ...) \
-	std::enable_if_t<::atma::concepts::detail::all_true_v<__VA_ARGS__>, BOOST_PP_EXPAND##type>
-
-
-
 // functor-call
 namespace atma
 {
@@ -24,36 +13,30 @@ namespace atma
 
 namespace atma::detail
 {
-	template <typename Fwd, typename F, typename... Fs>
+	template <typename Fwd, typename Gs, typename F>
 	struct functor_call_;
 
 	template <typename F, typename... Fs>
-	struct functor_call_<functor_call_no_fwds_t, F, Fs...>
+	struct functor_call_<functor_call_no_fwds_t, meta::list<Fs...>, F>
 	{
 		static_assert(std::is_empty_v<F>, "functor must be empty");
 
 		template <typename... Args, typename = std::enable_if_t<(!std::is_invocable_v<Fs, Args...> && ...)>>
 		constexpr auto operator ()(Args&&... args) const -> std::invoke_result_t<F, Args...>
 		{
-			// don't go through std::invoke because all empty functors should be callable
-			// through operator(), and it helps with debugging
 			return reinterpret_cast<F&>(const_cast<functor_call_&>(*this))(std::forward<Args>(args)...);
 		}
 	};
 
 	template <typename... Fwds, typename F, typename... Fs>
-	struct functor_call_<functor_call_fwds_t<Fwds...>, F, Fs...>
+	struct functor_call_<functor_call_fwds_t<Fwds...>, meta::list<Fs...>, F>
 	{
 		static_assert(std::is_empty_v<F>, "functor must be empty");
 
 		template <typename... Args, typename = std::enable_if_t<(!std::is_invocable_v<Fs, Fwds..., Args...> && ...)>>
 		constexpr auto operator ()(Args&&... args) const -> std::invoke_result_t<F, Fwds..., Args...>
 		{
-			// don't go through std::invoke because all empty functors should be callable
-			// through operator(), and it helps with debugging
-			return reinterpret_cast<F const&>(*this)(
-				reinterpret_cast<Fwds const&>(*this)...,
-				std::forward<Args>(args)...);
+			return reinterpret_cast<F const&>(*this)(reinterpret_cast<Fwds const&>(*this)..., std::forward<Args>(args)...);
 		}
 	};
 }
@@ -64,14 +47,27 @@ namespace atma::detail
 	template <typename, typename, typename>
 	struct functor_list_;
 
-	template <typename Fwd, typename... Gs>
-	struct functor_list_<Fwd, meta::list<Gs...>, meta::list<>>
+	// no functors provided/left
+	template <typename Fwd, typename Unused>
+	struct functor_list_<Fwd, Unused, meta::list<>>
 	{};
 
+	// Fwd: forwards
+	// Gs: a list of "previously seen" functors
+	// F: functor to create the functor-call operator for
+	// Fs: a list of remaining functors to recurse upon
 	template <typename Fwd, typename... Gs, typename F, typename... Fs>
 	struct functor_list_<Fwd, meta::list<Gs...>, meta::list<F, Fs...>>
 		: functor_list_<Fwd, meta::list<Gs..., F>, meta::list<Fs...>>
-		, functor_call_<Fwd, F, Gs...>
+		, functor_call_<Fwd, meta::list<Gs...>, F>
+	{};
+
+	// fwds_are_empty_functors is just a compile-time check to catch this as early as possible
+	template <typename T> struct fwds_are_empty_functors_t : std::true_type {};
+
+	template <typename... Fwds>
+	struct fwds_are_empty_functors_t<functor_call_fwds_t<Fwds...>>
+		: std::bool_constant<(std::is_empty_v<Fwds> && ...)>
 	{};
 }
 
@@ -79,21 +75,20 @@ namespace atma
 {
 	template <typename Fwds, typename... Fs>
 	struct functor_list_t
-		: detail::functor_list_<Fwds, meta::list<>, meta::list<rmref_t<Fs>...>>
+		: detail::functor_list_<Fwds, meta::list<>, meta::list<Fs...>>
 	{
 		constexpr functor_list_t() = default;
 
-		// we don't actually care about the arguments
 		template <typename... Gs>
 		constexpr functor_list_t(Gs&&...)
-		{}
+		{
+			static_assert(detail::fwds_are_empty_functors_t<Fwds>::value, "all forwarded functors must be empty functors");
+		}
 	};
 
 	template <typename... Fwds, typename... Fs>
-	functor_list_t(functor_call_fwds_t<Fwds...>, Fs&&...) -> functor_list_t<functor_call_fwds_t<Fwds...>, Fs...>;
+	functor_list_t(functor_call_fwds_t<Fwds...>, Fs&&...) -> functor_list_t<functor_call_fwds_t<Fwds...>, rmref_t<Fs>...>;
 
 	template <typename... Fs>
-	functor_list_t(Fs&&...) -> functor_list_t<functor_call_no_fwds_t, Fs...>;
+	functor_list_t(Fs&&...) -> functor_list_t<functor_call_no_fwds_t, rmref_t<Fs>...>;
 }
-
-
