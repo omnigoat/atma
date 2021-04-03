@@ -228,16 +228,27 @@ namespace atma
 		template <typename R, typename = std::void_t<>>
 		struct value_type_of_ii
 		{
-			struct nilx_ {};
-
-			using type = nilx_;
+			static_assert(actually_false<R>, "couldn't identify value_type for a supposed range concept");
 		};
 
+		// anything with a ::value_type subtype is that
 		template <typename R>
 		struct value_type_of_ii<R, std::void_t<typename std::remove_reference_t<R>::value_type>>
-		{
-			using type = typename std::remove_reference_t<R>::value_type;
-		};
+			{ using type = typename std::remove_reference_t<R>::value_type; };
+
+		// static arrays are obvious
+		template <typename R, size_t N>
+		struct value_type_of_ii<R[N], std::void_t<>>
+			{ using type = R; };
+
+		// pointers are their pointed-to-type
+		template <typename R>
+		struct value_type_of_ii<R*, std::void_t<>>
+			{ using type = R; };
+
+		template <typename R>
+		struct value_type_of_ii<R* const, std::void_t<>>
+			{ using type = R; };
 
 		// value_type_of
 		template <typename R, typename = std::void_t<>>

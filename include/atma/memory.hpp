@@ -16,15 +16,21 @@
 
 
 
+//
 // thoughts on memory things
 //
 //  a structure that combines an allocator & a pointer
-//    - after a lot of back-and-forth, I have come to the conclusion
-//      that this structure is too low-level for any reasonable
-//      abstraction. the moment we start adding operators etc., we
-//      begin to approach the more complex structures that were
-//      using this structure internally
+// 
+//  after a lot of back-and-forth, I have come to the conclusion
+//  that this structure is too low-level for any reasonable
+//  abstraction. the moment we start adding operators etc., we
+//  begin to approach the more complex structures that were
+//  using this structure internally
 //
+//  some basic operators are provided to prevent the loss of
+//  the allocator information
+//
+
 
 
 
@@ -191,18 +197,18 @@ namespace atma
 		return lhs.ptr == rhs.ptr;
 	}
 
-	// std::ostream
-	template <typename T, typename A>
-	inline decltype(auto) operator << (std::ostream& stream, basic_memory_t<T, A> const& x)
-	{
-		return stream << "memory{0x" << x.ptr << "}";
-	}
-
 	// addition
 	template <typename T, typename A>
 	inline auto operator + (basic_memory_t<T, A> const& lhs, std::integral auto rhs)
 	{
 		return basic_memory_t<T, A>{lhs.ptr + rhs, lhs.get_allocator()};
+	}
+
+	// std::ostream
+	template <typename T, typename A>
+	inline decltype(auto) operator << (std::ostream& stream, basic_memory_t<T, A> const& x)
+	{
+		return stream << "memory{0x" << x.ptr << "}";
 	}
 }
 
@@ -308,75 +314,6 @@ namespace atma
 		, ptr(data)
 	{}
 
-#if 0
-	template <typename T, typename A>
-	template <typename B>
-	inline basic_memory_t<T, A>::basic_memory_t(basic_memory_t<T, B> const& rhs)
-		: detail::base_memory_t<T, A>(rhs.get_allocator())
-		, data(rhs.data)
-	{}
-
-	template <typename T, typename A>
-	inline auto basic_memory_t<T, A>::operator = (pointer rhs) -> basic_memory_t&
-	{
-		data = rhs;
-		return *this;
-	}
-
-	template <typename T, typename A>
-	template <typename B>
-	inline auto basic_memory_t<T, A>::operator = (basic_memory_t<T, B> const& rhs) -> basic_memory_t&
-	{
-		data = rhs.data;
-		this->get_allocator() = rhs.get_allocator();
-		return *this;
-	}
-#endif
-
-#if 0
-	template <typename T, typename A>
-	inline auto basic_memory_t<T, A>::operator *  () const -> reference
-	{
-		return *data;
-	}
-
-	template <typename T, typename A>
-	inline auto basic_memory_t<T, A>::operator [] (intptr idx) const -> reference
-	{
-		return data[idx];
-	}
-
-	template <typename T, typename A>
-	inline auto basic_memory_t<T, A>::operator -> () const -> pointer
-	{
-		return data;
-	}
-#endif
-}
-
-
-namespace atma
-{
-#if 0
-	template <typename T, typename A>
-	inline basic_memory_t<T, A>::basic_memory_t(memory_allocate_copy_tag, const_pointer data, size_t size, allocator_type const& alloc)
-		: base_type(alloc)
-	{
-		allocate(size);
-		std::memcpy(this->data, data, size * sizeof(value_type));
-	}
-#endif // 0
-
-
-#if 0
-	template <typename T, typename A>
-	inline basic_memory_t<T, A>::basic_memory_t(size_t capacity, allocator_type const& alloc)
-		: base_type(alloc)
-	{
-		allocate(capacity);
-	}
-#endif // 0
-
 	template <typename T, typename A>
 	inline auto basic_memory_t<T, A>::self_allocate(size_t size) -> bool
 	{
@@ -391,18 +328,14 @@ namespace atma
 		auto allocator = this->get_allocator();
 		allocator_traits::deallocate(allocator, this->ptr, size);
 	}
-
 }
 
 
 
 
-
-
-
-
-
-
+//
+// basic_unique_memory_t implementation
+//
 namespace atma
 {
 	template <typename T, typename A>
