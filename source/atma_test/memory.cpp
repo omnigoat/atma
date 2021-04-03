@@ -329,6 +329,8 @@ SCENARIO_TEMPLATE("a (dest|src)_memxfer_t is directly constructed", xfer, XFER_T
 	using memxfer_type   = typename xfer::memxfer_t;
 	using storage_type   = atma::vector<value_type, allocator_type>;
 
+	//atma::get_allocator(4);
+
 	GIVEN("storage of four value-initialized elements")
 	{
 		auto storage = storage_type(4);
