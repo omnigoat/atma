@@ -2,15 +2,22 @@
 
 #include <atma/rope.hpp>
 
-SCENARIO("rope can be constructed")
+#include <iostream>
+
+
+SCENARIO("rope can be constructed" * doctest::skip())
 {
 	GIVEN("")
 	{
 		THEN("")
 		{
 			atma::rope_t rope;
-			rope.push_back("abcde", 5);
+			rope.push_back("ab", 2);
+			rope.push_back("cd", 2);
+			rope.insert(3, "xy", 2);
 			rope.insert(2, "fg", 2);
+
+			std::cout << rope << std::endl;
 		}
 	}
 }
