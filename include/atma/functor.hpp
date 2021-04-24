@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits>
+#include <tuple>
 
 // functor-call
 namespace atma
@@ -17,7 +18,7 @@ namespace atma::detail
 	struct functor_call_;
 
 	template <typename F, typename... Fs>
-	struct functor_call_<functor_call_no_fwds_t, meta::list<Fs...>, F>
+	struct functor_call_<functor_call_no_fwds_t, std::tuple<Fs...>, F>
 	{
 		static_assert(std::is_empty_v<F>, "functor must be empty");
 
@@ -29,7 +30,7 @@ namespace atma::detail
 	};
 
 	template <typename... Fwds, typename F, typename... Fs>
-	struct functor_call_<functor_call_fwds_t<Fwds...>, meta::list<Fs...>, F>
+	struct functor_call_<functor_call_fwds_t<Fwds...>, std::tuple<Fs...>, F>
 	{
 		static_assert(std::is_empty_v<F>, "functor must be empty");
 
@@ -49,7 +50,7 @@ namespace atma::detail
 
 	// no functors provided/left
 	template <typename Fwd, typename Unused>
-	struct functor_list_<Fwd, Unused, meta::list<>>
+	struct functor_list_<Fwd, Unused, std::tuple<>>
 	{};
 
 	// Fwd: forwards
@@ -57,9 +58,9 @@ namespace atma::detail
 	// F: functor to create the functor-call operator for
 	// Fs: a list of remaining functors to recurse upon
 	template <typename Fwd, typename... Gs, typename F, typename... Fs>
-	struct functor_list_<Fwd, meta::list<Gs...>, meta::list<F, Fs...>>
-		: functor_list_<Fwd, meta::list<Gs..., F>, meta::list<Fs...>>
-		, functor_call_<Fwd, meta::list<Gs...>, F>
+	struct functor_list_<Fwd, std::tuple<Gs...>, std::tuple<F, Fs...>>
+		: functor_list_<Fwd, std::tuple<Gs..., F>, std::tuple<Fs...>>
+		, functor_call_<Fwd, std::tuple<Gs...>, F>
 	{};
 
 	// fwds_are_empty_functors is just a compile-time check to catch this as early as possible
@@ -75,15 +76,15 @@ namespace atma
 {
 	template <typename Fwds, typename... Fs>
 	struct functor_list_t
-		: detail::functor_list_<Fwds, meta::list<>, meta::list<Fs...>>
+		: detail::functor_list_<Fwds, std::tuple<>, std::tuple<Fs...>>
 	{
+		static_assert(detail::fwds_are_empty_functors_t<Fwds>::value, "all forwarded functors must be empty functors");
+
 		constexpr functor_list_t() = default;
 
 		template <typename... Gs>
 		constexpr functor_list_t(Gs&&...)
-		{
-			static_assert(detail::fwds_are_empty_functors_t<Fwds>::value, "all forwarded functors must be empty functors");
-		}
+		{}
 	};
 
 	template <typename... Fwds, typename... Fs>
