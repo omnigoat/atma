@@ -1054,8 +1054,7 @@ namespace atma::detail
 	{
 		functor_call_fwds_t<F>(),
 
-		[](auto& f, auto&& dest, auto&& src, size_t sz)
-		requires MEMORY_TYPES(dest_memory_concept, src_memory_concept)
+		[](auto& f, dest_memory_concept auto&& dest, src_memory_concept auto&& src, size_t sz)
 		{
 			constexpr bool dest_is_bounded = bounded_memory_concept<decltype(dest)>;
 			constexpr bool src_is_bounded = bounded_memory_concept<decltype(src)>;
@@ -1077,8 +1076,7 @@ namespace atma::detail
 				sz);
 		},
 
-		[](auto& f, auto&& dest, auto&& src)
-		requires MEMORY_TYPES(dest_bounded_memory_concept, src_bounded_memory_concept)
+		[](auto& f, dest_bounded_memory_concept auto&& dest, src_bounded_memory_concept auto&& src)
 		{
 			ATMA_ASSERT(std::size(dest) == std::size(src));
 
@@ -1088,8 +1086,7 @@ namespace atma::detail
 				std::size(dest));
 		},
 
-		[](auto& f, auto&& dest, auto&& src)
-		requires MEMORY_TYPES(dest_bounded_memory_concept, src_memory_concept)
+		[](auto& f, dest_bounded_memory_concept auto&& dest, src_memory_concept auto&& src)
 		{
 			f(get_allocator(dest),
 				std::data(dest),
@@ -1097,8 +1094,7 @@ namespace atma::detail
 				std::size(dest));
 		},
 
-		[](auto& f, auto&& dest, auto&& src)
-		requires MEMORY_TYPES(dest_memory_concept, src_bounded_memory_concept)
+		[](auto& f, dest_memory_concept auto&& dest, src_bounded_memory_concept auto&& src)
 		{
 			f(get_allocator(dest),
 				std::data(dest),
@@ -1106,8 +1102,7 @@ namespace atma::detail
 				std::size(src));
 		},
 
-		[](auto&& dest, auto&& src)
-		requires MEMORY_TYPES(dest_memory_concept, std::ranges::contiguous_range)
+		[](dest_memory_concept auto&& dest, std::ranges::contiguous_range auto&& src)
 		{
 			auto const sz = std::distance(std::begin(src), std::end(src));
 
@@ -1117,8 +1112,7 @@ namespace atma::detail
 				sz);
 		},
 
-		[](auto& f, auto&& dest, auto&& src)
-		requires MEMORY_TYPES(std::ranges::sized_range, std::ranges::sized_range)
+		[](auto& f, std::ranges::sized_range auto&& dest, std::ranges::sized_range auto&& src)
 		{
 			using allocator_type = decltype(detail::allocator_type_of_range_(dest));
 
@@ -1128,10 +1122,8 @@ namespace atma::detail
 				std::size(src));
 		},
 		
-		[](auto& f, auto&& dest, auto begin, auto end)
-		requires dest_memory_concept<decltype(dest)> &&
-			std::input_iterator<decltype(begin)> &&
-			std::equality_comparable_with<decltype(begin), decltype(end)>
+		[](auto& f, dest_memory_concept auto&& dest, std::input_iterator auto begin, auto end)
+		requires std::equality_comparable_with<decltype(begin), decltype(end)>
 		{
 			f(get_allocator(dest),
 				std::data(dest),
