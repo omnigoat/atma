@@ -700,10 +700,10 @@ namespace atma::detail
 
 			if (this->replaceable(idx + 1))
 			{
-				auto sn = rope_node_ptr::make(rope_node_internal_t(
+				auto sn = rope_make_internal_ptr(
 					xfer_src(children_, idx),
 					l_info, r_info,
-					xfer_src(children_, idx + 2, rope_branching_factor - 2)));
+					xfer_src(children_, idx + 2, rope_branching_factor - 2));
 
 				return rope_edit_result_t{
 					rope_node_info_t{l_info + r_info, sn},
@@ -788,7 +788,7 @@ namespace atma::detail
 		bool can_fit_in_chunk = leaf_info.bytes + src.size() < detail::rope_buf_edit_max_size;
 
 		// simple append is possible
-		if (buf_is_appendable && byte_idx_is_at_end && can_fit_in_chunk)
+		if (can_fit_in_chunk && byte_idx_is_at_end && buf_is_appendable)
 		{
 			memory::memcpy(
 				xfer_dest(buf + leaf_info.bytes),
@@ -801,7 +801,7 @@ namespace atma::detail
 			return detail::rope_edit_result_t{result_info, {}, has_seam};
 		}
 		// append is wanted, but immutable data is in the way. reallocate & append
-		if (!buf_is_appendable && byte_idx_is_at_end && can_fit_in_chunk)
+		else if (can_fit_in_chunk && byte_idx_is_at_end && !buf_is_appendable)
 		{
 			auto affix_string_info = detail::text_info_t::from_str(src.data(), src.size());
 			auto result_info = leaf_info + affix_string_info;
@@ -811,22 +811,19 @@ namespace atma::detail
 				src);
 
 			return detail::rope_edit_result_t(result_info, {}, has_seam);
+		}
+		// we can fit everything into one chunk, but we are inserting into the middle
+		else if (can_fit_in_chunk && !byte_idx_is_at_end)
+		{
+			auto affix_string_info = detail::text_info_t::from_str(src.data(), src.size());
+			auto result_info = leaf_info + affix_string_info;
 
-#if 0
-			// append is not possible, but the total new size is under
-			// the minimum splittable size. like, we don't want two characters
-			// here, two there. allocate one new leaf and insert it all
-			else
-			{
-				result_info = leaf_info + affix_string_info;
-				result_info.node = detail::rope_make_leaf_ptr(
-					xfer_src(buf, byte_idx),
-					src,
-					xfer_src(buf + byte_idx, buf_size - byte_idx));
+			result_info.node = detail::rope_make_leaf_ptr(
+				xfer_src(buf, byte_idx),
+				src,
+				xfer_src(buf + byte_idx, buf_size - byte_idx));
 
-				return detail::rope_edit_result_t{result_info, {}, has_seam};
-			}
-#endif
+			return detail::rope_edit_result_t(result_info, {}, has_seam);
 		}
 
 		// splitting is required
@@ -883,7 +880,7 @@ namespace atma
 			(detail::text_info_t&)root_ = lhs_info + *rhs_info;
 			if (!lhs_info.node)
 				lhs_info.node = root_.node;
-			root_.node = detail::rope_node_ptr::make(detail::rope_node_internal_t{lhs_info, *rhs_info});
+			root_.node = detail::rope_make_internal_ptr(lhs_info, *rhs_info);
 		}
 		else
 		{
