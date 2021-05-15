@@ -749,8 +749,7 @@ namespace atma::detail
 	struct xfer_make_from_sized_contiguous_range_
 	{
 		template <typename R>
-		requires std::ranges::sized_range<R> &&
-		         std::ranges::contiguous_range<R>
+		requires std::ranges::sized_range<R> && std::ranges::contiguous_range<R>
 		auto operator ()(R&& range) -> bounded_memxfer_range_of_t<tag_type, rmref_t<R>>
 		{
 			return {get_allocator(range), std::addressof(*std::begin(range)), std::size(range)};
@@ -760,8 +759,7 @@ namespace atma::detail
 	template <typename tag_type>
 	struct xfer_make_from_contiguous_range_
 	{
-		template <typename R>
-		requires std::ranges::contiguous_range<R>
+		template <std::ranges::contiguous_range R>
 		auto operator ()(R&& range) -> bounded_memxfer_range_of_t<tag_type, rmref_t<R>>
 		{
 			auto const sz = std::distance(std::begin(range), std::end(range));
@@ -769,15 +767,13 @@ namespace atma::detail
 			return {get_allocator(range), std::addressof(*std::begin(range)), sz};
 		}
 
-		template <typename R>
-		requires std::ranges::contiguous_range<R>
+		template <std::ranges::contiguous_range R>
 		auto operator ()(R&& range, size_t size) -> bounded_memxfer_range_of_t<tag_type, rmref_t<R>>
 		{
 			return {get_allocator(range), std::addressof(*std::begin(range)), size};
 		}
 
-		template <typename R>
-		requires std::ranges::contiguous_range<R>
+		template <std::ranges::contiguous_range R>
 		auto operator ()(R&& range, size_t offset, size_t size) -> bounded_memxfer_range_of_t<tag_type, rmref_t<R>>
 		{
 			return {get_allocator(range), std::addressof(*std::begin(range)) + offset, size};
@@ -787,15 +783,13 @@ namespace atma::detail
 	template <typename tag_type>
 	struct xfer_make_from_memory_
 	{
-		template <typename M>
-		requires memory_concept<M>
+		template <memory_concept M>
 		auto operator ()(M&& memory) -> memxfer_range_of_t<tag_type, rmref_t<M>>
 		{
 			return {get_allocator(memory), std::data(memory)};
 		}
 
-		template <typename M>
-		requires memory_concept<M>
+		template <memory_concept M>
 		auto operator ()(M&& memory, size_t size) -> bounded_memxfer_range_of_t<tag_type, rmref_t<M>>
 		{
 			return {get_allocator(memory), std::data(memory), size};
@@ -805,8 +799,7 @@ namespace atma::detail
 	template <typename Tag>
 	struct xfer_make_from_iterator_pair_
 	{
-		template <typename It>
-		requires std::contiguous_iterator<It>
+		template <std::contiguous_iterator It>
 		auto operator ()(It begin, It end)
 			-> bounded_memxfer_t
 			< Tag
@@ -883,8 +876,7 @@ namespace atma::detail
 // memory_construct_at
 namespace atma
 {
-	constexpr auto memory_construct_at = [](auto&& dest, auto&&... args)
-	requires memory_concept<decltype(dest)>
+	constexpr auto memory_construct_at = [](memory_concept auto&& dest, auto&&... args)
 	{
 		decltype(auto) allocator = get_allocator(dest);
 		using allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
@@ -917,14 +909,12 @@ namespace atma::detail
 	{
 		functor_call_fwds_t<F>{},
 
-		[](auto& f, auto&& dest)
-		requires dest_bounded_memory_concept<decltype(dest)>
+		[](auto& f, dest_bounded_memory_concept auto&& dest)
 		{
 			f(get_allocator(dest), std::data(dest), std::size(dest));
 		},
 
-		[](auto& f, auto&& dest, size_t sz)
-		requires dest_memory_concept<decltype(dest)>
+		[](auto& f, dest_memory_concept auto&& dest, size_t sz)
 		{
 			f(get_allocator(dest), std::data(dest), sz);
 		}
