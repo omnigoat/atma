@@ -52,7 +52,7 @@ struct xfer_maker
 	using value_type = Value;
 
 	using memxfer_t = atma::memxfer_t<Tag, Value, Allocator<Value>>;
-	using bounded_memxfer_t = atma::bounded_memxfer_t<Tag, Value, Allocator<Value>>;
+	using bounded_memxfer_t = atma::bounded_memxfer_t<Tag, Value, std::dynamic_extent, Allocator<Value>>;
 
 	constexpr static auto make = [](auto&&... args)
 	{

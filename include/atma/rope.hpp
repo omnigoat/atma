@@ -790,6 +790,11 @@ namespace atma::detail
 		// simple append is possible
 		if (can_fit_in_chunk && byte_idx_is_at_end && buf_is_appendable)
 		{
+			// what we'd like to write:
+			//    atma::memory_copy(xfer_dest_append(buf + leaf_info.bytes, buf_size), src);
+			//
+			// and buf_size would automatically be updated
+
 			memory::memcpy(
 				xfer_dest(buf + leaf_info.bytes),
 				src);
