@@ -40,6 +40,12 @@ namespace atma
 		>;
 	};
 #endif
+
+	// sized_and_contiguous_range
+	template <typename R>
+	concept sized_and_contiguous_range =
+		std::ranges::sized_range<R> &&
+		std::ranges::contiguous_range<R>;
 }
 
 // span

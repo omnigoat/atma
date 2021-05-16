@@ -586,7 +586,15 @@ namespace atma
 			: alloc_and_ptr_(a, ptr)
 		{}
 
-		~memxfer_t() = default;
+		constexpr memxfer_t(memxfer_t const&) = default;
+
+		constexpr ~memxfer_t() = default;
+
+		// we, a range of const-elements, can always adapt a range of non-const elements
+		constexpr memxfer_t(memxfer_t<Tag, std::remove_const_t<T>, A> const& rhs)
+			requires std::is_const_v<T>
+			: alloc_and_ptr_(rhs.get_allocator(), (T const*)rhs.data())
+		{}
 
 		allocator_type& get_allocator() const { return const_cast<memxfer_t*>(this)->alloc_and_ptr_.first(); }
 
@@ -605,6 +613,15 @@ namespace atma
 	};
 }
 
+namespace atma::detail
+{
+	constexpr size_t count_from_extent(size_t extent, size_t offset, size_t count)
+	{
+		return count != std::dynamic_extent ? count
+			: extent == std::dynamic_extent ? std::dynamic_extent
+			: (extent - offset);
+	}
+}
 
 //
 // bounded_memxfer_t
@@ -615,64 +632,268 @@ namespace atma
 //   it to have empty(), size(), begin(), and end() methods. this allows
 //   us options for optimization in some algorithms
 //
-namespace atma
+namespace atma::detail
 {
-	template <typename Tag, typename T, typename A>
-	struct bounded_memxfer_t : memxfer_t<Tag, T, A>
+	// static-extent version
+	//----------------------------------
+	template <typename Tag, typename T, size_t Extent, typename A>
+	struct bounded_memxfer_impl_t
+		: memxfer_t<Tag, T, A>
 	{
 		using base_type = memxfer_t<Tag, T, A>;
 		using value_type = typename base_type::value_type;
 		using allocator_type = typename base_type::allocator_type;
 		using tag_type = Tag;
 
-		constexpr static size_t dynamic_extent = ~size_t();
+		static constexpr size_t extent_v = Extent;
 
-		bounded_memxfer_t(bounded_memxfer_t const& rhs)
+		// inherit constructors
+		using base_type::base_type;
+
+		// observers
+		auto empty() const -> bool { return extent_v == 0; }
+		auto size() const -> size_t { return extent_v; }
+		auto size_bytes() const -> size_t { return extent_v * sizeof value_type; }
+		auto extent() const -> size_t { return extent_v; }
+	};
+
+	// dynamic-extent version
+	//----------------------------------
+	template <typename Tag, typename T, typename A>
+	struct bounded_memxfer_impl_t<Tag, T, std::dynamic_extent, A>
+		: memxfer_t<Tag, T, A>
+	{
+		using base_type = memxfer_t<Tag, T, A>;
+		using value_type = typename base_type::value_type;
+		using allocator_type = typename base_type::allocator_type;
+		using tag_type = Tag;
+
+		static constexpr size_t extent_v = std::dynamic_extent;
+
+		constexpr bounded_memxfer_impl_t(bounded_memxfer_impl_t const& rhs)
 			: base_type(rhs.get_allocator(), rhs.data())
-			, size_(rhs.size())
+			, extent_(rhs.extent())
 		{}
 
-		// we, a range of const-elements, can always adapt a range of non-const elements
-		bounded_memxfer_t(bounded_memxfer_t<Tag, std::remove_const_t<T>, A> const& rhs)
-		requires std::is_const_v<T>
-			: base_type(rhs.get_allocator(), (T const*)rhs.data())
-			, size_(rhs.size())
+		// adapt a range with a static extent
+		template <size_t RhsExtent>
+		constexpr bounded_memxfer_impl_t(bounded_memxfer_impl_t<Tag, T, RhsExtent, A> const& rhs)
+			requires !std::is_const_v<T>
+			: base_type(rhs.get_allocator(), rhs.data())
+			, extent_(rhs.extent())
 		{}
 
-		constexpr bounded_memxfer_t(allocator_type allocator, T* ptr, size_t size)
+		// adapt a non-const range (if we're a const-range)
+		template <size_t RhsExtent>
+		constexpr bounded_memxfer_impl_t(bounded_memxfer_impl_t<Tag, std::remove_const_t<T>, RhsExtent, A> const& rhs)
+			requires std::is_const_v<T>
+			: base_type(rhs.get_allocator(), (T*)rhs.data())
+			, extent_(rhs.extent())
+		{}
+
+		constexpr bounded_memxfer_impl_t(allocator_type allocator, T* ptr, size_t extent)
+			: base_type(allocator, ptr)
+			, extent_(extent)
+		{}
+
+		constexpr bounded_memxfer_impl_t(T* ptr, size_t extent)
+			requires std::is_empty_v<allocator_type>
+			: base_type(allocator_type(), ptr)
+			, extent_(extent)
+		{}
+
+		// observers
+		constexpr auto empty() const -> bool { return extent_ == 0; }
+		constexpr auto extent() const -> size_t { return extent_; }
+
+		// observers for std::ranges (size == extent)
+		constexpr auto size() const -> size_t { return extent_; }
+		constexpr auto size_bytes() const -> size_t { return extent_ * sizeof value_type; }
+
+	private:
+		// explicitly hide memxfer constructors because we must initialize extent
+		using base_type::base_type;
+
+	private:
+		size_t const extent_ = std::dynamic_extent;
+	};
+}
+
+namespace atma
+{
+	template <typename Tag, typename T, size_t Extent, typename A>
+	struct bounded_memxfer_t
+		: detail::bounded_memxfer_impl_t<Tag, T, Extent, A>
+	{
+		using base_type = detail::bounded_memxfer_impl_t<Tag, T, Extent, A>;
+		using value_type = typename base_type::value_type;
+		using allocator_type = typename base_type::allocator_type;
+		using tag_type = Tag;
+
+		template <size_t Offset, size_t Count>
+		using subspan_type = bounded_memxfer_t<Tag, T, detail::count_from_extent(Extent, Offset, Count), allocator_type>;
+
+		// inherit constructors
+		using base_type::base_type;
+
+		// element access
+		auto begin()       -> value_type* { return this->alloc_and_ptr_.second(); }
+		auto end()         -> value_type* { return this->alloc_and_ptr_.second() + this->extent(); }
+		auto begin() const -> value_type const* { return this->alloc_and_ptr_.second(); }
+		auto end() const   -> value_type const* { return this->alloc_and_ptr_.second() + this->extent(); }
+
+		// compile-time subviews
+		template <size_t Offset, size_t Count = std::dynamic_extent>
+		constexpr auto subspan() const -> subspan_type<Offset, Count>
+		{
+			if constexpr (Count == std::dynamic_extent)
+			{
+				return {this->get_allocator(), this->data() + Offset, Count};
+			}
+			else
+			{
+				return {this->get_allocator(), this->data() + Offset};
+			}
+		}
+
+		template <size_t N> constexpr auto skip() const { return this->subspan<N>(); }
+		template <size_t N> constexpr auto take() const { return this->subspan<0, N>(); }
+
+		// run-time transformations
+		constexpr auto subspan(size_t offset, size_t count = std::dynamic_extent) const
+			-> bounded_memxfer_t<Tag, T, std::dynamic_extent, A>
+		{
+			return {this->get_allocator(), this->data() + offset, detail::count_from_extent(this->extent(), offset, count)};
+		}
+
+		constexpr auto skip(size_t n) const { return this->subspan(n); }
+		constexpr auto take(size_t n) const { return this->subspan(0, n); }
+	};
+}
+
+
+//
+// appendable_memxfer_t
+// --------------------------
+//   a type used for transferring memory around.
+//
+//   is always considered a destination, but will keep bookkeeping
+//   information about how many elements have been written to.
+//
+namespace atma
+{
+	template <typename T, typename A, size_t Extent = std::dynamic_extent>
+	struct appendable_memxfer_t : bounded_memxfer_t<dest_memory_tag_t, T, Extent, A>
+	{
+		using base_type = memxfer_t<dest_memory_tag_t, T, A>;
+		using value_type = typename base_type::value_type;
+		using allocator_type = typename base_type::allocator_type;
+		using tag_type = dest_memory_tag_t;
+
+		appendable_memxfer_t(appendable_memxfer_t const& rhs)
+			: base_type(rhs)
+			, size_(rhs.size_)
+		{}
+
+		constexpr appendable_memxfer_t(allocator_type allocator, T* ptr, size_t size)
 			: base_type(allocator, ptr)
 			, size_(size)
 		{}
 
-		constexpr bounded_memxfer_t(T* ptr, size_t size)
-		requires std::is_empty_v<allocator_type>
+		constexpr appendable_memxfer_t(T* ptr, size_t size)
+			requires std::is_empty_v<allocator_type>
 			: base_type(allocator_type(), ptr)
 			, size_(size)
 		{}
 
+		// iterators
 		auto begin()       -> value_type* { return this->alloc_and_ptr_.second(); }
 		auto end()         -> value_type* { return this->alloc_and_ptr_.second() + size_; }
 		auto begin() const -> value_type const* { return this->alloc_and_ptr_.second(); }
 		auto end() const   -> value_type const* { return this->alloc_and_ptr_.second() + size_; }
 
+		// observers
 		auto empty() const -> bool { return size_ == 0; }
 		auto size() const -> size_t { return size_; }
 		auto size_bytes() const -> size_t { return size_ * sizeof value_type; }
 
-		constexpr auto subspan(size_t offset, size_t count = dynamic_extent) const { 
-			return bounded_memxfer_t(this->get_allocator(), this->data() + offset, (count == dynamic_extent) ? size() - offset : count); }
+		// mutable operators
+		template <typename... Args>
+		auto append_construct(Args&&... args)
+		{
+			ATMA_ASSERT(size_ != extent);
+			new (&this->data()[size_++]) T{std::forward<Args>(args)...};
+		}
+
+		// subviews
+		constexpr auto subspan(size_t offset, size_t count = std::dynamic_extent) const
+		{
+			return appendable_memxfer_t(this->get_allocator(), this->data() + offset, (count == std::dynamic_extent) ? size() - offset : count);
+		}
 
 		// immutable transforms
-		auto skip(size_t n) const -> bounded_memxfer_t<Tag, T, A>
+		auto skip(size_t n) const -> appendable_memxfer_t<T, A>
 		{
 			ATMA_ASSERT(n < size_);
-			return bounded_memxfer_t<Tag, T, A>(this->get_allocator(), this->data() + n, this->size_ - n);
+			return appendable_memxfer_t<T, A>(this->get_allocator(), this->data() + n, this->size_ - n);
 		}
 
 	private:
-		size_t const size_ = unbounded_memory_size;
+		size_t size_ = 0;
 	};
+
+#if 0
+	template <typename T, typename A>
+	requires std::integral<std::remove_reference_t<BKI>>
+	struct appendable_memxfer_t<T, A, std::dynamic_extent>
+		: bounded_memxfer_t<dest_memory_tag_t, T, A>
+	{
+		using base_type = bounded_memxfer_t<dest_memory_tag_t, T, A>;
+		using value_type = typename base_type::value_type;
+		using allocator_type = typename base_type::allocator_type;
+		using bookkeeping_type = BKI;
+		using tag_type = dest_memory_tag_t;
+
+		appendable_memxfer_t(appendable_memxfer_t const& rhs)
+			: base_type(rhs)
+			, size_(rhs.size_)
+		{}
+
+		constexpr appendable_memxfer_t(allocator_type allocator, T* ptr, size_t size, bookkeeping_type bk)
+			: base_type(allocator, ptr, size)
+			, size_(bk)
+		{}
+
+		constexpr appendable_memxfer_t(T* ptr, size_t size, bookkeeping_type bk)
+			requires std::is_empty_v<allocator_type>
+			: base_type(allocator_type(), ptr)
+			, size_(bk)
+		{}
+
+		auto begin()       -> value_type* { return this->alloc_and_ptr_.second(); }
+		auto end()         -> value_type* { return this->alloc_and_ptr_.second() + this->size_; }
+		auto begin() const -> value_type const* { return this->alloc_and_ptr_.second(); }
+		auto end() const   -> value_type const* { return this->alloc_and_ptr_.second() + size_; }
+
+
+		constexpr auto subspan(size_t offset, size_t count = dynamic_extent) const {
+			return appendable_memxfer_t(this->get_allocator(), this->data() + offset, (count == dynamic_extent) ? size() - offset : count);
+		}
+
+		// immutable transforms
+		auto skip(size_t n) const -> appendable_memxfer_t<T, A, BKI>
+		{
+			ATMA_ASSERT(n < size_);
+			return appendable_memxfer_t<T, A, BKI>(this->get_allocator(), this->data() + n, this->size_ - n);
+		}
+
+	private:
+		size_t size_ = dynamic_extent;
+	};
+#endif
 }
+
+
 
 
 //
@@ -688,14 +909,14 @@ namespace atma
 	using dest_memxfer_t = memxfer_t<dest_memory_tag_t, T, A>;
 
 	template <typename T, typename A = std::allocator<std::remove_const_t<T>>>
-	using dest_bounded_memxfer_t = bounded_memxfer_t<dest_memory_tag_t, T, A>;
+	using dest_bounded_memxfer_t = bounded_memxfer_t<dest_memory_tag_t, T, std::dynamic_extent, A>;
 
 	// src_memxfer_t
 	template <typename T, typename A = std::allocator<std::remove_const_t<T>>>
 	using src_memxfer_t = memxfer_t<src_memory_tag_t, T, A>;
 
 	template <typename T, typename A = std::allocator<std::remove_const_t<T>>>
-	using src_bounded_memxfer_t = bounded_memxfer_t<src_memory_tag_t, T, A>;
+	using src_bounded_memxfer_t = bounded_memxfer_t<src_memory_tag_t, T, std::dynamic_extent, A>;
 }
 
 
@@ -714,8 +935,7 @@ namespace atma::detail
 	using memxfer_range_of_t = memxfer_t<Tag, value_type_of_t<Range>, allocator_type_of_t<Range>>;
 
 	template <typename Tag, typename Range>
-	using bounded_memxfer_range_of_t = bounded_memxfer_t<Tag, value_type_of_t<Range>, allocator_type_of_t<Range>>;
-
+	using bounded_memxfer_range_of_t = bounded_memxfer_t<Tag, value_type_of_t<Range>, std::dynamic_extent, allocator_type_of_t<Range>>;
 
 	template <typename tag_type>
 	struct xfer_make_from_ptr_
@@ -735,21 +955,20 @@ namespace atma::detail
 		template <typename T>
 		auto operator()(T* data, size_t sz) const
 		{
-			return bounded_memxfer_t<tag_type, T, std::allocator<std::remove_const_t<T>>>(data, sz);
+			return bounded_memxfer_t<tag_type, T, std::dynamic_extent, std::allocator<std::remove_const_t<T>>>(data, sz);
 		}
 
 		template <typename T, typename A>
 		auto operator()(A&& allocator, T* data, size_t sz) const
 		{
-			return bounded_memxfer_t<tag_type, T, rmref_t<A>>(std::forward<A>(allocator), data, sz);
+			return bounded_memxfer_t<tag_type, T, std::dynamic_extent, rmref_t<A>>(std::forward<A>(allocator), data, sz);
 		}
 	};
 
 	template <typename tag_type>
 	struct xfer_make_from_sized_contiguous_range_
 	{
-		template <typename R>
-		requires std::ranges::sized_range<R> && std::ranges::contiguous_range<R>
+		template <sized_and_contiguous_range R>
 		auto operator ()(R&& range) -> bounded_memxfer_range_of_t<tag_type, rmref_t<R>>
 		{
 			return {get_allocator(range), std::addressof(*std::begin(range)), std::size(range)};
@@ -804,7 +1023,8 @@ namespace atma::detail
 			-> bounded_memxfer_t
 			< Tag
 			, std::remove_reference_t<decltype(*std::declval<It>())>
-			, std::allocator<std::remove_const_t<std::remove_reference_t<decltype(*std::declval<It>())>>>>
+			, std::dynamic_extent
+			, std::allocator<std::iter_value_t<It>>>
 		{
 			size_t const sz = std::distance(begin, end);
 
@@ -823,8 +1043,8 @@ namespace atma::detail
 		// first match against pointer
 		xfer_make_from_ptr_<tag_type>,
 
-		// then match anything that satisfies the contiguous-range concept (std::begin,
-		// std::end), AND satisfies the sized-range concept (std::size)
+		// then match anything that satisfies the contiguous-range concept AND
+		// satisfies the sized-range concept (std::begin/end & std::size)
 		xfer_make_from_sized_contiguous_range_<tag_type>,
 
 		// then try _only_ the contiguous-range concept (use std::distance instead of std::size)
