@@ -615,11 +615,25 @@ namespace atma
 
 namespace atma::detail
 {
-	constexpr size_t count_from_extent(size_t extent, size_t offset, size_t count)
+	template <size_t Extent, size_t Offset, size_t Count>
+	struct subextent_t
+	{
+		static_assert(Count == std::dynamic_extent || Offset != std::dynamic_extent,
+			"if count is a Real Extent, then our offset can't be dynamic_extent");
+		
+		static constexpr size_t value = Count != std::dynamic_extent ? Count
+			: Extent != std::dynamic_extent ? (Extent - Offset)
+			: std::dynamic_extent;
+	};
+
+	template <size_t Extent, size_t Offset, size_t Count>
+	inline constexpr size_t subextent_v = subextent_t<Extent, Offset, Count>::value;
+
+	inline size_t subextent(size_t extent, size_t offset, size_t count)
 	{
 		return count != std::dynamic_extent ? count
-			: extent == std::dynamic_extent ? std::dynamic_extent
-			: (extent - offset);
+			: extent != std::dynamic_extent ? (extent - offset)
+			: std::dynamic_extent;
 	}
 }
 
@@ -731,7 +745,8 @@ namespace atma
 		using tag_type = Tag;
 
 		template <size_t Offset, size_t Count>
-		using subspan_type = bounded_memxfer_t<Tag, T, detail::count_from_extent(Extent, Offset, Count), allocator_type>;
+		using subspan_type = bounded_memxfer_t<Tag, T, detail::subextent_v<Extent, Offset, Count>, allocator_type>;
+		using dynamic_subspan_type = bounded_memxfer_t<Tag, T, std::dynamic_extent, A>;
 
 		// inherit constructors
 		using base_type::base_type;
@@ -746,9 +761,9 @@ namespace atma
 		template <size_t Offset, size_t Count = std::dynamic_extent>
 		constexpr auto subspan() const -> subspan_type<Offset, Count>
 		{
-			if constexpr (Count == std::dynamic_extent)
+			if constexpr (detail::subextent_v<Extent, Offset, Count> == std::dynamic_extent)
 			{
-				return {this->get_allocator(), this->data() + Offset, Count};
+				return {this->get_allocator(), this->data() + Offset, detail::subextent(this->extent(), Offset, Count)};
 			}
 			else
 			{
@@ -759,11 +774,10 @@ namespace atma
 		template <size_t N> constexpr auto skip() const { return this->subspan<N>(); }
 		template <size_t N> constexpr auto take() const { return this->subspan<0, N>(); }
 
-		// run-time transformations
-		constexpr auto subspan(size_t offset, size_t count = std::dynamic_extent) const
-			-> bounded_memxfer_t<Tag, T, std::dynamic_extent, A>
+		// run-time subviews
+		constexpr auto subspan(size_t offset, size_t count = std::dynamic_extent) const -> dynamic_subspan_type
 		{
-			return {this->get_allocator(), this->data() + offset, detail::count_from_extent(this->extent(), offset, count)};
+			return {this->get_allocator(), this->data() + offset, detail::subextent(this->extent(), offset, count)};
 		}
 
 		constexpr auto skip(size_t n) const { return this->subspan(n); }
