@@ -782,6 +782,122 @@ namespace atma
 }
 
 
+//
+// appendable_memxfer_t
+// --------------------------
+//   a type used for transferring memory around.
+//
+//   is always considered a destination, but will keep bookkeeping
+//   information about how many elements have been written to.
+//
+namespace atma
+{
+	//template <typename R>
+	//concept appendable_memxfer_concept =
+		
+
+	template <typename T, typename SizeTracking, size_t Extent = std::dynamic_extent, typename A = std::allocator<T>>
+	struct appendable_memxfer_t : bounded_memxfer_t<dest_memory_tag_t, T, Extent, A>
+	{
+		using base_type = bounded_memxfer_t<dest_memory_tag_t, T, Extent, A>;
+		using value_type = typename base_type::value_type;
+		using allocator_type = typename base_type::allocator_type;
+		using tag_type = dest_memory_tag_t;
+		using sizetrack_type = SizeTracking;
+
+		template <size_t Offset, size_t Count = std::dynamic_extent>
+		using subspan_type = appendable_memxfer_t<T, SizeTracking, detail::subextent_v<Extent, Offset, Count>, allocator_type>;
+
+		appendable_memxfer_t() = default;
+		appendable_memxfer_t(appendable_memxfer_t const& rhs) = default;
+
+		constexpr appendable_memxfer_t(allocator_type allocator, T* ptr, sizetrack_type size)
+			: base_type(allocator, ptr)
+			, size_(size)
+		{}
+
+		constexpr appendable_memxfer_t(T* ptr, sizetrack_type size)
+			requires std::is_empty_v<allocator_type>
+			: base_type(allocator_type(), ptr)
+			, size_(size)
+		{}
+
+		// iterators (hide base_type)
+		auto begin()       -> value_type* { return this->alloc_and_ptr_.second(); }
+		auto end()         -> value_type* { return this->alloc_and_ptr_.second() + size_; }
+		auto begin() const -> value_type const* { return this->alloc_and_ptr_.second(); }
+		auto end() const   -> value_type const* { return this->alloc_and_ptr_.second() + size_; }
+
+		// observers (hide base_type)
+		auto empty() const -> bool { return size_ == 0; }
+		auto size() const -> size_t { return size_; }
+		auto size_bytes() const -> size_t { return size_ * sizeof value_type; }
+
+
+		// mutable operators
+		template <typename... Args>
+		auto append_construct(Args&&... args)
+		{
+			ATMA_ASSERT(size_ != this->size());
+			new (&this->data()[size_++]) T{std::forward<Args>(args)...};
+		}
+
+	private:
+		sizetrack_type size_ = 0;
+	};
+
+#if 0
+	template <typename T, typename A>
+	requires std::integral<std::remove_reference_t<BKI>>
+	struct appendable_memxfer_t<T, A, std::dynamic_extent>
+		: bounded_memxfer_t<dest_memory_tag_t, T, A>
+	{
+		using base_type = bounded_memxfer_t<dest_memory_tag_t, T, A>;
+		using value_type = typename base_type::value_type;
+		using allocator_type = typename base_type::allocator_type;
+		using bookkeeping_type = BKI;
+		using tag_type = dest_memory_tag_t;
+
+		appendable_memxfer_t(appendable_memxfer_t const& rhs)
+			: base_type(rhs)
+			, size_(rhs.size_)
+		{}
+
+		constexpr appendable_memxfer_t(allocator_type allocator, T* ptr, size_t size, bookkeeping_type bk)
+			: base_type(allocator, ptr, size)
+			, size_(bk)
+		{}
+
+		constexpr appendable_memxfer_t(T* ptr, size_t size, bookkeeping_type bk)
+			requires std::is_empty_v<allocator_type>
+			: base_type(allocator_type(), ptr)
+			, size_(bk)
+		{}
+
+		auto begin()       -> value_type* { return this->alloc_and_ptr_.second(); }
+		auto end()         -> value_type* { return this->alloc_and_ptr_.second() + this->size_; }
+		auto begin() const -> value_type const* { return this->alloc_and_ptr_.second(); }
+		auto end() const   -> value_type const* { return this->alloc_and_ptr_.second() + size_; }
+
+
+		constexpr auto subspan(size_t offset, size_t count = dynamic_extent) const {
+			return appendable_memxfer_t(this->get_allocator(), this->data() + offset, (count == dynamic_extent) ? size() - offset : count);
+		}
+
+		// immutable transforms
+		auto skip(size_t n) const -> appendable_memxfer_t<T, A, BKI>
+		{
+			ATMA_ASSERT(n < size_);
+			return appendable_memxfer_t<T, A, BKI>(this->get_allocator(), this->data() + n, this->size_ - n);
+		}
+
+	private:
+		size_t size_ = dynamic_extent;
+	};
+#endif
+}
+
+
 
 
 //
@@ -996,20 +1112,29 @@ namespace atma
 // memory_default_construct / memory_value_construct
 namespace atma::detail
 {
-	constexpr auto _memory_default_construct = [](auto&&, auto* px, size_t sz)
+	constexpr auto _memory_default_construct = [](dest_memory_concept auto&& dest, size_t sz)
 	{
+		auto* px = std::data(dest);
+
 		using value_type = rmref_t<decltype(*px)>;
 
 		// allocator is not capable of default-constructing
 		for (size_t i = 0; i != sz; ++i)
+		{
 			::new (px++) value_type;
+		}
 	};
 
-	constexpr auto _memory_value_construct = [](auto&& allocator, auto* px, size_t sz)
+	constexpr auto _memory_value_construct = [](dest_memory_concept auto&& dest, size_t sz)
 	{
+		decltype(auto) allocator = get_allocator(dest);
+		auto* px = std::data(dest);
+
 		using allocator_traits = decltype(allocator_traits_of_allocator_(allocator));
 		for (size_t i = 0; i != sz; ++i)
+		{
 			allocator_traits::construct(allocator, px++);
+		}
 	};
 
 	template <typename F>
@@ -1019,12 +1144,12 @@ namespace atma::detail
 
 		[](auto& f, dest_bounded_memory_concept auto&& dest)
 		{
-			f(get_allocator(dest), std::data(dest), std::size(dest));
+			f(dest, std::size(dest));
 		},
 
 		[](auto& f, dest_memory_concept auto&& dest, size_t sz)
 		{
-			f(get_allocator(dest), std::data(dest), sz);
+			f(dest, sz);
 		}
 	};
 }
