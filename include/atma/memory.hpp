@@ -668,7 +668,6 @@ namespace atma::detail
 		auto empty() const -> bool { return extent_v == 0; }
 		auto size() const -> size_t { return extent_v; }
 		auto size_bytes() const -> size_t { return extent_v * sizeof value_type; }
-		auto extent() const -> size_t { return extent_v; }
 	};
 
 	// dynamic-extent version
@@ -686,7 +685,7 @@ namespace atma::detail
 
 		constexpr bounded_memxfer_impl_t(bounded_memxfer_impl_t const& rhs)
 			: base_type(rhs.get_allocator(), rhs.data())
-			, extent_(rhs.extent())
+			, size_(rhs.size())
 		{}
 
 		// adapt a range with a static extent
@@ -694,7 +693,7 @@ namespace atma::detail
 		constexpr bounded_memxfer_impl_t(bounded_memxfer_impl_t<Tag, T, RhsExtent, A> const& rhs)
 			requires !std::is_const_v<T>
 			: base_type(rhs.get_allocator(), rhs.data())
-			, extent_(rhs.extent())
+			, size_(rhs.size())
 		{}
 
 		// adapt a non-const range (if we're a const-range)
@@ -702,34 +701,31 @@ namespace atma::detail
 		constexpr bounded_memxfer_impl_t(bounded_memxfer_impl_t<Tag, std::remove_const_t<T>, RhsExtent, A> const& rhs)
 			requires std::is_const_v<T>
 			: base_type(rhs.get_allocator(), (T*)rhs.data())
-			, extent_(rhs.extent())
+			, size_(rhs.size())
 		{}
 
-		constexpr bounded_memxfer_impl_t(allocator_type allocator, T* ptr, size_t extent)
+		constexpr bounded_memxfer_impl_t(allocator_type allocator, T* ptr, size_t size)
 			: base_type(allocator, ptr)
-			, extent_(extent)
+			, size_(size)
 		{}
 
-		constexpr bounded_memxfer_impl_t(T* ptr, size_t extent)
+		constexpr bounded_memxfer_impl_t(T* ptr, size_t size)
 			requires std::is_empty_v<allocator_type>
 			: base_type(allocator_type(), ptr)
-			, extent_(extent)
+			, size_(size)
 		{}
 
 		// observers
-		constexpr auto empty() const -> bool { return extent_ == 0; }
-		constexpr auto extent() const -> size_t { return extent_; }
-
-		// observers for std::ranges (size == extent)
-		constexpr auto size() const -> size_t { return extent_; }
-		constexpr auto size_bytes() const -> size_t { return extent_ * sizeof value_type; }
+		constexpr auto empty() const -> bool { return size_ == 0; }
+		constexpr auto size() const -> size_t { return size_; }
+		constexpr auto size_bytes() const -> size_t { return size_ * sizeof value_type; }
 
 	private:
-		// explicitly hide memxfer constructors because we must initialize extent
+		// explicitly hide memxfer constructors because we must initialize size
 		using base_type::base_type;
 
 	private:
-		size_t const extent_ = std::dynamic_extent;
+		size_t const size_ = std::dynamic_extent;
 	};
 }
 
@@ -753,9 +749,9 @@ namespace atma
 
 		// element access
 		auto begin()       -> value_type* { return this->alloc_and_ptr_.second(); }
-		auto end()         -> value_type* { return this->alloc_and_ptr_.second() + this->extent(); }
+		auto end()         -> value_type* { return this->alloc_and_ptr_.second() + this->size(); }
 		auto begin() const -> value_type const* { return this->alloc_and_ptr_.second(); }
-		auto end() const   -> value_type const* { return this->alloc_and_ptr_.second() + this->extent(); }
+		auto end() const   -> value_type const* { return this->alloc_and_ptr_.second() + this->size(); }
 
 		// compile-time subviews
 		template <size_t Offset, size_t Count = std::dynamic_extent>
@@ -763,7 +759,7 @@ namespace atma
 		{
 			if constexpr (detail::subextent_v<Extent, Offset, Count> == std::dynamic_extent)
 			{
-				return {this->get_allocator(), this->data() + Offset, detail::subextent(this->extent(), Offset, Count)};
+				return {this->get_allocator(), this->data() + Offset, detail::subextent(this->size(), Offset, Count)};
 			}
 			else
 			{
@@ -777,7 +773,7 @@ namespace atma
 		// run-time subviews
 		constexpr auto subspan(size_t offset, size_t count = std::dynamic_extent) const -> dynamic_subspan_type
 		{
-			return {this->get_allocator(), this->data() + offset, detail::subextent(this->extent(), offset, count)};
+			return {this->get_allocator(), this->data() + offset, detail::subextent(this->size(), offset, count)};
 		}
 
 		constexpr auto skip(size_t n) const { return this->subspan(n); }
