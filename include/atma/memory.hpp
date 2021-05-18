@@ -1144,9 +1144,6 @@ namespace atma::detail
 
 namespace atma::detail
 {
-#define MEMORY_TYPES(dest_concept, src_concept) \
-	dest_concept<decltype(dest)> && src_concept<decltype(src)>
-
 	template <typename F>
 	constexpr auto _memory_copymove_ = functor_list_t
 	{
@@ -1228,8 +1225,6 @@ namespace atma::detail
 				begin, end);
 		}
 	};
-
-#undef MEMORY_TYPES
 }
 
 namespace atma
