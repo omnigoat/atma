@@ -79,6 +79,35 @@ namespace atma::detail
 
 
 //
+//
+//
+#if 0
+namespace atma::detail
+{
+	template <size_t Extent>
+	struct charbuf_t
+	{
+		using value_type = char;
+
+		bool empty() const { return size_ == 0; }
+		bool size() const { return size_; }
+		bool extent() const { return Extent; }
+
+		auto begin() -> value_type* { return chars_; }
+		auto end() -> value_type* { return chars_ + size_; }
+		auto begin() const -> value_type const* { return chars_; }
+		auto end() const -> value_type const* { return chars_ + size_; }
+
+		//void push_back(value_type x)
+	private:
+		size_t size_ = 0;
+		char chars_[Extent];
+	};
+}
+#endif
+
+
+//
 // text-info
 //
 namespace atma::detail
