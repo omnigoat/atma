@@ -1328,7 +1328,7 @@ namespace atma::detail
 
 			f(get_allocator(dest),
 				std::data(dest),
-				std::addressof(*std::begin(src)),
+				std::ranges::data(src),
 				sz);
 		},
 
