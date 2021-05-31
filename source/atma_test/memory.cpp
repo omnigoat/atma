@@ -380,6 +380,40 @@ SCENARIO_TEMPLATE("a (dest|src)_memxfer_t is directly constructed", xfer, XFER_T
 	}
 }
 
+#if 1
+SCENARIO("a bookkeeping_memxfer_t is directly constructed")
+{
+	using storage_type = std::vector<int>;
+
+	struct bkia
+	{
+		static void on_construct(size_t& v, size_t idx)
+		{
+			ATMA_ASSERT(idx == v);
+			++v;
+		}
+	};
+
+	struct bki
+	{
+		using value_type = size_t&;
+		using applier_type = bkia;
+
+		
+	};
+
+	GIVEN("storage of four value-initialized elements")
+	{
+		auto storage = storage_type(4);
+
+		size_t hooray = 0;
+		atma::aser_memxfer_t<int, bki, 4> bkmx{std::allocator<int>(), storage.data(), hooray};
+
+		atma::memory_default_construct(bkmx);
+	}
+}
+#endif
+
 
 SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, XFER_TYPE_COMBINATIONS)
 {
@@ -643,7 +677,7 @@ SCENARIO_TEMPLATE("memory_construct is called", xfer, ALLOCATOR_VALUE_TUPLES)
 
 		WHEN("memory_construct is called upon a vector with arguments for a direct constructor")
 		{
-			value_type_info::curry_direct_construct_args(atma::memory_construct, storage);
+			value_type_info::curry_direct_construct_args(atma::memory_construct, atma::xfer_dest(storage));
 
 			THEN("every element in the vector equates to the compar")
 			{
