@@ -33,7 +33,26 @@
 
 
 
-
+//
+// memory tracking
+// -----------------
+// no, not that tracking. I'm talking about when transferring memory around,
+// do we ever want to track how much of it is:
+//   a) initialized vs uninitialized
+//   b) "consumed" ??
+//   c) something something?
+//   d) a marker for where we've copied up to??
+//
+// in the end, since this will be templated anyway, what we should do is 
+// template the "aser" information, provide some sensible defaults,
+// and let users define custom _things_ if needed
+// 
+// the question becomes: what generic operations do we support so that our
+// algorithms update the aser information, and when do we call them?
+// I think probably something like:
+//  - when an item is copied
+//  - ???
+//  
 
 
 
@@ -783,95 +802,187 @@ namespace atma
 
 
 //
-// appendable_memxfer_t
+// aser_memxfer_t
 // --------------------------
-//   a type used for transferring memory around.
+// a type used for transferring memory around.
 //
-//   is always considered a destination, but will keep bookkeeping
-//   information about how many elements have been written to.
+// is always considered a destination, but will keep aser
+// information about _things_
 //
 namespace atma
 {
-	//template <typename R>
-	//concept appendable_memxfer_concept =
-		
+	template <typename Memory>
+	concept aser_memory_concept = dest_memory_concept<Memory> && requires(Memory memory, int i)
+	{
+		typename Memory::aser_type;
 
-	template <typename T, typename SizeTracking, size_t Extent = std::dynamic_extent, typename A = std::allocator<T>>
-	struct appendable_memxfer_t : bounded_memxfer_t<dest_memory_tag_t, T, Extent, A>
+		{ memory.aser_value() };
+	};
+
+	template <typename T>
+	concept aser_concept = requires(T::value_type x)
+	{
+		typename T::value_type;
+
+		// optional sub-type: T::applier_type
+	};
+}
+
+
+//
+// aser_applier
+//
+namespace atma::detail
+{
+	template <typename T, typename = std::void_t<>>
+	struct aser_applier_timpl
+	{
+		using type = T;
+	};
+
+	template <typename T>
+	struct aser_applier_timpl<T, std::void_t<typename rmref_t<T>::applier_type>>
+	{
+		using type = typename rmref_t<T>::applier_type;
+	};
+
+	template <typename T>
+	struct aser_applier_timpl<T, std::void_t<typename rmref_t<T>::aser_type>>
+	{
+		using type = typename aser_applier_timpl<typename rmref_t<T>::aser_type>::type;
+	};
+}
+
+namespace atma
+{
+	template <typename T>
+	using aser_applier_t = typename detail::aser_applier_timpl<T>::type;
+
+	template <aser_memory_concept Memory>
+	using aser_of_t = typename rmref_t<Memory>::aser_type;
+}
+
+
+//
+// aser_get_thing??
+//
+namespace atma::detail
+{
+	template <aser_memory_concept Memory>
+	constexpr auto _aser_memxfer_annotate_construct_ = functor_list_t
+	{
+		// version passing in the memory
+		[]<typename... Args>(Memory const& memory, Args&&... args)
+		requires requires(Args&&... args) {{ aser_applier_t<Memory>::on_construct(memory, std::forward<Args>(args)...) }; }
+		{
+			aser_applier_t<Memory>::on_construct(memory, std::forward<Args>(args)...);
+		},
+
+		// version passing in only the aser_value
+		[]<typename... Args>(Memory const& memory, Args&&... args)
+		requires requires {{ aser_applier_t<Memory>::on_construct(memory.aser_value(), std::forward<Args>(args)...) }; }
+		{
+			aser_applier_t<Memory>::on_construct(memory.aser_value(), std::forward<Args>(args)...);
+		},
+
+		// applier didn't have it, try aser
+		[]<typename... Args>(Memory const& memory, Args&&... args)
+		requires requires {{ aser_of_t<Memory>::on_construct(memory, std::forward<Args>(args)...) }; }
+		{
+			aser_of_t<Memory>::on_construct(memory, std::forward<Args>(args)...);
+		},
+
+		// applier didn't have it, try aser
+		[]<typename... Args>(Memory const& memory, Args&&... args)
+		requires requires { { aser_of_t<Memory>::on_construct(memory.aser_value(), std::forward<Args>(args)...) }; }
+		{
+			aser_of_t<Memory>::on_construct(memory.aser_value(), std::forward<Args>(args)...);
+		}
+	};
+
+	template <aser_memory_concept Memory, typename... Args>
+	inline void aser_memxfer_annotate_construct(Memory& memory, Args&&... args)
+	{
+		_aser_memxfer_annotate_construct_<Memory>(memory, std::forward<Args>(args)...);
+	}
+
+
+	template <typename Memory, typename... Args>
+	concept aser_annotates_construct_concept = aser_memory_concept<Memory> && requires(Memory& memory, size_t idx)
+	{
+		{ aser_memxfer_annotate_construct(memory, idx) };
+	};
+}
+
+
+//
+namespace atma
+{
+	
+
+
+	// aser = annotating something-er
+	template <typename T, aser_concept Bookkeeping, size_t Extent = std::dynamic_extent, typename A = std::allocator<T>>
+	struct aser_memxfer_t : bounded_memxfer_t<dest_memory_tag_t, T, Extent, A>
 	{
 		using base_type = bounded_memxfer_t<dest_memory_tag_t, T, Extent, A>;
 		using value_type = typename base_type::value_type;
 		using allocator_type = typename base_type::allocator_type;
 		using tag_type = dest_memory_tag_t;
-		using sizetrack_type = SizeTracking;
+		using aser_type = Bookkeeping;
+		using aser_value_type = typename Bookkeeping::value_type;
 
 		template <size_t Offset, size_t Count = std::dynamic_extent>
-		using subspan_type = appendable_memxfer_t<T, SizeTracking, detail::subextent_v<Extent, Offset, Count>, allocator_type>;
+		using subspan_type = aser_memxfer_t<T, Bookkeeping, detail::subextent_v<Extent, Offset, Count>, allocator_type>;
 
-		appendable_memxfer_t() = default;
-		appendable_memxfer_t(appendable_memxfer_t const& rhs) = default;
+		aser_memxfer_t() = default;
+		aser_memxfer_t(aser_memxfer_t const& rhs) = default;
 
-		constexpr appendable_memxfer_t(allocator_type allocator, T* ptr, sizetrack_type size)
+		constexpr aser_memxfer_t(allocator_type allocator, T* ptr, aser_value_type aser)
 			: base_type(allocator, ptr)
-			, size_(size)
+			, aser_(aser)
 		{}
 
-		constexpr appendable_memxfer_t(T* ptr, sizetrack_type size)
+		constexpr aser_memxfer_t(T* ptr, aser_value_type aser)
 			requires std::is_empty_v<allocator_type>
 			: base_type(allocator_type(), ptr)
-			, size_(size)
+			, aser_(aser)
 		{}
 
-		// iterators (hide base_type)
-		auto begin()       -> value_type* { return this->alloc_and_ptr_.second(); }
-		auto end()         -> value_type* { return this->alloc_and_ptr_.second() + size_; }
-		auto begin() const -> value_type const* { return this->alloc_and_ptr_.second(); }
-		auto end() const   -> value_type const* { return this->alloc_and_ptr_.second() + size_; }
 
-		// observers (hide base_type)
-		auto empty() const -> bool { return size_ == 0; }
-		auto size() const -> size_t { return size_; }
-		auto size_bytes() const -> size_t { return size_ * sizeof value_type; }
-
-
-		// mutable operators
-		template <typename... Args>
-		auto append_construct(Args&&... args)
-		{
-			ATMA_ASSERT(size_ != this->size());
-			new (&this->data()[size_++]) T{std::forward<Args>(args)...};
-		}
+		// aser observers
+		auto aser_value() const -> aser_value_type { return aser_; }
 
 	private:
-		sizetrack_type size_ = 0;
+		aser_value_type aser_ = aser_value_type();
 	};
 
 #if 0
 	template <typename T, typename A>
 	requires std::integral<std::remove_reference_t<BKI>>
-	struct appendable_memxfer_t<T, A, std::dynamic_extent>
+	struct aser_memxfer_t<T, A, std::dynamic_extent>
 		: bounded_memxfer_t<dest_memory_tag_t, T, A>
 	{
 		using base_type = bounded_memxfer_t<dest_memory_tag_t, T, A>;
 		using value_type = typename base_type::value_type;
 		using allocator_type = typename base_type::allocator_type;
-		using bookkeeping_type = BKI;
+		using aser_value_type = BKI;
 		using tag_type = dest_memory_tag_t;
 
-		appendable_memxfer_t(appendable_memxfer_t const& rhs)
+		aser_memxfer_t(aser_memxfer_t const& rhs)
 			: base_type(rhs)
 			, size_(rhs.size_)
 		{}
 
-		constexpr appendable_memxfer_t(allocator_type allocator, T* ptr, size_t size, bookkeeping_type bk)
+		constexpr aser_memxfer_t(allocator_type allocator, T* ptr, size_t size, aser_value_type aser)
 			: base_type(allocator, ptr, size)
-			, size_(bk)
+			, size_(aser)
 		{}
 
-		constexpr appendable_memxfer_t(T* ptr, size_t size, bookkeeping_type bk)
+		constexpr aser_memxfer_t(T* ptr, size_t size, aser_value_type aser)
 			requires std::is_empty_v<allocator_type>
 			: base_type(allocator_type(), ptr)
-			, size_(bk)
+			, size_(aser)
 		{}
 
 		auto begin()       -> value_type* { return this->alloc_and_ptr_.second(); }
@@ -881,14 +992,14 @@ namespace atma
 
 
 		constexpr auto subspan(size_t offset, size_t count = dynamic_extent) const {
-			return appendable_memxfer_t(this->get_allocator(), this->data() + offset, (count == dynamic_extent) ? size() - offset : count);
+			return aser_memxfer_t(this->get_allocator(), this->data() + offset, (count == dynamic_extent) ? size() - offset : count);
 		}
 
 		// immutable transforms
-		auto skip(size_t n) const -> appendable_memxfer_t<T, A, BKI>
+		auto skip(size_t n) const -> aser_memxfer_t<T, A, BKI>
 		{
 			ATMA_ASSERT(n < size_);
-			return appendable_memxfer_t<T, A, BKI>(this->get_allocator(), this->data() + n, this->size_ - n);
+			return aser_memxfer_t<T, A, BKI>(this->get_allocator(), this->data() + n, this->size_ - n);
 		}
 
 	private:
@@ -1109,36 +1220,65 @@ namespace atma
 	};
 }
 
-// memory_default_construct / memory_value_construct
+// memory_default_construct / memory_value_construct / memory_direct_construct
 namespace atma::detail
 {
-	constexpr auto _memory_default_construct = [](dest_memory_concept auto&& dest, size_t sz)
+	constexpr auto _memory_default_construct_ = [](dest_memory_concept auto&& dest, size_t sz)
 	{
 		auto* px = std::data(dest);
 
 		using value_type = rmref_t<decltype(*px)>;
 
 		// allocator is not capable of default-constructing
-		for (size_t i = 0; i != sz; ++i)
+		for (size_t i = 0; i != sz; ++i, ++px)
 		{
-			::new (px++) value_type;
+			::new (px) value_type;
+
+			if constexpr (aser_annotates_construct_concept<decltype(dest), size_t>)
+			{
+				aser_memxfer_annotate_construct(dest, i);
+			}
 		}
 	};
 
-	constexpr auto _memory_value_construct = [](dest_memory_concept auto&& dest, size_t sz)
+	constexpr auto _memory_value_construct_ = [](dest_memory_concept auto&& dest, size_t sz)
 	{
 		decltype(auto) allocator = get_allocator(dest);
 		auto* px = std::data(dest);
 
 		using allocator_traits = decltype(allocator_traits_of_allocator_(allocator));
-		for (size_t i = 0; i != sz; ++i)
+
+		for (size_t i = 0; i != sz; ++i, ++px)
 		{
-			allocator_traits::construct(allocator, px++);
+			allocator_traits::construct(allocator, px);
+
+			if constexpr (aser_annotates_construct_concept<decltype(dest), size_t>)
+			{
+				aser_memxfer_annotate_construct(dest, i);
+			}
+		}
+	};
+
+	constexpr auto _memory_direct_construct_ = [](dest_memory_concept auto&& dest, size_t sz, auto&&... args)
+	{
+		decltype(auto) allocator = get_allocator(dest);
+		auto* px = std::data(dest);
+
+		using allocator_traits = decltype(allocator_traits_of_allocator_(allocator));
+
+		for (size_t i = 0; i != sz; ++i, ++px)
+		{
+			allocator_traits::construct(allocator, px, std::forward<decltype(args)>(args)...);
+
+			if constexpr (aser_annotates_construct_concept<decltype(dest), size_t>)
+			{
+				aser_memxfer_annotate_construct(dest, i);
+			}
 		}
 	};
 
 	template <typename F>
-	constexpr auto _memory_range_delegate = functor_list_t
+	constexpr auto _memory_range_construct_delegate_ = functor_list_t
 	{
 		functor_call_fwds_t<F>{},
 
@@ -1156,48 +1296,36 @@ namespace atma::detail
 
 namespace atma
 {
-	constexpr auto memory_default_construct = detail::_memory_range_delegate<decltype(detail::_memory_default_construct)>;
-	constexpr auto memory_value_construct = detail::_memory_range_delegate<decltype(detail::_memory_value_construct)>;
+	constexpr auto memory_default_construct = detail::_memory_range_construct_delegate_<decltype(detail::_memory_default_construct_)>;
+	constexpr auto memory_value_construct = detail::_memory_range_construct_delegate_<decltype(detail::_memory_value_construct_)>;
 }
 
 
-// memory_construct
-namespace atma::detail
-{
-	constexpr auto _memory_range_construct = [](auto&& allocator, auto* px, size_t sz, auto&&... args)
-	{
-		using dest_allocator_traits = decltype(allocator_traits_of_allocator_(allocator));
-		
-		for (size_t i = 0; i != sz; ++i)
-			dest_allocator_traits::construct(allocator, px++, args...);
-	};
-}
 
 namespace atma
 {
 	constexpr auto memory_construct = functor_list_t
 	{
-		[](auto&& dest, auto&&... args)
-		requires dest_memory_concept<decltype(dest)>
+		[](dest_memory_concept auto&& dest, auto&&... args)
 		{
-			detail::_memory_range_construct(
-				get_allocator(dest),
-				std::data(dest),
+			detail::_memory_direct_construct_(
+				dest,
 				std::size(dest),
 				std::forward<decltype(args)>(args)...);
-		},
-
+		}
+		
+#if 0 // I don't think this gets to be a thing
+		,
 		[](auto&& dest, auto&&... args)
 		requires std::ranges::sized_range<decltype(dest)>
 		{
-			using allocator_type = decltype(detail::allocator_type_of_range_(dest));
-
-			detail::_memory_range_construct(
-				allocator_type(),
+			detail::_memory_direct_construct_(
+				dest,
 				std::addressof(*std::begin(dest)),
 				std::size(dest),
 				std::forward<decltype(args)>(args)...);
 		}
+#endif
 	};
 }
 
@@ -1206,7 +1334,7 @@ namespace atma
 // memory_copy_construct / memory_move_construct
 namespace atma::detail
 {
-	constexpr auto _memory_copy_construct = functor_list_t
+	constexpr auto _memory_copy_construct_ = functor_list_t
 	{
 		[](auto&& allocator, auto* px, auto* py, size_t sz)
 		{
@@ -1228,7 +1356,7 @@ namespace atma::detail
 		}
 	};
 
-	constexpr auto _memory_move_construct = functor_list_t
+	constexpr auto _memory_move_construct_ = functor_list_t
 	{
 		[](auto&& allocator, auto* px, auto* py, size_t sz)
 		{
@@ -1270,7 +1398,7 @@ namespace atma::detail
 namespace atma::detail
 {
 	template <typename F>
-	constexpr auto _memory_copymove_ = functor_list_t
+	constexpr auto _memory_copymove_delegate_ = functor_list_t
 	{
 		functor_call_fwds_t<F>(),
 
@@ -1354,8 +1482,8 @@ namespace atma::detail
 
 namespace atma
 {
-	constexpr auto memory_copy_construct = detail::_memory_copymove_<decltype(detail::_memory_copy_construct)>;
-	constexpr auto memory_move_construct = detail::_memory_copymove_<decltype(detail::_memory_move_construct)>;
+	constexpr auto memory_copy_construct = detail::_memory_copymove_delegate_<decltype(detail::_memory_copy_construct_)>;
+	constexpr auto memory_move_construct = detail::_memory_copymove_delegate_<decltype(detail::_memory_move_construct_)>;
 }
 
 
