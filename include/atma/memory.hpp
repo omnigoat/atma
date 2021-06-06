@@ -1190,6 +1190,9 @@ namespace atma::detail
 
 	template <typename A>
 	constexpr auto allocator_traits_of_allocator_(A&& a) -> std::allocator_traits<rmref_t<A>>;
+
+	template <typename A>
+	using allocator_traits_of_t = std::allocator_traits<rmref_t<A>>;
 }
 
 
@@ -1204,7 +1207,15 @@ namespace atma::detail
 //##################################
 
 
-
+namespace atma::detail
+{
+	template <typename Allocator>
+	inline void construct_with_allocator_traits_(Allocator&& allocator, auto&&... args)
+	{
+		using allocator_traits = allocator_traits_of_t<decltype(allocator)>;
+		allocator_traits::construct(std::forward<Allocator>(allocator), std::forward<decltype(args)>(args)...);
+	}
+}
 
 
 
@@ -1213,12 +1224,11 @@ namespace atma
 {
 	constexpr auto memory_construct_at = [](memory_concept auto&& dest, auto&&... args)
 	{
-		decltype(auto) allocator = get_allocator(dest);
-		using allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
-
-		allocator_traits::construct(allocator, std::data(dest), std::forward<decltype(args)>(args)...);
+		auto&& allocator = get_allocator(dest);
+		detail::construct_with_allocator_traits_(allocator, std::data(dest), std::forward<decltype(args)>(args)...);
 	};
 }
+
 
 // memory_default_construct / memory_value_construct / memory_direct_construct
 namespace atma::detail
@@ -1243,14 +1253,12 @@ namespace atma::detail
 
 	constexpr auto _memory_value_construct_ = [](dest_memory_concept auto&& dest, size_t sz)
 	{
-		decltype(auto) allocator = get_allocator(dest);
+		auto&& allocator = get_allocator(dest);
 		auto* px = std::data(dest);
-
-		using allocator_traits = decltype(allocator_traits_of_allocator_(allocator));
 
 		for (size_t i = 0; i != sz; ++i, ++px)
 		{
-			allocator_traits::construct(allocator, px);
+			construct_with_allocator_traits_(allocator, px);
 
 			if constexpr (aser_annotates_construct_concept<decltype(dest), size_t>)
 			{
@@ -1261,14 +1269,12 @@ namespace atma::detail
 
 	constexpr auto _memory_direct_construct_ = [](dest_memory_concept auto&& dest, size_t sz, auto&&... args)
 	{
-		decltype(auto) allocator = get_allocator(dest);
+		auto&& allocator = get_allocator(dest);
 		auto* px = std::data(dest);
-
-		using allocator_traits = decltype(allocator_traits_of_allocator_(allocator));
 
 		for (size_t i = 0; i != sz; ++i, ++px)
 		{
-			allocator_traits::construct(allocator, px, std::forward<decltype(args)>(args)...);
+			construct_with_allocator_traits_(allocator, px, std::forward<decltype(args)>(args)...);
 
 			if constexpr (aser_annotates_construct_concept<decltype(dest), size_t>)
 			{
@@ -1329,48 +1335,72 @@ namespace atma
 	};
 }
 
-
+#define ATMA_ASSERT_MEMORY_RANGES_DISJOINT(px, py, sz) \
+	do { \
+	ATMA_ASSERT((sz) == 0 || ((px) + (sz) <= (py)) || ((py) + (sz) <= (px)), "memory ranges must be disjoint"); \
+	} while(0)
 
 // memory_copy_construct / memory_move_construct
 namespace atma::detail
 {
 	constexpr auto _memory_copy_construct_ = functor_list_t
 	{
+		[](auto&& dest, auto&& src, size_t sz)
+		{
+			auto&& allocator = get_allocator(dest);
+			auto* px = std::data(dest);
+			auto* py = std::data(src);
+
+			for (size_t i = 0; i != sz; ++i, ++px, ++py)
+			{
+				construct_with_allocator_traits_(allocator, px, *py);
+			}
+		},
+
 		[](auto&& allocator, auto* px, auto* py, size_t sz)
 		{
-			ATMA_ASSERT(sz == 0 || (px + sz <= py) || (py + sz <= px),
-				"memory ranges must be disjoint");
+			ATMA_ASSERT_MEMORY_RANGES_DISJOINT(px, py, sz);
 
-			using dest_allocator_traits = decltype(allocator_traits_of_allocator_(allocator));
-
-			for (size_t i = 0; i != sz; ++i)
-				dest_allocator_traits::construct(allocator, px++, *py++);
+			for (size_t i = 0; i != sz; ++i, ++px, ++py)
+			{
+				construct_with_allocator_traits_(allocator, px, *py);
+			}
 		},
 
 		[](auto&& allocator, auto* px, auto begin, auto end)
 		{
-			using dest_allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
-
-			while (begin != end)
-				dest_allocator_traits::construct(allocator, px++, *begin++);
+			for ( ; begin != end; ++px, ++begin)
+			{
+				construct_with_allocator_traits_(allocator, px, *begin);
+			}
 		}
 	};
 
 	constexpr auto _memory_move_construct_ = functor_list_t
 	{
+		[](auto&& dest, auto&& src, size_t sz)
+		{
+			auto&& allocator = get_allocator(dest);
+			auto* px = std::data(dest);
+			auto* py = std::data(src);
+
+			for (size_t i = 0; i != sz; ++i, ++px, ++py)
+			{
+				construct_with_allocator_traits_(allocator, px, std::move(*py));
+			}
+		},
+
 		[](auto&& allocator, auto* px, auto* py, size_t sz)
 		{
 			if (sz == 0)
 				return;
-
-			using dest_allocator_traits = std::allocator_traits<rmref_t<decltype(allocator)>>;
 
 			// destination range is earlier, move forwards
 			if (px < py)
 			{
 				for (size_t i = 0; i != sz; ++i, ++px, ++py)
 				{
-					dest_allocator_traits::construct(allocator, px, std::move(*py));
+					construct_with_allocator_traits_(allocator, px, std::move(*py));
 				}
 			}
 			// src range earlier, move backwards
@@ -1380,17 +1410,17 @@ namespace atma::detail
 				auto pye = py + sz;
 				for (size_t i = 0; i != sz; ++i)
 				{
-					dest_allocator_traits::construct(allocator, --pxe, std::move(*--pye));
+					construct_with_allocator_traits_(allocator, --pxe, std::move(*--pye));
 				}
 			}
 		},
 
 		[](auto&& allocator, auto* px, auto begin, auto end)
 		{
-			using dest_allocator_traits = decltype(allocator_traits_of_allocator_(allocator));
-
-			while (begin != end)
-				dest_allocator_traits::construct(allocator, px, std::move(*begin++));
+			for ( ; begin != end; ++px, ++begin)
+			{
+				construct_with_allocator_traits_(allocator, px, std::move(*begin));
+			}
 		}
 	};
 }
@@ -1411,45 +1441,32 @@ namespace atma::detail
 
 			if constexpr (dest_is_bounded && src_is_bounded)
 				ATMA_ASSERT(dest.size() == src.size());
-
-			if constexpr (dest_is_bounded)
+			else if constexpr (dest_is_bounded)
 				ATMA_ASSERT(dest.size() == sz);
-
-			if constexpr (src_is_bounded)
+			else if constexpr (src_is_bounded)
 				ATMA_ASSERT(src.size() == sz);
 
-			f(get_allocator(dest),
-				std::data(dest),
-				std::data(src),
-				sz);
+			f(dest, src, sz);
 		},
 
 		[](auto& f, dest_bounded_memory_concept auto&& dest, src_bounded_memory_concept auto&& src)
 		{
 			ATMA_ASSERT(std::size(dest) == std::size(src));
 
-			f(get_allocator(dest),
-				std::data(dest),
-				std::data(src),
-				std::size(dest));
+			f(dest, src, std::size(dest));
 		},
 
 		[](auto& f, dest_bounded_memory_concept auto&& dest, src_memory_concept auto&& src)
 		{
-			f(get_allocator(dest),
-				std::data(dest),
-				std::data(src),
-				std::size(dest));
+			f(dest, src, std::size(dest));
 		},
 
 		[](auto& f, dest_memory_concept auto&& dest, src_bounded_memory_concept auto&& src)
 		{
-			f(get_allocator(dest),
-				std::data(dest),
-				std::data(src),
-				std::size(src));
+			f(dest, src, std::size(src));
 		},
 
+#if 0
 		[](dest_memory_concept auto&& dest, std::ranges::contiguous_range auto&& src)
 		{
 			auto const sz = std::distance(std::begin(src), std::end(src));
@@ -1469,7 +1486,8 @@ namespace atma::detail
 				std::data(src),
 				std::size(src));
 		},
-		
+#endif
+
 		[](auto& f, dest_memory_concept auto&& dest, std::input_iterator auto begin, auto end)
 		requires std::equality_comparable_with<decltype(begin), decltype(end)>
 		{
