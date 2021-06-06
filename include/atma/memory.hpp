@@ -872,32 +872,24 @@ namespace atma::detail
 	constexpr auto _aser_memxfer_annotate_construct_ = functor_list_t
 	{
 		// version passing in the memory
-		[]<typename... Args>(Memory const& memory, Args&&... args)
+		[]<typename... Args>(Memory& memory, Args&&... args)
 		requires requires(Args&&... args) {{ aser_applier_t<Memory>::on_construct(memory, std::forward<Args>(args)...) }; }
-		{
-			aser_applier_t<Memory>::on_construct(memory, std::forward<Args>(args)...);
-		},
+			{ aser_applier_t<Memory>::on_construct(memory, std::forward<Args>(args)...); },
 
 		// version passing in only the aser_value
-		[]<typename... Args>(Memory const& memory, Args&&... args)
-		requires requires {{ aser_applier_t<Memory>::on_construct(memory.aser_value(), std::forward<Args>(args)...) }; }
-		{
-			aser_applier_t<Memory>::on_construct(memory.aser_value(), std::forward<Args>(args)...);
-		},
+		[]<typename... Args>(Memory& memory, Args&&... args)
+		requires requires(Args&&... args) {{ aser_applier_t<Memory>::on_construct(memory.aser_value(), std::forward<Args>(args)...) }; }
+			{ aser_applier_t<Memory>::on_construct(memory.aser_value(), std::forward<Args>(args)...); },
 
 		// applier didn't have it, try aser
-		[]<typename... Args>(Memory const& memory, Args&&... args)
-		requires requires {{ aser_of_t<Memory>::on_construct(memory, std::forward<Args>(args)...) }; }
-		{
-			aser_of_t<Memory>::on_construct(memory, std::forward<Args>(args)...);
-		},
+		[]<typename... Args>(Memory& memory, Args&&... args)
+		requires requires(Args&&... args) {{ aser_of_t<Memory>::on_construct(memory, std::forward<Args>(args)...) }; }
+			{ aser_of_t<Memory>::on_construct(memory, std::forward<Args>(args)...); },
 
 		// applier didn't have it, try aser
-		[]<typename... Args>(Memory const& memory, Args&&... args)
-		requires requires { { aser_of_t<Memory>::on_construct(memory.aser_value(), std::forward<Args>(args)...) }; }
-		{
-			aser_of_t<Memory>::on_construct(memory.aser_value(), std::forward<Args>(args)...);
-		}
+		[]<typename... Args>(Memory& memory, Args&&... args)
+		requires requires(Args&&... args) {{ aser_of_t<Memory>::on_construct(memory.aser_value(), std::forward<Args>(args)...) }; }
+			{ aser_of_t<Memory>::on_construct(memory.aser_value(), std::forward<Args>(args)...); }
 	};
 
 	template <aser_memory_concept Memory, typename... Args>
@@ -906,14 +898,97 @@ namespace atma::detail
 		_aser_memxfer_annotate_construct_<Memory>(memory, std::forward<Args>(args)...);
 	}
 
-
 	template <typename Memory, typename... Args>
-	concept aser_annotates_construct_concept = aser_memory_concept<Memory> && requires(Memory& memory, size_t idx)
+	concept aser_annotates_construct_concept = aser_memory_concept<rmref_t<Memory>> && requires(Memory& memory, size_t idx)
 	{
 		{ aser_memxfer_annotate_construct(memory, idx) };
 	};
 }
 
+
+//
+// aser_memxfer_annotate_post_construct
+//
+namespace atma::detail
+{
+	template <aser_memory_concept Memory>
+	constexpr auto _aser_memxfer_annotate_post_construct_ = functor_list_t
+	{
+		// version passing in the memory
+		[]<typename... Args>(Memory& memory, Args&&... args)
+		requires requires(Args&&... args) {{ aser_applier_t<Memory>::on_post_construct(memory, std::forward<Args>(args)...) }; }
+			{ aser_applier_t<Memory>::on_post_construct(memory, std::forward<Args>(args)...); },
+
+		// version passing in only the aser_value
+		[]<typename... Args>(Memory& memory, Args&&... args)
+		requires requires(Args&&... args) {{ aser_applier_t<Memory>::on_post_construct(memory.aser_value(), std::forward<Args>(args)...) }; }
+			{ aser_applier_t<Memory>::on_post_construct(memory.aser_value(), std::forward<Args>(args)...); },
+
+		// applier didn't have it, try aser
+		[]<typename... Args>(Memory& memory, Args&&... args)
+		requires requires(Args&&... args) {{ aser_of_t<Memory>::on_post_construct(memory, std::forward<Args>(args)...) }; }
+			{ aser_of_t<Memory>::on_post_construct(memory, std::forward<Args>(args)...); },
+
+		// applier didn't have it, try aser
+		[]<typename... Args>(Memory& memory, Args&&... args)
+		requires requires(Args&&... args) {{ aser_of_t<Memory>::on_post_construct(memory.aser_value(), std::forward<Args>(args)...) }; }
+			{ aser_of_t<Memory>::on_post_construct(memory.aser_value(), std::forward<Args>(args)...); }
+	};
+
+	template <aser_memory_concept Memory, typename... Args>
+	inline void aser_memxfer_annotate_post_construct(Memory& memory, Args&&... args)
+	{
+		_aser_memxfer_annotate_post_construct_<Memory>(memory, std::forward<Args>(args)...);
+	}
+
+	template <typename Memory, typename... Args>
+	concept aser_annotates_post_construct_concept = aser_memory_concept<rmref_t<Memory>> && requires(Memory& memory, size_t sz)
+	{
+		{ _aser_memxfer_annotate_post_construct_<rmref_t<Memory>>(memory, sz) };
+	};
+}
+
+//
+// 
+//
+namespace atma::detail
+{
+	template <aser_memory_concept Memory>
+	constexpr auto _aser_memxfer_annotate_move_ = functor_list_t
+	{
+		// version passing in the memory
+		[]<typename... Args>(Memory const& memory, Args&&... args)
+		requires requires(Args&&... args) {{ aser_applier_t<Memory>::on_move(memory, std::forward<Args>(args)...) }; }
+			{ aser_applier_t<Memory>::on_move(memory, std::forward<Args>(args)...); },
+
+		// version passing in only the aser_value
+		[]<typename... Args>(Memory const& memory, Args&&... args)
+		requires requires(Args&&... args) {{ aser_applier_t<Memory>::on_move(memory.aser_value(), std::forward<Args>(args)...) }; }
+			{ aser_applier_t<Memory>::on_move(memory.aser_value(), std::forward<Args>(args)...); },
+
+		// applier didn't have it, try aser
+		[]<typename... Args>(Memory const& memory, Args&&... args)
+		requires requires(Args&&... args) {{ aser_of_t<Memory>::on_move(memory, std::forward<Args>(args)...) }; }
+			{ aser_of_t<Memory>::on_move(memory, std::forward<Args>(args)...); },
+
+		// applier didn't have it, try aser
+		[]<typename... Args>(Memory const& memory, Args&&... args)
+		requires requires(Args&&... args) {{ aser_of_t<Memory>::on_move(memory.aser_value(), std::forward<Args>(args)...) }; }
+			{ aser_of_t<Memory>::on_move(memory.aser_value(), std::forward<Args>(args)...); }
+	};
+
+	template <aser_memory_concept Memory, typename... Args>
+	inline void aser_memxfer_annotate_move(Memory& memory, Args&&... args)
+	{
+		_aser_memxfer_annotate_move_<Memory>(memory, std::forward<Args>(args)...);
+	}
+
+	template <typename Memory, typename... Args>
+	concept aser_annotates_move_concept = aser_memory_concept<Memory> && requires(Memory& memory, size_t idx)
+	{
+		{ aser_memxfer_annotate_move(memory, idx) };
+	};
+}
 
 //
 namespace atma
@@ -1249,6 +1324,11 @@ namespace atma::detail
 				aser_memxfer_annotate_construct(dest, i);
 			}
 		}
+
+		if constexpr (aser_annotates_post_construct_concept<decltype(dest), size_t>)
+		{
+			aser_memxfer_annotate_post_construct(dest, sz);
+		}
 	};
 
 	constexpr auto _memory_value_construct_ = [](dest_memory_concept auto&& dest, size_t sz)
@@ -1265,6 +1345,11 @@ namespace atma::detail
 				aser_memxfer_annotate_construct(dest, i);
 			}
 		}
+
+		if constexpr (aser_annotates_post_construct_concept<decltype(dest), size_t>)
+		{
+			aser_memxfer_annotate_post_construct(dest, sz);
+		}
 	};
 
 	constexpr auto _memory_direct_construct_ = [](dest_memory_concept auto&& dest, size_t sz, auto&&... args)
@@ -1280,6 +1365,11 @@ namespace atma::detail
 			{
 				aser_memxfer_annotate_construct(dest, i);
 			}
+		}
+
+		if constexpr (aser_annotates_post_construct_concept<decltype(dest), size_t>)
+		{
+			aser_memxfer_annotate_post_construct(dest, sz);
 		}
 	};
 
@@ -1354,9 +1444,20 @@ namespace atma::detail
 			for (size_t i = 0; i != sz; ++i, ++px, ++py)
 			{
 				construct_with_allocator_traits_(allocator, px, *py);
+
+				if constexpr (aser_annotates_construct_concept<decltype(dest), size_t>)
+				{
+					aser_memxfer_annotate_construct(dest, i);
+				}
+			}
+
+			if constexpr (aser_annotates_post_construct_concept<decltype(dest), size_t>)
+			{
+				aser_memxfer_annotate_post_construct(dest, sz);
 			}
 		},
 
+#if 0
 		[](auto&& allocator, auto* px, auto* py, size_t sz)
 		{
 			ATMA_ASSERT_MEMORY_RANGES_DISJOINT(px, py, sz);
@@ -1366,6 +1467,7 @@ namespace atma::detail
 				construct_with_allocator_traits_(allocator, px, *py);
 			}
 		},
+#endif
 
 		[](auto&& allocator, auto* px, auto begin, auto end)
 		{
@@ -1387,9 +1489,15 @@ namespace atma::detail
 			for (size_t i = 0; i != sz; ++i, ++px, ++py)
 			{
 				construct_with_allocator_traits_(allocator, px, std::move(*py));
+
+				if constexpr (aser_annotates_construct_concept<decltype(dest), size_t>)
+				{
+					aser_memxfer_annotate_construct(dest, i);
+				}
 			}
 		},
 
+#if 0
 		[](auto&& allocator, auto* px, auto* py, size_t sz)
 		{
 			if (sz == 0)
@@ -1414,6 +1522,7 @@ namespace atma::detail
 				}
 			}
 		},
+#endif
 
 		[](auto&& allocator, auto* px, auto begin, auto end)
 		{
