@@ -38,7 +38,7 @@
 			<Item Name="size">size_</Item>
 			<ArrayItems>
 				<Size>size_</Size>
-				<ValuePointer>imem_.ptr_</ValuePointer>
+				<ValuePointer>imem_.ptr</ValuePointer>
 			</ArrayItems>
 		</Expand>
 	</Type>
