@@ -839,7 +839,7 @@ SCENARIO_TEMPLATE("memory_copy_construct is called", xfer, ALLOCATOR_VALUE_TUPLE
 				//static_assert(atma::concepts::models<atma::assignable_concept, typename decltype(dest2_storage)::value_type>::value);
 				//static_assert(atma::concepts::models_v<atma::dest_memory_range_concept, decltype(dest2_storage)>);
 
-				atma::memory_copy_construct(dest2_storage, source);
+				//atma::memory_copy_construct(dest2_storage, source);
 			}
 		}
 	}
