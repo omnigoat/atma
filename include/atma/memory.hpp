@@ -899,9 +899,9 @@ namespace atma::detail
 	}
 
 	template <typename Memory, typename... Args>
-	concept aser_annotates_construct_concept = aser_memory_concept<rmref_t<Memory>> && requires(Memory& memory, size_t idx)
+	concept aser_annotates_construct_concept = aser_memory_concept<rmref_t<Memory>> && requires(Memory& memory, Args&&... args)
 	{
-		{ aser_memxfer_annotate_construct(memory, idx) };
+		{ _aser_memxfer_annotate_construct_<rmref_t<Memory>>(memory, std::forward<Args>(args)...) };
 	};
 }
 
@@ -1314,14 +1314,14 @@ namespace atma::detail
 
 		using value_type = rmref_t<decltype(*px)>;
 
-		// allocator is not capable of default-constructing
 		for (size_t i = 0; i != sz; ++i, ++px)
 		{
+			// allocator is not capable of default-constructing
 			::new (px) value_type;
 
-			if constexpr (aser_annotates_construct_concept<decltype(dest), size_t>)
+			if constexpr (aser_annotates_construct_concept<decltype(dest), size_t, decltype(px)>)
 			{
-				aser_memxfer_annotate_construct(dest, i);
+				aser_memxfer_annotate_construct(dest, i, px);
 			}
 		}
 
@@ -1340,9 +1340,9 @@ namespace atma::detail
 		{
 			construct_with_allocator_traits_(allocator, px);
 
-			if constexpr (aser_annotates_construct_concept<decltype(dest), size_t>)
+			if constexpr (aser_annotates_construct_concept<decltype(dest), size_t, decltype(px)>)
 			{
-				aser_memxfer_annotate_construct(dest, i);
+				aser_memxfer_annotate_construct(dest, i, px);
 			}
 		}
 
@@ -1361,9 +1361,9 @@ namespace atma::detail
 		{
 			construct_with_allocator_traits_(allocator, px, std::forward<decltype(args)>(args)...);
 
-			if constexpr (aser_annotates_construct_concept<decltype(dest), size_t>)
+			if constexpr (aser_annotates_construct_concept<decltype(dest), decltype(px)>)
 			{
-				aser_memxfer_annotate_construct(dest, i);
+				aser_memxfer_annotate_construct(dest, px);
 			}
 		}
 
@@ -1394,36 +1394,16 @@ namespace atma
 {
 	constexpr auto memory_default_construct = detail::_memory_range_construct_delegate_<decltype(detail::_memory_default_construct_)>;
 	constexpr auto memory_value_construct = detail::_memory_range_construct_delegate_<decltype(detail::_memory_value_construct_)>;
-}
 
-
-
-namespace atma
-{
-	constexpr auto memory_construct = functor_list_t
+	constexpr auto memory_construct = [](dest_memory_concept auto&& dest, auto&&... args)
 	{
-		[](dest_memory_concept auto&& dest, auto&&... args)
-		{
-			detail::_memory_direct_construct_(
-				dest,
-				std::size(dest),
-				std::forward<decltype(args)>(args)...);
-		}
-		
-#if 0 // I don't think this gets to be a thing
-		,
-		[](auto&& dest, auto&&... args)
-		requires std::ranges::sized_range<decltype(dest)>
-		{
-			detail::_memory_direct_construct_(
-				dest,
-				std::addressof(*std::begin(dest)),
-				std::size(dest),
-				std::forward<decltype(args)>(args)...);
-		}
-#endif
+		detail::_memory_direct_construct_(
+			dest,
+			std::size(dest),
+			std::forward<decltype(args)>(args)...);
 	};
 }
+
 
 #define ATMA_ASSERT_MEMORY_RANGES_DISJOINT(px, py, sz) \
 	do { \
@@ -1445,9 +1425,9 @@ namespace atma::detail
 			{
 				construct_with_allocator_traits_(allocator, px, *py);
 
-				if constexpr (aser_annotates_construct_concept<decltype(dest), size_t>)
+				if constexpr (aser_annotates_construct_concept<decltype(dest), size_t, decltype(px)>)
 				{
-					aser_memxfer_annotate_construct(dest, i);
+					aser_memxfer_annotate_construct(dest, i, px);
 				}
 			}
 
@@ -1490,10 +1470,15 @@ namespace atma::detail
 			{
 				construct_with_allocator_traits_(allocator, px, std::move(*py));
 
-				if constexpr (aser_annotates_construct_concept<decltype(dest), size_t>)
+				if constexpr (aser_annotates_construct_concept<decltype(dest), size_t, decltype(px)>)
 				{
-					aser_memxfer_annotate_construct(dest, i);
+					aser_memxfer_annotate_construct(dest, i, px);
 				}
+			}
+
+			if constexpr (aser_annotates_post_construct_concept<decltype(dest), size_t>)
+			{
+				aser_memxfer_annotate_post_construct(dest, sz);
 			}
 		},
 
