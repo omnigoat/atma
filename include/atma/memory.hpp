@@ -991,39 +991,33 @@ namespace atma::detail
 }
 
 //
-namespace atma
+namespace atma::detail
 {
-	
-
-
 	// aser = annotating something-er
-	template <typename T, aser_concept Bookkeeping, size_t Extent = std::dynamic_extent, typename A = std::allocator<T>>
-	struct aser_memxfer_t : bounded_memxfer_t<dest_memory_tag_t, T, Extent, A>
+	template <typename T, aser_concept Bookkeeping, size_t Extent = std::dynamic_extent, typename Allocator = std::allocator<T>>
+	struct aser_memxfer_impl_t
+		: bounded_memxfer_t<dest_memory_tag_t, T, Extent, Allocator>
 	{
-		using base_type = bounded_memxfer_t<dest_memory_tag_t, T, Extent, A>;
+		using base_type = bounded_memxfer_t<dest_memory_tag_t, T, Extent, Allocator>;
 		using value_type = typename base_type::value_type;
 		using allocator_type = typename base_type::allocator_type;
 		using tag_type = dest_memory_tag_t;
 		using aser_type = Bookkeeping;
 		using aser_value_type = typename Bookkeeping::value_type;
 
-		template <size_t Offset, size_t Count = std::dynamic_extent>
-		using subspan_type = aser_memxfer_t<T, Bookkeeping, detail::subextent_v<Extent, Offset, Count>, allocator_type>;
+		aser_memxfer_impl_t() = default;
+		aser_memxfer_impl_t(aser_memxfer_impl_t const& rhs) = default;
 
-		aser_memxfer_t() = default;
-		aser_memxfer_t(aser_memxfer_t const& rhs) = default;
-
-		constexpr aser_memxfer_t(allocator_type allocator, T* ptr, aser_value_type aser)
+		constexpr aser_memxfer_impl_t(allocator_type allocator, T* ptr, aser_value_type aser)
 			: base_type(allocator, ptr)
 			, aser_(aser)
 		{}
 
-		constexpr aser_memxfer_t(T* ptr, aser_value_type aser)
+		constexpr aser_memxfer_impl_t(T* ptr, aser_value_type aser)
 			requires std::is_empty_v<allocator_type>
 			: base_type(allocator_type(), ptr)
 			, aser_(aser)
 		{}
-
 
 		// aser observers
 		auto aser_value() const -> aser_value_type { return aser_; }
@@ -1032,58 +1026,95 @@ namespace atma
 		aser_value_type aser_ = aser_value_type();
 	};
 
-#if 0
-	template <typename T, typename A>
-	requires std::integral<std::remove_reference_t<BKI>>
-	struct aser_memxfer_t<T, A, std::dynamic_extent>
-		: bounded_memxfer_t<dest_memory_tag_t, T, A>
+	// dynamic-extent versino
+	template <typename T, aser_concept Bookkeeping, typename Allocator>
+	struct aser_memxfer_impl_t<T, Bookkeeping, std::dynamic_extent, Allocator>
+		: bounded_memxfer_t<dest_memory_tag_t, T, std::dynamic_extent, Allocator>
 	{
-		using base_type = bounded_memxfer_t<dest_memory_tag_t, T, A>;
+		using base_type = bounded_memxfer_t<dest_memory_tag_t, T, std::dynamic_extent, Allocator>;
 		using value_type = typename base_type::value_type;
 		using allocator_type = typename base_type::allocator_type;
-		using aser_value_type = BKI;
 		using tag_type = dest_memory_tag_t;
+		using aser_type = Bookkeeping;
+		using aser_value_type = typename Bookkeeping::value_type;
 
-		aser_memxfer_t(aser_memxfer_t const& rhs)
-			: base_type(rhs)
-			, size_(rhs.size_)
-		{}
+		aser_memxfer_impl_t() = default;
+		aser_memxfer_impl_t(aser_memxfer_impl_t const& rhs) = default;
 
-		constexpr aser_memxfer_t(allocator_type allocator, T* ptr, size_t size, aser_value_type aser)
+		constexpr aser_memxfer_impl_t(allocator_type allocator, T* ptr, size_t size, aser_value_type aser)
 			: base_type(allocator, ptr, size)
-			, size_(aser)
+			, aser_(aser)
 		{}
 
-		constexpr aser_memxfer_t(T* ptr, size_t size, aser_value_type aser)
+		constexpr aser_memxfer_impl_t(T* ptr, size_t size, aser_value_type aser)
 			requires std::is_empty_v<allocator_type>
-			: base_type(allocator_type(), ptr)
-			, size_(aser)
+			: base_type(allocator_type(), ptr, size)
+			, aser_(aser)
 		{}
 
-		auto begin()       -> value_type* { return this->alloc_and_ptr_.second(); }
-		auto end()         -> value_type* { return this->alloc_and_ptr_.second() + this->size_; }
-		auto begin() const -> value_type const* { return this->alloc_and_ptr_.second(); }
-		auto end() const   -> value_type const* { return this->alloc_and_ptr_.second() + size_; }
-
-
-		constexpr auto subspan(size_t offset, size_t count = dynamic_extent) const {
-			return aser_memxfer_t(this->get_allocator(), this->data() + offset, (count == dynamic_extent) ? size() - offset : count);
-		}
-
-		// immutable transforms
-		auto skip(size_t n) const -> aser_memxfer_t<T, A, BKI>
-		{
-			ATMA_ASSERT(n < size_);
-			return aser_memxfer_t<T, A, BKI>(this->get_allocator(), this->data() + n, this->size_ - n);
-		}
+		// aser observers
+		auto aser_value() const -> aser_value_type { return aser_; }
 
 	private:
-		size_t size_ = dynamic_extent;
+		aser_value_type aser_ = aser_value_type();
 	};
-#endif
 }
 
+namespace atma
+{
+	// aser = annotating something-er
+	template <typename T, aser_concept Bookkeeping, size_t Extent = std::dynamic_extent, typename Allocator = std::allocator<T>>
+	struct aser_memxfer_t
+		: detail::aser_memxfer_impl_t<T, Bookkeeping, Extent, Allocator>
+	{
+		using base_type = detail::aser_memxfer_impl_t<T, Bookkeeping, Extent, Allocator>;
+		using value_type = typename base_type::value_type;
+		using allocator_type = typename base_type::allocator_type;
+		using tag_type = dest_memory_tag_t;
+		using aser_type = Bookkeeping;
+		using aser_value_type = typename Bookkeeping::value_type;
 
+		template <size_t Offset, size_t Count = std::dynamic_extent>
+		using subspan_type = aser_memxfer_t<T, aser_type, detail::subextent_v<Extent, Offset, Count>, allocator_type>;
+		using dynamic_subspan_type = aser_memxfer_t<T, aser_type, std::dynamic_extent, allocator_type>;
+
+		//using base_type::base_type;
+
+		constexpr aser_memxfer_t(allocator_type allocator, T* ptr, aser_value_type aser)
+			: base_type(allocator, ptr, aser)
+		{}
+
+		constexpr aser_memxfer_t(T* ptr, aser_value_type aser)
+			: base_type(Allocator(), ptr, aser)
+		{}
+
+		// compile-time subviews
+		template <size_t Offset, size_t Count = std::dynamic_extent>
+		auto subspan() -> subspan_type<Offset, Count>
+		{
+			if constexpr (detail::subextent_v<Extent, Offset, Count> == std::dynamic_extent)
+			{
+				return {this->get_allocator(), this->data() + Offset, detail::subextent(this->size(), Offset, Count), this->aser_value()};
+			}
+			else
+			{
+				return {this->get_allocator(), this->data() + Offset, this->aser_value()};
+			}
+		}
+
+		template <size_t N> constexpr auto skip() { return this->subspan<N>(); }
+		template <size_t N> constexpr auto take() { return this->subspan<0, N>(); }
+
+		// run-time subviews
+		constexpr auto subspan(size_t offset, size_t count = std::dynamic_extent) -> dynamic_subspan_type
+		{
+			return {this->get_allocator(), this->data() + offset, detail::subextent(this->size(), offset, count), this->aser_value()};
+		}
+
+		constexpr auto skip(size_t n) { return this->subspan(n); }
+		constexpr auto take(size_t n) { return this->subspan(0, n); }
+	};
+}
 
 
 //

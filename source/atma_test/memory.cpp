@@ -380,46 +380,31 @@ SCENARIO_TEMPLATE("a (dest|src)_memxfer_t is directly constructed", xfer, XFER_T
 	}
 }
 
-#if 1
 template <typename T>
-struct bki
+struct general_append_oper_t
 {
 	using value_type = std::tuple<T*, size_t&>;
-	//using applier_type = bkia;
 
+
+	// check that we're constructing at the end of our initialized range
 	static void on_construct(value_type x, size_t idx, T* addr)
 	{
 		ATMA_ASSERT(addr == (std::get<0>(x) + std::get<1>(x) + idx));
 	}
 
+
+	// update size
 	static void on_post_construct(value_type x, size_t sz)
 	{
 		std::get<1>(x) += sz;
 	}
 };
 
-SCENARIO_TEMPLATE("a bookkeeping_memxfer_t is directly constructed", xfer, XFER_TYPE_COMBINATIONS)
+SCENARIO_TEMPLATE("a aser_memxfer_t is directly constructed", xfer, XFER_TYPE_COMBINATIONS)
 {
-	struct bkia
-	{
-		//static void on_construct(auto&& dest, size_t idx)
-		//{
-		//	ATMA_ASSERT(idx == v);
-		//	++v;
-		//}
-		//
-		//static void on_post_construct(size_t& v, size_t sz)
-		//{
-		//	v += sz;
-		//}
-	};
-
-	
-
-
 	using value_type     = typename xfer::value_type;
 	using allocator_type = typename xfer::allocator_type;
-	using memxfer_type   = atma::aser_memxfer_t<value_type, bki<value_type>, 4, allocator_type>;
+	using memxfer_type   = atma::aser_memxfer_t<value_type, general_append_oper_t<value_type>, 4, allocator_type>;
 	using storage_type   = atma::vector<value_type, allocator_type>;
 
 	using xferti = xfer_type_info_t<value_type>;
@@ -435,12 +420,15 @@ SCENARIO_TEMPLATE("a bookkeeping_memxfer_t is directly constructed", xfer, XFER_
 		size_t hooray = 0;
 		auto bkmx = memxfer_type(allocator_type(), storage.data(), std::tie(x, hooray));
 
-		atma::memory_default_construct(bkmx);
-		hooray = 0;
-		atma::memory_copy_construct(bkmx, atma::xfer_src(storage2));
+		//atma::memory_default_construct(bkmx);
+		//hooray = 0;
+		
+		// copy two things
+		atma::memory_copy_construct(bkmx, atma::xfer_src(storage2), 2);
+		// copy two more things into subview
+		atma::memory_copy_construct(bkmx.skip<2>(), atma::xfer_src(storage2, 2, 2), 2);
 	}
 }
-#endif
 
 
 SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, XFER_TYPE_COMBINATIONS)
