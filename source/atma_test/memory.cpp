@@ -404,7 +404,7 @@ SCENARIO_TEMPLATE("a aser_memxfer_t is directly constructed", xfer, XFER_TYPE_CO
 {
 	using value_type     = typename xfer::value_type;
 	using allocator_type = typename xfer::allocator_type;
-	using memxfer_type   = atma::aser_memxfer_t<value_type, general_append_oper_t<value_type>, 4, allocator_type>;
+	using memxfer_type   = atma::aser_memxfer_t<atma::dest_memory_tag_t, value_type, general_append_oper_t<value_type>, 4, allocator_type>;
 	using storage_type   = atma::vector<value_type, allocator_type>;
 
 	using xferti = xfer_type_info_t<value_type>;
