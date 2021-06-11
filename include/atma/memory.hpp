@@ -547,7 +547,7 @@ namespace atma
 	{
 		typename rmref_t<Memory>::value_type;
 		typename rmref_t<Memory>::allocator_type;
-		{ std::data(memory) };
+		{ std::data(memory) } -> std::same_as<std::add_pointer_t<typename rmref_t<Memory>::value_type>>;
 		{ atma::get_allocator(memory) };
 	};
 
@@ -573,6 +573,10 @@ namespace atma
 	template <typename Memory>
 	concept src_bounded_memory_concept = bounded_memory_concept<Memory> &&
 		std::is_same_v<src_memory_tag_t, typename rmref_t<Memory>::tag_type>;
+
+	template <typename Memory>
+	requires memory_concept<rmref_t<Memory>>
+	using memory_value_type_t = typename rmref_t<Memory>::value_type;
 }
 
 
@@ -994,14 +998,14 @@ namespace atma::detail
 namespace atma::detail
 {
 	// aser = annotating something-er
-	template <typename T, aser_concept Bookkeeping, size_t Extent = std::dynamic_extent, typename Allocator = std::allocator<T>>
+	template <typename Tag, typename T, aser_concept Bookkeeping, size_t Extent = std::dynamic_extent, typename Allocator = std::allocator<T>>
 	struct aser_memxfer_impl_t
-		: bounded_memxfer_t<dest_memory_tag_t, T, Extent, Allocator>
+		: bounded_memxfer_t<Tag, T, Extent, Allocator>
 	{
-		using base_type = bounded_memxfer_t<dest_memory_tag_t, T, Extent, Allocator>;
+		using base_type = bounded_memxfer_t<Tag, T, Extent, Allocator>;
 		using value_type = typename base_type::value_type;
 		using allocator_type = typename base_type::allocator_type;
-		using tag_type = dest_memory_tag_t;
+		using tag_type = typename base_type::tag_type;
 		using aser_type = Bookkeeping;
 		using aser_value_type = typename Bookkeeping::value_type;
 
@@ -1026,15 +1030,15 @@ namespace atma::detail
 		aser_value_type aser_ = aser_value_type();
 	};
 
-	// dynamic-extent versino
-	template <typename T, aser_concept Bookkeeping, typename Allocator>
-	struct aser_memxfer_impl_t<T, Bookkeeping, std::dynamic_extent, Allocator>
-		: bounded_memxfer_t<dest_memory_tag_t, T, std::dynamic_extent, Allocator>
+	// dynamic-extent version
+	template <typename Tag, typename T, aser_concept Bookkeeping, typename Allocator>
+	struct aser_memxfer_impl_t<Tag, T, Bookkeeping, std::dynamic_extent, Allocator>
+		: bounded_memxfer_t<Tag, T, std::dynamic_extent, Allocator>
 	{
-		using base_type = bounded_memxfer_t<dest_memory_tag_t, T, std::dynamic_extent, Allocator>;
+		using base_type = bounded_memxfer_t<Tag, T, std::dynamic_extent, Allocator>;
 		using value_type = typename base_type::value_type;
 		using allocator_type = typename base_type::allocator_type;
-		using tag_type = dest_memory_tag_t;
+		using tag_type = typename base_type::tag_type;
 		using aser_type = Bookkeeping;
 		using aser_value_type = typename Bookkeeping::value_type;
 
@@ -1063,20 +1067,20 @@ namespace atma::detail
 namespace atma
 {
 	// aser = annotating something-er
-	template <typename T, aser_concept Bookkeeping, size_t Extent = std::dynamic_extent, typename Allocator = std::allocator<T>>
+	template <typename Tag, typename T, aser_concept Bookkeeping, size_t Extent = std::dynamic_extent, typename Allocator = std::allocator<T>>
 	struct aser_memxfer_t
-		: detail::aser_memxfer_impl_t<T, Bookkeeping, Extent, Allocator>
+		: detail::aser_memxfer_impl_t<Tag, T, Bookkeeping, Extent, Allocator>
 	{
-		using base_type = detail::aser_memxfer_impl_t<T, Bookkeeping, Extent, Allocator>;
+		using base_type = detail::aser_memxfer_impl_t<Tag, T, Bookkeeping, Extent, Allocator>;
 		using value_type = typename base_type::value_type;
 		using allocator_type = typename base_type::allocator_type;
-		using tag_type = dest_memory_tag_t;
+		using tag_type = typename base_type::tag_type;
 		using aser_type = Bookkeeping;
 		using aser_value_type = typename Bookkeeping::value_type;
 
 		template <size_t Offset, size_t Count = std::dynamic_extent>
-		using subspan_type = aser_memxfer_t<T, aser_type, detail::subextent_v<Extent, Offset, Count>, allocator_type>;
-		using dynamic_subspan_type = aser_memxfer_t<T, aser_type, std::dynamic_extent, allocator_type>;
+		using subspan_type = aser_memxfer_t<Tag, T, aser_type, detail::subextent_v<Extent, Offset, Count>, allocator_type>;
+		using dynamic_subspan_type = aser_memxfer_t<Tag, T, aser_type, std::dynamic_extent, allocator_type>;
 
 		//using base_type::base_type;
 
@@ -1341,14 +1345,12 @@ namespace atma::detail
 {
 	constexpr auto _memory_default_construct_ = [](dest_memory_concept auto&& dest, size_t sz)
 	{
-		auto* px = std::data(dest);
-
-		using value_type = rmref_t<decltype(*px)>;
+		auto px = std::data(dest);
 
 		for (size_t i = 0; i != sz; ++i, ++px)
 		{
 			// allocator is not capable of default-constructing
-			::new (px) value_type;
+			::new (px) memory_value_type_t<decltype(dest)>;
 
 			if constexpr (aser_annotates_construct_concept<decltype(dest), size_t, decltype(px)>)
 			{
