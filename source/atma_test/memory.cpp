@@ -400,6 +400,21 @@ struct general_append_oper_t
 	}
 };
 
+template <size_t BufSize>
+struct thingy_t
+{
+	int data[BufSize];
+	size_t size = 0;
+
+	using value_type = int;
+};
+
+template <typename tag_type, size_t BufSize>
+auto make_aser_memxfer(thingy_t<BufSize>& t) -> atma::aser_memxfer_t<tag_type, int, general_append_oper_t<int>, BufSize, std::allocator<int>>
+{
+	return {std::allocator<int>(), t.data, std::tie(t.data, t.size)};
+}
+
 SCENARIO_TEMPLATE("a aser_memxfer_t is directly constructed", xfer, XFER_TYPE_COMBINATIONS)
 {
 	using value_type     = typename xfer::value_type;
@@ -422,7 +437,10 @@ SCENARIO_TEMPLATE("a aser_memxfer_t is directly constructed", xfer, XFER_TYPE_CO
 
 		//atma::memory_default_construct(bkmx);
 		//hooray = 0;
-		
+		thingy_t<8> tt;
+		auto go = atma::xfer_dest(tt);
+		atma::memory_value_construct(go);
+
 		// copy two things
 		atma::memory_copy_construct(bkmx, atma::xfer_src(storage2), 2);
 		// copy two more things into subview
