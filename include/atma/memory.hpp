@@ -1190,6 +1190,25 @@ namespace atma::detail
 		}
 	};
 
+	template <typename tag_type, typename M>
+	concept first_concept = requires(M&& memory) { { make_aser_memxfer<tag_type>(memory) }; };
+
+	template <typename tag_type>
+	struct xfer_make_from_aser_appropriate_memory_
+	{
+		template <typename M>
+		requires 
+			requires(M&& memory) {{ make_aser_memxfer<tag_type>(memory) }; } ||
+			requires { typename rmref_t<M>::aser_type<tag_type>; }
+		auto operator ()(M&& memory)
+		{
+			if constexpr (first_concept<tag_type, M>)
+				return make_aser_memxfer<tag_type>(memory);
+			else
+				return rmref_t<M>::template aser_type<tag_type>(get_allocator(memory), std::data(memory));
+		};
+	};
+
 	template <typename tag_type>
 	struct xfer_make_from_sized_contiguous_range_
 	{
@@ -1274,6 +1293,9 @@ namespace atma::detail
 
 		// then try _only_ the contiguous-range concept (use std::distance instead of std::size)
 		xfer_make_from_contiguous_range_<tag_type>,
+
+		// then try any memory that can be turned into an aser_memxfer
+		xfer_make_from_aser_appropriate_memory_<tag_type>,
 
 		// then try anything that satisfies the memory concept (get_allocator & std::data)
 		xfer_make_from_memory_<tag_type>,
