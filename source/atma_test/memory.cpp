@@ -410,16 +410,16 @@ struct thingy_t
 };
 
 template <typename tag_type, size_t BufSize>
-auto make_aser_memxfer(thingy_t<BufSize>& t) -> atma::aser_memxfer_t<tag_type, int, general_append_oper_t<int>, BufSize, std::allocator<int>>
+auto make_lich_memxfer(thingy_t<BufSize>& t) -> atma::lich_memxfer_t<tag_type, int, general_append_oper_t<int>, BufSize, std::allocator<int>>
 {
 	return {std::allocator<int>(), t.data, std::tie(t.data, t.size)};
 }
 
-SCENARIO_TEMPLATE("a aser_memxfer_t is directly constructed", xfer, XFER_TYPE_COMBINATIONS)
+SCENARIO_TEMPLATE("a lich_memxfer_t is directly constructed", xfer, XFER_TYPE_COMBINATIONS)
 {
 	using value_type     = typename xfer::value_type;
 	using allocator_type = typename xfer::allocator_type;
-	using memxfer_type   = atma::aser_memxfer_t<atma::dest_memory_tag_t, value_type, general_append_oper_t<value_type>, 4, allocator_type>;
+	using memxfer_type   = atma::lich_memxfer_t<atma::dest_memory_tag_t, value_type, general_append_oper_t<value_type>, 4, allocator_type>;
 	using storage_type   = atma::vector<value_type, allocator_type>;
 
 	using xferti = xfer_type_info_t<value_type>;
