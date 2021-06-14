@@ -1200,7 +1200,21 @@ namespace atma::detail
 		requires requires(M&& memory) { { make_lich_memxfer<tag_type>(memory) }; }
 		auto operator ()(M&& memory)
 		{
-			return make_lich_memxfer<tag_type>(memory);
+			return make_lich_memxfer<tag_type>(std::forward<M>(memory));
+		};
+
+		template <typename M>
+		requires requires(M&& memory, size_t size) { { make_lich_memxfer<tag_type>(memory, size) }; }
+		auto operator ()(M&& memory, size_t size)
+		{
+			return make_lich_memxfer<tag_type>(std::forward<M>(memory), size);
+		};
+
+		template <typename M>
+		requires requires(M&& memory, size_t offset, size_t size) { { make_lich_memxfer<tag_type>(memory, offset, size) }; }
+		auto operator ()(M&& memory, size_t offset, size_t size)
+		{
+			return make_lich_memxfer<tag_type>(std::forward<M>(memory), offset, size);
 		};
 	};
 
@@ -1208,10 +1222,24 @@ namespace atma::detail
 	struct xfer_make_from_lich_mem_fn_
 	{
 		template <typename M>
-		requires requires(M&& m) { { m.make_lich_memxfer() }; }
+		requires requires(M&& memory) { { memory.make_lich_memxfer() }; }
 		auto operator ()(M&& memory)
 		{
 			return memory.make_lich_memxfer();
+		};
+
+		template <typename M>
+		requires requires(M&& memory, size_t size) { { memory.make_lich_memxfer(size) }; }
+		auto operator ()(M&& memory, size_t size)
+		{
+			return memory.make_lich_memxfer(size);
+		};
+
+		template <typename M>
+		requires requires(M&& memory, size_t offset, size_t size) { { memory.make_lich_memxfer(offset, size) }; }
+		auto operator ()(M&& memory, size_t offset, size_t size)
+		{
+			return memory.make_lich_memxfer(offset, size);
 		};
 	};
 
@@ -1262,6 +1290,12 @@ namespace atma::detail
 		auto operator ()(M&& memory, size_t size) -> bounded_memxfer_range_of_t<tag_type, rmref_t<M>>
 		{
 			return {get_allocator(memory), std::data(memory), size};
+		}
+
+		template <memory_concept M>
+		auto operator ()(M&& memory, size_t offset, size_t size) -> bounded_memxfer_range_of_t<tag_type, rmref_t<M>>
+		{
+			return {get_allocator(memory), std::data(memory) + offset, size};
 		}
 	};
 
