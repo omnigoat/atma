@@ -602,6 +602,9 @@ namespace atma
 		using allocator_type = A;
 		using tag_type = Tag;
 
+		constexpr memxfer_t(memxfer_t const&) = default;
+		constexpr ~memxfer_t() = default;
+
 		// default-constructor only allowed if allocator doesn't hold state
 		constexpr memxfer_t(T* ptr = nullptr)
 		requires std::is_empty_v<allocator_type>
@@ -611,10 +614,6 @@ namespace atma
 		constexpr memxfer_t(allocator_type a, T* ptr)
 			: alloc_and_ptr_(a, ptr)
 		{}
-
-		constexpr memxfer_t(memxfer_t const&) = default;
-
-		constexpr ~memxfer_t() = default;
 
 		// we, a range of const-elements, can always adapt a range of non-const elements
 		constexpr memxfer_t(memxfer_t<Tag, std::remove_const_t<T>, A> const& rhs)
@@ -710,7 +709,7 @@ namespace atma::detail
 		static constexpr size_t extent_v = std::dynamic_extent;
 
 		constexpr bounded_memxfer_impl_t(bounded_memxfer_impl_t const& rhs)
-			: base_type(rhs.get_allocator(), rhs.data())
+			: base_type(rhs)
 			, size_(rhs.size())
 		{}
 
@@ -718,7 +717,7 @@ namespace atma::detail
 		template <size_t RhsExtent>
 		constexpr bounded_memxfer_impl_t(bounded_memxfer_impl_t<Tag, T, RhsExtent, A> const& rhs)
 			requires !std::is_const_v<T>
-			: base_type(rhs.get_allocator(), rhs.data())
+			: base_type(rhs)
 			, size_(rhs.size())
 		{}
 
@@ -955,6 +954,53 @@ namespace atma::detail
 		{ _lich_memxfer_annotate_post_construct_<rmref_t<Memory>>(memory, sz) };
 	};
 }
+
+
+//
+// lich_memxfer_annotate_post_construct
+//
+namespace atma::detail
+{
+	template <lich_memory_concept Memory>
+	constexpr auto _lich_memxfer_annotate_post_memcpy_ = functor_list_t
+	{
+		// version passing in the memory
+		[]<typename... Args>(Memory& memory, Args&&... args)
+		requires requires(Args&&... args) {{ lich_applier_type_t<Memory>::on_post_memcpy(memory, std::forward<Args>(args)...) }; }
+			{ lich_applier_type_t<Memory>::on_post_memcpy(memory, std::forward<Args>(args)...); },
+
+		// version passing in only the lich_value
+		[]<typename... Args>(Memory& memory, Args&&... args)
+		requires requires(Args&&... args) {{ lich_applier_type_t<Memory>::on_post_memcpy(memory.lich_value(), std::forward<Args>(args)...) }; }
+			{ lich_applier_type_t<Memory>::on_post_memcpy(memory.lich_value(), std::forward<Args>(args)...); },
+
+		// applier didn't have it, try lich
+		[]<typename... Args>(Memory& memory, Args&&... args)
+		requires requires(Args&&... args) {{ lich_type_t<Memory>::on_post_memcpy(memory, std::forward<Args>(args)...) }; }
+			{ lich_type_t<Memory>::on_post_memcpy(memory, std::forward<Args>(args)...); },
+
+		// applier didn't have it, try lich
+		[]<typename... Args>(Memory& memory, Args&&... args)
+		requires requires(Args&&... args) {{ lich_type_t<Memory>::on_post_memcpy(memory.lich_value(), std::forward<Args>(args)...) }; }
+			{ lich_type_t<Memory>::on_post_memcpy(memory.lich_value(), std::forward<Args>(args)...); }
+	};
+
+	template <lich_memory_concept Memory, typename... Args>
+	inline void lich_memxfer_annotate_post_memcpy(Memory& memory, Args&&... args)
+	{
+		_lich_memxfer_annotate_post_memcpy_<Memory>(memory, std::forward<Args>(args)...);
+	}
+
+	template <typename Memory, typename... Args>
+	concept lich_annotates_post_memcpy_concept = lich_memory_concept<rmref_t<Memory>> && requires(Memory& memory, size_t sz)
+	{
+		{ _lich_memxfer_annotate_post_memcpy_<rmref_t<Memory>>(memory, sz) };
+	};
+}
+
+
+
+
 
 namespace atma::detail
 {
@@ -1612,96 +1658,120 @@ namespace atma
 	}
 }
 
-// memcpy / memmove
-namespace atma::memory
+//
+// memory_copy
+// -------------
+//
+namespace atma
+{
+	template <dest_memory_concept Dest, src_memory_concept Src>
+	inline auto memory_copy(Dest dest, Src src, size_t const size_bytes) -> void
+	{
+		ATMA_ASSERT(size_bytes != unbounded_memory_size);
+		ATMA_ASSERT(size_bytes % sizeof memory_value_type_t<Dest> == 0);
+		ATMA_ASSERT(size_bytes % sizeof memory_value_type_t<Src> == 0);
+
+		std::memcpy(dest.data(), src.data(), size_bytes);
+
+		if constexpr (detail::lich_annotates_post_memcpy_concept<Dest, size_t>)
+		{
+			detail::lich_memxfer_annotate_post_memcpy(dest, size_bytes);
+		}
+	}
+
+	template <typename DT, typename DA, typename ST, typename SA>
+	inline auto memory_copy(dest_bounded_memxfer_t<DT, DA> dest, src_bounded_memxfer_t<ST, SA> src) -> void
+	{
+		ATMA_ASSERT(dest.size_bytes() == src.size_bytes());
+		auto sz = dest.size_bytes();
+		memory_copy(dest, src, sz);
+
+		if constexpr (detail::lich_annotates_post_memcpy_concept<decltype(dest), size_t>)
+		{
+			detail::lich_memxfer_annotate_post_memcpy(dest, sz);
+		}
+	}
+
+	template <typename DT, typename DA, typename ST, typename SA>
+	inline auto memory_copy(dest_bounded_memxfer_t<DT, DA> dest, src_memxfer_t<ST, SA> src) -> void
+	{
+		auto sz = dest.size_bytes();
+		memory_copy(dest, src, sz);
+
+		if constexpr (detail::lich_annotates_post_memcpy_concept<decltype(dest), size_t>)
+		{
+			detail::lich_memxfer_annotate_post_memcpy(dest, sz);
+		}
+	}
+
+	template <typename DT, typename DA, typename ST, typename SA>
+	inline auto memory_copy(dest_memxfer_t<DT, DA> dest, src_bounded_memxfer_t<ST, SA> src) -> void
+	{
+		auto sz = src.size_bytes();
+		memory_copy(dest, src, sz);
+
+		if constexpr (detail::lich_annotates_post_memcpy_concept<decltype(dest), size_t>)
+		{
+			detail::lich_memxfer_annotate_post_memcpy(dest, sz);
+		}
+	}
+}
+
+
+// memmove
+namespace atma
 {
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto memcpy(dest_memxfer_t<DT, DA> dest_range, src_memxfer_t<ST, SA> src_range, size_t size_bytes) -> void
+	inline auto memory_move(dest_memxfer_t<DT, DA> dest, src_memxfer_t<ST, SA> src, size_t size_bytes) -> void
 	{
-		static_assert(sizeof DT == sizeof ST);
-
 		ATMA_ASSERT(size_bytes != unbounded_memory_size);
 		ATMA_ASSERT(size_bytes % sizeof DT == 0);
 		ATMA_ASSERT(size_bytes % sizeof ST == 0);
 
-		std::memcpy(dest_range.data(), src_range.data(), size_bytes);
+		std::memmove(dest.data(), src.data(), size_bytes);
+
+		if constexpr (detail::lich_annotates_post_memcpy_concept<decltype(dest), size_t>)
+		{
+			detail::lich_memxfer_annotate_post_memcpy(dest, size_bytes);
+		}
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto memcpy(dest_bounded_memxfer_t<DT, DA> dest_range, src_bounded_memxfer_t<ST, SA> src_range) -> void
+	inline auto memory_move(dest_bounded_memxfer_t<DT, DA> dest, src_bounded_memxfer_t<ST, SA> src) -> void
 	{
-		ATMA_ASSERT(dest_range.size_bytes() == src_range.size_bytes());
-		auto sz = dest_range.size_bytes();
-		memcpy(dest_range, src_range, sz);
+		ATMA_ASSERT(dest.size_bytes() == src.size_bytes());
+		auto sz = dest.size_bytes();
+		memory_move(dest, src, sz);
+
+		if constexpr (detail::lich_annotates_post_memcpy_concept<decltype(dest), size_t>)
+		{
+			detail::lich_memxfer_annotate_post_memcpy(dest, sz);
+		}
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto memcpy(dest_bounded_memxfer_t<DT, DA> dest_range, src_memxfer_t<ST, SA> src_range) -> void
+	inline auto memory_move(dest_bounded_memxfer_t<DT, DA> dest, src_memxfer_t<ST, SA> src) -> void
 	{
-		auto sz = dest_range.size_bytes();
-		memcpy(dest_range, src_range, sz);
+		auto sz = dest.size_bytes();
+		memory_move(dest, src, sz);
+
+		if constexpr (detail::lich_annotates_post_memcpy_concept<decltype(dest), size_t>)
+		{
+			detail::lich_memxfer_annotate_post_memcpy(dest, sz);
+		}
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto memcpy(dest_memxfer_t<DT, DA> dest_range, src_bounded_memxfer_t<ST, SA> src_range) -> void
+	inline auto memory_move(dest_memxfer_t<DT, DA> dest, src_bounded_memxfer_t<ST, SA> src) -> void
 	{
-		auto sz = src_range.size_bytes();
-		memcpy(dest_range, src_range, sz);
+		auto sz = src.size_bytes();
+		memory_move(dest, src, sz);
+
+		if constexpr (lich_annotates_post_memcpy_concept<decltype(dest), size_t>)
+		{
+			lich_memxfer_annotate_post_memcpy(dest, sz);
+		}
 	}
-
-#if 1
-	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto memmove(dest_memxfer_t<DT, DA> dest_range, src_memxfer_t<ST, SA> src_range, size_t size_bytes) -> void
-	{
-		static_assert(sizeof DT == sizeof ST);
-
-		ATMA_ASSERT(size_bytes != unbounded_memory_size);
-		ATMA_ASSERT(size_bytes % sizeof DT == 0);
-		ATMA_ASSERT(size_bytes % sizeof ST == 0);
-
-		std::memmove(dest_range.data(), src_range.data(), size_bytes);
-	}
-
-#else
-	template <typename D, typename S>
-	inline auto memmove(D&& dest, S&& src, size_t sz) -> void
-	{
-		using DR = std::remove_reference_t<D>;
-		using SR = std::remove_reference_t<S>;
-
-		//if constexpr (concepts::models_v<)
-		//std::is_invocable_v<
-
-		ATMA_ASSERT(sz != unbounded_memory_size);
-		//ATMA_ASSERT(dest_range.unbounded() || dest_range.size() == sz);
-		//ATMA_ASSERT(src_range.unbounded() || src_range.size() == sz);
-
-		std::memmove(dest_range.begin(), src_range.begin(), sz * sizeof(DT));
-	}
-#endif
-
-	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto memmove(dest_bounded_memxfer_t<DT, DA> dest_range, src_bounded_memxfer_t<ST, SA> src_range) -> void
-	{
-		ATMA_ASSERT(dest_range.size_bytes() == src_range.size_bytes());
-		auto sz = dest_range.size_bytes();
-		memmove(dest_range, src_range, sz);
-	}
-
-	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto memmove(dest_bounded_memxfer_t<DT, DA> dest_range, src_memxfer_t<ST, SA> src_range) -> void
-	{
-		auto sz = dest_range.size_bytes();
-		memmove(dest_range, src_range, sz);
-	}
-
-	template <typename DT, typename DA, typename ST, typename SA>
-	inline auto memmove(dest_memxfer_t<DT, DA> dest_range, src_bounded_memxfer_t<ST, SA> src_range) -> void
-	{
-		auto sz = src_range.size_bytes();
-		memmove(dest_range, src_range, sz);
-	}
-
 }
 
 // memfill
