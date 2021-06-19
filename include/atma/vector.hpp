@@ -129,11 +129,6 @@ namespace atma
 
 
 	template <typename T, typename A>
-	inline vector<T,A>::vector() noexcept(std::is_nothrow_default_constructible_v<allocator_type>)
-	{
-	}
-
-	template <typename T, typename A>
 	inline vector<T, A>::vector(size_t size)
 		: capacity_(size)
 		, size_(size)
@@ -423,7 +418,7 @@ namespace atma
 		}
 		else if (size_ < size)
 		{
-			memory_copy_construct(
+			memory_direct_construct(
 				xfer_dest(imem_ + size_, size - size_),
 				x);
 		}
@@ -480,7 +475,7 @@ namespace atma
 		auto const offset = std::distance(cbegin(), here);
 		IMEM_GUARD_LT(size_ + 1);
 
-		memory::memmove(
+		memory_move(
 			xfer_dest(imem_ + offset + 1),
 			xfer_src(imem_ + offset),
 			(size_ - offset) * sizeof value_type);
@@ -503,7 +498,7 @@ namespace atma
 
 		IMEM_GUARD_LT(size_ + 1);
 
-		memory::memmove(
+		memory_move(
 			xfer_dest(imem_ + offset + 1),
 			xfer_src(imem_ + offset),
 			(size_ - offset) * sizeof value_type);
@@ -546,7 +541,7 @@ namespace atma
 		{
 			if constexpr (std::is_trivial_v<value_type>)
 			{
-				memory::memmove(
+				memory_move(
 					xfer_dest(imem_ + reloc_offset),
 					xfer_src(imem_ + offset),
 					mvsz * sizeof value_type);

@@ -997,7 +997,8 @@ SCENARIO_OF("memory/operations", "destruct is called")
 	}
 }
 
-SCENARIO_OF("memory/operations", "memcpy or memmove is called")
+#if 1
+SCENARIO_OF("memory/operations", "memory_copy or memory_move is called")
 {
 	GIVEN("a memory-range of instantiated integers")
 	{
@@ -1016,9 +1017,9 @@ SCENARIO_OF("memory/operations", "memcpy or memmove is called")
 		{
 			auto src_storage = std::vector<value_type>{5, 6, 7, 8};
 
-			THEN("memcpy performs correctly")
+			THEN("memory_copy performs correctly")
 			{
-				atma::memory::memcpy(
+				atma::memory_copy(
 					atma::xfer_dest(dest_memory, 2),
 					atma::xfer_src(src_storage, 2, 2));
 
@@ -1026,9 +1027,9 @@ SCENARIO_OF("memory/operations", "memcpy or memmove is called")
 					7, 8, 3, 4);
 			}
 
-			THEN("memmove performs overlapping regions correctly")
+			THEN("memory_move performs overlapping regions correctly")
 			{
-				atma::memory::memmove(
+				atma::memory_move(
 					atma::xfer_dest(dest_memory, 2),
 					atma::xfer_src(dest_memory + 1, 2));
 
@@ -1038,4 +1039,4 @@ SCENARIO_OF("memory/operations", "memcpy or memmove is called")
 		}
 	}
 }
-
+#endif
