@@ -81,9 +81,25 @@ namespace atma::detail
 //
 //
 //
-#if 0
+#if 1
 namespace atma::detail
 {
+	struct rope_charbuf_lich_oper_t
+	{
+		using value_type = struct{ char* ptr; size_t& size; };
+
+		// update size
+		template <lich_memory_concept Dest>
+		static void on_post_memcpy(Dest&& dest, size_t sz)
+		{
+			auto x = dest.lich_value();
+
+			ATMA_ASSERT(dest.data() == x.ptr + x.size);
+
+			x.size += sz;
+		}
+	};
+
 	template <size_t Extent>
 	struct charbuf_t
 	{
@@ -98,11 +114,21 @@ namespace atma::detail
 		auto begin() const -> value_type const* { return chars_; }
 		auto end() const -> value_type const* { return chars_ + size_; }
 
-		//void push_back(value_type x)
+		auto data() -> value_type* { return chars_; }
+
+		template <typename tag_type, size_t Extent>
+		friend auto make_lich_memxfer(charbuf_t<Extent>& t) -> atma::lich_memxfer_t<tag_type, int, rope_charbuf_lich_oper_t, Extent, std::allocator<int>>;
+
 	private:
 		size_t size_ = 0;
 		char chars_[Extent];
 	};
+
+	template <typename tag_type, size_t Extent>
+	inline auto make_lich_memxfer(charbuf_t<Extent>& t) -> atma::lich_memxfer_t<tag_type, int, rope_charbuf_lich_oper_t, Extent, std::allocator<int>>
+	{
+		return {std::allocator<int>(), t.chars_, std::tie(t.chars_, t.size_)};
+	}
 }
 #endif
 
@@ -642,7 +668,7 @@ namespace atma::detail
 	template <typename... Args>
 	inline auto rope_node_leaf_construct_(size_t& buf_size, char* buf, src_bounded_memxfer_t<char const> x, Args&&... args)
 	{
-		atma::memory::memcpy(xfer_dest(buf + buf_size), x);
+		atma::memory_copy(xfer_dest(buf + buf_size), x);
 		buf_size += x.size();
 
 		rope_node_leaf_construct_(buf_size, buf, std::forward<Args>(args)...);
@@ -823,8 +849,8 @@ namespace atma::detail
 			//    atma::memory_copy(xfer_dest_append(buf + leaf_info.bytes, buf_size), src);
 			//
 			// and buf_size would automatically be updated
-
-			memory::memcpy(
+			
+			memory_copy(
 				xfer_dest(buf + leaf_info.bytes),
 				src);
 
