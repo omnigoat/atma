@@ -34,16 +34,17 @@ namespace atma
 		using const_iterator  = T const*;
 		using buffer_type     = atma::basic_unique_memory_t<byte, Allocator>;
 		
-		vector() noexcept(std::is_nothrow_default_constructible_v<allocator_type>);
-		explicit vector(size_t size);
-		explicit vector(size_t size, T const&);
-		vector(std::initializer_list<T>);
-		template <typename I, typename = detail::valid_iterator_t<I>>
-		vector(I begin, I end);
+		vector() noexcept(std::is_nothrow_default_constructible_v<allocator_type>) = default;
 		vector(vector const&);
 		vector(vector&&) noexcept;
 		~vector();
-
+		
+		vector(std::initializer_list<T>);
+		explicit vector(size_t size);
+		explicit vector(size_t size, T const&);
+		template <typename I, typename = detail::valid_iterator_t<I>>
+		vector(I begin, I end);
+		
 		auto operator = (vector const&) -> vector&;
 		auto operator = (vector&&) -> vector&; // do we want this?
 		auto operator [] (int) const -> T const&;
@@ -100,8 +101,8 @@ namespace atma
 		using internal_memory_t = atma::basic_memory_t<T, Allocator>;
 
 		internal_memory_t imem_;
-		size_t capacity_;
-		size_t size_;
+		size_t capacity_ = 0;
+		size_t size_ = 0;
 
 		template <typename Y, typename B> friend struct vector;
 	};
@@ -129,8 +130,6 @@ namespace atma
 
 	template <typename T, typename A>
 	inline vector<T,A>::vector() noexcept(std::is_nothrow_default_constructible_v<allocator_type>)
-		: capacity_()
-		, size_()
 	{
 	}
 
@@ -141,7 +140,7 @@ namespace atma
 	{
 		imem_.self_allocate(capacity_);
 
-		memory_construct(
+		memory_default_construct(
 			xfer_dest(imem_, size));
 	}
 
@@ -152,7 +151,7 @@ namespace atma
 	{
 		imem_.self_allocate(capacity_);
 
-		memory_construct(
+		memory_direct_construct(
 			xfer_dest(imem_, size),
 			d);
 	}
@@ -403,7 +402,7 @@ namespace atma
 		}
 		else if (size_ < size)
 		{
-			memory_construct(
+			memory_default_construct(
 				xfer_dest(imem_ + size_, size - size_));
 		}
 
@@ -424,7 +423,7 @@ namespace atma
 		}
 		else if (size_ < size)
 		{
-			memory_construct(
+			memory_copy_construct(
 				xfer_dest(imem_ + size_, size - size_),
 				x);
 		}

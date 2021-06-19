@@ -62,6 +62,9 @@ struct xfer_maker
 			return atma::xfer_src(std::forward<decltype(args)>(args)...);
 	};
 
+	// curry_direct_construct_args takes a function and a list of arguments,
+	// and calls that function with the supplied arguments, FOLLOWED by a
+	// arguments defined in DEFINE_VALUE_TYPE_FOR_TESTING
 	inline static value_type const compar = xfer_type_info_t<value_type>::compar0;
 	constexpr static auto curry_direct_construct_args = xfer_type_info_t<value_type>::curry_direct_construct_args;
 };
@@ -692,7 +695,7 @@ SCENARIO_TEMPLATE("memory_value_construct is called", xfer, ALLOCATOR_VALUE_TUPL
 	}
 }
 
-SCENARIO_TEMPLATE("memory_construct is called", xfer, ALLOCATOR_VALUE_TUPLES)
+SCENARIO_TEMPLATE("memory_direct_construct is called", xfer, ALLOCATOR_VALUE_TUPLES)
 {
 	using allocator_type = std::tuple_element_t<0, xfer>;
 	using value_type     = std::tuple_element_t<1, xfer>;
@@ -709,9 +712,9 @@ SCENARIO_TEMPLATE("memory_construct is called", xfer, ALLOCATOR_VALUE_TUPLES)
 	{
 		auto storage = std::vector<value_type>(6, valval);
 
-		WHEN("memory_construct is called upon a vector with arguments for a direct constructor")
+		WHEN("memory_direct_construct is called upon a vector with arguments for a direct constructor")
 		{
-			value_type_info::curry_direct_construct_args(atma::memory_construct, atma::xfer_dest(storage));
+			value_type_info::curry_direct_construct_args(atma::memory_direct_construct, atma::xfer_dest(storage));
 
 			THEN("every element in the vector equates to the compar")
 			{
@@ -734,9 +737,9 @@ SCENARIO_TEMPLATE("memory_construct is called", xfer, ALLOCATOR_VALUE_TUPLES)
 		{
 			auto subrange = atma::xfer_dest(memory, 4);
 
-			WHEN("memory_construct is called with arguments for a direct constructor")
+			WHEN("memory_direct_construct is called with arguments for a direct constructor")
 			{
-				value_type_info::curry_direct_construct_args(atma::memory_construct, subrange);
+				value_type_info::curry_direct_construct_args(atma::memory_direct_construct, subrange);
 
 				THEN("elements [0, 4) equate to compar, and elements [4, 6) compare against valval")
 				{
@@ -751,9 +754,9 @@ SCENARIO_TEMPLATE("memory_construct is called", xfer, ALLOCATOR_VALUE_TUPLES)
 		{
 			auto subrange = atma::xfer_dest(memory + 1, 4);
 
-			WHEN("memory_construct is called with arguments for a direct constructor")
+			WHEN("memory_direct_construct is called with arguments for a direct constructor")
 			{
-				value_type_info::curry_direct_construct_args(atma::memory_construct, subrange);
+				value_type_info::curry_direct_construct_args(atma::memory_direct_construct, subrange);
 
 				THEN("element [0] equates to valval")
 				THEN("elements [1, 5) equate to compar")
@@ -766,9 +769,9 @@ SCENARIO_TEMPLATE("memory_construct is called", xfer, ALLOCATOR_VALUE_TUPLES)
 				}
 			}
 
-			WHEN("memory_construct is called with arguments for the copy-constructor")
+			WHEN("memory_direct_construct is called with arguments for the copy-constructor")
 			{
-				atma::memory_construct(subrange, compar);
+				atma::memory_direct_construct(subrange, compar);
 
 				THEN("element [0] equates to valval")
 				THEN("elements [1, 5) equate to compar")
