@@ -1,12 +1,10 @@
-
-; ignore visual studio files
+# ignore visual studio files
 .vs/
 Debug/
 Release/
 x64/
-.vs/
 
-; ignore obj folder for CS projects
+# ignore obj folder for CS projects
 project/AtmaCS/obj/
 
 *.opensdf
