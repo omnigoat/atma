@@ -89,7 +89,7 @@ namespace atma::detail
 		using value_type = struct{ char* ptr; size_t& size; };
 
 		// update size
-		template <lich_memory_concept Dest>
+		template <typename Dest>
 		static void on_post_memcpy(Dest&& dest, size_t sz)
 		{
 			auto x = dest.lich_value();
@@ -100,14 +100,17 @@ namespace atma::detail
 		}
 	};
 
-	template <size_t Extent>
 	struct charbuf_t
 	{
 		using value_type = char;
+		using allocator_type = std::allocator<char>;
+		using tag_type = dest_memory_tag_t;
+
+		static constexpr size_t Extent = rope_buf_size;
 
 		bool empty() const { return size_ == 0; }
-		bool size() const { return size_; }
-		bool extent() const { return Extent; }
+		size_t size() const { return size_; }
+		size_t extent() const { return Extent; }
 
 		auto begin() -> value_type* { return chars_; }
 		auto end() -> value_type* { return chars_ + size_; }
@@ -115,20 +118,28 @@ namespace atma::detail
 		auto end() const -> value_type const* { return chars_ + size_; }
 
 		auto data() -> value_type* { return chars_; }
+		auto data() const -> value_type const* { return chars_; }
 
-		template <typename tag_type, size_t Extent>
-		friend auto make_lich_memxfer(charbuf_t<Extent>& t) -> atma::lich_memxfer_t<tag_type, int, rope_charbuf_lich_oper_t, Extent, std::allocator<int>>;
+		auto get_allocator() { return std::allocator<char>(); }
+
+		void push_back(char x)
+		{
+			ATMA_ASSERT(size_ != Extent);
+			chars_[size_++] = x;
+		}
+
+		char operator[](size_t idx) const { return chars_[idx]; }
+
+		template <typename tag_type>
+		auto make_lich_memxfer() -> atma::lich_memxfer_t<tag_type, char, rope_charbuf_lich_oper_t, rope_buf_size>
+		{
+			return {chars_, rope_charbuf_lich_oper_t::value_type{chars_, size_}};
+		}
 
 	private:
 		size_t size_ = 0;
 		char chars_[Extent];
 	};
-
-	template <typename tag_type, size_t Extent>
-	inline auto make_lich_memxfer(charbuf_t<Extent>& t) -> atma::lich_memxfer_t<tag_type, int, rope_charbuf_lich_oper_t, Extent, std::allocator<int>>
-	{
-		return {std::allocator<int>(), t.chars_, std::tie(t.chars_, t.size_)};
-	}
 }
 #endif
 
@@ -260,8 +271,7 @@ namespace atma::detail
 		// this buffer can only ever be appended to. nodes store how many
 		// characters/bytes they address inside this buffer, so we can append
 		// more data to this buffer and maintain an immutable data-structure
-		size_t size = 0;
-		char buf[rope_buf_size];
+		charbuf_t buf;
 	};
 }
 
@@ -549,23 +559,23 @@ namespace atma::detail
 
 			[](rope_node_leaf_t const& x)
 			{
-				return text_info_t::from_str(x.buf, x.size);
+				return text_info_t::from_str(x.buf.data(), x.buf.size());
 			});
 	}
 
-	inline auto fix_seam(size_t char_idx, detail::rope_node_info_t const& leaf_info, char* buf, size_t& buf_size)
+	inline auto fix_seam(size_t char_idx, detail::rope_node_info_t const& leaf_info, charbuf_t& buf)
 	{
 		//auto cr = detail::rope_src_buf_t("\015", 1);
 
-		auto const new_buf_size = buf_size + 1;
+		auto const new_buf_size = buf.size() + 1;
 
 		// by definition, we should have enough space in any leaf-node to fix a seam
 		ATMA_ASSERT(new_buf_size <= detail::rope_buf_size);
 
 		// append if possible
-		if (leaf_info.bytes == buf_size)
+		if (leaf_info.bytes == buf.size())
 		{
-			buf[buf_size++] = rope_utils::LF;
+			buf.push_back(rope_utils::LF);
 
 			// don't increment linecount if we appended onto a CR character, giving CRLF
 			auto new_leaf_info = text_info_t{
@@ -578,7 +588,7 @@ namespace atma::detail
 		// buffer-size small enough to reallocate the node
 		else if (new_buf_size < rope_buf_edit_split_size)
 		{
-			auto byte_idx = utf8_charseq_idx_to_byte_idx(buf, buf_size, char_idx);
+			auto byte_idx = utf8_charseq_idx_to_byte_idx(buf.data(), buf.size(), char_idx);
 
 			auto new_text_info = text_info_t{
 				leaf_info.bytes + 1,
@@ -588,7 +598,7 @@ namespace atma::detail
 			auto new_node = detail::rope_make_leaf_ptr(
 				xfer_src(buf, byte_idx),
 				rope_src_buf_t("\n", 1),
-				xfer_src(buf + byte_idx, buf_size - byte_idx));
+				xfer_src(buf).skip(byte_idx));
 
 			auto new_leaf_info = rope_node_info_t{new_text_info, new_node};
 
@@ -597,13 +607,13 @@ namespace atma::detail
 		// split the node
 		else
 		{
-			auto byte_idx = utf8_charseq_idx_to_byte_idx(buf, buf_size, char_idx);
+			auto byte_idx = utf8_charseq_idx_to_byte_idx(buf.data(), buf.size(), char_idx);
 
 			auto& leaf = leaf_info.node->known_leaf();
 
 			auto [lhs_info, rhs_info] = insert_and_redistribute(leaf_info,
-				xfer_src(leaf.buf, leaf.size),
-				xfer_src(buf, buf_size), byte_idx);
+				xfer_src(leaf.buf),
+				xfer_src(buf), byte_idx);
 
 			//lhs_info.characters = (uint32_t)char_idx;
 			//lhs_info.bytes = (uint32_t)byte_idx;
@@ -611,7 +621,7 @@ namespace atma::detail
 			//rhs_info.bytes = (uint32_t)(leaf_info.bytes - byte_idx);
 			//rhs_info.characters = (uint32_t)(leaf_info.characters - char_idx);
 			auto rhs_node = detail::rope_make_leaf_ptr(
-				xfer_src(buf + lhs_info.bytes, rhs_info.bytes));
+				xfer_src(buf, lhs_info.bytes, rhs_info.bytes));
 
 			return detail::rope_edit_result_t{lhs_info, detail::rope_node_info_t{rhs_info, rhs_node}};
 		}
@@ -650,7 +660,7 @@ namespace atma::detail
 
 			[&, f = std::forward<F>(f)](rope_node_leaf_t& x) -> rope_edit_result_t
 			{
-				return std::invoke(f, char_idx, info, x.buf, x.size);
+				return std::invoke(f, char_idx, info, x.buf);
 			}
 		);
 	}
@@ -662,16 +672,15 @@ namespace atma::detail
 //
 namespace atma::detail
 {
-	inline auto rope_node_leaf_construct_(size_t& buf_size, char* buf)
+	inline auto rope_node_leaf_construct_(charbuf_t& buf)
 	{}
 
 	template <typename... Args>
-	inline auto rope_node_leaf_construct_(size_t& buf_size, char* buf, src_bounded_memxfer_t<char const> x, Args&&... args)
+	inline auto rope_node_leaf_construct_(charbuf_t& buf, src_bounded_memxfer_t<char const> x, Args&&... args)
 	{
-		atma::memory_copy(xfer_dest(buf + buf_size), x);
-		buf_size += x.size();
-
-		rope_node_leaf_construct_(buf_size, buf, std::forward<Args>(args)...);
+		atma::memory_copy(xfer_dest(buf).skip(buf.size()), x);
+		
+		rope_node_leaf_construct_(buf, std::forward<Args>(args)...);
 	}
 
 	template <typename... Args>
@@ -680,7 +689,7 @@ namespace atma::detail
 #if ATMA_ROPE_DEBUG_BUFFER
 		atma::memory_value_construct(atma::xfer_dest(buf), rope_buf_size);
 #endif
-		rope_node_leaf_construct_(size, buf, std::forward<Args>(args)...);
+		rope_node_leaf_construct_(buf, std::forward<Args>(args)...);
 	}
 }
 
@@ -819,7 +828,7 @@ namespace atma::detail
 
 namespace atma::detail
 {
-	inline auto rope_insert_(size_t char_idx, detail::rope_node_info_t const& leaf_info, char* buf, size_t& buf_size, detail::rope_src_buf_t src_text) -> detail::rope_edit_result_t
+	inline auto rope_insert_(size_t char_idx, detail::rope_node_info_t const& leaf_info, charbuf_t& buf, detail::rope_src_buf_t src_text) -> detail::rope_edit_result_t
 	{
 		ATMA_ASSERT(!src_text.empty());
 
@@ -832,13 +841,13 @@ namespace atma::detail
 		auto src = has_seam ? src_text.skip(1) : src_text;
 
 
-		auto byte_idx = utf8_charseq_idx_to_byte_idx(buf, buf_size, char_idx);
+		auto byte_idx = utf8_charseq_idx_to_byte_idx(buf.data(), buf.size(), char_idx);
 		//auto combined_bytes_size = leaf_info.bytes + src.size();
 
 		// if we want to append, we must first make sure that the (immutable, remember) buffer
 		// does not have any trailing information used by other trees. secondly, we must make
 		// sure that the byte_idx of the character is actually the last byte_idx of the buffer
-		bool buf_is_appendable = leaf_info.bytes == buf_size;
+		bool buf_is_appendable = leaf_info.bytes == buf.size();
 		bool byte_idx_is_at_end = leaf_info.bytes == byte_idx;
 		bool can_fit_in_chunk = leaf_info.bytes + src.size() < detail::rope_buf_edit_max_size;
 
@@ -851,10 +860,11 @@ namespace atma::detail
 			// and buf_size would automatically be updated
 			
 			memory_copy(
-				xfer_dest(buf + leaf_info.bytes),
-				src);
+				xfer_dest(buf).skip(leaf_info.bytes),
+				src,
+				std::size(src));
 
-			buf_size += src.size();
+			//buf_size += src.size();
 
 			auto affix_string_info = detail::text_info_t::from_str(src.data(), src.size());
 			auto result_info = leaf_info + affix_string_info;
@@ -881,7 +891,7 @@ namespace atma::detail
 			result_info.node = detail::rope_make_leaf_ptr(
 				xfer_src(buf, byte_idx),
 				src,
-				xfer_src(buf + byte_idx, buf_size - byte_idx));
+				xfer_src(buf).skip(byte_idx));
 
 			return detail::rope_edit_result_t(result_info, {}, has_seam);
 		}
@@ -890,7 +900,7 @@ namespace atma::detail
 		{
 			auto& leaf = leaf_info.node->known_leaf();
 
-			auto [lhs_info, rhs_info] = detail::insert_and_redistribute(leaf_info, xfer_src(leaf.buf, leaf.size), src, byte_idx);
+			auto [lhs_info, rhs_info] = detail::insert_and_redistribute(leaf_info, xfer_src(leaf.buf), src, byte_idx);
 
 			return detail::rope_edit_result_t{lhs_info, rhs_info};
 		}
@@ -930,9 +940,9 @@ namespace atma
 	inline auto rope_t::insert(size_t char_idx, char const* str, size_t sz) -> void
 	{
 		auto [lhs_info, rhs_info, seam] = root_.node->edit_chunk_at_char(char_idx, root_,
-			[str, sz](size_t char_idx, detail::rope_node_info_t const& leaf_info, char* buf, size_t& buf_size)
+			[str, sz](size_t char_idx, detail::rope_node_info_t const& leaf_info, detail::charbuf_t& buf)
 			{
-				return detail::rope_insert_(char_idx, leaf_info, buf, buf_size, xfer_src(str, sz));
+				return detail::rope_insert_(char_idx, leaf_info, buf, xfer_src(str, sz));
 			});
 
 		if (rhs_info.has_value())
@@ -953,7 +963,7 @@ namespace atma
 		x.for_all_text(
 			[&stream](detail::rope_node_info_t const& info)
 			{
-				stream << std::string_view(info.node->known_leaf().buf, info.bytes);
+				stream << std::string_view(info.node->known_leaf().buf.data(), info.bytes);
 			});
 
 		return stream;

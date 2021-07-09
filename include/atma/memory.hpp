@@ -792,13 +792,24 @@ namespace atma
 			}
 		}
 
+		template <size_t Begin, size_t End>
+		constexpr auto subspan_bounds() const -> bounded_memxfer_t<Tag, T, (End - Begin), allocator_type>
+		{
+			return {this->get_allocator(), this->data() + Begin};
+		}
+
 		template <size_t N> constexpr auto skip() const { return this->subspan<N>(); }
 		template <size_t N> constexpr auto take() const { return this->subspan<0, N>(); }
 
 		// run-time subviews
 		constexpr auto subspan(size_t offset, size_t count = std::dynamic_extent) const -> dynamic_subspan_type
 		{
-			return {this->get_allocator(), this->data() + offset, detail::subextent(this->size(), offset, count)};
+			return {this->get_allocator(), (T*)this->data() + offset, detail::subextent(this->size(), offset, count)};
+		}
+
+		constexpr auto subspan_bounds(size_t begin, size_t end) const -> bounded_memxfer_t<Tag, T, std::dynamic_extent, allocator_type>
+		{
+			return {this->get_allocator(), this->data() + begin, (end - begin)};
 		}
 
 		constexpr auto skip(size_t n) const { return this->subspan(n); }
@@ -992,9 +1003,9 @@ namespace atma::detail
 	}
 
 	template <typename Memory, typename... Args>
-	concept lich_annotates_post_memcpy_concept = lich_memory_concept<rmref_t<Memory>> && requires(Memory& memory, size_t sz)
+	concept lich_annotates_post_memcpy_concept = lich_memory_concept<rmref_t<Memory>> && requires(Memory& memory, Args&&... args)
 	{
-		{ _lich_memxfer_annotate_post_memcpy_<rmref_t<Memory>>(memory, sz) };
+		{ _lich_memxfer_annotate_post_memcpy_<rmref_t<Memory>>(memory, std::forward<Args>(args)...) };
 	};
 }
 
@@ -1216,24 +1227,24 @@ namespace atma::detail
 	struct xfer_make_from_lich_mem_fn_
 	{
 		template <typename M>
-		requires requires(M&& memory) { { memory.make_lich_memxfer() }; }
+		requires requires(M&& memory) { { memory.template make_lich_memxfer<tag_type>() }; }
 		auto operator ()(M&& memory)
 		{
-			return memory.make_lich_memxfer();
+			return memory.template make_lich_memxfer<tag_type>();
 		};
 
 		template <typename M>
-		requires requires(M&& memory, size_t size) { { memory.make_lich_memxfer(size) }; }
+		requires requires(M&& memory, size_t size) { { memory.template make_lich_memxfer<tag_type>(size) }; }
 		auto operator ()(M&& memory, size_t size)
 		{
-			return memory.make_lich_memxfer(size);
+			return memory.template make_lich_memxfer<tag_type>(size);
 		};
 
 		template <typename M>
-		requires requires(M&& memory, size_t offset, size_t size) { { memory.make_lich_memxfer(offset, size) }; }
+		requires requires(M&& memory, size_t offset, size_t size) { { memory.template make_lich_memxfer<tag_type>(offset, size) }; }
 		auto operator ()(M&& memory, size_t offset, size_t size)
 		{
-			return memory.make_lich_memxfer(offset, size);
+			return memory.template make_lich_memxfer<tag_type>(offset, size);
 		};
 	};
 
@@ -1321,16 +1332,16 @@ namespace atma::detail
 		// first match against pointer
 		xfer_make_from_ptr_<tag_type>,
 
+		// then try any memory that can be turned into an lich_memxfer
+		xfer_make_from_lich_free_fn_<tag_type>,
+		xfer_make_from_lich_mem_fn_<tag_type>,
+
 		// then match anything that satisfies the contiguous-range concept AND
 		// satisfies the sized-range concept (std::begin/end & std::size)
 		xfer_make_from_sized_contiguous_range_<tag_type>,
 
 		// then try _only_ the contiguous-range concept (use std::distance instead of std::size)
 		xfer_make_from_contiguous_range_<tag_type>,
-
-		// then try any memory that can be turned into an lich_memxfer
-		xfer_make_from_lich_free_fn_<tag_type>,
-		xfer_make_from_lich_mem_fn_<tag_type>,
 
 		// then try anything that satisfies the memory concept (get_allocator & std::data)
 		xfer_make_from_memory_<tag_type>,
