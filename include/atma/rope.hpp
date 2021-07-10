@@ -76,6 +76,36 @@ namespace atma::detail
 	using rope_src_buf_t = src_bounded_memxfer_t<char const>;
 }
 
+namespace atma
+{
+	struct rope_default_traits
+	{
+		// how many children an internal node has
+		constexpr static size_t const rope_branching_factor = 4;
+
+		// rope-buffer size
+		constexpr static size_t const rope_buf_size = 512;
+
+
+		constexpr static size_t rope_buf_edit_max_size = rope_buf_size - 2;
+		constexpr static size_t rope_buf_edit_split_size = (rope_buf_size / 2) - (rope_buf_size / 32);
+		constexpr static size_t rope_buf_edit_split_drift_size = (rope_buf_size / 32);
+	};
+
+	struct rope_test_traits
+	{
+		// how many children an internal node has
+		constexpr static size_t const rope_branching_factor = 4;
+
+		// rope-buffer size
+		constexpr static size_t const rope_buf_size = 9;
+
+
+		constexpr static size_t rope_buf_edit_max_size = rope_buf_size - 2;
+		constexpr static size_t rope_buf_edit_split_size = (rope_buf_size / 2) - (rope_buf_size / 32);
+		constexpr static size_t rope_buf_edit_split_drift_size = (rope_buf_size / 32);
+	};
+}
 
 
 //
@@ -884,6 +914,12 @@ namespace atma::detail
 		}
 	}
 }
+
+
+
+
+
+
 
 namespace atma
 {
