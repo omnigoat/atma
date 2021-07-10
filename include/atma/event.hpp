@@ -239,7 +239,7 @@ namespace atma::detail
 
 			// put iter in binder
 			binder.event_backend_ = event_backend;
-			binder.event_system_backend_ = shared_from_this<event_system_backend_t>();
+			binder.event_system_backend_ = this->shared_from_this_as<event_system_backend_t>();
 			binder.binding_handle_ = binding_handle;
 		}
 	}
