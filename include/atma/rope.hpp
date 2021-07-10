@@ -887,14 +887,16 @@ namespace atma::detail
 
 namespace atma
 {
-	struct rope_t
+	template <typename RopeTraits>
+	struct basic_rope_t
 	{
-		rope_t();
+		basic_rope_t();
 
 		auto push_back(char const*, size_t) -> void;
 		auto insert(size_t char_idx, char const* str, size_t sz) -> void;
 
-		friend std::ostream& operator << (std::ostream&, rope_t const&);
+		template <typename RT2>
+		friend std::ostream& operator << (std::ostream&, basic_rope_t<RT2> const&);
 
 		template <typename F>
 		auto for_all_text(F&& f) const
@@ -905,17 +907,26 @@ namespace atma
 	private:
 		detail::rope_node_info_t root_;
 	};
+}
 
-	inline rope_t::rope_t()
+
+
+
+namespace atma
+{
+	template <typename RT>
+	inline basic_rope_t<RT>::basic_rope_t()
 		: root_(detail::rope_make_internal_ptr())
 	{}
 
-	inline auto rope_t::push_back(char const* str, size_t sz) -> void
+	template <typename RT>
+	inline auto basic_rope_t<RT>::push_back(char const* str, size_t sz) -> void
 	{
 		this->insert(root_.node->length(), str, sz);
 	}
 	
-	inline auto rope_t::insert(size_t char_idx, char const* str, size_t sz) -> void
+	template <typename RT>
+	inline auto basic_rope_t<RT>::insert(size_t char_idx, char const* str, size_t sz) -> void
 	{
 		auto [lhs_info, rhs_info, seam] = root_.node->edit_chunk_at_char(char_idx, root_,
 			[str, sz](size_t char_idx, detail::rope_node_info_t const& leaf_info, detail::charbuf_t& buf)
@@ -936,7 +947,8 @@ namespace atma
 		}
 	}
 
-	inline std::ostream& operator << (std::ostream& stream, rope_t const& x)
+	template <typename RT>
+	inline std::ostream& operator << (std::ostream& stream, basic_rope_t<RT> const& x)
 	{
 		x.for_all_text(
 			[&stream](detail::rope_node_info_t const& info)
@@ -948,4 +960,6 @@ namespace atma
 	}
 
 
+
+	using rope_t = basic_rope_t<void>;
 }
