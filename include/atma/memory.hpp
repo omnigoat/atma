@@ -33,37 +33,6 @@
 
 
 
-//
-// memory tracking
-// -----------------
-// no, not that tracking. I'm talking about when transferring memory around,
-// do we ever want to track how much of it is:
-//   a) initialized vs uninitialized
-//   b) "consumed" ??
-//   c) something something?
-//   d) a marker for where we've copied up to??
-//
-// in the end, since this will be templated anyway, what we should do is 
-// template the "lich" information, provide some sensible defaults,
-// and let users define custom _things_ if needed
-// 
-// limited-information-changes
-// lich
-// 
-// the question becomes: what generic operations do we support so that our
-// algorithms update the lich information, and when do we call them?
-// I think probably something like:
-//  - when an item is copied
-//  - ???
-//  
-
-
-
-
-
-
-
-
 
 
 
@@ -819,317 +788,6 @@ namespace atma
 
 
 //
-// lich_memxfer_t
-// --------------------------
-// a type used for transferring memory around.
-//
-// is always considered a destination, but will keep lich
-// information about _things_
-//
-namespace atma
-{
-	template <typename Memory>
-	concept lich_memory_concept = dest_memory_concept<Memory> && requires(Memory memory, int i)
-	{
-		typename Memory::lich_type;
-
-		{ memory.lich_value() };
-	};
-
-	template <typename T>
-	concept lich_concept = requires(T::value_type x)
-	{
-		typename T::value_type;
-
-		// optional sub-type: T::applier_type
-	};
-}
-
-//
-// lich_type_t
-// -------------
-// gets our lich subtype from a memory
-//
-namespace atma
-{
-	template <lich_memory_concept Memory>
-	using lich_type_t = typename rmref_t<Memory>::lich_type;
-}
-
-
-//
-// lich_applier_t
-// ----------------
-// gets the applier from a memory - this will be memory::lich_type::applier_type
-// if present, and 'void' if not
-//
-namespace atma
-{
-	namespace detail
-	{
-		template <typename T, typename = std::void_t<>>
-		struct lich_applier_type_t_
-			{ using type = void; };
-
-		template <typename T>
-		struct lich_applier_type_t_<T, std::void_t<typename rmref_t<T>::lich_type::applier_type>>
-			{ using type = typename rmref_t<T>::lich_type::applier_type; };
-	}
-	
-	template <lich_memory_concept T>
-	using lich_applier_type_t = typename detail::lich_applier_type_t_<T>::type;
-}
-
-
-//
-// lich_annotates_construct
-//
-namespace atma::detail
-{
-	template <lich_memory_concept Memory>
-	constexpr auto _lich_memxfer_annotate_construct_ = functor_list_t
-	{
-		// version passing in the memory
-		[]<typename... Args>(Memory& memory, Args&&... args)
-		requires requires(Args&&... args) {{ lich_applier_type_t<Memory>::on_construct(memory, std::forward<Args>(args)...) }; }
-			{ lich_applier_type_t<Memory>::on_construct(memory, std::forward<Args>(args)...); },
-
-		// version passing in only the lich_value
-		[]<typename... Args>(Memory& memory, Args&&... args)
-		requires requires(Args&&... args) {{ lich_applier_type_t<Memory>::on_construct(memory.lich_value(), std::forward<Args>(args)...) }; }
-			{ lich_applier_type_t<Memory>::on_construct(memory.lich_value(), std::forward<Args>(args)...); },
-
-		// applier didn't have it, try lich-type with the memory
-		[]<typename... Args>(Memory& memory, Args&&... args)
-		requires requires(Args&&... args) {{ lich_type_t<Memory>::on_construct(memory, std::forward<Args>(args)...) }; }
-			{ lich_type_t<Memory>::on_construct(memory, std::forward<Args>(args)...); },
-
-		// applier didn't have it, try lich-type with only the lich_value
-		[]<typename... Args>(Memory& memory, Args&&... args)
-		requires requires(Args&&... args) {{ lich_type_t<Memory>::on_construct(memory.lich_value(), std::forward<Args>(args)...) }; }
-			{ lich_type_t<Memory>::on_construct(memory.lich_value(), std::forward<Args>(args)...); }
-	};
-
-	template <lich_memory_concept Memory, typename... Args>
-	inline void lich_memxfer_annotate_construct(Memory& memory, Args&&... args)
-	{
-		_lich_memxfer_annotate_construct_<Memory>(memory, std::forward<Args>(args)...);
-	}
-
-	template <typename Memory, typename... Args>
-	concept lich_annotates_construct_concept = lich_memory_concept<rmref_t<Memory>> && requires(Memory& memory, Args&&... args)
-	{
-		{ _lich_memxfer_annotate_construct_<rmref_t<Memory>>(memory, std::forward<Args>(args)...) };
-	};
-}
-
-
-//
-// lich_memxfer_annotate_post_construct
-//
-namespace atma::detail
-{
-	template <lich_memory_concept Memory>
-	constexpr auto _lich_memxfer_annotate_post_construct_ = functor_list_t
-	{
-		// version passing in the memory
-		[]<typename... Args>(Memory& memory, Args&&... args)
-		requires requires(Args&&... args) {{ lich_applier_type_t<Memory>::on_post_construct(memory, std::forward<Args>(args)...) }; }
-			{ lich_applier_type_t<Memory>::on_post_construct(memory, std::forward<Args>(args)...); },
-
-		// version passing in only the lich_value
-		[]<typename... Args>(Memory& memory, Args&&... args)
-		requires requires(Args&&... args) {{ lich_applier_type_t<Memory>::on_post_construct(memory.lich_value(), std::forward<Args>(args)...) }; }
-			{ lich_applier_type_t<Memory>::on_post_construct(memory.lich_value(), std::forward<Args>(args)...); },
-
-		// applier didn't have it, try lich
-		[]<typename... Args>(Memory& memory, Args&&... args)
-		requires requires(Args&&... args) {{ lich_type_t<Memory>::on_post_construct(memory, std::forward<Args>(args)...) }; }
-			{ lich_type_t<Memory>::on_post_construct(memory, std::forward<Args>(args)...); },
-
-		// applier didn't have it, try lich
-		[]<typename... Args>(Memory& memory, Args&&... args)
-		requires requires(Args&&... args) {{ lich_type_t<Memory>::on_post_construct(memory.lich_value(), std::forward<Args>(args)...) }; }
-			{ lich_type_t<Memory>::on_post_construct(memory.lich_value(), std::forward<Args>(args)...); }
-	};
-
-	template <lich_memory_concept Memory, typename... Args>
-	inline void lich_memxfer_annotate_post_construct(Memory& memory, Args&&... args)
-	{
-		_lich_memxfer_annotate_post_construct_<Memory>(memory, std::forward<Args>(args)...);
-	}
-
-	template <typename Memory, typename... Args>
-	concept lich_annotates_post_construct_concept = lich_memory_concept<rmref_t<Memory>> && requires(Memory& memory, size_t sz)
-	{
-		{ _lich_memxfer_annotate_post_construct_<rmref_t<Memory>>(memory, sz) };
-	};
-}
-
-
-//
-// lich_memxfer_annotate_post_construct
-//
-namespace atma::detail
-{
-	template <lich_memory_concept Memory>
-	constexpr auto _lich_memxfer_annotate_post_memcpy_ = functor_list_t
-	{
-		// version passing in the memory
-		[]<typename... Args>(Memory& memory, Args&&... args)
-		requires requires(Args&&... args) {{ lich_applier_type_t<Memory>::on_post_memcpy(memory, std::forward<Args>(args)...) }; }
-			{ lich_applier_type_t<Memory>::on_post_memcpy(memory, std::forward<Args>(args)...); },
-
-		// version passing in only the lich_value
-		[]<typename... Args>(Memory& memory, Args&&... args)
-		requires requires(Args&&... args) {{ lich_applier_type_t<Memory>::on_post_memcpy(memory.lich_value(), std::forward<Args>(args)...) }; }
-			{ lich_applier_type_t<Memory>::on_post_memcpy(memory.lich_value(), std::forward<Args>(args)...); },
-
-		// applier didn't have it, try lich
-		[]<typename... Args>(Memory& memory, Args&&... args)
-		requires requires(Args&&... args) {{ lich_type_t<Memory>::on_post_memcpy(memory, std::forward<Args>(args)...) }; }
-			{ lich_type_t<Memory>::on_post_memcpy(memory, std::forward<Args>(args)...); },
-
-		// applier didn't have it, try lich
-		[]<typename... Args>(Memory& memory, Args&&... args)
-		requires requires(Args&&... args) {{ lich_type_t<Memory>::on_post_memcpy(memory.lich_value(), std::forward<Args>(args)...) }; }
-			{ lich_type_t<Memory>::on_post_memcpy(memory.lich_value(), std::forward<Args>(args)...); }
-	};
-
-	template <lich_memory_concept Memory, typename... Args>
-	inline void lich_memxfer_annotate_post_memcpy(Memory& memory, Args&&... args)
-	{
-		_lich_memxfer_annotate_post_memcpy_<Memory>(memory, std::forward<Args>(args)...);
-	}
-
-	template <typename Memory, typename... Args>
-	concept lich_annotates_post_memcpy_concept = lich_memory_concept<rmref_t<Memory>> && requires(Memory& memory, Args&&... args)
-	{
-		{ _lich_memxfer_annotate_post_memcpy_<rmref_t<Memory>>(memory, std::forward<Args>(args)...) };
-	};
-}
-
-
-
-
-
-namespace atma::detail
-{
-	template <typename Tag, typename T, lich_concept Lichling, size_t Extent = std::dynamic_extent, typename Allocator = std::allocator<T>>
-	struct lich_memxfer_impl_t
-		: bounded_memxfer_t<Tag, T, Extent, Allocator>
-	{
-		using base_type = bounded_memxfer_t<Tag, T, Extent, Allocator>;
-		using value_type = typename base_type::value_type;
-		using allocator_type = typename base_type::allocator_type;
-		using tag_type = typename base_type::tag_type;
-		using lich_type = Lichling;
-		using lich_value_type = typename Lichling::value_type;
-
-		lich_memxfer_impl_t() = default;
-		lich_memxfer_impl_t(lich_memxfer_impl_t const& rhs) = default;
-
-		constexpr lich_memxfer_impl_t(allocator_type allocator, T* ptr, lich_value_type lich)
-			: base_type(allocator, ptr)
-			, lich_(lich)
-		{}
-
-		constexpr lich_memxfer_impl_t(T* ptr, lich_value_type lich)
-			requires std::is_empty_v<allocator_type>
-			: base_type(allocator_type(), ptr)
-			, lich_(lich)
-		{}
-
-		// lich observers
-		auto lich_value() const -> lich_value_type { return lich_; }
-
-	private:
-		lich_value_type lich_ = lich_value_type();
-	};
-
-	// dynamic-extent version
-	template <typename Tag, typename T, lich_concept Lichling, typename Allocator>
-	struct lich_memxfer_impl_t<Tag, T, Lichling, std::dynamic_extent, Allocator>
-		: bounded_memxfer_t<Tag, T, std::dynamic_extent, Allocator>
-	{
-		using base_type = bounded_memxfer_t<Tag, T, std::dynamic_extent, Allocator>;
-		using value_type = typename base_type::value_type;
-		using allocator_type = typename base_type::allocator_type;
-		using tag_type = typename base_type::tag_type;
-		using lich_type = Lichling;
-		using lich_value_type = typename Lichling::value_type;
-
-		lich_memxfer_impl_t() = default;
-		lich_memxfer_impl_t(lich_memxfer_impl_t const& rhs) = default;
-
-		constexpr lich_memxfer_impl_t(allocator_type allocator, T* ptr, size_t size, lich_value_type lich)
-			: base_type(allocator, ptr, size)
-			, lich_(lich)
-		{}
-
-		constexpr lich_memxfer_impl_t(T* ptr, size_t size, lich_value_type lich)
-			requires std::is_empty_v<allocator_type>
-			: base_type(allocator_type(), ptr, size)
-			, lich_(lich)
-		{}
-
-		// lich observers
-		auto lich_value() const -> lich_value_type { return lich_; }
-
-	private:
-		lich_value_type lich_ = lich_value_type();
-	};
-}
-
-namespace atma
-{
-	template <typename Tag, typename T, lich_concept Lichling, size_t Extent = std::dynamic_extent, typename Allocator = std::allocator<T>>
-	struct lich_memxfer_t
-		: detail::lich_memxfer_impl_t<Tag, T, Lichling, Extent, Allocator>
-	{
-		using base_type = detail::lich_memxfer_impl_t<Tag, T, Lichling, Extent, Allocator>;
-		using value_type = typename base_type::value_type;
-		using allocator_type = typename base_type::allocator_type;
-		using tag_type = typename base_type::tag_type;
-		using lich_type = Lichling;
-		using lich_value_type = typename Lichling::value_type;
-
-		template <size_t Offset, size_t Count = std::dynamic_extent>
-		using subspan_type = lich_memxfer_t<Tag, T, lich_type, detail::subextent_v<Extent, Offset, Count>, allocator_type>;
-		using dynamic_subspan_type = lich_memxfer_t<Tag, T, lich_type, std::dynamic_extent, allocator_type>;
-
-		using base_type::base_type;
-
-		// compile-time subviews
-		template <size_t Offset, size_t Count = std::dynamic_extent>
-		auto subspan() -> subspan_type<Offset, Count>
-		{
-			if constexpr (detail::subextent_v<Extent, Offset, Count> == std::dynamic_extent)
-			{
-				return {this->get_allocator(), this->data() + Offset, detail::subextent(this->size(), Offset, Count), this->lich_value()};
-			}
-			else
-			{
-				return {this->get_allocator(), this->data() + Offset, this->lich_value()};
-			}
-		}
-
-		template <size_t N> constexpr auto skip() { return this->subspan<N>(); }
-		template <size_t N> constexpr auto take() { return this->subspan<0, N>(); }
-
-		// run-time subviews
-		constexpr auto subspan(size_t offset, size_t count = std::dynamic_extent) -> dynamic_subspan_type
-		{
-			return {this->get_allocator(), this->data() + offset, detail::subextent(this->size(), offset, count), this->lich_value()};
-		}
-
-		constexpr auto skip(size_t n) { return this->subspan(n); }
-		constexpr auto take(size_t n) { return this->subspan(0, n); }
-	};
-}
-
-
-//
 // dest_/src_ versions of memory-ranges
 // --------------------------
 //
@@ -1196,56 +854,6 @@ namespace atma::detail
 		{
 			return bounded_memxfer_t<tag_type, T, std::dynamic_extent, rmref_t<A>>(std::forward<A>(allocator), data, sz);
 		}
-	};
-
-	template <typename tag_type>
-	struct xfer_make_from_lich_free_fn_
-	{
-		template <typename M>
-		requires requires(M&& memory) { { make_lich_memxfer<tag_type>(memory) }; }
-		auto operator ()(M&& memory)
-		{
-			return make_lich_memxfer<tag_type>(std::forward<M>(memory));
-		};
-
-		template <typename M>
-		requires requires(M&& memory, size_t size) { { make_lich_memxfer<tag_type>(memory, size) }; }
-		auto operator ()(M&& memory, size_t size)
-		{
-			return make_lich_memxfer<tag_type>(std::forward<M>(memory), size);
-		};
-
-		template <typename M>
-		requires requires(M&& memory, size_t offset, size_t size) { { make_lich_memxfer<tag_type>(memory, offset, size) }; }
-		auto operator ()(M&& memory, size_t offset, size_t size)
-		{
-			return make_lich_memxfer<tag_type>(std::forward<M>(memory), offset, size);
-		};
-	};
-
-	template <typename tag_type>
-	struct xfer_make_from_lich_mem_fn_
-	{
-		template <typename M>
-		requires requires(M&& memory) { { memory.template make_lich_memxfer<tag_type>() }; }
-		auto operator ()(M&& memory)
-		{
-			return memory.template make_lich_memxfer<tag_type>();
-		};
-
-		template <typename M>
-		requires requires(M&& memory, size_t size) { { memory.template make_lich_memxfer<tag_type>(size) }; }
-		auto operator ()(M&& memory, size_t size)
-		{
-			return memory.template make_lich_memxfer<tag_type>(size);
-		};
-
-		template <typename M>
-		requires requires(M&& memory, size_t offset, size_t size) { { memory.template make_lich_memxfer<tag_type>(offset, size) }; }
-		auto operator ()(M&& memory, size_t offset, size_t size)
-		{
-			return memory.template make_lich_memxfer<tag_type>(offset, size);
-		};
 	};
 
 	template <typename tag_type>
@@ -1332,10 +940,6 @@ namespace atma::detail
 		// first match against pointer
 		xfer_make_from_ptr_<tag_type>,
 
-		// then try any memory that can be turned into an lich_memxfer
-		xfer_make_from_lich_free_fn_<tag_type>,
-		xfer_make_from_lich_mem_fn_<tag_type>,
-
 		// then match anything that satisfies the contiguous-range concept AND
 		// satisfies the sized-range concept (std::begin/end & std::size)
 		xfer_make_from_sized_contiguous_range_<tag_type>,
@@ -1419,16 +1023,6 @@ namespace atma::detail
 		{
 			// allocator is not capable of default-constructing
 			::new (px) memory_value_type_t<decltype(dest)>;
-
-			if constexpr (lich_annotates_construct_concept<decltype(dest), size_t, decltype(px)>)
-			{
-				lich_memxfer_annotate_construct(dest, i, px);
-			}
-		}
-
-		if constexpr (lich_annotates_post_construct_concept<decltype(dest), size_t>)
-		{
-			lich_memxfer_annotate_post_construct(dest, sz);
 		}
 	};
 
@@ -1440,16 +1034,6 @@ namespace atma::detail
 		for (size_t i = 0; i != sz; ++i, ++px)
 		{
 			construct_with_allocator_traits_(allocator, px);
-
-			if constexpr (lich_annotates_construct_concept<decltype(dest), size_t, decltype(px)>)
-			{
-				lich_memxfer_annotate_construct(dest, i, px);
-			}
-		}
-
-		if constexpr (lich_annotates_post_construct_concept<decltype(dest), size_t>)
-		{
-			lich_memxfer_annotate_post_construct(dest, sz);
 		}
 	};
 
@@ -1461,16 +1045,6 @@ namespace atma::detail
 		for (size_t i = 0; i != sz; ++i, ++px)
 		{
 			construct_with_allocator_traits_(allocator, px, std::forward<decltype(args)>(args)...);
-
-			if constexpr (lich_annotates_construct_concept<decltype(dest), decltype(px)>)
-			{
-				lich_memxfer_annotate_construct(dest, px);
-			}
-		}
-
-		if constexpr (lich_annotates_post_construct_concept<decltype(dest), size_t>)
-		{
-			lich_memxfer_annotate_post_construct(dest, sz);
 		}
 	};
 
@@ -1525,16 +1099,6 @@ namespace atma::detail
 			for (size_t i = 0; i != sz; ++i, ++px, ++py)
 			{
 				construct_with_allocator_traits_(allocator, px, *py);
-
-				if constexpr (lich_annotates_construct_concept<decltype(dest), size_t, decltype(px)>)
-				{
-					lich_memxfer_annotate_construct(dest, i, px);
-				}
-			}
-
-			if constexpr (lich_annotates_post_construct_concept<decltype(dest), size_t>)
-			{
-				lich_memxfer_annotate_post_construct(dest, sz);
 			}
 		},
 
@@ -1561,11 +1125,6 @@ namespace atma::detail
 				for (size_t i = 0; i != sz; ++i, ++px, ++py)
 				{
 					construct_with_allocator_traits_(allocator, px, std::move(*py));
-
-					if constexpr (lich_annotates_construct_concept<decltype(dest), size_t, decltype(px)>)
-					{
-						lich_memxfer_annotate_construct(dest, i, px);
-					}
 				}
 			}
 			// src range earlier, move backwards
@@ -1577,17 +1136,7 @@ namespace atma::detail
 				{
 					--pxe, --pye;
 					construct_with_allocator_traits_(allocator, pxe, std::move(*pye));
-
-					if constexpr (lich_annotates_construct_concept<decltype(dest), size_t, decltype(pxe)>)
-					{
-						lich_memxfer_annotate_construct(dest, (i - 1), pxe);
-					}
 				}
-			}
-
-			if constexpr (lich_annotates_post_construct_concept<decltype(dest), size_t>)
-			{
-				lich_memxfer_annotate_post_construct(dest, sz);
 			}
 		},
 
@@ -1683,11 +1232,6 @@ namespace atma
 		ATMA_ASSERT(size_bytes % sizeof memory_value_type_t<Src> == 0);
 
 		std::memcpy(dest.data(), src.data(), size_bytes);
-
-		if constexpr (detail::lich_annotates_post_memcpy_concept<Dest, size_t>)
-		{
-			detail::lich_memxfer_annotate_post_memcpy(dest, size_bytes);
-		}
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
@@ -1696,11 +1240,6 @@ namespace atma
 		ATMA_ASSERT(dest.size_bytes() == src.size_bytes());
 		auto sz = dest.size_bytes();
 		memory_copy(dest, src, sz);
-
-		if constexpr (detail::lich_annotates_post_memcpy_concept<decltype(dest), size_t>)
-		{
-			detail::lich_memxfer_annotate_post_memcpy(dest, sz);
-		}
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
@@ -1708,11 +1247,6 @@ namespace atma
 	{
 		auto sz = dest.size_bytes();
 		memory_copy(dest, src, sz);
-
-		if constexpr (detail::lich_annotates_post_memcpy_concept<decltype(dest), size_t>)
-		{
-			detail::lich_memxfer_annotate_post_memcpy(dest, sz);
-		}
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
@@ -1720,11 +1254,6 @@ namespace atma
 	{
 		auto sz = src.size_bytes();
 		memory_copy(dest, src, sz);
-
-		if constexpr (detail::lich_annotates_post_memcpy_concept<decltype(dest), size_t>)
-		{
-			detail::lich_memxfer_annotate_post_memcpy(dest, sz);
-		}
 	}
 }
 
@@ -1740,11 +1269,6 @@ namespace atma
 		ATMA_ASSERT(size_bytes % sizeof ST == 0);
 
 		std::memmove(dest.data(), src.data(), size_bytes);
-
-		if constexpr (detail::lich_annotates_post_memcpy_concept<decltype(dest), size_t>)
-		{
-			detail::lich_memxfer_annotate_post_memcpy(dest, size_bytes);
-		}
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
@@ -1753,11 +1277,6 @@ namespace atma
 		ATMA_ASSERT(dest.size_bytes() == src.size_bytes());
 		auto sz = dest.size_bytes();
 		memory_move(dest, src, sz);
-
-		if constexpr (detail::lich_annotates_post_memcpy_concept<decltype(dest), size_t>)
-		{
-			detail::lich_memxfer_annotate_post_memcpy(dest, sz);
-		}
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
@@ -1765,11 +1284,6 @@ namespace atma
 	{
 		auto sz = dest.size_bytes();
 		memory_move(dest, src, sz);
-
-		if constexpr (detail::lich_annotates_post_memcpy_concept<decltype(dest), size_t>)
-		{
-			detail::lich_memxfer_annotate_post_memcpy(dest, sz);
-		}
 	}
 
 	template <typename DT, typename DA, typename ST, typename SA>
@@ -1777,11 +1291,6 @@ namespace atma
 	{
 		auto sz = src.size_bytes();
 		memory_move(dest, src, sz);
-
-		if constexpr (lich_annotates_post_memcpy_concept<decltype(dest), size_t>)
-		{
-			lich_memxfer_annotate_post_memcpy(dest, sz);
-		}
 	}
 }
 
