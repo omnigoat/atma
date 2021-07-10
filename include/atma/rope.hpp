@@ -84,22 +84,6 @@ namespace atma::detail
 #if 1
 namespace atma::detail
 {
-	struct rope_charbuf_lich_oper_t
-	{
-		using value_type = struct{ char* ptr; size_t& size; };
-
-		// update size
-		template <typename Dest>
-		static void on_post_memcpy(Dest&& dest, size_t sz)
-		{
-			auto x = dest.lich_value();
-
-			ATMA_ASSERT(dest.data() == x.ptr + x.size);
-
-			x.size += sz;
-		}
-	};
-
 	struct charbuf_t
 	{
 		using value_type = char;
@@ -129,12 +113,6 @@ namespace atma::detail
 		}
 
 		char operator[](size_t idx) const { return chars_[idx]; }
-
-		template <typename tag_type>
-		auto make_lich_memxfer() -> atma::lich_memxfer_t<tag_type, char, rope_charbuf_lich_oper_t, rope_buf_size>
-		{
-			return {chars_, rope_charbuf_lich_oper_t::value_type{chars_, size_}};
-		}
 
 	private:
 		size_t size_ = 0;
