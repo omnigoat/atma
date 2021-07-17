@@ -250,6 +250,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\source\include_guide.cpp" />
+    <ClCompile Include="..\..\include\atma\rope.ixx" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
