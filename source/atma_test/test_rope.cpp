@@ -1,12 +1,13 @@
 #include <atma/unit_test.hpp>
 
-#include <atma/rope.hpp>
+import atma.rope;
 
 #include <iostream>
 
-
 SCENARIO("rope can be constructed" * doctest::skip())
 {
+	int k = atma::detail::rope_branching_factor;
+
 	GIVEN("")
 	{
 		THEN("")

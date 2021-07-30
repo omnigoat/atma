@@ -1,4 +1,5 @@
-#pragma once
+module;
+
 
 #include <atma/utf/utf8_string.hpp>
 
@@ -11,6 +12,9 @@
 #include <optional>
 #include <array>
 #include <functional>
+
+
+export module atma.rope;
 
 #define ATMA_ROPE_DEBUG_BUFFER 1
 
@@ -200,13 +204,13 @@ namespace atma::detail
 {
 	struct rope_node_internal_t
 	{
-		
+
 		// accepts in-order arguments to fill children_
 		template <typename... Args>
 		rope_node_internal_t(Args&&...);
 
 		auto length() const -> size_t;
-		
+
 		auto push(rope_node_info_t const&) const -> rope_node_ptr;
 		auto child_at(size_t idx) const -> rope_node_info_t const& { return children_[idx]; }
 		auto children_range() const -> decltype(auto) { return (children_); }
@@ -335,9 +339,9 @@ namespace atma::detail
 
 		ri.node->visit(
 			[&f](rope_node_internal_t const& x)
-				{ x.for_each_child(std::bind(&rope_for_all_text<F>, f, std::placeholders::_1)); }, //atma::curry(&rope_for_all_text<F>, f)); },
+			{ x.for_each_child(std::bind(&rope_for_all_text<F>, f, std::placeholders::_1)); }, //atma::curry(&rope_for_all_text<F>, f)); },
 			[&ri, f = std::forward<F>(f)](rope_node_leaf_t const& x)
-				{ std::invoke(f, ri); } );
+		{ std::invoke(f, ri); });
 	}
 }
 
@@ -370,7 +374,7 @@ namespace atma::detail
 
 		if (byte_idx == 0)
 			return 0;
-		
+
 		size_t i = byte_idx - 1;
 		while (!is_break(buf, i))
 			--i;
@@ -419,8 +423,8 @@ namespace atma::detail
 			constexpr auto splitbuf_halfsize = splitbuf_size / 2ull;
 			static_assert(splitbuf_halfsize * 2 == splitbuf_size);
 
-			char splitbuf[splitbuf_size] = {0};
-			
+			char splitbuf[splitbuf_size] ={0};
+
 			size_t result_size = hostbuf.size() + insbuf.size();
 			size_t midpoint = result_size / 2;
 			size_t ins_end_idx = byte_idx + insbuf.size();
@@ -430,10 +434,10 @@ namespace atma::detail
 
 			for (size_t i = bufcopy_start; i != bufcopy_end; ++i)
 				splitbuf[i - bufcopy_start]
-					= (i < byte_idx) ? hostbuf[i]
-					: (i < ins_end_idx) ? insbuf[i - byte_idx]
-					: hostbuf[i - insbuf.size()]
-					;
+				= (i < byte_idx) ? hostbuf[i]
+				: (i < ins_end_idx) ? insbuf[i - byte_idx]
+				: hostbuf[i - insbuf.size()]
+				;
 
 			split_idx = bufcopy_start + find_split_point(xfer_src(splitbuf, splitbuf_size), midpoint - bufcopy_start);
 
@@ -603,7 +607,7 @@ namespace atma::detail
 
 			return detail::rope_edit_result_t{lhs_info, detail::rope_node_info_t{rhs_info, rhs_node}};
 		}
-		
+
 	}
 
 
@@ -640,7 +644,7 @@ namespace atma::detail
 			{
 				return std::invoke(f, char_idx, info, x.buf);
 			}
-		);
+			);
 	}
 }
 
@@ -657,7 +661,7 @@ namespace atma::detail
 	inline auto rope_node_leaf_construct_(charbuf_t& buf, src_bounded_memxfer_t<char const> x, Args&&... args)
 	{
 		atma::memory_copy(xfer_dest(buf).skip(buf.size()), x);
-		
+
 		rope_node_leaf_construct_(buf, std::forward<Args>(args)...);
 	}
 
@@ -783,7 +787,7 @@ namespace atma::detail
 		else
 		{
 			auto s = rope_make_internal_ptr(
-				xfer_src(children_, idx), 
+				xfer_src(children_, idx),
 				l_info,
 				xfer_src(children_, idx + 1, rope_branching_factor - idx - 1));
 
@@ -836,7 +840,7 @@ namespace atma::detail
 			//    atma::memory_copy(xfer_dest_append(buf + leaf_info.bytes, buf_size), src);
 			//
 			// and buf_size would automatically be updated
-			
+
 			memory_copy(
 				xfer_dest(buf).skip(leaf_info.bytes),
 				src,
@@ -885,7 +889,16 @@ namespace atma::detail
 	}
 }
 
-namespace atma
+
+
+
+
+//
+// rope_t
+// --------
+// 
+//
+export namespace atma
 {
 	struct rope_t
 	{
@@ -897,25 +910,22 @@ namespace atma
 		friend std::ostream& operator << (std::ostream&, rope_t const&);
 
 		template <typename F>
-		auto for_all_text(F&& f) const
-		{
-			detail::rope_for_all_text(std::forward<F>(f), root_);
-		}
+		auto for_all_text(F&& f) const;
 
 	private:
 		detail::rope_node_info_t root_;
 	};
 
-	inline rope_t::rope_t()
+	rope_t::rope_t()
 		: root_(detail::rope_make_internal_ptr())
 	{}
 
-	inline auto rope_t::push_back(char const* str, size_t sz) -> void
+	auto rope_t::push_back(char const* str, size_t sz) -> void
 	{
 		this->insert(root_.node->length(), str, sz);
 	}
-	
-	inline auto rope_t::insert(size_t char_idx, char const* str, size_t sz) -> void
+
+	auto rope_t::insert(size_t char_idx, char const* str, size_t sz) -> void
 	{
 		auto [lhs_info, rhs_info, seam] = root_.node->edit_chunk_at_char(char_idx, root_,
 			[str, sz](size_t char_idx, detail::rope_node_info_t const& leaf_info, detail::charbuf_t& buf)
@@ -936,7 +946,14 @@ namespace atma
 		}
 	}
 
-	inline std::ostream& operator << (std::ostream& stream, rope_t const& x)
+	template <typename F>
+	auto rope_t::for_all_text(F&& f) const
+	{
+		detail::rope_for_all_text(std::forward<F>(f), root_);
+	}
+
+
+	std::ostream& operator << (std::ostream& stream, rope_t const& x)
 	{
 		x.for_all_text(
 			[&stream](detail::rope_node_info_t const& info)
@@ -946,6 +963,5 @@ namespace atma
 
 		return stream;
 	}
-
-
 }
+
