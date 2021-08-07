@@ -1,44 +1,9 @@
 #pragma once
 
-#include "meta.hpp"
 #include "types.hpp"
 
 #include <tuple>
 #include <functional>
-
-
-// this is probably the way I want to go in the future for traits
-namespace atma
-{
-	template <size_t N, typename F, typename = std::void_t<>>
-	struct has_n_arguments_tx
-		: std::false_type
-	{};
-
-	template <typename F>
-	struct has_n_arguments_tx<0, F, std::void_t<std::invoke_result_t<F>>>
-		: std::true_type
-	{};
-
-	template <typename F>
-	struct has_n_arguments_tx<1, F, std::void_t<std::invoke_result_t<F, meta::any_t>>>
-		: std::true_type
-	{};
-
-	template <size_t N, typename F>
-	inline bool constexpr has_n_arguments_v = has_n_arguments_tx<N, F>::value;
-
-	template <typename R, typename F, typename... Args>
-	struct invoke_result_returns_tx
-		: std::bool_constant<std::is_same_v<R, std::invoke_result_t<F, Args...>>>
-	{};
-
-	template <typename R, typename F, typename... Args>
-	inline bool constexpr invoke_result_returns_v = invoke_result_returns_tx<R, F, Args...>::value;
-
-}
-
-
 
 namespace atma
 {

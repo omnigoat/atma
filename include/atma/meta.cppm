@@ -1,14 +1,12 @@
-#pragma once
+export module atma.meta;
 
-#include <functional>
-#include <utility>
-#include <algorithm>
+import std.core;
 
 // nullptr_v
 namespace atma::meta
 {
-	template <typename T>
-	inline constexpr T* nullptr_ = nullptr;
+	export template <typename T>
+	inline constexpr T* nullptr_v = nullptr;
 }
 
 // any_t
@@ -31,13 +29,13 @@ namespace atma::meta
 		{}
 	};
 
-	using any_t = any_t_<>;
+	export using any_t = any_t_<>;
 }
 
 // list
 namespace atma::meta
 {
-	template <typename... As>
+	export template <typename... As>
 	struct list
 	{
 		using type = list;
@@ -46,7 +44,7 @@ namespace atma::meta
 }
 
 // integral types
-namespace atma::meta
+export namespace atma::meta
 {
 	struct nil_ {};
 
@@ -64,7 +62,7 @@ namespace atma::meta
 }
 
 // integral operations
-namespace atma::meta
+export namespace atma::meta
 {
 	template <typename x> using inc = integral_constant_of<++x()>;
 	template <typename x> using dec = integral_constant_of<--x()>;
@@ -76,7 +74,7 @@ namespace atma::meta
 }
 
 // identity
-namespace atma::meta
+export namespace atma::meta
 {
 	template <typename T>
 	struct identity {
@@ -89,7 +87,7 @@ namespace atma::meta
 namespace atma::meta
 {
 	template <typename T>
-	constexpr auto typeval = T::type::value;
+	constexpr auto tv_ = T::type::value;
 }
 
 
@@ -110,14 +108,14 @@ namespace atma::meta
 		using defer_ = decltype(try_defer_<C, Ts...>(0));
 	}
 
-	template <template <typename...> class C, typename... Ts>
+	export template <template <typename...> class C, typename... Ts>
 	struct defer : detail::defer_<C, Ts...>
 	{
 	};
 }
 
 // invokify & invoke
-namespace atma::meta
+export namespace atma::meta
 {
 	template <template <typename...> typename C>
 	struct invokify {
@@ -133,24 +131,21 @@ namespace atma::meta
 // map
 namespace atma::meta
 {
-	namespace detail
-	{
-		template <typename, typename>
-		struct map_impl;
+	template <typename, typename>
+	struct map_impl;
 
-		template <class F>
-		struct map_impl<F, list<>> {
-			using type = list<>;
-		};
+	template <class F>
+	struct map_impl<F, list<>> {
+		using type = list<>;
+	};
 
-		template <typename F, typename... Xs>
-		struct map_impl<F, list<Xs...>> {
-			using type = list<invoke<F, Xs>...>;
-		};
-	}
+	template <typename F, typename... Xs>
+	struct map_impl<F, list<Xs...>> {
+		using type = list<invoke<F, Xs>...>;
+	};
 
-	template <typename F, typename List>
-	using map = typename detail::map_impl<F, List>::type;
+	export template <typename F, typename List>
+	using map = typename map_impl<F, List>::type;
 }
 
 // fold
@@ -184,12 +179,12 @@ namespace atma::meta
 		{};
 	}
 
-	template <typename... Args>
+	export template <typename... Args>
 	using fold = typename detail::fold_pick<list<Args...>>::type;
 }
 
 // bind_back
-namespace atma::meta
+export namespace atma::meta
 {
 	template <typename F, typename... Us>
 	struct bind_back
@@ -201,22 +196,22 @@ namespace atma::meta
 
 
 // logical operators
-namespace atma::meta
+export namespace atma::meta
 {
 	struct and_op {
 		template <typename A, typename B>
-		using invoke = integral_constant_of<typeval<A> && typeval<B>>;
+		using invoke = integral_constant_of<tv_<A> && tv_<B>>;
 	};
 
 	struct or_op {
 		template <typename A, typename B>
-		using invoke = integral_constant_of<typeval<A> || typeval<B>>;
+		using invoke = integral_constant_of<tv_<A> || tv_<B>>;
 	};
 }
 
 
 // all/any
-namespace atma::meta
+export namespace atma::meta
 {
 	template <typename list>
 	using all = fold<and_op, bool_<true>, list>;
