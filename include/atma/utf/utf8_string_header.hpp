@@ -1,7 +1,6 @@
 #pragma once
 
 #include <atma/types.hpp>
-#include <atma/assert.hpp>
 
 #include <atma/utf/utf8_char.hpp>
 

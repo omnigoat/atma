@@ -1,9 +1,10 @@
 #ifndef ATMA_UTF_UTF8_ISTREAM
 #define ATMA_UTF_UTF8_ISTREAM
 //=====================================================================
-#include <atma/assert.hpp>
 #include <atma/utf/algorithm.hpp>
 //=====================================================================
+#include <atma/assert.hpp>
+
 namespace atma {
 //=====================================================================
 	

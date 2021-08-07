@@ -26,7 +26,9 @@
     <ClInclude Include="..\..\include\atma\logging.hpp" />
     <ClInclude Include="..\..\include\atma\math\functions.hpp" />
     <ClInclude Include="..\..\include\atma\memory.hpp" />
-    <ClInclude Include="..\..\include\atma\assert.hpp" />
+    <ClCompile Include="..\..\include\atma\assert.hpp">
+      <FileType>Document</FileType>
+    </ClCompile>
     <ClInclude Include="..\..\include\atma\bind.hpp" />
     <ClInclude Include="..\..\include\atma\bitmask.hpp" />
     <ClInclude Include="..\..\include\atma\com_ptr.hpp" />
@@ -50,6 +52,7 @@
     <ClInclude Include="..\..\include\atma\math\vector4f.hpp" />
     <ClInclude Include="..\..\include\atma\math\vector4i.hpp" />
     <ClInclude Include="..\..\include\atma\lockfree_queue.hpp" />
+    <ClCompile Include="..\..\include\atma\assert.cppm" />
     <ClCompile Include="..\..\include\atma\meta.cppm">
       <FileType>Document</FileType>
     </ClCompile>
