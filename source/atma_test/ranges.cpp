@@ -2,7 +2,6 @@
 
 #include <atma/algorithm.hpp>
 #include <atma/vector.hpp>
-#include <atma/meta.hpp>
 
 // used below
 struct is_3_t {

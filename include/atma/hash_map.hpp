@@ -344,11 +344,11 @@ namespace atma::detail
 				// we have a filled slot
 				if ((chain_ptr->filled & b) == b)
 				{
-					if constexpr (has_n_arguments_v<0, F>)
+					if constexpr (std::is_invocable<F>)
 					{
 						std::invoke(std::forward<F>(f));
 					}
-					else if constexpr (invoke_result_returns_v<void, F, value_type&>)
+					else if constexpr (std::is_invocable_r<void, F, value_type&>)
 					{
 						std::invoke(std::forward<F>(f), chain_ptr->at(element_idx));
 					}
