@@ -6,8 +6,6 @@ import atma.rope;
 
 SCENARIO("rope can be constructed" * doctest::skip())
 {
-	int k = atma::detail::rope_branching_factor;
-
 	GIVEN("")
 	{
 		THEN("")

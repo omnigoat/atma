@@ -1,7 +1,6 @@
 #pragma once
 
 #include <atma/types.hpp>
-#include <atma/concepts.hpp>
 
 #include <functional>
 #include <ranges>
@@ -9,38 +8,6 @@
 // range
 namespace atma
 {
-#if 0
-	struct range_concept
-	{
-		template <typename Range>
-		auto contract(Range&& range) -> concepts::specifies<
-			SPECIFIES_EXPR(std::begin(range)),
-			SPECIFIES_EXPR(std::end(range))
-		>;
-	};
-
-	struct random_access_range_concept
-		: concepts::refines<range_concept>
-	{
-		// returned itertor is random-access and it can be indexed by int
-		template <typename Range>
-		auto contract(Range&& range) -> concepts::specifies<
-			SPECIFIES_CONCEPT_MODELS(random_iterator_concept, decltype(std::begin(range))),
-			SPECIFIES_EXPR(range[0])
-		>;
-	};
-
-	struct contiguous_range_concept
-		: concepts::refines<random_access_range_concept>
-	{
-		template <typename Range>
-		auto contract(Range&& range) -> concepts::specifies<
-			SPECIFIES_CONCEPT_MODELS(contiguous_iterator_concept, decltype(std::begin(range))),
-			SPECIFIES_EXPR(range[0])
-		>;
-	};
-#endif
-
 	// sized_and_contiguous_range
 	template <typename R>
 	concept sized_and_contiguous_range =
