@@ -13,7 +13,6 @@ module;
 #include <array>
 #include <functional>
 
-
 export module atma.rope;
 
 #define ATMA_ROPE_DEBUG_BUFFER 1
