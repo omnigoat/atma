@@ -214,9 +214,6 @@
     <ClInclude Include="..\..\include\atma\ranges\map.hpp">
       <Filter>include\ranges</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\concepts.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\ranges\zip.hpp">
       <Filter>include\ranges</Filter>
     </ClInclude>
