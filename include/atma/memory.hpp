@@ -1,7 +1,6 @@
 #pragma once
 
 #include <atma/aligned_allocator.hpp>
-#include <atma/concepts.hpp>
 #include <atma/assert.hpp>
 #include <atma/types.hpp>
 #include <atma/ebo_pair.hpp>

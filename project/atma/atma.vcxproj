@@ -15,7 +15,6 @@
     <ClInclude Include="..\..\include\atma\aligned_allocator.hpp" />
     <ClInclude Include="..\..\include\atma\arena_allocator.hpp" />
     <ClInclude Include="..\..\include\atma\atomic.hpp" />
-    <ClInclude Include="..\..\include\atma\concepts.hpp" />
     <ClInclude Include="..\..\include\atma\ebo_pair.hpp" />
     <ClInclude Include="..\..\include\atma\flyweight.hpp" />
     <ClInclude Include="..\..\include\atma\function.hpp" />
@@ -157,13 +156,15 @@
       <EnableModules>true</EnableModules>
       <FloatingPointModel />
       <ConformanceMode>true</ConformanceMode>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Lib>
-      <AdditionalOptions>/verbose %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>
+      </AdditionalOptions>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Distribution|x64'">

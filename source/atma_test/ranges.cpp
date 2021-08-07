@@ -3,7 +3,6 @@
 #include <atma/algorithm.hpp>
 #include <atma/vector.hpp>
 #include <atma/meta.hpp>
-#include <atma/concepts.hpp>
 
 // used below
 struct is_3_t {
@@ -14,15 +13,6 @@ struct is_3_t {
 } const is_3;
 
 
-struct result_t {};
-
-template <typename T, typename U,
-	CONCEPT_MODELS_(atma::concepts::Same, T, U)
->
-auto operator % (T&& lhs, U&& rhs) -> result_t
-{
-	return result_t{};
-}
 
 SCENARIO_OF("ranges/filter_t", "ranges can be filtered")
 {
@@ -33,19 +23,6 @@ SCENARIO_OF("ranges/filter_t", "ranges can be filtered")
 	GIVEN("a prvalue vector of numbers")
 	{
 		using namespace atma;
-
-		struct dragon_t {};
-		struct knight_t {};
-
-		static_assert( concepts::models<concepts::Same, dragon_t, dragon_t>::value);
-		static_assert(!concepts::models<concepts::Same, knight_t, dragon_t>::value);
-
-		static_assert(!concepts::models<concepts::Same, knight_t, void>::value);
-		static_assert(!concepts::models<concepts::Same, void, dragon_t>::value);
-
-		static_assert(std::is_same_v<decltype(knight_t{} % knight_t{}), result_t>);
-
-		auto r = dragon_t{} % dragon_t{};
 
 		THEN("ownership is transferred")
 		{
