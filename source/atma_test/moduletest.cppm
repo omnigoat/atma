@@ -4,6 +4,6 @@ import atma.rope;
 
 int blam()
 {
-	atma::rope_t hooray;
+	[[maybe_unused]] atma::rope_t hooray;
 	return 4;
 }
