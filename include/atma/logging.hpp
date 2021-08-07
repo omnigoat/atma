@@ -3,7 +3,6 @@
 #include <atma/types.hpp>
 #include <atma/lockfree_queue.hpp>
 #include <atma/threading.hpp>
-#include <atma/assert.hpp>
 #include <atma/intrusive_ptr.hpp>
 #include <atma/vector.hpp>
 #include <atma/bind.hpp>

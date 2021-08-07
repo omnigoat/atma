@@ -1,8 +1,7 @@
 #pragma once
 
-#include <atma/assert.hpp>
 #include <atma/ranges/core.hpp>
-
+#include <atma/assert.hpp>
 
 // forward-declares
 namespace atma

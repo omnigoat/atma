@@ -4,12 +4,14 @@
 #include "hash.hpp"
 #include "unique_memory.hpp"
 #include "math/functions.hpp"
-#include "assert.hpp"
 #include "function_traits.hpp"
 #include "meta.hpp"
+#include <atma/assert.hpp>
 
 #include <functional>
 #include <array>
+
+
 
 #if USE_SPP_HASH_MAP
 
