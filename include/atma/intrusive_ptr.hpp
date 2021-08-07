@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atma/assert.hpp>
 #include <atomic>
 #include <type_traits>
 
@@ -145,10 +144,13 @@ namespace atma
 
 		auto operator = (intrusive_ptr const& rhs) -> intrusive_ptr&
 		{
-			ATMA_ASSERT(this != &rhs);
-			ref_counted_traits<T>::add_ref(rhs.px);
-			ref_counted_traits<T>::rm_ref(px);
-			px = rhs.px;
+			if (this != &rhs)
+			{
+				ref_counted_traits<T>::add_ref(rhs.px);
+				ref_counted_traits<T>::rm_ref(px);
+				px = rhs.px;
+			}
+
 			return *this;
 		}
 

@@ -103,9 +103,6 @@
     <ClInclude Include="..\..\include\atma\aligned_allocator.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\assert.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\atomic.hpp">
       <Filter>include</Filter>
     </ClInclude>
@@ -248,6 +245,12 @@
       <Filter>include</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\atma\meta.cppm">
+      <Filter>include</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\atma\assert.hpp">
+      <Filter>include</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\atma\assert.cppm">
       <Filter>include</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,9 +1,9 @@
 #pragma once
 
+#include <atma/assert.hpp>
 #include <atma/types.hpp>
 #include <atma/atomic.hpp>
 #include <atma/unique_memory.hpp>
-#include <atma/assert.hpp>
 #include <atma/config/platform.hpp>
 #include <atma/math/functions.hpp>
 
@@ -11,6 +11,8 @@
 #include <thread>
 #include <algorithm>
 #include <atomic>
+
+
 
 namespace atma
 {
