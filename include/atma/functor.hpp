@@ -88,8 +88,8 @@ namespace atma
 	};
 
 	template <typename... Fwds, typename... Fs>
-	functor_list_t(functor_call_fwds_t<Fwds...>, Fs&&...) -> functor_list_t<functor_call_fwds_t<Fwds...>, rmref_t<Fs>...>;
+	functor_list_t(functor_call_fwds_t<Fwds...>, Fs&&...) -> functor_list_t<functor_call_fwds_t<Fwds...>, rm_ref_t<Fs>...>;
 
 	template <typename... Fs>
-	functor_list_t(Fs&&...) -> functor_list_t<functor_call_no_fwds_t, rmref_t<Fs>...>;
+	functor_list_t(Fs&&...) -> functor_list_t<functor_call_no_fwds_t, rm_ref_t<Fs>...>;
 }

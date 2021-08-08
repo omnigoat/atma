@@ -160,6 +160,22 @@ export namespace atma
 	template <typename T>
 	constexpr bool is_implicitly_default_constructible_v =
 		detail::is_implicitly_default_constructible_impl<T>::value;
+
+
+	//
+	// rm_ref_t
+	//
+	template <typename T>
+	using rm_ref_t = std::remove_reference_t<T>;
+
+	//
+	// rm_cvref_t
+	//
+	template <typename T>
+	using rm_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
+
+	template <typename T>
+	using iter_reference_t = decltype(*std::declval<T&>());
 }
 
 //======================================================================
@@ -248,37 +264,20 @@ namespace atma
 		template <typename R>
 		struct value_type_of_ii<R* const, std::void_t<>>
 			{ using type = R; };
-
-		// value_type_of
-		template <typename R, typename = std::void_t<>>
-		struct value_type_of
-		{
-			using type = typename value_type_of_ii<R>::type;
-		};
-
-		template <typename R>
-		struct value_type_of<R, std::void_t<decltype(*begin(std::declval<R&>()))>>
-		{
-			using type = std::remove_reference_t<decltype(*begin(std::declval<R&>()))>;
-		};
 	}
 
+	export template <typename R, typename = std::void_t<>>
+	struct value_type_of
+		{ using type = typename detail::value_type_of_ii<R>::type; };
+
+	template <typename R>
+	struct value_type_of<R, std::void_t<decltype(*begin(std::declval<R&>()))>>
+		{ using type = std::remove_reference_t<decltype(*begin(std::declval<R&>()))>; };
+
 	export template <typename R>
-	using value_type_of_t = typename detail::value_type_of<R>::type;
+	using value_type_of_t = typename value_type_of<R>::type;
 }
 
-export namespace atma
-{
-	template <typename T>
-	using rmref_t = std::remove_reference_t<T>;
-
-	template <typename T>
-	using rm_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
-
-
-	template <typename T>
-	using iter_reference_t = decltype(*std::declval<T&>());
-}
 
 
 //

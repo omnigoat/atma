@@ -514,9 +514,9 @@ namespace atma
 	template <typename Memory>
 	concept memory_concept = requires(Memory memory)
 	{
-		typename rmref_t<Memory>::value_type;
-		typename rmref_t<Memory>::allocator_type;
-		{ std::data(memory) } -> std::same_as<std::add_pointer_t<typename rmref_t<Memory>::value_type>>;
+		typename rm_ref_t<Memory>::value_type;
+		typename rm_ref_t<Memory>::allocator_type;
+		{ std::data(memory) } -> std::same_as<std::add_pointer_t<typename rm_ref_t<Memory>::value_type>>;
 		{ atma::get_allocator(memory) };
 	};
 
@@ -529,23 +529,23 @@ namespace atma
 
 	template <typename Memory>
 	concept dest_memory_concept = memory_concept<Memory> &&
-		std::is_same_v<dest_memory_tag_t, typename rmref_t<Memory>::tag_type>;
+		std::is_same_v<dest_memory_tag_t, typename rm_ref_t<Memory>::tag_type>;
 
 	template <typename Memory>
 	concept src_memory_concept = memory_concept<Memory> &&
-		std::is_same_v<src_memory_tag_t, typename rmref_t<Memory>::tag_type>;
+		std::is_same_v<src_memory_tag_t, typename rm_ref_t<Memory>::tag_type>;
 
 	template <typename Memory>
 	concept dest_bounded_memory_concept = bounded_memory_concept<Memory> &&
-		std::is_same_v<dest_memory_tag_t, typename rmref_t<Memory>::tag_type>;
+		std::is_same_v<dest_memory_tag_t, typename rm_ref_t<Memory>::tag_type>;
 
 	template <typename Memory>
 	concept src_bounded_memory_concept = bounded_memory_concept<Memory> &&
-		std::is_same_v<src_memory_tag_t, typename rmref_t<Memory>::tag_type>;
+		std::is_same_v<src_memory_tag_t, typename rm_ref_t<Memory>::tag_type>;
 
 	template <typename Memory>
-	requires memory_concept<rmref_t<Memory>>
-	using memory_value_type_t = typename rmref_t<Memory>::value_type;
+	requires memory_concept<rm_ref_t<Memory>>
+	using memory_value_type_t = typename rm_ref_t<Memory>::value_type;
 }
 
 
@@ -837,7 +837,7 @@ namespace atma::detail
 		template <typename T, typename A>
 		auto operator()(A&& allocator, T* data) const
 		{
-			return memxfer_t<tag_type, T, rmref_t<A>>(std::forward<A>(allocator), data);
+			return memxfer_t<tag_type, T, rm_ref_t<A>>(std::forward<A>(allocator), data);
 		}
 
 		template <typename T>
@@ -849,7 +849,7 @@ namespace atma::detail
 		template <typename T, typename A>
 		auto operator()(A&& allocator, T* data, size_t sz) const
 		{
-			return bounded_memxfer_t<tag_type, T, std::dynamic_extent, rmref_t<A>>(std::forward<A>(allocator), data, sz);
+			return bounded_memxfer_t<tag_type, T, std::dynamic_extent, rm_ref_t<A>>(std::forward<A>(allocator), data, sz);
 		}
 	};
 
@@ -857,7 +857,7 @@ namespace atma::detail
 	struct xfer_make_from_sized_contiguous_range_
 	{
 		template <sized_and_contiguous_range R>
-		auto operator ()(R&& range) -> bounded_memxfer_range_of_t<tag_type, rmref_t<R>>
+		auto operator ()(R&& range) -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<R>>
 		{
 			return {get_allocator(range), std::addressof(*std::begin(range)), std::size(range)};
 		};
@@ -867,7 +867,7 @@ namespace atma::detail
 	struct xfer_make_from_contiguous_range_
 	{
 		template <std::ranges::contiguous_range R>
-		auto operator ()(R&& range) -> bounded_memxfer_range_of_t<tag_type, rmref_t<R>>
+		auto operator ()(R&& range) -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<R>>
 		{
 			auto const sz = std::distance(std::begin(range), std::end(range));
 
@@ -875,13 +875,13 @@ namespace atma::detail
 		}
 
 		template <std::ranges::contiguous_range R>
-		auto operator ()(R&& range, size_t size) -> bounded_memxfer_range_of_t<tag_type, rmref_t<R>>
+		auto operator ()(R&& range, size_t size) -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<R>>
 		{
 			return {get_allocator(range), std::addressof(*std::begin(range)), size};
 		}
 
 		template <std::ranges::contiguous_range R>
-		auto operator ()(R&& range, size_t offset, size_t size) -> bounded_memxfer_range_of_t<tag_type, rmref_t<R>>
+		auto operator ()(R&& range, size_t offset, size_t size) -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<R>>
 		{
 			return {get_allocator(range), std::addressof(*std::begin(range)) + offset, size};
 		}
@@ -891,19 +891,19 @@ namespace atma::detail
 	struct xfer_make_from_memory_
 	{
 		template <memory_concept M>
-		auto operator ()(M&& memory) -> memxfer_range_of_t<tag_type, rmref_t<M>>
+		auto operator ()(M&& memory) -> memxfer_range_of_t<tag_type, rm_ref_t<M>>
 		{
 			return {get_allocator(memory), std::data(memory)};
 		}
 
 		template <memory_concept M>
-		auto operator ()(M&& memory, size_t size) -> bounded_memxfer_range_of_t<tag_type, rmref_t<M>>
+		auto operator ()(M&& memory, size_t size) -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<M>>
 		{
 			return {get_allocator(memory), std::data(memory), size};
 		}
 
 		template <memory_concept M>
-		auto operator ()(M&& memory, size_t offset, size_t size) -> bounded_memxfer_range_of_t<tag_type, rmref_t<M>>
+		auto operator ()(M&& memory, size_t offset, size_t size) -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<M>>
 		{
 			return {get_allocator(memory), std::data(memory) + offset, size};
 		}
@@ -968,10 +968,10 @@ namespace atma::detail
 	constexpr auto allocator_type_of_range_(R&& a) -> std::allocator<rm_cvref_t<decltype(*std::begin(a))>>;
 
 	template <typename A>
-	constexpr auto allocator_traits_of_allocator_(A&& a) -> std::allocator_traits<rmref_t<A>>;
+	constexpr auto allocator_traits_of_allocator_(A&& a) -> std::allocator_traits<rm_ref_t<A>>;
 
 	template <typename A>
-	using allocator_traits_of_t = std::allocator_traits<rmref_t<A>>;
+	using allocator_traits_of_t = std::allocator_traits<rm_ref_t<A>>;
 }
 
 
