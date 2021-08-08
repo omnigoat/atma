@@ -1,10 +1,10 @@
 #pragma once
 
-#include <atma/types.hpp>
-
 #pragma warning(push,3)
 #include <smmintrin.h>
 #pragma warning(pop)
+
+import atma.types;
 
 
 namespace atma { namespace math {

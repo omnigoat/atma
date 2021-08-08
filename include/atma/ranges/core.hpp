@@ -1,9 +1,9 @@
 #pragma once
 
-#include <atma/types.hpp>
-
 #include <functional>
 #include <ranges>
+
+import atma.types;
 
 // range
 namespace atma

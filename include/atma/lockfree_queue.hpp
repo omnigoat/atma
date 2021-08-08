@@ -1,7 +1,6 @@
 #pragma once
 
 #include <atma/assert.hpp>
-#include <atma/types.hpp>
 #include <atma/atomic.hpp>
 #include <atma/unique_memory.hpp>
 #include <atma/config/platform.hpp>
@@ -12,7 +11,7 @@
 #include <algorithm>
 #include <atomic>
 
-
+import atma.types;
 
 namespace atma
 {

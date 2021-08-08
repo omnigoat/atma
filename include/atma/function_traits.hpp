@@ -1,9 +1,9 @@
 #pragma once
 
-#include "types.hpp"
-
 #include <tuple>
 #include <functional>
+
+import atma.types;
 
 namespace atma
 {

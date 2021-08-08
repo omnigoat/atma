@@ -7,9 +7,10 @@
 #include <atma/function_traits.hpp>
 #include <atma/tuple.hpp>
 #include <atma/vector.hpp>
-#include <atma/types.hpp>
 
 #include <algorithm>
+
+import atma.types;
 
 namespace atma::functors
 {

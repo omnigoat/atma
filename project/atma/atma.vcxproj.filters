@@ -169,9 +169,6 @@
     <ClInclude Include="..\..\include\atma\tuple.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\types.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\unique_memory.hpp">
       <Filter>include</Filter>
     </ClInclude>
@@ -251,6 +248,9 @@
       <Filter>include</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\atma\assert.cppm">
+      <Filter>include</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\atma\types.cppm">
       <Filter>include</Filter>
     </ClCompile>
   </ItemGroup>

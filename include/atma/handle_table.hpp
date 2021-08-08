@@ -1,11 +1,10 @@
 #pragma once
 
-#include <atma/types.hpp>
-//#include <atma/math/compile_time.hpp>
-
 #include <iostream>
 #include <atomic>
 #include <memory>
+
+import atma.types;
 
 namespace atma { namespace math { namespace ct {
 

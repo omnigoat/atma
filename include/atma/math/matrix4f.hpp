@@ -3,8 +3,9 @@
 #include <atma/math/constants.hpp>
 #include <atma/math/scalar.hpp>
 #include <atma/math/vector4f.hpp>
-#include <atma/types.hpp>
 #include <atma/assert.hpp>
+
+import atma.types;
 
 #if ATMA_PLATFORM_WINDOWS
 # undef near
