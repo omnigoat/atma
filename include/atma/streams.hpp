@@ -1,12 +1,13 @@
 #pragma once
 
-#include <atma/types.hpp>
 #include <atma/intrusive_ptr.hpp>
 #include <atma/bitmask.hpp>
 #include <atma/unique_memory.hpp>
 #include <atma/event.hpp>
 
 #include <algorithm>
+
+import atma.types;
 
 namespace atma
 {

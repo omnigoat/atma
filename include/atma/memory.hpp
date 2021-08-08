@@ -1,7 +1,6 @@
 #pragma once
 
 #include <atma/aligned_allocator.hpp>
-#include <atma/types.hpp>
 #include <atma/ebo_pair.hpp>
 #include <atma/functor.hpp>
 #include <atma/assert.hpp>
@@ -11,6 +10,8 @@
 #include <type_traits>
 #include <vector>
 #include <memory>
+
+import atma.types;
 
 //
 // thoughts on memory things

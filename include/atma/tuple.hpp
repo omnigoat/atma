@@ -1,11 +1,12 @@
 #pragma once
 
-#include <atma/types.hpp>
 #include <atma/idxs.hpp>
 #include <atma/enable_if.hpp>
 
 #include <tuple>
 #include <cstdint>
+
+import atma.types;
 
 
 // msvc does weird things with its intrinsics

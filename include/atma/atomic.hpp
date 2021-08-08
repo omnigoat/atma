@@ -1,9 +1,9 @@
 #pragma once
 
 #include <atma/config/platform.hpp>
-#include <atma/types.hpp>
 #include <atma/assert.hpp>
 
+import atma.types;
 
 namespace atma
 {
