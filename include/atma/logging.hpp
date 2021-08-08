@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atma/types.hpp>
 #include <atma/lockfree_queue.hpp>
 #include <atma/threading.hpp>
 #include <atma/intrusive_ptr.hpp>
@@ -13,6 +12,8 @@
 #include <set>
 #include <thread>
 #include <sstream>
+
+import atma.types;
 
 namespace atma
 {

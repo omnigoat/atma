@@ -1,0 +1,306 @@
+module;
+
+#include <cstdint>
+#include <type_traits>
+#include <memory>
+
+export module atma.types;
+
+//import std.core;
+
+//
+// fundamental integral types
+// ----------------------------
+//   we put oft-used types into the global namespace. so sue me.
+//
+export using uchar  = unsigned char;
+export using ushort = unsigned short;
+export using uint   = unsigned int;
+export using ulong  = unsigned long;
+export using ullong = unsigned long long;
+
+export using int8  = int8_t;
+export using int16 = int16_t;
+export using int32 = int32_t;
+export using int64 = int64_t;
+
+export using uint8  = uint8_t;
+export using uint16 = uint16_t;
+export using uint32 = uint32_t;
+export using uint64 = uint64_t;
+
+export using  intptr =  intptr_t;
+export using uintptr = uintptr_t;
+
+export using byte = std::byte;
+
+export using size_t = std::size_t;
+
+
+
+
+#define ATMA_PP_CAT_II(a, b) a##b
+#define ATMA_PP_CAT(a, b) ATMA_PP_CAT_II(a, b)
+
+#define ATMA_SPLAT_FN_II(counter, pattern) int ATMA_PP_CAT(splat, counter)[] = {0, (pattern, void(), 0)...};
+#define ATMA_SPLAT_FN(pattern) ATMA_SPLAT_FN_II(__COUNTER__, pattern)
+
+#define ATMA_SFINAE_TEST_METHOD(name, oper) \
+	template <typename T> \
+	struct name##_t \
+	{ \
+	private: \
+		template <typename C> constexpr static bool test(decltype(&C::oper)) { return true; } \
+		template <typename C> constexpr static bool test(...) { return false; } \
+		\
+	public: \
+		static constexpr bool value = test<T>(0); \
+	}; \
+	template <typename T> constexpr bool name##_v = name##_t<T>::value
+
+export namespace atma
+{
+	//
+	//  actually_false
+	//  ----------------
+	//    for static_assert
+	//
+	template <typename...>
+	constexpr bool actually_false = false;
+
+
+	template <typename T>
+	using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
+
+	//
+	//  transfer_const_t
+	//  ------------------
+	//    takes T, and if const, transforms M to be const, otherwise just M
+	//
+	template <typename T, typename M>
+	using transfer_const_t = std::conditional_t<std::is_const_v<T>, M const, M>;
+
+	//
+	//  has_functor_operator
+	//  ----------------------
+	//    boolean. true if type T has an `operator ()`
+	//
+	ATMA_SFINAE_TEST_METHOD(has_functor_operator, operator ());
+
+	//
+	//  is_function_pointer
+	//  ---------------------
+	//    srsly, c++ std.
+	//
+	template <typename T>
+	struct is_function_pointer_t : std::conditional_t<
+		std::is_pointer_v<T>,
+		std::is_function<std::remove_pointer_t<T>>,
+		std::false_type>
+	{};
+
+	template <typename T>
+	constexpr static bool is_function_pointer_v = is_function_pointer_t<T>::value;
+
+	//
+	//  is_function_reference
+	//  -----------------------
+	//    srsly, c++ std.
+	//
+	template <typename T>
+	struct is_function_reference_t : std::conditional_t<
+		std::is_reference_v<T>,
+		std::is_function<std::remove_reference_t<T>>,
+		std::false_type>
+	{};
+
+	template <typename T>
+	constexpr static bool is_function_reference_v = is_function_reference_t<T>::value;
+
+	//
+	//  is_callable_v
+	//  ---------------
+	//    returns true if T can be used like "T(args...)"
+	//
+	template <typename T>
+	constexpr bool is_callable_v =
+		is_function_pointer_v<T> ||
+		is_function_reference_v<T> ||
+		std::is_member_function_pointer_v<T> ||
+		has_functor_operator_v<T>;
+
+	//
+	//  storage_type_t
+	//  ----------------
+	//    takes a type, and if it is an lvalue, keeps it as an lvalue,
+	//    for any other type returns a non-reference type
+	//
+	template <typename T>
+	using storage_type_t = std::conditional_t<std::is_rvalue_reference_v<T>, std::remove_reference_t<T>, T>;
+
+	//
+	//  is_implicitly_constructible_v
+	//  -------------------------------
+	//    determine whether T can be default-initialized with {}
+	//
+	namespace detail
+	{
+		template <typename T, typename = void>
+		struct is_implicitly_default_constructible_impl
+			: std::false_type {};
+
+		template <typename T>
+		void is_implicitly_default_constructible_impl_fn(const T&);
+
+		template <typename T>
+		struct is_implicitly_default_constructible_impl<T, std::void_t<decltype(is_implicitly_default_constructible_impl_fn<T>({}))>>
+			: std::true_type {};
+	}
+
+	template <typename T>
+	constexpr bool is_implicitly_default_constructible_v =
+		detail::is_implicitly_default_constructible_impl<T>::value;
+}
+
+//======================================================================
+//  is_range_v
+//======================================================================
+namespace atma
+{
+	namespace detail
+	{
+		template <typename T, typename = std::void_t<>>
+		struct is_range
+		{
+			static constexpr bool value = false;
+		};
+
+		template <typename T>
+		struct is_range<T, std::void_t<
+			decltype(std::begin(std::declval<T>())),
+			decltype(std::end(std::declval<T>()))>>
+		{
+			static constexpr bool value = true;
+		};
+	}
+
+	template <typename T>
+	inline constexpr bool is_range_v = detail::is_range<T>::value;
+}
+
+
+//
+//  visit_with
+//  -----------------
+//    it's std::overload but with a better name
+//
+export namespace atma
+{
+	template <typename... Fs>
+	struct visit_with : Fs...
+	{
+		using Fs::operator()...;
+	};
+
+	template <typename... Ts>
+	visit_with(Ts&&...) -> visit_with<Ts...>;
+}
+
+
+
+
+
+//
+//  value_type_of
+//  ---------------
+//    deducing value-type from R
+//    
+//     - tries remove-ref(*begin(R))
+//     - tries R::value_type
+//     - fails
+//
+namespace atma
+{
+	namespace detail
+	{
+		// value_type_of_ii
+		template <typename R, typename = std::void_t<>>
+		struct value_type_of_ii
+		{
+			static_assert(actually_false<R>, "couldn't identify value_type for a supposed range concept");
+		};
+
+		// anything with a ::value_type subtype is that
+		template <typename R>
+		struct value_type_of_ii<R, std::void_t<typename std::remove_reference_t<R>::value_type>>
+			{ using type = typename std::remove_reference_t<R>::value_type; };
+
+		// static arrays are obvious
+		template <typename R, size_t N>
+		struct value_type_of_ii<R[N], std::void_t<>>
+			{ using type = R; };
+
+		// pointers are their pointed-to-type
+		template <typename R>
+		struct value_type_of_ii<R*, std::void_t<>>
+			{ using type = R; };
+
+		template <typename R>
+		struct value_type_of_ii<R* const, std::void_t<>>
+			{ using type = R; };
+
+		// value_type_of
+		template <typename R, typename = std::void_t<>>
+		struct value_type_of
+		{
+			using type = typename value_type_of_ii<R>::type;
+		};
+
+		template <typename R>
+		struct value_type_of<R, std::void_t<decltype(*begin(std::declval<R&>()))>>
+		{
+			using type = std::remove_reference_t<decltype(*begin(std::declval<R&>()))>;
+		};
+	}
+
+	export template <typename R>
+	using value_type_of_t = typename detail::value_type_of<R>::type;
+}
+
+export namespace atma
+{
+	template <typename T>
+	using rmref_t = std::remove_reference_t<T>;
+
+	template <typename T>
+	using rm_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
+
+
+	template <typename T>
+	using iter_reference_t = decltype(*std::declval<T&>());
+}
+
+
+//
+//  allocator_type_of
+//  -------------------
+//    returns a "Range"'s allocator, or std::allocator<value-type> if possible
+//
+export namespace atma
+{
+	template <typename R, typename = std::void_t<>>
+	struct allocator_type_of
+	{
+		using type = std::allocator<rm_cvref_t<value_type_of_t<R>>>;
+	};
+
+	template <typename R>
+	struct allocator_type_of<R, std::void_t<typename R::allocator_type>>
+	{
+		using type = typename R::allocator_type;
+	};
+
+	template <typename R>
+	using allocator_type_of_t = typename allocator_type_of<std::remove_reference_t<R>>::type;
+}
+

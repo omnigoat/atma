@@ -72,7 +72,9 @@
     <ClInclude Include="..\..\include\atma\threading.hpp" />
     <ClInclude Include="..\..\include\atma\thread\engine.hpp" />
     <ClInclude Include="..\..\include\atma\tuple.hpp" />
-    <ClInclude Include="..\..\include\atma\types.hpp" />
+    <ClCompile Include="..\..\include\atma\types.cppm">
+      <FileType>Document</FileType>
+    </ClCompile>
     <ClInclude Include="..\..\include\atma\unique_memory.hpp" />
     <ClInclude Include="..\..\include\atma\unit_test.hpp" />
     <ClInclude Include="..\..\include\atma\utf\algorithm.hpp" />

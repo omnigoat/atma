@@ -1,7 +1,8 @@
 #pragma once
 
-#include <atma/types.hpp>
 #include <atma/config/platform.hpp>
+
+import atma.types;
 
 namespace atma { namespace platform {
 

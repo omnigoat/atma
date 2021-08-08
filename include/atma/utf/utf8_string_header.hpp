@@ -1,7 +1,5 @@
 #pragma once
 
-#include <atma/types.hpp>
-
 #include <atma/utf/utf8_char.hpp>
 
 #include <ranges>
