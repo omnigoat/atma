@@ -49,25 +49,10 @@
     <ClInclude Include="..\..\include\atma\utf\algorithm.hpp">
       <Filter>include\utf</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\utf\utf8_istream.hpp">
-      <Filter>include\utf</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\atma\utf\utf8_iterator.hpp">
-      <Filter>include\utf</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\config\platform.hpp">
       <Filter>include\config</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\utf\utf8_string_header.hpp">
-      <Filter>include\utf</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\utf\utf8_string.hpp">
-      <Filter>include\utf</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\atma\utf\utf8_string_range_header.hpp">
-      <Filter>include\utf</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\atma\utf\utf8_string_range.hpp">
       <Filter>include\utf</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\atma\thread\engine.hpp">
@@ -78,9 +63,6 @@
     </ClInclude>
     <ClInclude Include="..\..\include\atma\platform\allocation.hpp">
       <Filter>include\platform</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\atma\utf\utf8_char.hpp">
-      <Filter>include\utf</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\atma\math\intersection.hpp">
       <Filter>include\math</Filter>
