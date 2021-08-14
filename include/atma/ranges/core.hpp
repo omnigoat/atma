@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atma/assert.hpp>
+
 #include <functional>
 #include <ranges>
 

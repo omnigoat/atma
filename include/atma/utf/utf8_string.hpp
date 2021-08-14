@@ -1,11 +1,10 @@
 #pragma once
 
 #include <atma/assert.hpp>
+import atma.types;
 
 #include <type_traits>
 #include <span>
-
-import atma.types;
 
 //=====================================================================
 //
