@@ -1,12 +1,11 @@
 module;
 
-
-#include <atma/utf/utf8_string.hpp>
-
+#include <atma/assert.hpp>
+#include <atma/memory.hpp>
 #include <atma/intrusive_ptr.hpp>
 #include <atma/ranges/core.hpp>
-#include <atma/memory.hpp>
 #include <atma/algorithm.hpp>
+#include <atma/utf/utf8_string.hpp>
 
 #include <variant>
 #include <optional>
@@ -17,6 +16,7 @@ module;
 
 export module atma.rope;
 
+import atma.types;
 
 namespace atma::detail
 {
@@ -802,7 +802,6 @@ namespace atma::detail
 
 	inline auto rope_node_internal_t::push(rope_node_info_t const& x) const -> rope_node_ptr
 	{
-		//ATMA_ASSERT(child_count_ < rope_branching_factor);
 		return rope_node_ptr(); ///rope_node_internal_ptr::make(children_, child_count_, x);
 	}
 }
@@ -964,4 +963,3 @@ export namespace atma
 		return stream;
 	}
 }
-

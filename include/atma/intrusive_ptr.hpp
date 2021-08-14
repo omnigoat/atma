@@ -1,7 +1,10 @@
 #pragma once
 
+#include <atma/assert.hpp>
+
 #include <atomic>
 #include <type_traits>
+#include <tuple>
 
 namespace atma
 {
@@ -50,14 +53,20 @@ namespace atma
 	template <typename T, typename = std::void_t<>>
 	struct ref_counted_traits
 	{
-		static auto add_ref(ref_counted const* t) -> void {
-			t && ++t->ref_count_;
+		static auto add_ref(ref_counted const* t) -> void
+		{
+			ATMA_ASSERT(t);
+			if (t)
+			{
+				++t->ref_count_;
+			}
 		}
 
-		static auto rm_ref(ref_counted const* t) -> void {
-			ATMA_ASSERT(!t || t->ref_count_ >= 0);
-
-			if (t && --t->ref_count_ == 0) {
+		static auto rm_ref(ref_counted const* t) -> void
+		{
+			ATMA_ASSERT(t);
+			if (t && --t->ref_count_ == 0)
+			{
 				delete t;
 			}
 		}
@@ -69,7 +78,10 @@ namespace atma
 	{
 		static auto add_ref(T const* t) -> void
 		{
-			t && t->increment_refcount();
+			if (t)
+			{
+				t->increment_refcount();
+			}
 		}
 
 		static auto rm_ref(T const* t) -> void
