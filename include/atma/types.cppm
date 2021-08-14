@@ -4,9 +4,9 @@ module;
 #include <type_traits>
 #include <memory>
 
+
 export module atma.types;
 
-//import std.core;
 
 //
 // fundamental integral types
@@ -58,20 +58,10 @@ export using size_t = std::size_t;
 	}; \
 	template <typename T> constexpr bool name##_v = name##_t<T>::value
 
+
+
 export namespace atma
 {
-	//
-	//  actually_false
-	//  ----------------
-	//    for static_assert
-	//
-	template <typename...>
-	constexpr bool actually_false = false;
-
-
-	template <typename T>
-	using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
-
 	//
 	//  transfer_const_t
 	//  ------------------
@@ -93,34 +83,32 @@ export namespace atma
 	//    srsly, c++ std.
 	//
 	template <typename T>
-	struct is_function_pointer_t : std::conditional_t<
-		std::is_pointer_v<T>,
-		std::is_function<std::remove_pointer_t<T>>,
-		std::false_type>
-	{};
+	struct is_function_pointer_t
+		: std::conditional_t<
+			std::is_pointer_v<T>,
+			std::is_function<std::remove_pointer_t<T>>,
+			std::false_type>
+		{};
 
 	template <typename T>
 	constexpr static bool is_function_pointer_v = is_function_pointer_t<T>::value;
 
 	//
 	//  is_function_reference
-	//  -----------------------
-	//    srsly, c++ std.
 	//
 	template <typename T>
-	struct is_function_reference_t : std::conditional_t<
-		std::is_reference_v<T>,
-		std::is_function<std::remove_reference_t<T>>,
-		std::false_type>
-	{};
+	struct is_function_reference_t
+		: std::conditional_t<
+			std::is_reference_v<T>,
+			std::is_function<std::remove_reference_t<T>>,
+			std::false_type>
+		{};
 
 	template <typename T>
 	constexpr static bool is_function_reference_v = is_function_reference_t<T>::value;
 
 	//
 	//  is_callable_v
-	//  ---------------
-	//    returns true if T can be used like "T(args...)"
 	//
 	template <typename T>
 	constexpr bool is_callable_v =
@@ -131,77 +119,51 @@ export namespace atma
 
 	//
 	//  storage_type_t
-	//  ----------------
-	//    takes a type, and if it is an lvalue, keeps it as an lvalue,
-	//    for any other type returns a non-reference type
 	//
 	template <typename T>
 	using storage_type_t = std::conditional_t<std::is_rvalue_reference_v<T>, std::remove_reference_t<T>, T>;
 
 	//
-	//  is_implicitly_constructible_v
-	//  -------------------------------
-	//    determine whether T can be default-initialized with {}
-	//
-	namespace detail
-	{
-		template <typename T, typename = void>
-		struct is_implicitly_default_constructible_impl
-			: std::false_type {};
-
-		template <typename T>
-		void is_implicitly_default_constructible_impl_fn(const T&);
-
-		template <typename T>
-		struct is_implicitly_default_constructible_impl<T, std::void_t<decltype(is_implicitly_default_constructible_impl_fn<T>({}))>>
-			: std::true_type {};
-	}
-
-	template <typename T>
-	constexpr bool is_implicitly_default_constructible_v =
-		detail::is_implicitly_default_constructible_impl<T>::value;
-
-
-	//
-	// rm_ref_t
+	//  rm_ref_t
 	//
 	template <typename T>
 	using rm_ref_t = std::remove_reference_t<T>;
 
 	//
-	// rm_cvref_t
+	//  rm_cvref_t
 	//
 	template <typename T>
 	using rm_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
+	//
+	//  iter_reference_t
+	//
 	template <typename T>
 	using iter_reference_t = decltype(*std::declval<T&>());
 }
 
-//======================================================================
-//  is_range_v
-//======================================================================
-namespace atma
+
+//
+//  is_implicitly_default_constructible
+//
+namespace atma::detail
 {
-	namespace detail
-	{
-		template <typename T, typename = std::void_t<>>
-		struct is_range
-		{
-			static constexpr bool value = false;
-		};
+	template <class T, class = void>
+	struct is_implicitly_default_constructible_impl
+		: std::false_type {}; // determine whether T can be copy-initialized with {}
 
-		template <typename T>
-		struct is_range<T, std::void_t<
-			decltype(std::begin(std::declval<T>())),
-			decltype(std::end(std::declval<T>()))>>
-		{
-			static constexpr bool value = true;
-		};
-	}
+	template <class T>
+	void is_implicitly_default_constructible_impl_fn(const T&);
 
+	template <class T>
+	struct is_implicitly_default_constructible_impl<T, std::void_t<decltype(is_implicitly_default_constructible_impl_fn<T>({}))>>
+		: std::true_type {};
+}
+
+export namespace atma
+{
 	template <typename T>
-	inline constexpr bool is_range_v = detail::is_range<T>::value;
+	constexpr bool is_implicitly_default_constructible_v = detail::is_implicitly_default_constructible_impl<T>::value;
 }
 
 
@@ -221,9 +183,6 @@ export namespace atma
 	template <typename... Ts>
 	visit_with(Ts&&...) -> visit_with<Ts...>;
 }
-
-
-
 
 
 //
@@ -302,4 +261,3 @@ export namespace atma
 	template <typename R>
 	using allocator_type_of_t = typename allocator_type_of<std::remove_reference_t<R>>::type;
 }
-

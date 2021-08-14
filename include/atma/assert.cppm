@@ -1,3 +1,5 @@
+module;
+
 export module atma.assert;
 
 import std.core;
@@ -63,8 +65,9 @@ export namespace atma::assert
 //
 export namespace atma::assert
 {
-	auto trigger(const char* msg, const char* filename, size_t line) -> bool
+	auto trigger(const char* msg, std::source_location const& L) -> bool
 	{
-		return (*detail::global_handler_)(msg, filename, line);
+		return (*detail::global_handler_)(msg, L.file_name(), L.line());
 	}
 }
+

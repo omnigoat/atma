@@ -1,3 +1,5 @@
+#pragma once
+
 #include <atma/config/platform.hpp>
 
 #include <boost/preprocessor/seq.hpp>
@@ -7,6 +9,7 @@
 #include <boost/preprocessor/variadic/to_tuple.hpp>
 
 #include <iostream>
+#include <source_location>
 
 #ifdef ATMA_PLATFORM_WINDOWS
 #	define ATMA_DEBUGBREAK() __debugbreak()
@@ -31,7 +34,7 @@
 //
 #define ATMA_HALT(msg) \
 	do { \
-		::atma::assert::trigger(msg, __FILE__, __LINE__); \
+		::atma::assert::trigger(msg, std::source_location::current()); \
 		ATMA_DEBUGBREAK(); \
 		break; \
 	} while(0)
@@ -46,7 +49,7 @@
 //
 #define ATMA_ENSURE_III(x, msg) \
 	do { \
-		if ( !(x) && ::atma::assert::trigger(msg, __FILE__, __LINE__) ) \
+		if ( !(x) && ::atma::assert::trigger(msg, std::source_location::current()) ) \
 			{ ATMA_DEBUGBREAK(); } \
 		break; \
 	} while(0)
@@ -105,5 +108,5 @@
 //
 namespace atma::assert
 {
-	auto trigger(const char* msg, const char* filename, size_t line) -> bool;
+	auto trigger(const char* msg, std::source_location const&) -> bool;
 }
