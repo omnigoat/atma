@@ -1,8 +1,10 @@
 module;
 
-export module atma.assert;
+#include <iostream>
+#include <source_location>
+#include <atomic>
 
-import std.core;
+export module atma.assert;
 
 //
 // handler_t
@@ -34,7 +36,6 @@ export namespace atma::assert
 
 namespace atma::assert::detail
 {
-	// atomic so set/get handler is RUINING OUR DAY
 	std::atomic<handler_t> global_handler_{&hard_break_handler};
 }
 
