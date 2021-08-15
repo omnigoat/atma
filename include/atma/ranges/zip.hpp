@@ -229,7 +229,7 @@ namespace atma
 //======================================================================
 namespace atma
 {
-	template <typename... Ranges>
+	template <std::ranges::range... Ranges>
 	inline auto zip(Ranges&&... ranges)
 	{
 		return zip_range_t{std::forward<Ranges>(ranges)...};
