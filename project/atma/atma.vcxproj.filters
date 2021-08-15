@@ -100,9 +100,6 @@
     <ClInclude Include="..\..\include\atma\console.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\enable_if.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\enable_multiple_shared_from_this.hpp">
       <Filter>include</Filter>
     </ClInclude>
@@ -209,9 +206,6 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\atma\preprocessor.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\atma\rope.hpp">
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
