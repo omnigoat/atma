@@ -9,12 +9,6 @@
 
 namespace atma
 {
-	namespace detail
-	{
-		template <typename I>
-		using valid_iterator_t = std::enable_if<std::is_base_of<std::forward_iterator_tag, typename std::iterator_traits<I>::iterator_category>::value>;
-	}
-
 	template <typename T, typename Allocator = atma::aligned_allocator_t<T, 4>>
 	struct vector
 	{
@@ -42,7 +36,7 @@ namespace atma
 		vector(std::initializer_list<T>);
 		explicit vector(size_t size);
 		explicit vector(size_t size, T const&);
-		template <typename I, typename = detail::valid_iterator_t<I>>
+		template <std::forward_iterator I>
 		vector(I begin, I end);
 		
 		auto operator = (vector const&) -> vector&;
@@ -160,7 +154,7 @@ namespace atma
 	}
 
 	template <typename T, typename A>
-	template <typename I, typename>
+	template <std::forward_iterator I>
 	inline vector<T, A>::vector(I begin, I end)
 		: capacity_()
 		, size_()
