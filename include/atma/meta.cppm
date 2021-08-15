@@ -1,6 +1,8 @@
-export module atma.meta;
+module;
 
-import std.core;
+#include <utility>
+
+export module atma.meta;
 
 // nullptr_v
 namespace atma::meta
@@ -16,6 +18,7 @@ namespace atma::meta
 	struct any_t_
 	{
 		constexpr any_t_() = default;
+
 		constexpr any_t_(T&&)
 		{}
 	};
@@ -24,6 +27,7 @@ namespace atma::meta
 	struct any_t_<void>
 	{
 		constexpr any_t_() = default;
+
 		template <typename T>
 		constexpr any_t_(T&&)
 		{}
