@@ -151,7 +151,8 @@ namespace atma {
 
 
 
-	template <typename T, typename = atma::enable_if<std::is_integral<T>, std::is_unsigned<T>>>
+	template <std::integral T>
+	requires std::is_unsigned_v<T>
 	inline auto to_string(T x, uint base = 10) -> atma::string
 	{
 		atma::string s;
