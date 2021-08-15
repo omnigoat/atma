@@ -1,10 +1,8 @@
 #pragma once
 
-#include <atma/assert.hpp>
-
 #include <atomic>
-#include <type_traits>
-#include <tuple>
+
+import atma.meta;
 
 namespace atma
 {
@@ -55,7 +53,6 @@ namespace atma
 	{
 		static auto add_ref(ref_counted const* t) -> void
 		{
-			ATMA_ASSERT(t);
 			if (t)
 			{
 				++t->ref_count_;
@@ -64,7 +61,6 @@ namespace atma
 
 		static auto rm_ref(ref_counted const* t) -> void
 		{
-			ATMA_ASSERT(t);
 			if (t && --t->ref_count_ == 0)
 			{
 				delete t;
@@ -102,9 +98,7 @@ namespace atma
 	{
 		using value_type = T;
 
-		intrusive_ptr()
-			: px()
-		{}
+		intrusive_ptr() noexcept = default;
 
 		explicit intrusive_ptr(std::nullptr_t)
 			: px()
@@ -169,152 +163,180 @@ namespace atma
 		template <typename Y, typename = std::enable_if_t<std::is_convertible<Y*, T*>>>
 		auto operator = (intrusive_ptr<Y> const& rhs) -> intrusive_ptr&
 		{
-			ref_counted_traits<T>::add_ref(rhs.px);
-			ref_counted_traits<T>::rm_ref(px);
-			px = rhs.px;
+			if (this != &rhs)
+			{
+				ref_counted_traits<T>::add_ref(rhs.px);
+				ref_counted_traits<T>::rm_ref(px);
+				px = rhs.px;
+			}
+
 			return *this;
 		}
 
-		operator bool () const {
+		operator bool () const
+		{
 			return px != nullptr;
 		}
 
-		auto operator ! () const -> bool {
+		auto operator ! () const -> bool
+		{
 			return px == nullptr;
 		}
 
-		auto operator * () const -> T& {
+		auto operator * () const -> T&
+		{
 			return *px;
 		}
 		
-		auto operator -> () const -> T* {
+		auto operator -> () const -> T*
+		{
 			return px;
 		}
 
-		auto get() const -> T* {
+		auto get() const -> T*
+		{
 			return px;
 		}
 
-		auto reset() -> void {
+		auto reset() -> void
+		{
 			*this = intrusive_ptr{};
 		}
 
 		template <typename Y>
-		auto cast_static() const -> intrusive_ptr<Y> {
+		auto cast_static() const -> intrusive_ptr<Y>
+		{
 			return intrusive_ptr<Y>(static_cast<Y*>(px));
 		}
 
 		template <typename Y>
-		auto cast_dynamic() const -> intrusive_ptr<Y> {
+		auto cast_dynamic() const -> intrusive_ptr<Y>
+		{
 			return intrusive_ptr<Y>(dynamic_cast<Y*>(px));
 		}
 
 		template <typename... Args>
 		static auto make(Args&&... args) -> intrusive_ptr<T>;
 
-		static intrusive_ptr null;
+		static intrusive_ptr const null;
 
 		friend void swap(intrusive_ptr& lhs, intrusive_ptr& rhs)
 		{
-			using namespace std;
-			swap(lhs.px, rhs.px);
+			auto t = lhs.px;
+			lhs.px = rhs.px;
+			rhs.px = t;
 		}
 
 	private:
-		T* px;
+		T* px = nullptr;
 
 		template <typename> friend struct intrusive_ptr;
 	};
 
 	template <typename T>
-	intrusive_ptr<T> intrusive_ptr<T>::null = intrusive_ptr<T>();
+	inline intrusive_ptr<T> const intrusive_ptr<T>::null;
+}
 
 
+//
+// non-member operators
+//
+namespace atma
+{
 	template <typename T>
-	inline auto operator == (intrusive_ptr<T> const& lhs, intrusive_ptr<T> const& rhs) -> bool {
+	inline auto operator == (intrusive_ptr<T> const& lhs, intrusive_ptr<T> const& rhs) -> bool
+	{
 		return lhs.get() == rhs.get();
 	}
 
 	template <typename T>
-	inline auto operator == (intrusive_ptr<T> const& lhs, T const* rhs) -> bool {
+	inline auto operator == (intrusive_ptr<T> const& lhs, T const* rhs) -> bool
+	{
 		return lhs.get() == rhs;
 	}
 
 	template <typename T>
-	inline auto operator == (T const* lhs, intrusive_ptr<T> const& rhs) -> bool {
+	inline auto operator == (T const* lhs, intrusive_ptr<T> const& rhs) -> bool
+	{
 		return lhs == rhs.get();
 	}
 
 	template <typename T>
-	inline auto operator == (intrusive_ptr<T> const& lhs, std::nullptr_t) -> bool {
+	inline auto operator == (intrusive_ptr<T> const& lhs, std::nullptr_t) -> bool
+	{
 		return lhs.get() == nullptr;
 	}
 
 	template <typename T>
-	inline auto operator == (std::nullptr_t, intrusive_ptr<T> const& rhs) -> bool {
+	inline auto operator == (std::nullptr_t, intrusive_ptr<T> const& rhs) -> bool
+	{
 		return nullptr = rhs.get();
 	}
 
 	template <typename T>
-	inline auto operator != (intrusive_ptr<T> const& lhs, intrusive_ptr<T> const& rhs) -> bool {
+	inline auto operator != (intrusive_ptr<T> const& lhs, intrusive_ptr<T> const& rhs) -> bool
+	{
 		return lhs.get() != rhs.get();
 	}
 
 	template <typename T>
-	inline auto operator < (intrusive_ptr<T> const& lhs, intrusive_ptr<T> const& rhs) -> bool {
+	inline auto operator < (intrusive_ptr<T> const& lhs, intrusive_ptr<T> const& rhs) -> bool
+	{
 		return lhs.get() < rhs.get();
 	}
-
 
 	template <typename Y, typename T>
 	inline auto ptr_cast_static(atma::intrusive_ptr<T> const& ptr) -> atma::intrusive_ptr<Y>
 	{
 		return intrusive_ptr<Y>(static_cast<Y*>(ptr.get()));
 	}
+}
 
-	struct enable_intrusive_ptr_make
+
+//
+// make
+//
+namespace atma
+{
+	template <typename T, typename Args, typename = std::void_t<>>
+	struct enable_intrusive_ptr_make;
+	
+	template <typename T, typename... Args>
+	struct enable_intrusive_ptr_make<T, meta::list<Args...>, std::void_t<>>
 	{
-	private:
-		template <typename T, typename A, typename = std::void_t<>>
-		struct maker {
-			template <typename... Args>
-			static auto make(Args&&... args) -> T*
-			{
-				return new T(std::forward<Args>(args)...);
-			}
-		};
-
-		template <typename T, typename... Args>
-		struct maker<T, std::tuple<Args...>, std::void_t<decltype(T::make(std::declval<Args>()...))>>
+		static auto make(Args... args) -> T*
 		{
-			template <typename... Args>
-			static auto make(Args&&... args) -> T*
-			{
-				return T::make(std::forward<Args>(args)...);
-			}
-		};
-
-	public:
-		template <typename T, typename... Args>
-		static auto make(Args&&... args) -> T*
-		{
-			return maker<T, std::tuple<Args...>>::make(std::forward<Args>(args)...);
+			return new T(args...);
 		}
 	};
 
-	template <typename T>
-	template <typename... Args>
-	inline auto intrusive_ptr<T>::make(Args&&... args) -> intrusive_ptr<T>
+	template <typename T, typename... Args>
+	struct enable_intrusive_ptr_make<T, meta::list<Args...>, std::void_t<decltype(T::make(std::declval<Args>()...))>>
 	{
-		return intrusive_ptr{enable_intrusive_ptr_make::template make<T>(std::forward<Args>(args)...)};
-	}
-
-
+		static auto make(Args... args) -> T*
+		{
+			return T::make(args...);
+		}
+	};
 
 	template <typename T, typename... Args>
 	inline auto make_intrusive(Args&&... args) -> intrusive_ptr<T>
 	{
 		return intrusive_ptr<T>::make(std::forward<Args>(args)...);
+	}
+}
+
+
+//
+// intrusive_ptr implementation
+//
+namespace atma
+{
+	template <typename T>
+	template <typename... Args>
+	inline auto intrusive_ptr<T>::make(Args&&... args) -> intrusive_ptr<T>
+	{
+		return intrusive_ptr{enable_intrusive_ptr_make<T, meta::list<Args...>>::make(std::forward<Args>(args)...)};
 	}
 }
 
