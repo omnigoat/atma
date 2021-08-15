@@ -72,7 +72,7 @@ namespace atma
 	inline void enqueue_function_to_queue(lockfree_queue_t& queue, atma::function<void(Args...)> const& f)
 	{
 		using internal_function_t = basic_relative_function_t<(uint32)16, void(Args...)>;
-		auto const sz = sizeof(atma::remove_cvref_t<decltype(f)>);
+		auto const sz = sizeof(atma::rm_cvref_t<decltype(f)>);
 
 		queue.with_allocation((uint32)sz + (uint32)f.external_buffer_size(), 4, true, [&f](auto& A) {
 			new (A.data()) internal_function_t(f, (char*)A.data() + sizeof(internal_function_t));
