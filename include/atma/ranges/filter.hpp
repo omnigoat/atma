@@ -3,6 +3,8 @@
 #include <atma/ranges/core.hpp>
 #include <atma/assert.hpp>
 
+import atma.types;
+
 // forward-declares
 namespace atma
 {
@@ -313,11 +315,11 @@ namespace atma
 // non-member operators
 namespace atma
 {
-	template <typename R, typename F>
+	template <std::ranges::range R, typename F>
 	inline auto operator | (R&& range, F&& functor)
-	requires std::ranges::range<R> && detail::is_filter_functor_v<remove_cvref_t<F>>
+	requires detail::is_filter_functor_v<rm_cvref_t<F>>
 	{
-		if constexpr (detail::is_filtered_range_v<remove_cvref_t<R>>)
+		if constexpr (detail::is_filtered_range_v<rm_cvref_t<R>>)
 		{
 			auto predicate = [f=std::forward<R>(range).predicate(), g=std::forward<F>(functor).predicate()](auto&& x) {
 				return std::invoke(f, std::forward<decltype(x)>(x)) && std::invoke(g, std::forward<decltype(x)>(x)); };
@@ -331,7 +333,7 @@ namespace atma
 	}
 
 	template <typename F, typename G>
-	requires detail::is_filter_functor_v<remove_cvref_t<F>> && detail::is_filter_functor_v<remove_cvref_t<G>>
+	requires detail::is_filter_functor_v<rm_cvref_t<F>> && detail::is_filter_functor_v<rm_cvref_t<G>>
 	inline auto operator * (F&& lhs, G&& rhs)
 	{
 		auto predicate = [f=lhs.predicate(), g=rhs.predicate()](auto&& x) {
@@ -347,20 +349,19 @@ namespace atma
 namespace atma
 {
 	// filter: f vs r
-	template <typename F, typename R>
-	requires std::ranges::range<R> && !detail::is_filtered_range_v<R>
+	template <typename F, std::ranges::range R>
+	requires !detail::is_filtered_range_v<R>
 	inline auto filter(F&& predicate, R&& range) {
 		return filtered_range_t{std::forward<R>(range), std::forward<F>(predicate)}; }
 
 	// filter: f vs filtered-range<r, g>
-	template <typename F, typename R>
+	template <typename F, std::ranges::range R>
 	requires detail::is_filtered_range_v<R>
 	inline auto filter(F&& predicate, R&& range) {
 		return std::forward<R>(range) | filter_functor_t{std::forward<F>(predicate)}; }
 
 	// filter: member vs r
-	template <typename M, typename C, typename R>
-	requires std::ranges::range<R>
+	template <typename M, typename C, std::ranges::range R>
 	inline auto filter(M C::*m, R&& range)
 	{
 		auto f = [m](auto&& x) -> bool { return x.*m; };

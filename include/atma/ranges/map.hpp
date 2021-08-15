@@ -4,6 +4,7 @@
 #include <atma/function.hpp>
 #include <atma/ranges/core.hpp>
 
+import atma.types;
 
 // forward-declares
 namespace atma
@@ -269,11 +270,11 @@ namespace atma
 	//======================================================================
 	// operators
 	//======================================================================
-	template <typename R, typename F>
-	requires std::ranges::range<R> && detail::is_map_functor_v<remove_cvref_t<F>>
+	template <std::ranges::range R, typename F>
+	requires detail::is_map_functor_v<rm_cvref_t<F>>
 	inline auto operator | (R&& range, F&& functor)
 	{
-		if constexpr (detail::is_mapped_range_v<remove_cvref_t<R>>)
+		if constexpr (detail::is_mapped_range_v<rm_cvref_t<R>>)
 		{
 			auto function = [f=std::forward<R>(range).function(), g=std::forward<F>(functor).function()](auto&& x) {
 				return std::invoke(g, std::invoke(f, std::forward<decltype(x)>(x))); };
@@ -290,8 +291,7 @@ namespace atma
 	//======================================================================
 	// FUNCTIONS
 	//======================================================================
-	template <typename R, typename F>
-	requires std::ranges::range<R>
+	template <std::ranges::range R, typename F>
 	inline auto map(F f, R&& range)
 	{
 		return mapped_range_t{std::forward<R>(range), std::forward<F>(f)};
