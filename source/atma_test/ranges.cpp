@@ -289,7 +289,7 @@ SCENARIO_OF("ranges/zip", "ranges can be zipped")
 		using MR = decltype(r);
 
 		// iterator is an iterator
-			static_assert(std::default_initializable<MR::iterator>);
+		static_assert(std::default_initializable<MR::iterator>);
 		static_assert(std::movable<MR::iterator>);
 		static_assert(std::weakly_incrementable<MR::iterator>);
 		static_assert(std::input_or_output_iterator<MR::iterator>);
