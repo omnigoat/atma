@@ -89,6 +89,8 @@ namespace atma
 
 	private:
 		auto imem_capsize(size_t minsize) -> size_t;
+		auto imem_guard_lt(size_t capacity) -> void;
+		auto imem_guard_gt(size_t capacity) -> void;
 		auto imem_recapacitize(size_t) -> void;
 
 	private:
@@ -101,26 +103,7 @@ namespace atma
 		template <typename Y, typename B> friend struct vector;
 	};
 
-
-
-
-#define IMEM_GUARD_LT(capacity) \
-	do { \
-		if (capacity_ < capacity) \
-			imem_recapacitize(imem_capsize(capacity)); \
-	} while(0)
-
-#define IMEM_GUARD_GT(capacity) \
-	do { \
-		if (capacity < capacity_) \
-			imem_recapacitize(imem_capsize(capacity)); \
-	} while(0)
-
-#define IMEM_ASSERT_ITER(iter) \
-	do { \
-		ATMA_ASSERT(cbegin() <= iter && iter <= cend()); \
-	} while(0)
-
+#define IMEM_ASSERT_ITER(iter) ATMA_ASSERT(cbegin() <= iter && iter <= cend())
 
 	template <typename T, typename A>
 	inline vector<T, A>::vector(size_t size)
@@ -370,7 +353,7 @@ namespace atma
 	template <typename T, typename A>
 	inline auto vector<T,A>::reserve(size_t capacity) -> void
 	{
-		IMEM_GUARD_LT(capacity);
+		imem_guard_lt(capacity);
 	}
 	
 	template <typename T, typename A>
@@ -382,7 +365,7 @@ namespace atma
 	template <typename T, typename A>
 	inline auto vector<T,A>::resize(size_t size) -> void
 	{
-		IMEM_GUARD_LT(size);
+		imem_guard_lt(size);
 
 		if (size < size_)
 		{
@@ -395,7 +378,7 @@ namespace atma
 				xfer_dest(imem_ + size_, size - size_));
 		}
 
-		IMEM_GUARD_GT(size);
+		imem_guard_gt(size);
 
 		size_ = size;
 	}
@@ -403,7 +386,7 @@ namespace atma
 	template <typename T, typename A>
 	inline auto vector<T,A>::resize(size_t size, value_type const& x) -> void
 	{
-		IMEM_GUARD_LT(size);
+		imem_guard_lt(size);
 		
 		if (size < size_)
 		{
@@ -417,7 +400,7 @@ namespace atma
 				x);
 		}
 
-		IMEM_GUARD_GT(size);
+		imem_guard_gt(size);
 
 		size_ = size;
 	}
@@ -425,7 +408,7 @@ namespace atma
 	template <typename T, typename A>
 	inline auto vector<T, A>::push_back(value_type const& x) -> void
 	{
-		IMEM_GUARD_LT(size_ + 1);
+		imem_guard_lt(size_ + 1);
 
 		memory_construct_at(imem_ + size_, x);
 
@@ -435,7 +418,7 @@ namespace atma
 	template <typename T, typename A>
 	inline auto vector<T,A>::push_back(T&& x) -> void
 	{
-		IMEM_GUARD_LT(size_ + 1);
+		imem_guard_lt(size_ + 1);
 
 		imem_.construct(size_, std::move(x));
 		++size_;
@@ -445,7 +428,7 @@ namespace atma
 	template <typename... Args>
 	inline auto vector<T, A>::emplace_back(Args&&... args) -> reference
 	{
-		IMEM_GUARD_LT(size_ + 1);
+		imem_guard_lt(size_ + 1);
 
 		imem_.construct(size_, std::forward<Args>(args)...);
 		++size_;
@@ -467,7 +450,7 @@ namespace atma
 		IMEM_ASSERT_ITER(here);
 
 		auto const offset = std::distance(cbegin(), here);
-		IMEM_GUARD_LT(size_ + 1);
+		imem_guard_lt(size_ + 1);
 
 		memory_move(
 			xfer_dest(imem_ + offset + 1),
@@ -490,7 +473,7 @@ namespace atma
 
 		auto const offset = std::distance(cbegin(), here);
 
-		IMEM_GUARD_LT(size_ + 1);
+		imem_guard_lt(size_ + 1);
 
 		memory_move(
 			xfer_dest(imem_ + offset + 1),
@@ -529,7 +512,7 @@ namespace atma
 		size_t const rangesize = std::distance(start, end);
 		size_t const reloc_offset = offset + rangesize;
 
-		IMEM_GUARD_LT(size_ + rangesize);
+		imem_guard_lt(size_ + rangesize);
 
 		if (auto const mvsz = (size_ - offset))
 		{
@@ -569,7 +552,7 @@ namespace atma
 		imem_.memmove(offset, offset + 1, (size_ - offset - 1) * sizeof value_type);
 		--size_;
 
-		IMEM_GUARD_GT(size_);
+		imem_guard_gt(size_);
 	}
 
 	template <typename T, typename A>
@@ -620,20 +603,73 @@ namespace atma
 		capacity_ = newcap;
 	}
 
+	//
+	// takes two inputs, a new minimum capacity requirement (MCR), and our current capacity,
+	// and figures out what the resultant capacity should be
+	// 
+	// this will return capacities smaller than our current capcity if
+	// the new minimum capacity required is significantly smaller than our current
+	// 
+	// note: our growth-factor is 1.5
+	//
 	template <typename T, typename A>
-	inline auto vector<T, A>::imem_capsize(size_t mincap) -> size_t
+	inline auto vector<T, A>::imem_capsize(size_t mcr) -> size_t
 	{
-		if (mincap < capacity_)
-			if (mincap < capacity_ / 2)
-				return mincap;
-			else if (mincap < capacity_ - capacity_ / 3)
-				return capacity_ - capacity_ / 3;
-			else
-				return capacity_;
-		else if (capacity_ < mincap)
-			return std::max(mincap, capacity_ + capacity_ / 2);
+		// the very minimum amount of small space is the heuristic "eight"
+		if (mcr <= 8)
+		{
+			return 8;
+		}
+		//
+		// with a growth factor of 1.5, the moment our MCR is less than halfish
+		// our current capacity, we should scale down by double-growth
+		//
+		//  consider a vector that grew: [8] -> [12] -> [18]
+		//       now any size <= 8 we can scale down by double-growth 2.25
+		//  18 / 2.25 = 8
+		//   x / 2.25 === 4x / 9
+		//  18 * 4 / 9 = 8
+		//
+		else if (mcr <= capacity_ * 4 / 9)
+		{
+			return mcr;
+		}
+		//
+		// we need to expand our current capacity by 1.5
+		//
+		else if (capacity_ < mcr)
+		{
+			auto r = std::max(capacity_, size_t(8));
+			while (r < mcr)
+				r = 3*r / 2;
+
+			return r;
+		}
+		//
+		// no change required
+		//
 		else
+		{
 			return capacity_;
+		}
+	}
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::imem_guard_lt(size_t capacity) -> void
+	{
+		if (auto mcr = imem_capsize(capacity); capacity_ < mcr)
+		{
+			imem_recapacitize(mcr);
+		}
+	}
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::imem_guard_gt(size_t capacity) -> void
+	{
+		if (auto mcr = imem_capsize(capacity); mcr < capacity_)
+		{
+			imem_recapacitize(mcr);
+		}
 	}
 
 	template <typename T, typename A>
@@ -679,8 +715,4 @@ namespace atma
 	{
 		return !operator == (lhs, rhs);
 	}
-
-
-	#undef IMEM_GUARD_LT
-	#undef IMEM_GUARD_GT
 }
