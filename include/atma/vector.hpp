@@ -549,10 +549,6 @@ namespace atma
 			}
 		}
 
-		// maybe sanity check
-		//static_assert(, H>);
-		static_assert(memory_concept<decltype(xfer_dest(imem_ + offset, rangesize))>);
-
 		memory_copy_construct(
 			xfer_dest(imem_ + offset, rangesize),
 			start, end);
