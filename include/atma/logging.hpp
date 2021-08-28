@@ -3,7 +3,6 @@
 #include <atma/lockfree_queue.hpp>
 #include <atma/threading.hpp>
 #include <atma/intrusive_ptr.hpp>
-#include <atma/vector.hpp>
 #include <atma/bind.hpp>
 #include <atma/streams.hpp>
 
@@ -14,6 +13,7 @@
 #include <sstream>
 
 import atma.types;
+import atma.vector;
 
 namespace atma
 {

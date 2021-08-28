@@ -1085,27 +1085,31 @@ namespace atma
 // memory_copy_construct / memory_move_construct
 namespace atma::detail
 {
+	inline void _blam_(auto&& dest, auto&& src, size_t sz)
+	{
+		auto&& allocator = get_allocator(dest);
+		auto* px = std::data(dest);
+		auto* py = std::data(src);
+
+		for (size_t i = 0; i != sz; ++i, ++px, ++py)
+		{
+			construct_with_allocator_traits_(allocator, px, *py);
+		}
+	}
+
+	template <typename Allocator>
+	inline void _blam2_(Allocator&& allocator, auto* px, auto begin, auto end)
+	{
+		for (; begin != end; ++px, ++begin)
+		{
+			construct_with_allocator_traits_(allocator, px, *begin);
+		}
+	}
+
 	constexpr auto _memory_copy_construct_ = functor_list_t
 	{
-		[](auto&& dest, auto&& src, size_t sz)
-		{
-			auto&& allocator = get_allocator(dest);
-			auto* px = std::data(dest);
-			auto* py = std::data(src);
-
-			for (size_t i = 0; i != sz; ++i, ++px, ++py)
-			{
-				construct_with_allocator_traits_(allocator, px, *py);
-			}
-		},
-
-		[](auto&& allocator, auto* px, auto begin, auto end)
-		{
-			for ( ; begin != end; ++px, ++begin)
-			{
-				construct_with_allocator_traits_(allocator, px, *begin);
-			}
-		}
+		[](auto&& dest, auto&& src, size_t sz) { _blam_(dest, src, sz); },
+		[](auto&& allocator, auto* px, auto begin, auto end) { _blam2_(allocator, px, begin, end); }
 	};
 
 	constexpr auto _memory_move_construct_ = functor_list_t

@@ -154,9 +154,6 @@
     <ClInclude Include="..\..\include\atma\unit_test.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\vector.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\streams.hpp">
       <Filter>include</Filter>
     </ClInclude>
@@ -227,6 +224,9 @@
       <Filter>include</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\atma\types.cppm">
+      <Filter>include</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\atma\vector.cppm">
       <Filter>include</Filter>
     </ClCompile>
   </ItemGroup>
