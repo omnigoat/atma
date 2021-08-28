@@ -2,13 +2,13 @@
 
 #include <atma/function.hpp>
 #include <atma/lockfree_queue.hpp>
-#include <atma/vector.hpp>
 
 #include <atma/config/platform.hpp>
 #include <atma/platform/interop.hpp>
 
 #include <boost/preprocessor.hpp>
 
+import atma.vector;
 
 //
 // ATMA_SCOPED_LOCK(...)

@@ -40,7 +40,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Test|x64'">
-    <IncludePath>$(ProjectDir)..\..\vendor;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\..\include;$(ProjectDir)..\..\vendor;$(IncludePath)</IncludePath>
     <OutDir>$(ProjectDir)..\..\builds\$(Platform)\$(Configuration)\$(TargetName)\</OutDir>
     <IntDir>$(ProjectDir)..\..\intermediates\$(Platform)\$(Configuration)\$(TargetName)\</IntDir>
     <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
@@ -69,11 +69,11 @@
       <DiagnosticsFormat>Caret</DiagnosticsFormat>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <EnforceTypeConversionRules>true</EnforceTypeConversionRules>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <EnableModules>true</EnableModules>
       <AdditionalModuleDependencies>
       </AdditionalModuleDependencies>
       <FloatingPointModel />
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

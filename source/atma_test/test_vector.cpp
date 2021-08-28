@@ -1,9 +1,10 @@
-#include <atma/unit_test.hpp>
 
-#include <atma/vector.hpp>
+#include <atma/unit_test.hpp>
+#include <atma/memory.hpp>
+
+import atma.vector;
 
 using canary_t = atma::unit_test::canary_t;
-
 
 
 SCENARIO_OF("vector", "vectors can be constructed")

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atma/platform/allocation.hpp>
+#include <exception>
 
 import atma.types;
 
