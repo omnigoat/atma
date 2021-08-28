@@ -2,10 +2,11 @@
 
 #include <atma/utf/utf8_string.hpp>
 
-#include <atma/vector.hpp>
 #include <atma/streams.hpp>
 
 #include <algorithm>
+
+import atma.vector;
 
 
 namespace atma {

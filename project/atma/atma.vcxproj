@@ -77,7 +77,10 @@
     <ClInclude Include="..\..\include\atma\unit_test.hpp" />
     <ClInclude Include="..\..\include\atma\utf\algorithm.hpp" />
     <ClInclude Include="..\..\include\atma\utf\utf8_string.hpp" />
-    <ClInclude Include="..\..\include\atma\vector.hpp" />
+    <ClCompile Include="..\..\include\atma\vector.cppm">
+      <FileType>Document</FileType>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Development|x64'">CompileAsCppModule</CompileAs>
+    </ClCompile>
     <ClInclude Include="..\..\vendor\doctest\doctest.h" />
   </ItemGroup>
   <ItemGroup>

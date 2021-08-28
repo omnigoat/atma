@@ -1,7 +1,9 @@
 #include <atma/unit_test.hpp>
 
 #include <atma/algorithm.hpp>
-#include <atma/vector.hpp>
+#include <atma/ranges/filter.hpp>
+
+import atma.vector;
 
 // used below
 struct is_3_t {

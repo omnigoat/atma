@@ -17,8 +17,10 @@
 
 
 // used for canary_t
-#include <boost/preprocessor/tuple/enum.hpp>
-#include <boost/preprocessor/array/elem.hpp>
+//#include <boost/preprocessor/tuple/enum.hpp>
+//#include <boost/preprocessor/array/elem.hpp>
+#include <boost/preprocessor/seq.hpp>
+#include <boost/preprocessor.hpp>
 
 #include <map>
 #include <vector>
@@ -741,6 +743,13 @@ namespace atma { namespace unit_test {
 		return lhs.payload == rhs.payload;
 	}
 
+
+}}
+
+
+
+
+
 #define CHECK_CANARY_SCOPE(name, ...) \
 	CHECK(::atma::unit_test::canary_t::event_log_matches(name, {__VA_ARGS__}))
 
@@ -761,8 +770,7 @@ namespace atma { namespace unit_test {
 
 
 
-#define CHECK_VECTOR_II_m(r, v, i, elem) \
-	CHECK(BOOST_PP_ARRAY_ELEM(0, v)[i]BOOST_PP_ARRAY_ELEM(1, v) == elem);
+#define CHECK_VECTOR_II_m(r, v, i, elem) CHECK(BOOST_PP_ARRAY_ELEM(0, v)[i]BOOST_PP_ARRAY_ELEM(1, v) == elem);
 
 #define CHECK_VECTOR_II(v, expr, seq) \
 	BOOST_PP_SEQ_FOR_EACH_I(CHECK_VECTOR_II_m, (2, (v, expr)), seq)
@@ -776,10 +784,3 @@ namespace atma { namespace unit_test {
 #define CHECK_WHOLE_VECTOR(v, ...) \
 	CHECK((v).size() == BOOST_PP_VARIADIC_SIZE(__VA_ARGS__)); \
 	CHECK_VECTOR_EX((v), , __VA_ARGS__)
-
-
-}}
-
-
-
-

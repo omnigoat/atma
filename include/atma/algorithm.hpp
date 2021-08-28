@@ -6,11 +6,11 @@
 
 #include <atma/function_traits.hpp>
 #include <atma/tuple.hpp>
-#include <atma/vector.hpp>
 
 #include <algorithm>
 
 import atma.types;
+import atma.vector;
 
 namespace atma::functors
 {
