@@ -41,8 +41,5 @@
     <ClCompile Include="..\..\source\atma_test\test_rope.cpp">
       <Filter>source</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\source\atma_test\moduletest.cppm">
-      <Filter>source</Filter>
-    </ClCompile>
   </ItemGroup>
 </Project>
