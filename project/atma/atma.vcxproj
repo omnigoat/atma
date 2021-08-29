@@ -26,9 +26,8 @@
     <ClInclude Include="..\..\include\atma\logging.hpp" />
     <ClInclude Include="..\..\include\atma\math\functions.hpp" />
     <ClInclude Include="..\..\include\atma\memory.hpp" />
-    <ClCompile Include="..\..\include\atma\assert.hpp">
-      <FileType>Document</FileType>
-    </ClCompile>
+    <ClInclude Include="..\..\include\atma\assert.hpp" />
+	<ClCompile Include="..\..\include\atma\assert.cppm"/>
     <ClInclude Include="..\..\include\atma\bind.hpp" />
     <ClInclude Include="..\..\include\atma\bitmask.hpp" />
     <ClInclude Include="..\..\include\atma\com_ptr.hpp" />
@@ -51,10 +50,7 @@
     <ClInclude Include="..\..\include\atma\math\vector4f.hpp" />
     <ClInclude Include="..\..\include\atma\math\vector4i.hpp" />
     <ClInclude Include="..\..\include\atma\lockfree_queue.hpp" />
-    <ClCompile Include="..\..\include\atma\assert.cppm" />
-    <ClCompile Include="..\..\include\atma\meta.cppm">
-      <FileType>Document</FileType>
-    </ClCompile>
+    <ClCompile Include="..\..\include\atma\meta.cppm" />
     <ClInclude Include="..\..\include\atma\placeholders.hpp" />
     <ClInclude Include="..\..\include\atma\platform\allocation.hpp" />
     <ClInclude Include="..\..\include\atma\platform\interop.hpp" />
@@ -70,17 +66,12 @@
     <ClInclude Include="..\..\include\atma\threading.hpp" />
     <ClInclude Include="..\..\include\atma\thread\engine.hpp" />
     <ClInclude Include="..\..\include\atma\tuple.hpp" />
-    <ClCompile Include="..\..\include\atma\types.cppm">
-      <FileType>Document</FileType>
-    </ClCompile>
+    <ClCompile Include="..\..\include\atma\types.cppm" />
     <ClInclude Include="..\..\include\atma\unique_memory.hpp" />
     <ClInclude Include="..\..\include\atma\unit_test.hpp" />
     <ClInclude Include="..\..\include\atma\utf\algorithm.hpp" />
     <ClInclude Include="..\..\include\atma\utf\utf8_string.hpp" />
-    <ClCompile Include="..\..\include\atma\vector.cppm">
-      <FileType>Document</FileType>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Development|x64'">CompileAsCppModule</CompileAs>
-    </ClCompile>
+    <ClCompile Include="..\..\include\atma\vector.cppm" />
     <ClInclude Include="..\..\vendor\doctest\doctest.h" />
   </ItemGroup>
   <ItemGroup>
