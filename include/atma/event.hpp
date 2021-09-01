@@ -7,6 +7,7 @@
 #include <atma/algorithm.hpp>
 #include <atma/arena_allocator.hpp>
 #include <atma/ranges/filter.hpp>
+#include <atma/ranges/map.hpp>
 
 #include <functional>
 #include <memory>
