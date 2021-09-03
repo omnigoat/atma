@@ -1,6 +1,5 @@
 #pragma once
 
-#include "aligned_allocator.hpp"
 #include "hash.hpp"
 #include "unique_memory.hpp"
 #include "math/functions.hpp"

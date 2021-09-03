@@ -82,9 +82,6 @@
     <ClInclude Include="..\..\include\atma\algorithm.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\aligned_allocator.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\atomic.hpp">
       <Filter>include</Filter>
     </ClInclude>
@@ -205,6 +202,9 @@
     <ClInclude Include="..\..\include\atma\preprocessor.hpp">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\atma\assert.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\resources\atma.natvis" />
@@ -217,9 +217,6 @@
     <ClCompile Include="..\..\include\atma\meta.cppm">
       <Filter>include</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\atma\assert.hpp">
-      <Filter>include</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\include\atma\assert.cppm">
       <Filter>include</Filter>
     </ClCompile>
@@ -227,6 +224,9 @@
       <Filter>include</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\atma\vector.cppm">
+      <Filter>include</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\atma\aligned_allocator.cppm">
       <Filter>include</Filter>
     </ClCompile>
   </ItemGroup>

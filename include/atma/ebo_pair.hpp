@@ -1,5 +1,6 @@
 #pragma once
 
+#include <type_traits>
 
 // ebo-pair
 namespace atma::detail

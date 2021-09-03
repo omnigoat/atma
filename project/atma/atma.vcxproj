@@ -12,7 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\atma\algorithm.hpp" />
-    <ClInclude Include="..\..\include\atma\aligned_allocator.hpp" />
+    <ClCompile Include="..\..\include\atma\aligned_allocator.cppm" />
     <ClInclude Include="..\..\include\atma\arena_allocator.hpp" />
     <ClInclude Include="..\..\include\atma\atomic.hpp" />
     <ClInclude Include="..\..\include\atma\ebo_pair.hpp" />
@@ -27,7 +27,7 @@
     <ClInclude Include="..\..\include\atma\math\functions.hpp" />
     <ClInclude Include="..\..\include\atma\memory.hpp" />
     <ClInclude Include="..\..\include\atma\assert.hpp" />
-	<ClCompile Include="..\..\include\atma\assert.cppm"/>
+    <ClCompile Include="..\..\include\atma\assert.cppm" />
     <ClInclude Include="..\..\include\atma\bind.hpp" />
     <ClInclude Include="..\..\include\atma\bitmask.hpp" />
     <ClInclude Include="..\..\include\atma\com_ptr.hpp" />
