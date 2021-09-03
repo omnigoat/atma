@@ -36,7 +36,7 @@ SCENARIO_OF("ranges/filter_t", "ranges can be filtered")
 
 		THEN("basic filtering works")
 		{
-			auto result = atma::as_vector | atma::filter(is_even, atma::vector<int>{1, 2, 3, 4});
+			auto result = atma::filter(is_even, atma::vector<int>{1, 2, 3, 4}) | atma::as_vector;
 			CHECK_WHOLE_VECTOR(result, 2, 4);
 		}
 	}
@@ -53,7 +53,7 @@ SCENARIO_OF("ranges/filter_t", "ranges can be filtered")
 
 		THEN("basic filtering works")
 		{
-			auto result = atma::as_vector | atma::filter(is_even, numbers);
+			auto result = atma::filter(is_even, numbers) | atma::as_vector;
 			CHECK_WHOLE_VECTOR(numbers, 1, 2, 3, 4);
 			CHECK_WHOLE_VECTOR(result, 2, 4);
 		}
@@ -66,7 +66,7 @@ SCENARIO_OF("ranges/filter_t", "ranges can be filtered")
 			// filtered must be referring to @numbers by const-reference
 			static_assert(std::is_same_v<typename decltype(filtered)::storage_range_t, atma::vector<int> const&>);
 
-			auto result = atma::as_vector | filtered;
+			auto result = filtered | atma::as_vector;
 
 			CHECK_WHOLE_VECTOR(result, 2, 4);
 		}
@@ -99,7 +99,7 @@ SCENARIO_OF("ranges/filter_t", "ranges can be filtered")
 
 		THEN("basic filtering works")
 		{
-			auto result = atma::as_vector | atma::filter(is_even, numbers);
+			auto result = atma::filter(is_even, numbers) | atma::as_vector;
 			CHECK_WHOLE_VECTOR(numbers, 1, 2, 3, 4);
 			CHECK_WHOLE_VECTOR(result, 2, 4);
 		}
@@ -242,7 +242,7 @@ SCENARIO_OF("ranges/map", "ranges can be mapped")
 
 		THEN("we can map plus10")
 		{
-			auto numbers_plus10 = atma::as_vector | atma::map(plus_10, numbers);
+			auto numbers_plus10 = atma::map(plus_10, numbers) | atma::as_vector;
 			CHECK_WHOLE_VECTOR(numbers_plus10, 11, 12, 13, 14);
 		}
 	}
