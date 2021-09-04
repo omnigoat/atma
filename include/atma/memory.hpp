@@ -18,6 +18,8 @@ import atma.aligned_allocator;
 //
 //  a structure that combines an allocator & a pointer
 // 
+//  (basic_memory_t)
+// 
 //  after a lot of back-and-forth, I have come to the conclusion
 //  that this structure is too low-level for any reasonable
 //  abstraction. the moment we start adding operators etc., we
@@ -57,24 +59,24 @@ namespace atma
 namespace atma::detail
 {
 	template <typename Allocator, bool = std::is_empty_v<Allocator>>
-	struct base_memory_tx;
+	struct base_memory_impl;
 
 	template <typename Allocator>
-	struct base_memory_tx<Allocator, false>
+	struct base_memory_impl<Allocator, false>
 	{
 		using allocator_type = Allocator;
 		using allocator_traits = std::allocator_traits<allocator_type>;
 
-		base_memory_tx() = default;
-		base_memory_tx(base_memory_tx const&) = default;
+		base_memory_impl() = default;
+		base_memory_impl(base_memory_impl const&) = default;
 
-		base_memory_tx(Allocator const& allocator)
+		base_memory_impl(Allocator const& allocator)
 			noexcept(std::is_nothrow_copy_constructible_v<allocator_type>)
 			: allocator_(allocator)
 		{}
 
 		template <typename U>
-		base_memory_tx(base_memory_tx<U> const& rhs)
+		base_memory_impl(base_memory_impl<U> const& rhs)
 			noexcept(noexcept(Allocator(rhs.get_allocator())))
 			: allocator_(rhs.get_allocator())
 		{}
@@ -86,21 +88,21 @@ namespace atma::detail
 	};
 
 	template <typename Allocator>
-	struct base_memory_tx<Allocator, true>
+	struct base_memory_impl<Allocator, true>
 		: protected Allocator
 	{
 		using allocator_type = Allocator;
 		using allocator_traits = std::allocator_traits<allocator_type>;
 
-		base_memory_tx() = default;
-		base_memory_tx(base_memory_tx const&) = default;
+		base_memory_impl() = default;
+		base_memory_impl(base_memory_impl const&) = default;
 
-		base_memory_tx(Allocator const& allocator)
+		base_memory_impl(Allocator const& allocator)
 			: Allocator(allocator)
 		{}
 
 		template <typename U>
-		base_memory_tx(base_memory_tx<U> const& rhs)
+		base_memory_impl(base_memory_impl<U> const& rhs)
 			noexcept(noexcept(Allocator(rhs.get_allocator())))
 			: Allocator(rhs.get_allocator())
 		{}
@@ -109,8 +111,9 @@ namespace atma::detail
 	};
 
 	template <typename T, typename A>
-	using base_memory_t = base_memory_tx<typename std::allocator_traits<A>::template rebind_alloc<T>>;
+	using base_memory_t = base_memory_impl<typename std::allocator_traits<A>::template rebind_alloc<T>>;
 }
+
 
 //
 //  basic_memory_t
@@ -196,7 +199,7 @@ namespace atma
 	template <typename T, typename A>
 	inline decltype(auto) operator << (std::ostream& stream, basic_memory_t<T, A> const& x)
 	{
-		return stream << "memory{0x" << x.ptr << "}";
+		return stream << "basic_memory_t{0x" << x.ptr << "}";
 	}
 }
 
