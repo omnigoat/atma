@@ -1,7 +1,6 @@
 #pragma once
 
 #include "hash.hpp"
-#include "unique_memory.hpp"
 #include "math/functions.hpp"
 #include "function_traits.hpp"
 #include "meta.hpp"
@@ -10,7 +9,7 @@
 #include <functional>
 #include <array>
 
-
+import atma.memory;
 
 #if USE_SPP_HASH_MAP
 

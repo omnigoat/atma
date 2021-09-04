@@ -127,9 +127,6 @@
     <ClInclude Include="..\..\include\atma\logging.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\memory.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\placeholders.hpp">
       <Filter>include</Filter>
     </ClInclude>
@@ -227,6 +224,9 @@
       <Filter>include</Filter>
     </ClCompile>
     <ClCompile Include="..\..\include\atma\aligned_allocator.cppm">
+      <Filter>include</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\atma\memory.cppm">
       <Filter>include</Filter>
     </ClCompile>
   </ItemGroup>

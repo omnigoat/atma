@@ -1,6 +1,5 @@
 #include <atma/unit_test.hpp>
 
-#include <atma/memory.hpp>
 #include <atma/algorithm.hpp>
 #include <atma/ranges/filter.hpp>
 #include <atma/ranges/map.hpp>

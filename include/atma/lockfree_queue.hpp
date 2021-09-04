@@ -2,7 +2,6 @@
 
 #include <atma/assert.hpp>
 #include <atma/atomic.hpp>
-#include <atma/unique_memory.hpp>
 #include <atma/config/platform.hpp>
 #include <atma/math/functions.hpp>
 
@@ -12,6 +11,7 @@
 #include <atomic>
 
 import atma.types;
+import atma.memory;
 
 namespace atma
 {

@@ -1,10 +1,14 @@
 #include <atma/unit_test.hpp>
-#include <atma/memory.hpp>
 #include <atma/string.hpp>
 #include <atma/functor.hpp>
 #include <atma/preprocessor.hpp>
 
 #include <numeric>
+
+import atma.memory;
+
+
+
 
 #define CHECK_MEMORY_II_m(r, v, i, elem) \
 	CHECK_EQ(((typename decltype(v)::pointer)v.data())[i], elem);
@@ -187,7 +191,7 @@ FOR_EACH_COMBINATION(TYPE_ALLOCATORS_TO_STRING, ~, GENERATE_COMBINATIONS_OF_TUPL
 
 
 
-
+#if 0
 
 SCENARIO_TEMPLATE("base_memory_t performing EBO", xfer, ALLOCATOR_VALUE_TUPLES)
 {
@@ -217,6 +221,9 @@ SCENARIO_TEMPLATE("base_memory_t performing EBO", xfer, ALLOCATOR_VALUE_TUPLES)
 		}
 	}
 }
+
+#endif
+
 
 SCENARIO_TEMPLATE("basic_memory_t can be constructed", xfer, ALLOCATOR_VALUE_TUPLES)
 {
