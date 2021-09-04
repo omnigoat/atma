@@ -1,12 +1,13 @@
 module;
 
-#include <atma/memory.hpp>
-#include <atma/unique_memory.hpp>
 #include <atma/assert.hpp>
 
 #include <initializer_list>
 
 export module atma.vector;
+
+import atma.aligned_allocator;
+import atma.memory;
 
 export namespace atma
 {
