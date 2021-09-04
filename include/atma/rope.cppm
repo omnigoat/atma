@@ -1,7 +1,6 @@
 module;
 
 #include <atma/assert.hpp>
-#include <atma/memory.hpp>
 #include <atma/intrusive_ptr.hpp>
 #include <atma/ranges/core.hpp>
 #include <atma/algorithm.hpp>
@@ -17,6 +16,7 @@ module;
 export module atma.rope;
 
 import atma.types;
+import atma.memory;
 
 namespace atma::detail
 {
