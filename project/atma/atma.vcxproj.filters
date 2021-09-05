@@ -97,9 +97,6 @@
     <ClInclude Include="..\..\include\atma\console.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\enable_multiple_shared_from_this.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\event.hpp">
       <Filter>include</Filter>
     </ClInclude>
