@@ -18,7 +18,7 @@ namespace atma
 		virtual ~ref_counted() {}
 
 		template <typename T>
-		auto shared_from_this() -> intrusive_ptr<T>
+		auto shared_from_this_as() -> intrusive_ptr<T>
 		{
 			return intrusive_ptr<T>(static_cast<T*>(this));
 		}
@@ -39,12 +39,6 @@ namespace atma
 		auto shared_from_this() -> intrusive_ptr<T>
 		{
 			return intrusive_ptr<T>{static_cast<T*>(this)};
-		}
-
-		template <typename Y>
-		auto shared_from_this_as() -> intrusive_ptr<Y>
-		{
-			return intrusive_ptr<Y>(static_cast<Y*>(this));
 		}
 	};
 
