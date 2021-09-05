@@ -33,7 +33,6 @@
     <ClInclude Include="..\..\include\atma\com_ptr.hpp" />
     <ClInclude Include="..\..\include\atma\config\platform.hpp" />
     <ClInclude Include="..\..\include\atma\console.hpp" />
-    <ClInclude Include="..\..\include\atma\enable_multiple_shared_from_this.hpp" />
     <ClInclude Include="..\..\include\atma\event.hpp" />
     <ClInclude Include="..\..\include\atma\function_traits.hpp" />
     <ClInclude Include="..\..\include\atma\hash.hpp" />
