@@ -34,7 +34,7 @@
 //
 #define ATMA_HALT(msg) \
 	do { \
-		::atma::assert::trigger(msg); \
+		::atma::assert::trigger(msg, std::source_location::current()); \
 		ATMA_DEBUGBREAK(); \
 		break; \
 	} while(0)
@@ -49,7 +49,7 @@
 //
 #define ATMA_ENSURE_III(x, msg) \
 	do { \
-		if ( !(x) && ::atma::assert::trigger(msg) ) \
+		if ( !(x) && ::atma::assert::trigger(msg, std::source_location::current()) ) \
 			{ ATMA_DEBUGBREAK(); } \
 		break; \
 	} while(0)
@@ -108,5 +108,5 @@
 //
 namespace atma::assert
 {
-	auto trigger(const char* msg, std::source_location const& = std::source_location::current()) -> bool;
+	auto trigger(const char* msg, std::source_location const&) -> bool;
 }
