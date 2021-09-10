@@ -1,8 +1,13 @@
 #include <atma/unit_test.hpp>
+#include <atma/utf/utf8_string.hpp>
+
+#include <array>
+#include <utility>
+#include <iostream>
 
 import atma.rope;
+import atma.memory;
 
-#include <iostream>
 
 SCENARIO("rope can be constructed" * doctest::skip())
 {

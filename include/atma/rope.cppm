@@ -10,6 +10,7 @@ module;
 #include <optional>
 #include <array>
 #include <functional>
+#include <utility>
 
 #define ATMA_ROPE_DEBUG_BUFFER 1
 
@@ -82,7 +83,7 @@ namespace atma::detail
 	using rope_src_buf_t = src_bounded_memxfer_t<char const>;
 }
 
-namespace atma
+export namespace atma
 {
 	struct rope_default_traits
 	{
@@ -93,9 +94,9 @@ namespace atma
 		constexpr static size_t const rope_buf_size = 512;
 
 
-		constexpr static size_t rope_buf_edit_max_size = rope_buf_size - 2;
-		constexpr static size_t rope_buf_edit_split_size = (rope_buf_size / 2) - (rope_buf_size / 32);
-		constexpr static size_t rope_buf_edit_split_drift_size = (rope_buf_size / 32);
+		constexpr static size_t buf_edit_max_size = rope_buf_size - 2;
+		constexpr static size_t buf_edit_split_size = (rope_buf_size / 2) - (rope_buf_size / 32);
+		constexpr static size_t buf_edit_split_drift_size = (rope_buf_size / 32);
 	};
 
 	struct rope_test_traits
@@ -107,16 +108,16 @@ namespace atma
 		constexpr static size_t const rope_buf_size = 9;
 
 
-		constexpr static size_t rope_buf_edit_max_size = rope_buf_size - 2;
-		constexpr static size_t rope_buf_edit_split_size = (rope_buf_size / 2) - (rope_buf_size / 32);
-		constexpr static size_t rope_buf_edit_split_drift_size = (rope_buf_size / 32);
+		constexpr static size_t buf_edit_max_size = rope_buf_size - 2;
+		constexpr static size_t buf_edit_split_size = (rope_buf_size / 2) - (rope_buf_size / 32);
+		constexpr static size_t buf_edit_split_drift_size = (rope_buf_size / 32);
 	};
 }
 
 
 
 
-namespace atma
+export namespace atma
 {
 	template <typename RopeTraits>
 	struct basic_rope_t
@@ -132,14 +133,14 @@ namespace atma
 		template <typename F>
 		auto for_all_text(F&& f) const;
 
-	private: // character information
+	//private: // character information
 		struct charbuf_t;
 		struct edit_result_t;
 		
 		using dest_buf_t = dest_bounded_memxfer_t<char>;
 		using src_buf_t = src_bounded_memxfer_t<char const>;
 
-	private: // nodes
+	//private: // nodes
 		struct node_t;
 		struct node_internal_t;
 		struct node_leaf_t;
@@ -151,21 +152,24 @@ namespace atma
 		template <typename... Args> static auto make_leaf_ptr(Args&&... args) -> node_ptr;
 		template <typename... Args> static auto make_internal_ptr(Args&&... args) -> node_ptr;
 
-	private: // text information
+	//public: // text information
 		struct text_info_t;
 		struct node_info_t;
 		using maybe_node_info_t = std::optional<node_info_t>;
 
-	private:
+		//friend auto operator + (node_info_t const&, text_info_t const&) -> node_info_t;
+
+	//private:
 		static auto fix_seam(size_t char_idx, node_info_t const&, charbuf_t&) -> edit_result_t;
-		static auto insert_and_redistribute(text_info_t const&, detail::rope_src_buf_t hostbuf, detail::rope_src_buf_t insbuf, size_t byte_idx) -> std::tuple<node_info_t, node_info_t>;
+		static auto insert_and_redistribute(text_info_t const&, detail::rope_src_buf_t hostbuf, src_buf_t insbuf, size_t byte_idx) -> std::tuple<node_info_t, node_info_t>;
+		static auto insert_impl(size_t char_idx, node_info_t const& leaf_info, charbuf_t& buf, src_buf_t src_text) -> edit_result_t;
 
 	private:
 		node_info_t root_;
 	};
 }
 
-namespace atma
+export namespace atma
 {
 	template <typename RT>
 	struct basic_rope_t<RT>::edit_result_t
@@ -180,7 +184,7 @@ namespace atma
 //
 //  rope_node_t
 //
-namespace atma
+export namespace atma
 {
 	template <typename RT>
 	struct basic_rope_t<RT>::node_t : atma::ref_counted_of<basic_rope_t<RT>::node_t>
@@ -268,14 +272,15 @@ namespace atma
 // charbuf_t
 //
 #if 1
-namespace atma::detail
+export namespace atma
 {
-	template <size_t Extent>
-	struct charbuf_t
+	template <typename RT>
+	struct basic_rope_t<RT>::charbuf_t
 	{
 		using value_type = char;
 		using allocator_type = std::allocator<char>;
 		using tag_type = dest_memory_tag_t;
+		static constexpr size_t Extent = RT::rope_buf_size;
 
 		bool empty() const { return size_ == 0; }
 		size_t size() const { return size_; }
@@ -310,7 +315,7 @@ namespace atma::detail
 //
 // text-info
 //
-namespace atma
+export namespace atma
 {
 	template <typename RT>
 	struct basic_rope_t<RT>::text_info_t
@@ -326,6 +331,8 @@ namespace atma
 		{
 			ATMA_ASSERT(str);
 
+			static_assert(std::ranges::range<utf8_const_range_t&>);
+
 			text_info_t r;
 			for (auto x : utf8_const_range_t{str, str + sz})
 			{
@@ -337,23 +344,33 @@ namespace atma
 
 			return r;
 		}
-	};
 
-	template <typename RT>
-	inline auto operator + (typename basic_rope_t<RT>::text_info_t const& lhs, typename basic_rope_t<RT>::text_info_t const& rhs) -> typename basic_rope_t<RT>::text_info_t
-	{
-		return typename basic_rope_t<RT>::text_info_t{
-			lhs.bytes + rhs.bytes,
-			lhs.characters + rhs.characters,
-			lhs.line_breaks + rhs.line_breaks};
-	}
+		auto operator + (typename basic_rope_t<RT>::text_info_t const& rhs) const
+			-> typename basic_rope_t<RT>::text_info_t
+		{
+			return typename basic_rope_t<RT>::text_info_t{
+				bytes + rhs.bytes,
+				characters + rhs.characters,
+				line_breaks + rhs.line_breaks};
+		}
+	};
+	
+	//template <typename RT>
+	//inline auto operator + (typename basic_rope_t<RT>::text_info_t const& lhs, typename basic_rope_t<RT>::text_info_t const& rhs)
+	//	-> typename basic_rope_t<RT>::text_info_t
+	//{
+	//	return typename basic_rope_t<RT>::text_info_t{
+	//		lhs.bytes + rhs.bytes,
+	//		lhs.characters + rhs.characters,
+	//		lhs.line_breaks + rhs.line_breaks};
+	//}
 }
 
 
 //
 // node-info
 //
-namespace atma
+export namespace atma
 {
 	template <typename RT>
 	struct basic_rope_t<RT>::node_info_t : text_info_t
@@ -368,26 +385,26 @@ namespace atma
 		{}
 
 		node_ptr node;
+
+		node_info_t operator + (text_info_t const& rhs) const
+		{
+			return node_info_t{(text_info_t&)*this + rhs, this->node};
+		}
 	};
 
-	template <typename RT,
-		typename NodeInfo = typename basic_rope_t<RT>::node_info_t,
-		typename TextInfo = typename basic_rope_t<RT>::text_info_t>
-	inline auto operator + (NodeInfo const& lhs, TextInfo const& rhs) -> NodeInfo
-	{
-		return NodeInfo{(TextInfo&)lhs + rhs, lhs.node};
-	}
-
-
-	
-	
+	//template <typename RT>
+	//inline auto operator + (typename basic_rope_t<RT>::node_info_t const& lhs, typename basic_rope_t<RT>::text_info_t const& rhs)
+	//	-> typename basic_rope_t<RT>::node_info_t
+	//{
+	//	return typename basic_rope_t<RT>::node_info_t{(typename basic_rope_t<RT>::text_info_t&)lhs + rhs, lhs.node};
+	//}
 }
 
 
 //
 //  node_internal_t
 //
-namespace atma
+export namespace atma
 {
 	template <typename RT>
 	struct basic_rope_t<RT>::node_internal_t
@@ -430,7 +447,7 @@ namespace atma
 //
 // rope_node_leaf_t
 //
-namespace atma
+export namespace atma
 {
 	template <typename RT>
 	struct basic_rope_t<RT>::node_leaf_t
@@ -441,7 +458,7 @@ namespace atma
 		// this buffer can only ever be appended to. nodes store how many
 		// characters/bytes they address inside this buffer, so we can append
 		// more data to this buffer and maintain an immutable data-structure
-		detail::charbuf_t<RT::rope_buf_size> buf;
+		charbuf_t buf;
 	};
 }
 
@@ -466,7 +483,7 @@ namespace atma::detail
 #endif
 
 // implementation
-namespace atma
+export namespace atma
 {
 	template <typename RT>
 	inline basic_rope_t<RT>::node_info_t::node_info_t(node_ptr const& node)
@@ -478,7 +495,7 @@ namespace atma
 
 
 // something
-namespace atma::detail
+export namespace atma::detail
 {
 	inline auto is_break(rope_src_buf_t buf, size_t byte_idx) -> bool
 	{
@@ -530,7 +547,7 @@ namespace atma::detail
 	}
 }
 
-namespace atma
+export namespace atma
 {
 	template <typename RT>
 	inline auto basic_rope_t<RT>::insert_and_redistribute(text_info_t const& host, src_buf_t hostbuf, src_buf_t insbuf, size_t byte_idx)
@@ -618,7 +635,7 @@ namespace atma
 }
 
 // rope_node_t implementation
-namespace atma
+export namespace atma
 {
 	template <typename RT>
 	inline basic_rope_t<RT>::node_t::node_t()
@@ -782,7 +799,7 @@ namespace atma
 //
 // rope_node_leaf_t implementation
 //
-namespace atma
+export namespace atma
 {
 #if 0
 	inline auto rope_node_leaf_construct_(charbuf_t& buf)
@@ -812,11 +829,12 @@ namespace atma
 //
 // rope_node_internal_t implementation
 //
-namespace atma::detail
+export namespace atma::detail
 {
-	template <typename RT, typename... Args>
-	inline auto rope_node_internal_construct_(size_t& acc_count, typename basic_rope_t<RT>::node_info_t* dest,
-		src_bounded_memxfer_t<typename basic_rope_t<RT>::node_info_t const> x, Args&&... args) -> void
+	template <typename RT>
+	inline auto rope_node_internal_construct_(size_t& acc_count,
+		typename basic_rope_t<RT>::node_info_t* dest,
+		src_bounded_memxfer_t<typename basic_rope_t<RT>::node_info_t const> x) -> void
 	{
 		atma::memory_copy_construct(
 			xfer_dest(dest + acc_count),
@@ -825,22 +843,24 @@ namespace atma::detail
 		acc_count += x.size();
 	}
 
-	template <typename RT, typename... Args>
-	inline auto rope_node_internal_construct_(size_t& acc_count, typename basic_rope_t<RT>::node_info_t* dest, typename basic_rope_t<RT>::node_info_t const& x, Args&&... args) -> void
+	template <typename RT>
+	inline auto rope_node_internal_construct_(size_t& acc_count,
+		typename basic_rope_t<RT>::node_info_t* dest,
+		typename basic_rope_t<RT>::node_info_t const& x) -> void
 	{
 		dest[acc_count] = x;
 		++acc_count;
 	}
 }
 
-namespace atma
+export namespace atma
 {
 	template <typename RT>
 	template <typename... Args>
 	inline basic_rope_t<RT>::node_internal_t::node_internal_t(Args&&... args)
 	{
 		size_t acc = 0;
-		(detail::rope_node_internal_construct_(acc, children_.data(), std::forward<Args>(args)), ...);
+		(detail::rope_node_internal_construct_<RT>(acc, children_.data(), std::forward<Args>(args)), ...);
 
 		for (size_t i = acc; i != RT::rope_branching_factor; ++i)
 			children_[i].node = node_ptr::make();
@@ -873,6 +893,9 @@ namespace atma
 		if (maybe_r_info.has_value())
 		{
 			auto const& r_info = *maybe_r_info;
+
+			static_assert(std::derived_from<std::contiguous_iterator_tag, std::random_access_iterator_tag>);
+			//static_assert(std::derived_from<std::random_access_iterator_tag, std::contiguous_iterator_tag>);
 
 			if (this->replaceable(idx + 1))
 			{
@@ -939,9 +962,10 @@ namespace atma
 }
 
 
-namespace atma::detail
+export namespace atma
 {
-	inline auto rope_insert_(size_t char_idx, detail::rope_node_info_t const& leaf_info, charbuf_t& buf, detail::rope_src_buf_t src_text) -> detail::rope_edit_result_t
+	template <typename RT>
+	inline auto basic_rope_t<RT>::insert_impl(size_t char_idx, node_info_t const& leaf_info, charbuf_t& buf, src_buf_t src_text) -> edit_result_t
 	{
 		ATMA_ASSERT(!src_text.empty());
 
@@ -962,7 +986,7 @@ namespace atma::detail
 		// sure that the byte_idx of the character is actually the last byte_idx of the buffer
 		bool buf_is_appendable = leaf_info.bytes == buf.size();
 		bool byte_idx_is_at_end = leaf_info.bytes == byte_idx;
-		bool can_fit_in_chunk = leaf_info.bytes + src.size() < detail::rope_buf_edit_max_size;
+		bool can_fit_in_chunk = leaf_info.bytes + src.size() < RT::buf_edit_max_size;
 
 		// simple append is possible
 		if (can_fit_in_chunk && byte_idx_is_at_end && buf_is_appendable)
@@ -979,43 +1003,43 @@ namespace atma::detail
 
 			//buf_size += src.size();
 
-			auto affix_string_info = detail::text_info_t::from_str(src.data(), src.size());
+			auto affix_string_info = text_info_t::from_str(src.data(), src.size());
 			auto result_info = leaf_info + affix_string_info;
-			return detail::rope_edit_result_t{result_info, {}, has_seam};
+			return edit_result_t{result_info, {}, has_seam};
 		}
 		// append is wanted, but immutable data is in the way. reallocate & append
 		else if (can_fit_in_chunk && byte_idx_is_at_end && !buf_is_appendable)
 		{
-			auto affix_string_info = detail::text_info_t::from_str(src.data(), src.size());
+			auto affix_string_info = text_info_t::from_str(src.data(), src.size());
 			auto result_info = leaf_info + affix_string_info;
 
-			result_info.node = detail::rope_make_leaf_ptr(
+			result_info.node = make_leaf_ptr(
 				xfer_src(buf, leaf_info.bytes),
 				src);
 
-			return detail::rope_edit_result_t(result_info, {}, has_seam);
+			return edit_result_t(result_info, {}, has_seam);
 		}
 		// we can fit everything into one chunk, but we are inserting into the middle
 		else if (can_fit_in_chunk && !byte_idx_is_at_end)
 		{
-			auto affix_string_info = detail::text_info_t::from_str(src.data(), src.size());
+			auto affix_string_info = text_info_t::from_str(src.data(), src.size());
 			auto result_info = leaf_info + affix_string_info;
 
-			result_info.node = detail::rope_make_leaf_ptr(
+			result_info.node = make_leaf_ptr(
 				xfer_src(buf, byte_idx),
 				src,
 				xfer_src(buf).skip(byte_idx));
 
-			return detail::rope_edit_result_t(result_info, {}, has_seam);
+			return edit_result_t(result_info, {}, has_seam);
 		}
 
 		// splitting is required
 		{
 			auto& leaf = leaf_info.node->known_leaf();
 
-			auto [lhs_info, rhs_info] = detail::insert_and_redistribute(leaf_info, xfer_src(leaf.buf), src, byte_idx);
+			auto [lhs_info, rhs_info] = insert_and_redistribute(leaf_info, xfer_src(leaf.buf), src, byte_idx);
 
-			return detail::rope_edit_result_t{lhs_info, rhs_info};
+			return edit_result_t{lhs_info, rhs_info};
 		}
 	}
 }
@@ -1027,11 +1051,11 @@ namespace atma::detail
 // ----------------
 // 
 //
-namespace atma
+export namespace atma
 {
 	template <typename RT>
 	inline basic_rope_t<RT>::basic_rope_t()
-		: root_(detail::rope_make_internal_ptr())
+		: root_(make_internal_ptr())
 	{}
 
 	template <typename RT>
@@ -1044,17 +1068,17 @@ namespace atma
 	inline auto basic_rope_t<RT>::insert(size_t char_idx, char const* str, size_t sz) -> void
 	{
 		auto [lhs_info, rhs_info, seam] = root_.node->edit_chunk_at_char(char_idx, root_,
-			[str, sz](size_t char_idx, detail::rope_node_info_t const& leaf_info, detail::charbuf_t& buf)
+			[str, sz](size_t char_idx, node_info_t const& leaf_info, charbuf_t& buf)
 			{
-				return detail::rope_insert_(char_idx, leaf_info, buf, xfer_src(str, sz));
+				return insert_impl(char_idx, leaf_info, buf, xfer_src(str, sz));
 			});
 
 		if (rhs_info.has_value())
 		{
-			(detail::text_info_t&)root_ = lhs_info + *rhs_info;
+			(text_info_t&)root_ = lhs_info + *rhs_info;
 			if (!lhs_info.node)
 				lhs_info.node = root_.node;
-			root_.node = detail::rope_make_internal_ptr(lhs_info, *rhs_info);
+			root_.node = make_internal_ptr(lhs_info, *rhs_info);
 		}
 		else
 		{
@@ -1066,20 +1090,23 @@ namespace atma
 	template <typename F>
 	auto basic_rope_t<RT>::for_all_text(F&& f) const
 	{
-		detail::rope_for_all_text(std::forward<F>(f), root_);
+		//detail::rope_for_all_text(std::forward<F>(f), root_);
 	}
 
 	template <typename RT>
 	inline std::ostream& operator << (std::ostream& stream, basic_rope_t<RT> const& x)
 	{
 		x.for_all_text(
-			[&stream](detail::rope_node_info_t const& info)
+			[&stream](basic_rope_t<RT>::node_info_t const& info)
 			{
 				stream << std::string_view(info.node->known_leaf().buf.data(), info.bytes);
 			});
 
 		return stream;
 	}
+}
 
-	using rope_t = basic_rope_t<void>;
+export namespace atma
+{
+	using rope_t = basic_rope_t<rope_test_traits>;
 }

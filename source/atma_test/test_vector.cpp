@@ -1,8 +1,8 @@
 
 #include <atma/unit_test.hpp>
-#include <atma/memory.hpp>
 
 import atma.vector;
+import atma.memory;
 
 using canary_t = atma::unit_test::canary_t;
 
