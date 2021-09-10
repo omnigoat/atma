@@ -341,7 +341,7 @@ namespace atma
 //  means that the amount of bytes traversed is variable, as utf8 is
 //  want to be
 //
-namespace atma::detail
+namespace atma
 {
 	struct basic_utf8_iterator_t
 	{
@@ -376,7 +376,7 @@ namespace atma::detail
 
 namespace atma
 {
-	using utf8_iterator_t = detail::basic_utf8_iterator_t;
+	using utf8_iterator_t = basic_utf8_iterator_t;
 }
 
 
@@ -603,7 +603,7 @@ namespace atma
 //=====================================================================
 // @basic_utf8_iterator_t implementation
 //=====================================================================
-namespace atma::detail
+namespace atma
 {
 	inline basic_utf8_iterator_t::basic_utf8_iterator_t(char const* here)
 		: here_(here)
@@ -635,12 +635,12 @@ namespace atma::detail
 		return r;
 	}
 
-	inline auto operator == (basic_utf8_iterator_t const& lhs, basic_utf8_iterator_t const& rhs)
+	inline auto operator == (basic_utf8_iterator_t lhs, basic_utf8_iterator_t rhs) -> bool
 	{
 		return lhs.char_data() == rhs.char_data();
 	}
 
-	inline auto operator != (basic_utf8_iterator_t const& lhs, basic_utf8_iterator_t const& rhs)
+	inline auto operator != (basic_utf8_iterator_t lhs, basic_utf8_iterator_t rhs) -> bool
 	{
 		return !operator == (lhs, rhs);
 	}
