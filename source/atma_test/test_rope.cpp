@@ -8,7 +8,6 @@
 import atma.rope;
 import atma.memory;
 
-
 SCENARIO("rope can be constructed" * doctest::skip())
 {
 	GIVEN("")
