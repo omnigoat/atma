@@ -1,5 +1,6 @@
 
 #include <atma/unit_test.hpp>
+#include <atma/algorithm.hpp>
 
 import atma.vector;
 import atma.memory;
