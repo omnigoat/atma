@@ -1,6 +1,7 @@
 module;
 
 #include <utility>
+#include <type_traits>
 
 export module atma.meta;
 
@@ -37,14 +38,68 @@ namespace atma::meta
 }
 
 // list
-namespace atma::meta
+export namespace atma::meta
 {
-	export template <typename... As>
+	template <typename... As>
 	struct list
 	{
 		using type = list;
 		static constexpr size_t size() noexcept { return sizeof...(As); }
 	};
+
+
+	namespace detail
+	{
+		template <int N, typename>
+		struct drop_;
+
+		template <typename List>
+		struct drop_<0, List>
+			{ using type = List; };
+
+		template <int N, typename First, typename... Args>
+		struct drop_<N, list<First, Args...>>
+			{ using type = typename drop_<N - 1, list<Args...>>::type; };
+	}
+
+	namespace detail
+	{
+		template <int N, typename List, typename Result = list<>>
+		struct drop_back_ii_;
+
+		template <typename List, typename Result>
+		struct drop_back_ii_<0, List, Result>
+			{ using type = Result; };
+
+		template <int N, typename First, typename... Args, typename... RArgs>
+		struct drop_back_ii_<N, list<First, Args...>, list<RArgs...>>
+			{ using type = list<RArgs..., First>; };
+
+
+		template <int N, typename List>
+		struct drop_back_;
+
+		template <int N, typename... Args>
+		struct drop_back_<N, list<Args...>>
+		{
+			static_assert(sizeof...(Args) - N >= 0);
+			using type = typename drop_back_ii_<sizeof...(Args) - N, list<Args...>>::type;
+		};
+
+		template <typename List>
+		struct drop_back_<0, List>
+			{ using type = List; };
+
+		template <int N, typename Back, typename... Args>
+		struct drop_back_<N, list<Args..., Back>>
+			{ using type = typename drop_back_<N - 1, list<Args...>>::type; };
+	}
+
+	template <int N, typename list>
+	using drop = typename detail::drop_<N, list>::type;
+
+	template <int N, typename list>
+	using drop_back = typename detail::drop_back_<N, list>::type;
 }
 
 // integral types
@@ -224,6 +279,47 @@ export namespace atma::meta
 	using any = fold<or_op, bool_<false>, list>;
 }
 
+export namespace atma::meta
+{
+	namespace detail
+	{
+		template <typename List1, typename List2>
+		struct _all_same2_;
 
+		template <typename... Args1, typename... Args2>
+		struct _all_same2_<list<Args1...>, list<Args2...>>
+		{
+			using pair_list = list<std::pair<Args1, Args2>...>;
+		};
+
+		template <typename X>
+		struct _all_same_
+		{
+			static_assert(std::is_same_v<X, int>, "wrong");
+		};
+
+		template <typename... Args>
+		struct _all_same_<list<Args...>>
+		{
+			using first_list = drop<1, list<Args...>>;
+			using second_list = drop_back<1, list<Args...>>;
+		};
+
+		template <typename... Args>
+		struct _all_same3_
+		{
+			using L = _all_same_<list<Args...>>;
+			using P = typename _all_same2_<typename L::first_list, typename L::second_list>::pair_list;
+		};
+
+		struct same_op {
+			template <typename X>
+			using invoke = std::is_same<typename X::first_type, typename X::second_type>;
+		};
+	}
+
+	template <typename... Args>
+	using all_same = all<map<detail::same_op, typename detail::_all_same3_<Args...>::P>>;
+}
 
 
