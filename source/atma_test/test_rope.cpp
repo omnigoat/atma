@@ -14,7 +14,7 @@ SCENARIO("rope can be constructed" * doctest::skip())
 	{
 		THEN("")
 		{
-			atma::rope_t rope;
+			atma::basic_rope_t<atma::rope_test_traits> rope;
 			rope.push_back("ab", 2);
 			rope.push_back("cd", 2);
 			rope.insert(3, "xy", 2);
