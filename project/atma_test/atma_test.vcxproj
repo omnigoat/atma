@@ -44,7 +44,6 @@
     <OutDir>$(ProjectDir)..\..\builds\$(Platform)\$(Configuration)\$(TargetName)\</OutDir>
     <IntDir>$(ProjectDir)..\..\intermediates\$(Platform)\$(Configuration)\$(TargetName)\</IntDir>
     <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
-    <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='TestOpt|x64'">
     <IncludePath>$(ProjectDir)..\..\vendor;$(ProjectDir)..\..\include;$(IncludePath)</IncludePath>
@@ -74,11 +73,13 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>$(TargetPath) -r=atma_console</Command>
+      <Command>REM $(TargetPath) -r=atma_console</Command>
     </PostBuildEvent>
+    <ProjectReference>
+      <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
+    </ProjectReference>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='TestOpt|x64'">
     <ClCompile>

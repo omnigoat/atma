@@ -17,9 +17,9 @@ module;
 
 export module atma.rope;
 
+#if 0
 import atma.types;
 import atma.memory;
-
 
 
 
@@ -425,62 +425,6 @@ export namespace atma::_rope_
 			});
 	}
 
-#if 0
-	template <typename RT>
-	struct node_t : atma::ref_counted_of<node_t>
-	{
-		node_t();
-
-		node_t(node_internal_t const& x)
-			: variant_(x)
-		{}
-
-		node_t(node_leaf_t<RT> const& x)
-			: variant_(x)
-		{}
-
-		auto length() const -> size_t;
-		auto find_for_char_idx(size_t idx) const -> std::tuple<size_t, size_t>;
-
-		template <typename F>
-		auto edit_chunk_at_char(size_t char_idx, node_info_t<RT> const&, F&&) -> edit_result_t<RT>;
-
-		auto known_internal() -> node_internal_t&
-		{
-			return std::get<node_internal_t>(variant_);
-		}
-
-		auto known_leaf() -> node_leaf_t<RT>&
-		{
-			return std::get<node_leaf_t<RT>>(variant_);
-		}
-
-		auto calculate_text_info() const -> text_info_t;
-
-		template <typename... Args>
-		auto visit(Args&&... args)
-		{
-			return std::visit(visit_with{std::forward<Args>(args)...}, variant_);
-		}
-
-		template <typename... Args>
-		auto visit(Args&&... args) const
-		{
-			return std::visit(visit_with{std::forward<Args>(args)...}, variant_);
-		}
-
-		//template <typename F>
-		//auto for_all_text(F&& f)
-		//{
-		//	this->visit([](node_internal_t const& x){ for (auto& y : x.children_range()) if (y.node) y.node->for_all_text(f); },
-		//		[](node_leaf_t const& x) { if (x.bytes) f(xfer_src(x.buf, x.size))}
-		//}
-
-	private:
-		std::variant<node_internal_t<RT>, node_leaf_t<RT>> variant_;
-	};
-#endif
-
 	template <typename RT, typename... Args>
 	inline node_ptr<RT> make_internal_ptr(Args&&... args)
 	{
@@ -666,58 +610,6 @@ export namespace atma::_rope_
 // node_t implementation
 export namespace atma::_rope_
 {
-#if 0
-	inline node_t::node_t()
-		: variant_(node_leaf_t())
-	{}
-
-	inline auto node_t::length() const -> size_t
-	{
-		return this->visit(
-			[](node_internal_t const& x) { return x.length(); },
-			[](node_leaf_t const& x) { return size_t(); });
-	}
-
-	inline auto node_t::find_for_char_idx(size_t idx) const -> std::tuple<size_t, size_t>
-	{
-		return this->visit(
-			[idx](node_internal_t const& x)
-			{
-				size_t child_idx = 0;
-				size_t acc_chars = 0;
-				for (auto const& child : x.children_range())
-				{
-					if (idx <= acc_chars + child.characters)
-						break;
-
-					acc_chars += child.characters;
-					++child_idx;
-				}
-
-				return std::make_tuple(child_idx, idx - acc_chars);
-			},
-
-			[idx](node_leaf_t const& x)
-			{
-				return std::make_tuple(size_t(), size_t());
-			});
-	}
-
-	inline auto node_t::calculate_text_info() const -> text_info_t
-	{
-		return this->visit(
-			[](node_internal_t const& x)
-			{
-				return atma::foldl(x.children_range(), text_info_t(), functors::add);
-			},
-
-			[](node_leaf_t const& x)
-			{
-				return text_info_t<RT>::from_str(x.buf.data(), x.buf.size());
-			});
-	}
-#endif
-
 	template <typename RT>
 	inline auto fix_seam(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf)
 	{
@@ -784,43 +676,6 @@ export namespace atma::_rope_
 
 	}
 
-#if 0
-	template <typename F, typename RT>
-	inline auto node_t::edit_chunk_at_char(size_t char_idx, node_info_t<RT> const& info, F&& f) -> edit_result_t<RT>
-	{
-		return this->visit(
-			[&](node_internal_t& x)
-			{
-				// find child
-				auto [child_idx, child_rel_idx] = find_for_char_idx(char_idx);
-				auto const& child = x.child_at(child_idx);
-
-				// recurse
-				auto [l_info, r_info, has_seam] = child.node->edit_chunk_at_char(child_rel_idx, child, f);
-				auto result = x.clone_with(child_idx, l_info, r_info);
-
-				// if we can fix a torn seam here, do so
-				if (has_seam && child_idx > 0)
-				{
-					auto const& seamchild = x.child_at(child_idx - 1);
-					seamchild.node->edit_chunk_at_char(seamchild.characters, seamchild, fix_seam<RT>);
-				}
-				// we can not, pass the seam up a level
-				else
-				{
-					result.seam = has_seam;
-				}
-
-				return result;
-			},
-
-			[&, f = std::forward<F>(f)](node_leaf_t& x) -> edit_result_t<RT>
-			{
-				return std::invoke(f, char_idx, info, x.buf);
-			}
-			);
-	}
-#endif
 }
 
 
@@ -1093,9 +948,6 @@ export namespace atma
 	};
 }
 
-
-
-
 export namespace atma
 {
 	template <typename RT>
@@ -1110,7 +962,7 @@ export namespace atma
 	}
 
 	template <typename RT>
-	inline auto basic_rope_t<RT>::insert(size_t char_idx, char const* str, size_t sz) -> void
+	auto basic_rope_t<RT>::insert(size_t char_idx, char const* str, size_t sz) -> void
 	{
 		auto [lhs_info, rhs_info, seam] = edit_chunk_at_char(root_, char_idx,
 			[str, sz](size_t char_idx, _rope_::node_info_t<RT> const& leaf_info, _rope_::charbuf_t<RT::buf_size>& buf)
@@ -1132,7 +984,7 @@ export namespace atma
 	}
 
 	template <typename RT>
-	inline std::ostream& operator << (std::ostream& stream, basic_rope_t<RT> const& x)
+	std::ostream& operator << (std::ostream& stream, basic_rope_t<RT> const& x)
 	{
 		x.for_all_text(
 			[&stream](_rope_::node_info_t<RT> const& info)
@@ -1148,3 +1000,13 @@ export namespace atma
 	using rope_t = basic_rope_t<rope_default_traits>;
 }
 
+export namespace atma_test
+{
+	void expose_rope_symbol()
+	{
+		atma::basic_rope_t<atma::rope_default_traits> ropey;
+		//[[maybe_unused]] atma::basic_rope_t<atma::rope_test_traits> rope2;
+		ropey.push_back("blam", 4);
+	}
+}
+#endif
