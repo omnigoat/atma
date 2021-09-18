@@ -1,6 +1,8 @@
-//#define CATCH_CONFIG_MAIN
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+
+#define DOCTEST_CONFIG_IMPLEMENT
 #include <atma/unit_test.hpp>
 
-//#include <doctest/doctest.h>
-
+int main(int argc, char** argv)
+{
+	return doctest::Context(argc, argv).run();
+}

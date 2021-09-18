@@ -32,6 +32,9 @@
     <Filter Include="vendor\doctest">
       <UniqueIdentifier>{12db3afe-a656-41e8-9bf4-d6c36d02f70d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="modules">
+      <UniqueIdentifier>{3a70054b-cdb3-4b49-b782-3dff1bbe2f3d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\atma\math\vector4f.hpp">
@@ -199,15 +202,15 @@
     <ClInclude Include="..\..\include\atma\assert.hpp">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\atma\rope.hpp">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\resources\atma.natvis" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\source\include_guide.cpp" />
-    <ClCompile Include="..\..\include\atma\rope.cppm">
-      <Filter>include</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\include\atma\meta.cppm">
       <Filter>include</Filter>
     </ClCompile>
@@ -225,6 +228,9 @@
     </ClCompile>
     <ClCompile Include="..\..\include\atma\memory.cppm">
       <Filter>include</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\atma\rope.cppm">
+      <Filter>modules</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
