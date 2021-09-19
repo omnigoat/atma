@@ -116,7 +116,20 @@ namespace atma
 	};
 
 	template <typename First, typename Second, template <typename, typename> typename Transformer = default_storage_transformer_t>
-	using ebo_pair_t = detail::ebo_pair_impl<First, Second, Transformer>;
+	struct ebo_pair_t
+		: detail::ebo_pair_impl<First, Second, Transformer>
+	{
+		using base_type = detail::ebo_pair_impl<First, Second, Transformer>;
+
+		using base_type::base_type;
+
+		ebo_pair_t& operator = (ebo_pair_t const& rhs)
+		{
+			this->first() = rhs.first();
+			this->second() = rhs.second();
+			return *this;
+		}
+	};
 }
 
 
