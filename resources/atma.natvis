@@ -90,11 +90,12 @@
 	<!-- node_info_t -->
 	<Type Name="atma::_rope_::node_info_t&lt;*&gt;">
 		<!-- internal-node -->
-		<DisplayString Condition="node._Ptr &amp;&amp; node._Ptr->_Which &lt; 0">{{ invalid }}</DisplayString>
 		<DisplayString Condition="node._Ptr &amp;&amp; node._Ptr->_Which==0">internal-node {{ chars={characters}, bytes={bytes} }}</DisplayString>
-		<!-- introspect the variant to show only the bits of the storage we're valid for -->
+		<!-- leaf-node -->
 		<DisplayString Condition="node._Ptr &amp;&amp; node._Ptr->_Which==1">leaf-node {{ chars={characters}, bytes={bytes}, {((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)node._Ptr->_Tail).buf.chars_,[characters]s8} }}</DisplayString>
-
+		<!-- invalid -->
+		<DisplayString>{{ empty }}</DisplayString>
+		
 		<Expand>
 			<Item Name="bytes">bytes</Item>
 			<Item Name="characters">characters</Item>

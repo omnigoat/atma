@@ -599,6 +599,12 @@ namespace atma
 			: alloc_and_ptr_(rhs.get_allocator(), (T const*)rhs.data())
 		{}
 
+		memxfer_t& operator = (memxfer_t const& rhs)
+		{
+			alloc_and_ptr_ = rhs.alloc_and_ptr_;
+			return *this;
+		}
+
 		allocator_type& get_allocator() const { return const_cast<memxfer_t*>(this)->alloc_and_ptr_.first(); }
 
 		auto data() -> value_type* { return alloc_and_ptr_.second(); }
@@ -611,7 +617,7 @@ namespace atma
 
 	protected:
 		// store the allocator EBO-d with the vtable pointer
-		using alloc_and_ptr_type = ebo_pair_t<A, T* const>;
+		using alloc_and_ptr_type = ebo_pair_t<A, T*>;
 		alloc_and_ptr_type alloc_and_ptr_;
 	};
 }
@@ -718,6 +724,11 @@ namespace atma::detail
 			, size_(size)
 		{}
 
+		bounded_memxfer_impl_t& operator = (bounded_memxfer_impl_t const& rhs)
+		{
+			return (bounded_memxfer_impl_t&)base_type::operator = (rhs);
+		}
+
 		// observers
 		constexpr auto empty() const -> bool { return size_ == 0; }
 		constexpr auto size() const -> size_t { return size_; }
@@ -749,6 +760,12 @@ export namespace atma
 
 		// inherit constructors
 		using base_type::base_type;
+		
+		bounded_memxfer_t& operator = (bounded_memxfer_t const& rhs)
+		{
+			return (bounded_memxfer_t&)base_type::operator = (rhs);
+		}
+
 
 		// element access
 		auto begin()       -> value_type* { return this->alloc_and_ptr_.second(); }

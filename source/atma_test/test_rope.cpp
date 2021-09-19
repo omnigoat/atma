@@ -15,14 +15,23 @@
 import atma.rope;
 import atma.memory;
 
+using test_rope_t = atma::basic_rope_t<atma::rope_test_traits>;
+
+
 SCENARIO("rope can be constructed" * doctest::skip())
 {
-	GIVEN("")
+	test_rope_t rope;
+}
+
+SCENARIO("rope can be inserted" * doctest::skip())
+{
+	GIVEN("a default-constructed rope")
 	{
+		test_rope_t rope;
+
 		THEN("")
 		{
-			atma::basic_rope_t<atma::rope_test_traits> rope;
-			rope.push_back("ab", 2);
+			rope.push_back("\nab", 2);
 			rope.push_back("cd", 2);
 			rope.insert(3, "xy", 2);
 			rope.insert(2, "fg", 2);
