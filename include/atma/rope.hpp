@@ -60,9 +60,13 @@ namespace atma::_rope_
 	//    operations are going to happen afterwards (like someone
 	//    typing).
 	//
-	constexpr size_t buf_edit_max_size = buf_size - 2;
-	constexpr size_t buf_edit_split_size = (buf_size / 2) - (buf_size / 32);
-	constexpr size_t buf_edit_split_drift_size = (buf_size / 32);
+	//constexpr size_t buf_edit_max_size = buf_size - 2;
+	//constexpr size_t buf_edit_split_size = (buf_size / 2) - (buf_size / 32);
+	//constexpr size_t buf_edit_split_drift_size = (buf_size / 32);
+
+	struct text_info_t;
+	template <typename> struct node_info_t;
+	template <typename RT> using maybe_node_info_t = std::optional<node_info_t<RT>>;
 
 	template <typename> struct node_internal_t;
 	template <typename> struct node_leaf_t;
@@ -167,9 +171,8 @@ namespace atma::_rope_
 	};
 }
 
-
 //
-// text-info
+// text_info_t
 //
 namespace atma::_rope_
 {
@@ -207,9 +210,8 @@ namespace atma::_rope_
 	}
 }
 
-
 //
-// node_info_t<RT>
+// node_info_t
 //
 namespace atma::_rope_
 {
@@ -228,15 +230,11 @@ namespace atma::_rope_
 	static_assert(sizeof(node_info_t<rope_default_traits>) == sizeof(node_ptr<rope_default_traits>) + sizeof(uint32_t) * 4,
 		"we have unnecessary padding in our info structures");
 
-
 	template <typename RT>
 	inline auto operator + (node_info_t<RT> const& lhs, text_info_t const& rhs) -> node_info_t<RT>
 	{
 		return node_info_t<RT>{(text_info_t&)lhs + rhs, lhs.node};
 	}
-
-	template <typename RT>
-	using maybe_node_info_t = std::optional<node_info_t<RT>>;
 }
 
 //
@@ -348,31 +346,23 @@ namespace atma::_rope_
 	struct node_t : atma::ref_counted_of<node_t<RT>>
 	{
 		node_t() = default;
+		node_t(node_internal_t<RT> const& x);
+		node_t(node_leaf_t<RT> const& x);
 
-		node_t(node_internal_t<RT> const& x)
-			: variant_{x}
-		{}
+		bool is_internal() const;
+		bool is_leaf() const;
 
-		node_t(node_leaf_t<RT> const& x)
-			: variant_{x}
-		{}
-
-		bool is_internal() const { return variant_.index() == 0; }
-		bool is_leaf() const { return variant_.index() == 1; }
-
-		auto known_internal() -> node_internal_t<RT>& { return std::get<node_internal_t<RT>>(variant_); }
-		auto known_leaf() -> node_leaf_t<RT>& { return std::get<node_leaf_t<RT>>(variant_); }
+		auto known_internal() -> node_internal_t<RT>&;
+		auto known_leaf() -> node_leaf_t<RT>&;
 
 		// visit node with functors
 		template <typename... Args>
-		auto visit(Args&&... args)
-		{
-			return std::visit(visit_with{std::forward<Args>(args)...}, variant_);
-		}
+		auto visit(Args&&... args);
 
 	private:
 		std::variant<node_internal_t<RT>, node_leaf_t<RT>> variant_;
 	};
+
 
 	template <typename RT, typename... Args>
 	inline node_ptr<RT> make_internal_ptr(Args&&... args)
@@ -385,8 +375,6 @@ namespace atma::_rope_
 	{
 		return node_ptr<RT>::make(node_leaf_t<RT>{std::forward<Args>(args)...});
 	}
-
-
 }
 
 //
@@ -394,8 +382,6 @@ namespace atma::_rope_
 //
 namespace atma::_rope_
 {
-	
-
 	template <typename RT>
 	inline auto length(node_ptr<RT> const& x) -> size_t
 	{
@@ -763,7 +749,7 @@ namespace atma::_rope_
 			return _rope_::edit_result_t<RT>{new_leaf_info};
 		}
 		// buffer-size small enough to reallocate the node
-		else if (new_buf_size < buf_edit_split_size)
+		else if (new_buf_size < RT::buf_edit_split_size)
 		{
 			auto byte_idx = utf8_charseq_idx_to_byte_idx(buf.data(), buf.size(), char_idx);
 
@@ -964,8 +950,6 @@ namespace atma::_rope_
 	}
 }
 
-
-
 //
 // node_leaf_t implementation
 //
@@ -992,6 +976,64 @@ namespace atma::_rope_
 		(node_leaf_construct_(buf, std::forward<Args>(args)), ...);
 	}
 }
+
+//
+// node_t implementation
+//
+namespace atma::_rope_
+{
+	template <typename RT>
+	node_t<RT>::node_t(node_internal_t<RT> const& x)
+		: variant_{x}
+	{}
+
+	template <typename RT>
+	node_t<RT>::node_t(node_leaf_t<RT> const& x)
+		: variant_{x}
+	{}
+
+	template <typename RT>
+	bool node_t<RT>::is_internal() const
+	{
+		return variant_.index() == 0;
+	}
+
+	template <typename RT>
+	bool node_t<RT>::is_leaf() const
+	{
+		return variant_.index() == 1;
+	}
+
+	template <typename RT>
+	auto node_t<RT>::known_internal() -> node_internal_t<RT>&
+	{
+		return std::get<node_internal_t<RT>>(variant_);
+	}
+
+	template <typename RT>
+	auto node_t<RT>::known_leaf() -> node_leaf_t<RT>&
+	{
+		return std::get<node_leaf_t<RT>>(variant_);
+	}
+
+	// visit node with functors
+	template <typename RT>
+	template <typename... Args>
+	auto node_t<RT>::visit(Args&&... args)
+	{
+		return std::visit(visit_with{std::forward<Args>(args)...}, variant_);
+	}
+}
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1023,7 +1065,7 @@ namespace atma::_rope_
 		// sure that the byte_idx of the character is actually the last byte_idx of the buffer
 		bool buf_is_appendable = leaf_info.bytes == buf.size();
 		bool byte_idx_is_at_end = leaf_info.bytes == byte_idx;
-		bool can_fit_in_chunk = leaf_info.bytes + insbuf.size() < _rope_::buf_edit_max_size;
+		bool can_fit_in_chunk = leaf_info.bytes + insbuf.size() < RT::buf_edit_max_size;
 
 		// simple append is possible
 		if (can_fit_in_chunk && byte_idx_is_at_end && buf_is_appendable)
