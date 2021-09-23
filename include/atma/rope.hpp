@@ -66,11 +66,9 @@ namespace atma::_rope_
 
 	template <typename> struct node_internal_t;
 	template <typename> struct node_leaf_t;
-	template <typename RT> using node_t = std::variant<node_internal_t<RT>, node_leaf_t<RT>>;
+	template <typename> struct node_t;
 
-	template <typename RT> using node_internal_ptr = intrusive_ptr<node_internal_t<RT>>;
-	template <typename RT> using node_leaf_ptr = intrusive_ptr<node_leaf_t<RT>>;
-	template <typename RT> using node_ptr = std::shared_ptr<node_t<RT>>;
+	template <typename RT> using node_ptr = intrusive_ptr<node_t<RT>>;
 
 	namespace linebreaks
 	{
@@ -344,38 +342,59 @@ namespace atma::_rope_
 	};
 }
 
+namespace atma::_rope_
+{
+	template <typename RT>
+	struct node_t : atma::ref_counted_of<node_t<RT>>
+	{
+		node_t() = default;
+
+		node_t(node_internal_t<RT> const& x)
+			: variant_{x}
+		{}
+
+		node_t(node_leaf_t<RT> const& x)
+			: variant_{x}
+		{}
+
+		bool is_internal() const { return variant_.index() == 0; }
+		bool is_leaf() const { return variant_.index() == 1; }
+
+		auto known_internal() -> node_internal_t<RT>& { return std::get<node_internal_t<RT>>(variant_); }
+		auto known_leaf() -> node_leaf_t<RT>& { return std::get<node_leaf_t<RT>>(variant_); }
+
+		// visit node with functors
+		template <typename... Args>
+		auto visit(Args&&... args)
+		{
+			return std::visit(visit_with{std::forward<Args>(args)...}, variant_);
+		}
+
+	private:
+		std::variant<node_internal_t<RT>, node_leaf_t<RT>> variant_;
+	};
+
+	template <typename RT, typename... Args>
+	inline node_ptr<RT> make_internal_ptr(Args&&... args)
+	{
+		return node_ptr<RT>::make(node_internal_t<RT>{std::forward<Args>(args)...});
+	}
+
+	template <typename RT, typename... Args>
+	inline node_ptr<RT> make_leaf_ptr(Args&&... args)
+	{
+		return node_ptr<RT>::make(node_leaf_t<RT>{std::forward<Args>(args)...});
+	}
+
+
+}
 
 //
 //  node algorithms
 //
 namespace atma::_rope_
 {
-	template <typename RT>
-	inline auto known_internal(node_ptr<RT> const& x) -> node_internal_t<RT>&
-	{
-		return std::get<node_internal_t<RT>>(*x);
-	}
-
-	template <typename RT>
-	inline auto known_leaf(node_ptr<RT> const& x) -> node_leaf_t<RT>&
-	{
-		return std::get<node_leaf_t<RT>>(*x);
-	}
-
-	// visit node with functors
-	template <typename RT, typename... Args>
-	inline auto visit(node_ptr<RT> const& x, Args&&... args)
-	{
-		return std::visit(visit_with{std::forward<Args>(args)...}, *x);
-	}
-
-	// visit that takes a default value if the node-ptr is null
-	template <typename RT, typename... Args, typename R = std::common_type_t<std::invoke_result_t<Arg, node_info_t<RT>>...>>
-	inline auto visit(R default_result, node_ptr<RT> const& x, Args&&... args) -> R
-	{
-		return !x ? default_result :
-			std::visit(visit_with{std::forward<Args>(args)...}, *x);
-	}
+	
 
 	template <typename RT>
 	inline auto length(node_ptr<RT> const& x) -> size_t
@@ -406,7 +425,7 @@ namespace atma::_rope_
 	template <typename RT, typename F>
 	inline auto edit_chunk_at_char(node_info_t<RT> const& info, size_t char_idx, F f) -> edit_result_t<RT>
 	{
-		return visit(info.node,
+		return info.node->visit(
 			[&, f](node_internal_t<RT>& x)
 			{
 				// find child
@@ -436,7 +455,7 @@ namespace atma::_rope_
 	template <typename RT>
 	inline auto calculate_text_info(node_ptr<RT> const& node) -> text_info_t
 	{
-		return visit(node,
+		return node->visit(
 			[](node_internal_t<RT> const& x)
 			{
 				return x.calculate_combined_info();
@@ -448,25 +467,13 @@ namespace atma::_rope_
 			});
 	}
 
-	template <typename RT, typename... Args>
-	inline node_ptr<RT> make_internal_ptr(Args&&... args)
-	{
-		return std::make_shared<node_t<RT>>(node_internal_t<RT>{std::forward<Args>(args)...});
-	}
-
-	template <typename RT, typename... Args>
-	inline node_ptr<RT> make_leaf_ptr(Args&&... args)
-	{
-		return std::make_shared<node_t<RT>>(node_leaf_t<RT>{std::forward<Args>(args)...});
-	}
-
 	template <typename F, typename RT>
 	inline auto for_all_text(F f, node_info_t<RT> const& ri)
 	{
 		if (!ri.node)
 			return;
 
-		visit(ri.node,
+		ri.node->visit(
 			[f](node_internal_t<RT> const& x)
 			{
 				x.for_each_child(atma::curry(&for_all_text<F, RT>, f));
@@ -808,7 +815,7 @@ namespace atma::_rope_
 	template <typename RT>
 	auto valid_children_count(node_ptr<RT> const& node) -> uint32_t
 	{
-		return visit(0u, node, 
+		return !node ? 0 : node->visit(
 				[](node_internal_t<RT> const& x) { return (uint32_t)x.children_range().size(); },
 				[](node_leaf_t<RT> const& x) { return 0u; });
 	}
@@ -876,7 +883,7 @@ namespace atma::_rope_
 	template <typename RT>
 	inline auto node_internal_t<RT>::replaceable(size_t idx) const -> bool
 	{
-		return visit(children_[idx].node,
+		return children_[idx].node->visit(
 			[](node_internal_t<RT> const&) { return false; },
 			[&](node_leaf_t<RT> const& x) { return children_[idx].bytes == 0; });
 	}
@@ -1055,7 +1062,7 @@ namespace atma::_rope_
 
 		// splitting is required
 		{
-			auto& leaf = known_leaf(leaf_info.node);
+			auto& leaf = leaf_info.node->known_leaf();
 
 			auto [lhs_info, rhs_info] = _rope_::insert_and_redistribute<RT>(leaf_info, xfer_src(leaf.buf), insbuf, byte_idx);
 
@@ -1148,7 +1155,7 @@ namespace atma
 		x.for_all_text(
 			[&stream](_rope_::node_info_t<RT> const& info)
 			{
-				stream << std::string_view(std::get<_rope_::node_leaf_t<RT>>(*info.node).buf.data(), info.bytes);
+				stream << std::string_view(info.node->known_leaf().buf.data(), info.bytes);
 			});
 
 		return stream;
