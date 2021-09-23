@@ -180,7 +180,6 @@ namespace atma::_rope_
 		uint32_t bytes = 0;
 		uint32_t characters = 0;
 		uint32_t line_breaks = 0;
-		uint32_t pad = 0;
 
 		auto can_append_at(size_t byte_idx) const { return byte_idx == bytes; }
 
@@ -219,17 +218,18 @@ namespace atma::_rope_
 	template <typename RT>
 	struct node_info_t : text_info_t
 	{
-		node_info_t<RT>() = default;
+		node_info_t() = default;
+		node_info_t(node_ptr<RT> const& node);
+		node_info_t(text_info_t const& info, uint32_t children, node_ptr<RT> const&);
+		node_info_t(text_info_t const& info, node_ptr<RT> const&);
 
-		node_info_t<RT>(node_ptr<RT> const& node);
-
-		node_info_t<RT>(text_info_t const& info, node_ptr<RT> const& node = node_ptr<RT>())
-			: text_info_t(info)
-			, node(node)
-		{}
-
+		uint32_t children = 0;
 		node_ptr<RT> node;
 	};
+
+	static_assert(sizeof(node_info_t<rope_default_traits>) == sizeof(node_ptr<rope_default_traits>) + sizeof(uint32_t) * 4,
+		"we have unnecessary padding in our info structures");
+
 
 	template <typename RT>
 	inline auto operator + (node_info_t<RT> const& lhs, text_info_t const& rhs) -> node_info_t<RT>
@@ -277,14 +277,27 @@ namespace atma::_rope_
 		auto push(node_info_t<RT> const&) const -> node_ptr<RT>;
 		auto child_at(size_t idx) const -> node_info_t<RT> const& { return children_[idx]; }
 		
-		auto children_range()
+		static constexpr size_t all_children = ~size_t();
+
+		auto children_range(size_t limit = all_children)
 		{
-			return std::span<node_info_t<RT>>(children_.data(), size_);
+			limit = (limit == all_children) ? size_ : limit;
+			ATMA_ASSERT(limit <= RT::branching_factor);
+
+			return std::span<node_info_t<RT>>(children_.data(), limit);
 		}
 
-		auto children_range() const
+		auto children_range(size_t limit = all_children) const
 		{
-			return std::span<node_info_t<RT> const>(children_.data(), size_);
+			limit = (limit == all_children) ? size_ : limit;
+			ATMA_ASSERT(limit <= RT::branching_factor);
+
+			return std::span<node_info_t<RT> const>(children_.data(), limit);
+		}
+
+		auto empty_children_range()
+		{
+			return std::span{children_.data() + size_, RT::branching_factor - size_};
 		}
 
 		auto clone_with(size_t idx, node_info_t<RT> const&, std::optional<node_info_t<RT>> const&) const -> edit_result_t<RT>;
@@ -306,7 +319,7 @@ namespace atma::_rope_
 		}
 
 	private:
-		std::array<node_info_t<RT>, branching_factor> children_;
+		std::array<node_info_t<RT>, RT::branching_factor> children_;
 		size_t size_ = 0;
 	};
 
@@ -349,26 +362,25 @@ namespace atma::_rope_
 		return std::get<node_leaf_t<RT>>(*x);
 	}
 
-
-	template <typename R, typename RT, typename... Args>
-	inline auto visit_result(R const default_result, node_ptr<RT> const& x, Args&&... args) -> R
-	{
-		if (!x)
-			return default_result;
-
-		return std::visit(visit_with{std::forward<Args>(args)...}, *x);
-	}
-
+	// visit node with functors
 	template <typename RT, typename... Args>
 	inline auto visit(node_ptr<RT> const& x, Args&&... args)
 	{
 		return std::visit(visit_with{std::forward<Args>(args)...}, *x);
 	}
 
+	// visit that takes a default value if the node-ptr is null
+	template <typename RT, typename... Args, typename R = std::common_type_t<std::invoke_result_t<Arg, node_info_t<RT>>...>>
+	inline auto visit(R default_result, node_ptr<RT> const& x, Args&&... args) -> R
+	{
+		return !x ? default_result :
+			std::visit(visit_with{std::forward<Args>(args)...}, *x);
+	}
+
 	template <typename RT>
 	inline auto length(node_ptr<RT> const& x) -> size_t
 	{
-		return visit_result(size_t(), x,
+		return visit(size_t(), x,
 			[](node_internal_t<RT> const& x) { return x.length(); },
 			[](node_leaf_t<RT> const& x) { return size_t(); });
 	}
@@ -408,14 +420,6 @@ namespace atma::_rope_
 				auto [l_info, r_info, has_seam] = edit_chunk_at_char(child, child_rel_idx, f);
 				auto result = x.clone_with(child_idx, l_info, r_info);
 
-				// if we can fix a torn seam here, do so
-				//if (has_seam && child_idx > 0)
-				//{
-				//	auto const& seamchild = x.child_at(child_idx - 1);
-				//	edit_chunk_at_char(seamchild, seamchild.characters, fix_seam<RT>);
-				//}
-				//// we can not, pass the seam up a level
-				//else
 				{
 					result.seam = has_seam;
 				}
@@ -472,6 +476,120 @@ namespace atma::_rope_
 				std::invoke(f, ri);
 			});
 	}
+
+	template <typename RT>
+	using node_info_stack_t = std::vector<node_info_t<RT>*>;
+
+	constexpr struct _insert_node_
+	{
+		template <typename RT>
+		auto append_node_ii_(node_info_t<RT>& result, node_info_stack_t<RT>& stack, node_info_t<RT>& dest, node_ptr<RT> ins) -> node_info_t<RT>
+		{
+			return dest;
+		}
+
+		template <typename RT>
+		auto append_node_(node_info_t<RT>& result, node_info_stack_t<RT>& stack, node_info_t<RT>& dest, node_ptr<RT> ins) -> node_info_t<RT>
+		{
+			//visit(dest.node,
+			//	[](node_internal_t<RT>& x)
+			//	{
+			//		auto const children = x.children_range();
+			//		auto const empty_children = x.empty_children_range();
+			//	
+			//		if (empty_children.empty())
+			//		{
+			//			// if there's nothing in the stack we need to 'split'
+			//		}
+			//		else
+			//		{
+			//			//visit(x.children_range().last().node,
+			//				//[](node_internal_t<RT>& x)
+			//		}
+			//	
+			//	},
+			//	[](node_leaf_t<RT>& x)
+			//	{
+			//		//return append_node_ii_(result, stack, 
+			//	});
+
+			return dest;
+		}
+
+		template <typename RT>
+		auto operator ()(node_info_stack_t<RT>& stack, node_ptr<RT> x) const -> node_info_t<RT>
+		{
+			ATMA_ASSERT(x->is_leaf());
+
+			return stack.pop();
+		}
+
+	} insert_node_;
+
+	constexpr struct _append_node_
+	{
+		template <typename RT>
+		using node_stack_t = std::vector<node_info_t<RT>*>;
+
+		template <typename RT>
+		auto append_node_ii_(node_info_t<RT>& result, node_stack_t<RT>& stack, node_info_t<RT>& dest, node_ptr<RT> ins) -> node_info_t<RT>
+		{
+			return dest;
+		}
+
+		template <typename RT>
+		auto append_node_(node_info_t<RT>& result, node_stack_t<RT>& stack, node_info_t<RT>& dest, node_ptr<RT> ins) -> node_info_t<RT>
+		{
+			//visit(dest.node,
+			//	[](node_internal_t<RT>& x)
+			//	{
+			//		auto const children = x.children_range();
+			//		auto const empty_children = x.empty_children_range();
+			//	
+			//		if (empty_children.empty())
+			//		{
+			//			// if there's nothing in the stack we need to 'split'
+			//		}
+			//		else
+			//		{
+			//			//visit(x.children_range().last().node,
+			//				//[](node_internal_t<RT>& x)
+			//		}
+			//	
+			//	},
+			//	[](node_leaf_t<RT>& x)
+			//	{
+			//		//return append_node_ii_(result, stack, 
+			//	});
+
+			return dest;
+		}
+
+		template <typename RT>
+		auto operator ()(node_info_t<RT>& dest, node_ptr<RT> x) const -> node_info_t<RT>
+		{
+			node_info_t<RT> result;
+
+			node_stack_t<RT> node_stack;
+			node_stack.reserve(8);
+			node_stack.push_back(&dest);
+			append_node_(result, node_stack, dest, x);
+
+			return result;
+		}
+
+	} append_node;
+
+
+	
+
+
+	//template <typename RT>
+	//auto build_rope(src_buf_t str) -> node_info_t<RT>
+	//{
+	//	
+	//}
+
 }
 
 // something
@@ -688,11 +806,32 @@ namespace atma::_rope_
 namespace atma::_rope_
 {
 	template <typename RT>
-	inline node_info_t<RT>::node_info_t(node_ptr<RT> const& node)
+	auto valid_children_count(node_ptr<RT> const& node) -> uint32_t
+	{
+		return visit(0u, node, 
+				[](node_internal_t<RT> const& x) { return (uint32_t)x.children_range().size(); },
+				[](node_leaf_t<RT> const& x) { return 0u; });
+	}
+
+	template <typename RT>
+	node_info_t<RT>::node_info_t(node_ptr<RT> const& node)
 		: text_info_t{calculate_text_info(node)}
 		, node(node)
 	{}
+
+	template <typename RT>
+	node_info_t<RT>::node_info_t(text_info_t const& info, uint32_t children, node_ptr<RT> const& node)
+		: text_info_t(info)
+		, children(children)
+		, node(node)
+	{}
+
+	template <typename RT>
+	node_info_t<RT>::node_info_t(text_info_t const& info, node_ptr<RT> const& node)
+		: node_info_t(info, valid_children_count(node), node)
+	{}
 }
+
 
 
 //
@@ -723,9 +862,6 @@ namespace atma::_rope_
 	{
 		size_t acc = 0;
 		(node_internal_construct_(acc, children_.data(), std::forward<Args>(args)), ...);
-
-		//for (size_t i = acc; i != RT::branching_factor; ++i)
-		//	children_[i].node = make_leaf_ptr<RT>();
 	}
 
 	template <typename RT>

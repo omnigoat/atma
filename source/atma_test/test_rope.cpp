@@ -31,7 +31,7 @@ SCENARIO("rope can be inserted" * doctest::skip())
 
 		THEN("")
 		{
-			rope.push_back("\nab", 2);
+			rope.push_back("ab", 2);
 			rope.push_back("cd", 2);
 			rope.insert(3, "xy", 2);
 			rope.insert(2, "fg", 2);
