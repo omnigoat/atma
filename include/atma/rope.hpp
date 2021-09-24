@@ -19,51 +19,42 @@
 import atma.types;
 import atma.memory;
 
+// when we are making modifications to a buffer, there are several
+// breakpoints which determine our behaviour. those breakpoints
+// are as follows:
+//
+//  - buf_edit_max_size
+//    ----------------------
+//    a maximum edit-size, which is the size of the buffer
+//    minus two bytes. this means if we're inserting a seam,
+//    we are guaranteed to be able to fit CRLF into the previous
+//    logical leaf-node. exceeding this requires splitting.
+//
+//  - buf_edit_split_size
+//    ------------------------
+//    a size that when exceeded causes a split anyhow, which is
+//    used to prevent large memory allocations when many small
+//    edits are made in a row. edits made that result in a size
+//    smaller than this breakpoint result in the whole buffer
+//    being reallocated and updated
+//
+//  - buf_edit_split_drift_size
+//    ------------------------------
+//    if we're editing (in the real-world case, inserting) a very
+//    short string into roughly the middle of the buffer, we'll
+//    allow the split point to drift a little so that we split
+//    after the inserted text. we're predicting that more insert-
+//    operations are going to happen afterwards (like someone
+//    typing).
+//
 
+
+
+//
+// forwards
+//
 namespace atma::_rope_
 {
-	//constexpr size_t const branching_factor = 4;
-	//constexpr size_t const buf_size = 512;
-	//constexpr size_t const buf_min_size = buf_size / 3;
-
-	// how many children an internal node has
-	constexpr size_t const branching_factor = 4;
-
-	// rope-buffer size
-	constexpr size_t const buf_size = 9;
-
-	// when we are making modifications to a buffer, there are several
-	// breakpoints which determine our behaviour. those breakpoints
-	// are as follows:
-	//
-	//  - buf_edit_max_size
-	//    ----------------------
-	//    a maximum edit-size, which is the size of the buffer
-	//    minus two bytes. this means if we're inserting a seam,
-	//    we are guaranteed to be able to fit CRLF into the previous
-	//    logical leaf-node. exceeding this requires splitting.
-	//
-	//  - buf_edit_split_size
-	//    ------------------------
-	//    a size that when exceeded causes a split anyhow, which is
-	//    used to prevent large memory allocations when many small
-	//    edits are made in a row. edits made that result in a size
-	//    smaller than this breakpoint result in the whole buffer
-	//    being reallocated and updated
-	//
-	//  - buf_edit_split_drift_size
-	//    ------------------------------
-	//    if we're editing (in the real-world case, inserting) a very
-	//    short string into roughly the middle of the buffer, we'll
-	//    allow the split point to drift a little so that we split
-	//    after the inserted text. we're predicting that more insert-
-	//    operations are going to happen afterwards (like someone
-	//    typing).
-	//
-	//constexpr size_t buf_edit_max_size = buf_size - 2;
-	//constexpr size_t buf_edit_split_size = (buf_size / 2) - (buf_size / 32);
-	//constexpr size_t buf_edit_split_drift_size = (buf_size / 32);
-
 	struct text_info_t;
 	template <typename> struct node_info_t;
 	template <typename RT> using maybe_node_info_t = std::optional<node_info_t<RT>>;
@@ -74,27 +65,28 @@ namespace atma::_rope_
 
 	template <typename RT> using node_ptr = intrusive_ptr<node_t<RT>>;
 
+	using dest_buf_t = dest_bounded_memxfer_t<char>;
+	using src_buf_t = src_bounded_memxfer_t<char const>;
+
 	namespace linebreaks
 	{
 		constexpr char CR = 0x0d;
 		constexpr char LF = 0x0a;
 	}
-
-	using dest_buf_t = dest_bounded_memxfer_t<char>;
-	using src_buf_t = src_bounded_memxfer_t<char const>;
 }
 
 
+//
+// traits
+//
 namespace atma
 {
 	struct rope_default_traits
 	{
 		// how many children an internal node has
 		constexpr static size_t const branching_factor = 4;
-
 		// rope-buffer size
 		constexpr static size_t const buf_size = 512;
-
 
 		constexpr static size_t buf_edit_max_size = buf_size - 2;
 		constexpr static size_t buf_edit_split_size = (buf_size / 2) - (buf_size / 32);
@@ -105,10 +97,8 @@ namespace atma
 	{
 		// how many children an internal node has
 		constexpr static size_t const branching_factor = 4;
-
 		// rope-buffer size
 		constexpr static size_t const buf_size = 9;
-
 
 		constexpr static size_t buf_edit_max_size = buf_size - 2;
 		constexpr static size_t buf_edit_split_size = (buf_size / 2) - (buf_size / 32);
@@ -122,14 +112,14 @@ namespace atma
 //
 namespace atma::_rope_
 {
-	template <size_t Extent>
+	template <size_t ExtentX>
 	struct charbuf_t
 	{
 		using value_type = char;
 		using allocator_type = std::allocator<char>;
 		using tag_type = dest_memory_tag_t;
 
-		//static constexpr size_t Extent = RT::buf_size;
+		static constexpr size_t Extent = ExtentX;
 
 		bool empty() const { return size_ == 0; }
 		size_t size() const { return size_; }
@@ -171,6 +161,7 @@ namespace atma::_rope_
 	};
 }
 
+
 //
 // text_info_t
 //
@@ -210,6 +201,7 @@ namespace atma::_rope_
 	}
 }
 
+
 //
 // node_info_t
 //
@@ -224,11 +216,16 @@ namespace atma::_rope_
 		node_info_t(text_info_t const& info, node_ptr<RT> const&);
 
 		uint32_t children = 0;
+
+		// weight = total number of leaf-nodes
+		//uint16_t weight = 0;
+
 		node_ptr<RT> node;
 	};
 
-	static_assert(sizeof(node_info_t<rope_default_traits>) == sizeof(node_ptr<rope_default_traits>) + sizeof(uint32_t) * 4,
-		"we have unnecessary padding in our info structures");
+	// the size of node_info_t should be the minimal size
+	static_assert(sizeof(node_info_t<rope_default_traits>) == sizeof(node_ptr<rope_default_traits>) + sizeof(uint32_t) + sizeof(text_info_t),
+		"we have an unexpected size for node_info_t");
 
 	template <typename RT>
 	inline auto operator + (node_info_t<RT> const& lhs, text_info_t const& rhs) -> node_info_t<RT>
@@ -237,8 +234,9 @@ namespace atma::_rope_
 	}
 }
 
+
 //
-// edit_result_t<RT>
+// edit_result_t
 //
 namespace atma::_rope_
 {
@@ -250,10 +248,6 @@ namespace atma::_rope_
 		bool seam = false;
 	};
 }
-
-
-
-
 
 
 //
@@ -275,12 +269,18 @@ namespace atma::_rope_
 		
 		static constexpr size_t all_children = ~size_t();
 
-		auto children_range(size_t limit = all_children)
+		auto insert(size_t idx, node_info_t<RT> const& info)
 		{
-			limit = (limit == all_children) ? size_ : limit;
-			ATMA_ASSERT(limit <= RT::branching_factor);
+			ATMA_ASSERT(size_ != RT::branching_factor);
+			ATMA_ASSERT(idx <= size_);
 
-			return std::span<node_info_t<RT>>(children_.data(), limit);
+			for (int i = RT::branching_factor; i--> (idx + 1); )
+			{
+				children_[i] = children_[i - 1];
+			}
+
+			children_[idx] = info;
+			++size_;
 		}
 
 		auto children_range(size_t limit = all_children) const
@@ -291,10 +291,12 @@ namespace atma::_rope_
 			return std::span<node_info_t<RT> const>(children_.data(), limit);
 		}
 
-		auto empty_children_range()
+		auto empty_children_range() const
 		{
-			return std::span{children_.data() + size_, RT::branching_factor - size_};
+			return std::span<node_info_t<RT> const>{children_.data() + size_, RT::branching_factor - size_};
 		}
+
+		auto children_size() const { return size_; }
 
 		auto clone_with(size_t idx, node_info_t<RT> const&, std::optional<node_info_t<RT>> const&) const -> edit_result_t<RT>;
 
@@ -340,6 +342,10 @@ namespace atma::_rope_
 	};
 }
 
+
+//
+// node_t
+//
 namespace atma::_rope_
 {
 	template <typename RT>
@@ -476,46 +482,39 @@ namespace atma::_rope_
 	constexpr struct _insert_node_
 	{
 		template <typename RT>
-		auto append_node_ii_(node_info_t<RT>& result, node_info_stack_t<RT>& stack, node_info_t<RT>& dest, node_ptr<RT> ins) -> node_info_t<RT>
+		auto operator ()(node_info_stack_t<RT>& stack, node_ptr<RT> dest, size_t idx, node_ptr<RT> ins) const -> node_info_t<RT>
 		{
-			return dest;
+			node_info_t<RT> ins_info{ins};
+			return this->operator ()(stack, dest, idx, ins_info);
 		}
 
 		template <typename RT>
-		auto append_node_(node_info_t<RT>& result, node_info_stack_t<RT>& stack, node_info_t<RT>& dest, node_ptr<RT> ins) -> node_info_t<RT>
+		auto operator ()(node_info_stack_t<RT>& stack, node_ptr<RT> dest, size_t idx, node_info_t<RT> ins_info) const -> node_info_t<RT>
 		{
-			//visit(dest.node,
-			//	[](node_internal_t<RT>& x)
-			//	{
-			//		auto const children = x.children_range();
-			//		auto const empty_children = x.empty_children_range();
-			//	
-			//		if (empty_children.empty())
-			//		{
-			//			// if there's nothing in the stack we need to 'split'
-			//		}
-			//		else
-			//		{
-			//			//visit(x.children_range().last().node,
-			//				//[](node_internal_t<RT>& x)
-			//		}
-			//	
-			//	},
-			//	[](node_leaf_t<RT>& x)
-			//	{
-			//		//return append_node_ii_(result, stack, 
-			//	});
+			ATMA_ASSERT(!stack.empty());
+			ATMA_ASSERT(dest->is_internal());
+			//ATMA_ASSERT(ins->is_leaf());
 
-			return dest;
-		}
+			auto& desti = dest->known_internal();
 
-		template <typename RT>
-		auto operator ()(node_info_stack_t<RT>& stack, node_ptr<RT> x) const -> node_info_t<RT>
-		{
-			ATMA_ASSERT(x->is_leaf());
+			auto* info = stack.top();
+			ATMA_ASSERT(info->node == dest);
+
+			// no space to insert this node, we must split
+			if (desti.empty_range().empty())
+			{
+				
+			}
 
 			return stack.pop();
 		}
+
+	private:
+		//template <typename RT>
+		//auto insert_(node_info_t<RT>& result, node_info_stack_t<RT>& stack, node_info_t<RT>& dest, node_ptr<RT> ins) const -> node_info_t<RT>
+		//{
+		//	return dest;
+		//}
 
 	} insert_node_;
 
@@ -722,7 +721,8 @@ namespace atma::_rope_
 	}
 }
 
-// node_t implementation
+
+
 namespace atma::_rope_
 {
 	template <typename RT>
@@ -733,7 +733,7 @@ namespace atma::_rope_
 		auto const new_buf_size = buf.size() + 1;
 
 		// by definition, we should have enough space in any leaf-node to fix a seam
-		ATMA_ASSERT(new_buf_size <= _rope_::buf_size);
+		ATMA_ASSERT(new_buf_size <= RT::buf_size);
 
 		// append if possible
 		if (leaf_info.bytes == buf.size())
@@ -809,6 +809,7 @@ namespace atma::_rope_
 	template <typename RT>
 	node_info_t<RT>::node_info_t(node_ptr<RT> const& node)
 		: text_info_t{calculate_text_info(node)}
+		, children(valid_children_count(node))
 		, node(node)
 	{}
 
@@ -821,7 +822,9 @@ namespace atma::_rope_
 
 	template <typename RT>
 	node_info_t<RT>::node_info_t(text_info_t const& info, node_ptr<RT> const& node)
-		: node_info_t(info, valid_children_count(node), node)
+		: text_info_t(info)
+		, children(valid_children_count(node))
+		, node(node)
 	{}
 }
 
@@ -834,6 +837,16 @@ namespace atma::_rope_
 {
 	template <typename RT, typename... Args>
 	inline auto node_internal_construct_(size_t& acc_count, node_info_t<RT>* dest, src_bounded_memxfer_t<node_info_t<RT> const> x, Args&&... args) -> void
+	{
+		atma::memory_copy_construct(
+			xfer_dest(dest + acc_count),
+			x);
+
+		acc_count += x.size();
+	}
+
+	template <typename RT, typename... Args>
+	inline auto node_internal_construct_(size_t& acc_count, node_info_t<RT>* dest, src_bounded_memxfer_t<node_info_t<RT>> x, Args&&... args) -> void
 	{
 		atma::memory_copy_construct(
 			xfer_dest(dest + acc_count),
@@ -890,7 +903,7 @@ namespace atma::_rope_
 				auto sn = make_internal_ptr<RT>(
 					xfer_src(children_, idx),
 					l_info, r_info,
-					xfer_src(children_, idx + 2, branching_factor - 2));
+					xfer_src(children_, idx + 2, RT::branching_factor - 2));
 
 				return edit_result_t<RT>{
 					node_info_t<RT>{l_info + r_info, sn},
@@ -899,15 +912,15 @@ namespace atma::_rope_
 			else
 			{
 				// something something split
-				auto left_size = branching_factor / 2 + 1;
-				auto right_size = branching_factor / 2;
+				auto left_size = RT::branching_factor / 2 + 1;
+				auto right_size = RT::branching_factor / 2;
 
 				node_ptr<RT> ln, rn;
 
 				if (idx < left_size)
 				{
 					ln = make_internal_ptr<RT>(xfer_src(children_, idx), l_info, r_info);
-					rn = make_internal_ptr<RT>(xfer_src(children_, idx, branching_factor - idx - 1));
+					rn = make_internal_ptr<RT>(xfer_src(children_, idx, RT::branching_factor - idx - 1));
 				}
 				if (idx + 1 < left_size)
 				{
@@ -930,7 +943,7 @@ namespace atma::_rope_
 			auto s = make_internal_ptr<RT>(
 				xfer_src(children_, idx),
 				l_info,
-				xfer_src(children_, idx + 1, branching_factor - idx - 1));
+				xfer_src(children_, idx + 1, RT::branching_factor - idx - 1));
 
 			return edit_result_t<RT>{node_info_t<RT>{l_info, s}, maybe_node_info_t<RT>()};
 		}
@@ -970,7 +983,7 @@ namespace atma::_rope_
 	inline node_leaf_t<RT>::node_leaf_t(Args&&... args)
 	{
 #if ATMA_ROPE_DEBUG_BUFFER
-		atma::memory_value_construct(atma::xfer_dest(buf), buf_size);
+		atma::memory_value_construct(atma::xfer_dest(buf), RT::buf_size);
 #endif
 
 		(node_leaf_construct_(buf, std::forward<Args>(args)), ...);
@@ -1027,8 +1040,240 @@ namespace atma::_rope_
 
 
 
+// algorithms
+namespace atma::_rope_
+{
+	template <typename RT>
+	struct insert_result_t
+	{
+		node_info_t<RT> lhs;
+		maybe_node_info_t<RT> maybe_rhs;
+	};
+
+#if 0
+	template <typename RT>
+	inline auto replace_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& repl_info) -> insert_result_t<RT>
+	{
+		ATMA_ASSERT(dest.node->is_internal());
+
+		auto& dest_node = dest.node->known_internal();
+		ATMA_ASSERT(idx < dest_node.children_size(), "you can't replace at this index");
+
+		// we can non-destructively append the node
+		if (idx == dest_node.children_size())
+		{
+			dest_node.insert(idx, repl_info);
+
+			auto const result = node_info_t<RT>{dest, dest.children + 1, dest.node};
+			return {result};
+		}
+		// we still have space for the node, but we'll still need
+		// to replicate this node
+		else if (!dest_node.empty_children_range().empty())
+		{
+			auto result_node = make_internal_ptr<RT>(
+				xfer_src(dest_node.children_range(idx)),
+				repl_info,
+				xfer_src(dest_node.children_range().last(dest_node.children_size() - idx)));
+
+			node_info_t<RT> result{result_node};
+
+			return {result};
+		}
+		// we don't have any space! we must split
+		else
+		{
+			// something something split
+			constexpr auto left_size = RT::branching_factor / 2 + 1;
+			constexpr auto right_size = RT::branching_factor / 2;
+
+			node_ptr<RT> ln, rn;
+
+			auto children = dest_node.children_range();
+
+			if (idx < left_size)
+			{
+				ln = make_internal_ptr<RT>(
+					xfer_src(children, idx),
+					repl_info,
+					xfer_src(children, idx, left_size - idx));
+
+				rn = make_internal_ptr<RT>(
+					xfer_src(children, left_size, right_size));
+			}
+			else
+			{
+				ln = make_internal_ptr<RT>(
+					xfer_src(children, idx, left_size));
+
+				rn = make_internal_ptr<RT>(
+					xfer_src(children, left_size, idx - left_size),
+					repl_info,
+					xfer_src(children, idx, right_size - (idx - left_size)));
+			}
+
+			return insert_result_t<RT>{node_info_t<RT>{ln}, node_info_t<RT>{rn}};
+		}
+	}
+#endif
+
+	template <typename RT>
+	inline auto replace_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& repl_info) -> edit_result_t<RT>
+	{
+		ATMA_ASSERT(dest.node->is_internal());
+
+		auto& dest_node = dest.node->known_internal();
+		ATMA_ASSERT(idx < dest_node.children_size(), "you can't replace at this index");
+
+		auto children = dest_node.children_range();
+
+		auto result_node = make_internal_ptr<RT>(
+			xfer_src(children, idx),
+			repl_info,
+			xfer_src(children, idx + 1, children.size() - idx - 1));
+
+		auto result = node_info_t<RT>{dest, result_node};
+
+		return edit_result_t<RT>{result};
+	}
+
+	template <typename RT>
+	inline auto insert_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& ins_info) -> insert_result_t<RT>
+	{
+		ATMA_ASSERT(dest.node->is_internal());
+
+		auto& dest_node = dest.node->known_internal();
+		ATMA_ASSERT(idx <= dest_node.children_size(), "you can't insert past the end");
+
+		// we can non-destructively append the node
+		if (idx == dest_node.children_size())
+		{
+			dest_node.insert(idx, ins_info);
+			auto const result = node_info_t<RT>{(dest + ins_info), dest.children + 1, dest.node};
+			return {result};
+		}
+		// we still have space for the node, but we'll still need
+		// to replicate this node
+		else if (!dest_node.empty_children_range().empty())
+		{
+			auto result_node = make_internal_ptr<RT>(
+				xfer_src(dest_node.children_range(idx)),
+				ins_info,
+				xfer_src(dest_node.children_range().last(dest_node.children_size() - idx)));
+
+			node_info_t<RT> result{result_node};
+
+			return {result};
+		}
+
+		// fallthrough
+		return {dest};
+	}
 
 
+
+	//
+	// a very common operation involves a child node needing to be replaced, with a possible
+	// additional sibling-node requiring insertion.
+	//
+	template <typename RT>
+	inline auto replace_and_insert_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& repl_info, maybe_node_info_t<RT> const& ins_info) -> insert_result_t<RT>
+	{
+		ATMA_ASSERT(dest.node->is_internal());
+
+		auto& dest_node = dest.node->known_internal();
+		ATMA_ASSERT(idx <= dest_node.children_size(), "you can't insert past the end");
+
+		// we can non-destructively append the node
+		if (idx == dest_node.children_size())
+		{
+			auto result = dest;
+			++result.children;
+
+			//dest_node.empty_children_range().front() = ins_info;
+			dest_node.insert(idx, repl_info);
+
+			return {result};
+		}
+		// we still have space for the node, but we'll still need
+		// to replicate this node
+		else if (!dest_node.empty_children_range().empty())
+		{
+			auto result_node = make_internal_ptr<RT>(
+				xfer_src(dest_node.children_range(idx)),
+				repl_info,
+				xfer_src(dest_node.children_range().last(dest_node.children_size() - idx)));
+		
+			node_info_t<RT> result{result_node};
+
+			return {result};
+		}
+
+		// if we have space in our node's array, just insert
+		//if (auto empty_children = dest_node.empty_children_range(); !empty_children.empty())
+		//{
+		//	
+		//}
+		return {dest};
+
+#if 0
+		if (maybe_r_info.has_value())
+		{
+			auto const& r_info = *maybe_r_info;
+
+			if (this->replaceable(idx + 1))
+			{
+				auto sn = make_internal_ptr<RT>(
+					xfer_src(children_, idx),
+					l_info, r_info,
+					xfer_src(children_, idx + 2, RT::branching_factor - 2));
+
+				return edit_result_t<RT>{
+					node_info_t<RT>{l_info + r_info, sn},
+						maybe_node_info_t<RT>{}};
+			}
+			else
+			{
+				// something something split
+				auto left_size = RT::branching_factor / 2 + 1;
+				auto right_size = RT::branching_factor / 2;
+
+				node_ptr<RT> ln, rn;
+
+				if (idx < left_size)
+				{
+					ln = make_internal_ptr<RT>(xfer_src(children_, idx), l_info, r_info);
+					rn = make_internal_ptr<RT>(xfer_src(children_, idx, RT::branching_factor - idx - 1));
+				}
+				if (idx + 1 < left_size)
+				{
+					ln = make_internal_ptr<RT>(xfer_src(children_, idx), l_info);
+					rn = make_internal_ptr<RT>(r_info, xfer_src(children_, idx + 1, right_size));
+				}
+				else
+				{
+					ln = make_internal_ptr<RT>(xfer_src(children_, left_size));
+					rn = make_internal_ptr<RT>(l_info, r_info);
+				}
+
+				return edit_result_t<RT>{
+					node_info_t<RT>{ln},
+						node_info_t<RT>{rn}};
+			}
+		}
+		else
+		{
+			auto s = make_internal_ptr<RT>(
+				xfer_src(children_, idx),
+				l_info,
+				xfer_src(children_, idx + 1, RT::branching_factor - idx - 1));
+
+			return edit_result_t<RT>{node_info_t<RT>{l_info, s}, maybe_node_info_t<RT>()};
+		}
+#endif
+	}
+
+}
 
 
 
@@ -1137,6 +1382,8 @@ namespace atma
 		{
 			_rope_::for_all_text(std::forward<F>(f), root_);
 		}
+
+		decltype(auto) root() { return root_; }
 
 	private:
 		_rope_::node_info_t<RopeTraits> root_;
