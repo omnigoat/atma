@@ -61,11 +61,117 @@
 		</Expand>
 	</Type>
 
+	<!-- ebo_pair -->
+	<!--<Type Name="atma::detail::ebo_pair_impl&lt;*,*,*,1,0&gt;">
+		<DisplayString>ebo_pair_t&lt;{"$T1",sb}, {"$T2",sb}&gt;</DisplayString>
+		<Expand>
+			<Item Name="first">($T1&amp;)*this,nd</Item>
+			<Item Name="second">second_,nd</Item>
+		</Expand>
+	</Type>
+
+	<Type Name="atma::detail::ebo_pair_impl&lt;*,*,*,0,1&gt;">
+		<DisplayString>ebo_pair_t&lt;{"$T1",sb}, {"$T2",sb}&gt;</DisplayString>
+		<Expand>
+			<Item Name="first">first_</Item>
+			<Item Name="second">($T2&amp;)*this,nd</Item>
+		</Expand>
+	</Type>-->
+
+	<!-- ebo_pair -->
+	<Type Name="atma::ebo_pair_t&lt;*&gt;">
+		<DisplayString>ebo_pair_t&lt;{"$T1",sb}, {"$T2",sb}&gt;</DisplayString>
+		<Expand>
+			<Item Optional="true" Name="first">first_</Item>
+			<Item Optional="true" Name="first">static_cast&lt;$T1&amp;&gt;(*this),nd</Item>
+			<Item Optional="true" Name="second">second_</Item>
+			<Item Optional="true" Name="second">static_cast&lt;$T2&amp;&gt;(*this),nd</Item>
+		</Expand>
+	</Type>
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	<!-- memory -->
+
+	<!-- memxfer_t -->
+	<Type Name="atma::memxfer_t&lt;atma::dest_memory_tag_t, *&gt;">
+		<DisplayString>dest_memxfer_t&lt;{"$T1", sb}&gt;</DisplayString>
+		<Expand>
+			<Item Optional="true" Name="allocator">alloc_and_ptr_.first_</Item>
+			<Item Optional="true" Name="allocator">static_cast&lt;$T2&amp;&gt;(alloc_and_ptr_)</Item>
+			<Item Optional="true" Name="data">alloc_and_ptr_.second_</Item>
+			<Item Optional="true" Name="data">static_cast&lt;$T1&amp;&gt;(alloc_and_ptr_)</Item>
+		</Expand>
+	</Type>
+
+	<Type Name="atma::memxfer_t&lt;atma::src_memory_tag_t, *&gt;">
+		<DisplayString>src_memxfer_t&lt;{"$T1", sb}&gt;</DisplayString>
+		<Expand>
+			<Item Optional="true" Name="allocator">alloc_and_ptr_.first_</Item>
+			<Item Optional="true" Name="allocator">static_cast&lt;$T2&amp;&gt;(alloc_and_ptr_)</Item>
+			<Item Optional="true" Name="data">alloc_and_ptr_.second_</Item>
+			<Item Optional="true" Name="data">static_cast&lt;$T1&amp;&gt;(alloc_and_ptr_)</Item>
+		</Expand>
+	</Type>
+
+	<Type Name="atma::detail::bounded_memxfer_impl_t&lt;*,*,-1,*&gt;">
+		<DisplayString>src_bounded_memxfer_t&lt;{"$T1", sb}&gt;</DisplayString>
+		<Expand>
+			<!-- I can't understand the spaces for templating here... -->
+			<ExpandedItem Optional="true">(atma::memxfer_t&lt;$T1, $T2,$T3 &gt;*)this</ExpandedItem>
+			<ExpandedItem Optional="true">(atma::memxfer_t&lt;$T1,$T2 ,$T3 &gt;*)this</ExpandedItem>
+			
+			<Item Name="size">size_</Item>
+			
+			<Synthetic Name="[elements]">
+				<DisplayString>{{ size={size_} }}</DisplayString>
+				<Expand>
+					<ArrayItems>
+						<Size>size_</Size>
+						<ValuePointer>alloc_and_ptr_.second_</ValuePointer>
+					</ArrayItems>
+				</Expand>
+			</Synthetic>
+		</Expand>
+	</Type>
+	
+	<!-- bounded_memxfer_t -->
+	<Type Name="atma::bounded_memxfer_t&lt;atma::dest_memory_tag_t,*&gt;">
+		<DisplayString>dest_bounded_memxfer_t&lt;{"$T1", sb}&gt;</DisplayString>
+		<Expand>
+			<!-- I can't understand the spaces for templating here... -->
+			<ExpandedItem >(atma::detail::bounded_memxfer_impl_t&lt;atma::dest_memory_tag_t,$T1,$T2,$T3 &gt;*)this</ExpandedItem>
+		</Expand>
+	</Type>
+
+	<Type Name="atma::bounded_memxfer_t&lt;atma::src_memory_tag_t,*&gt;">
+		<DisplayString>src_bounded_memxfer_t&lt;{"$T1", sb}&gt;</DisplayString>
+		<Expand>
+			<!-- I can't understand the spaces for templating here... -->
+			<ExpandedItem>(atma::detail::bounded_memxfer_impl_t&lt;atma::src_memory_tag_t,$T1 ,$T2,$T3&gt;*)this</ExpandedItem>
+		</Expand>
+	</Type>
+
+
+	
+	
+	
+	
+
+
 	<!-- rope_node_t -->
 	<Type Name="std::variant&lt;atma::_rope_::node_internal_t&lt;*&gt;, atma::_rope_::node_leaf_t&lt;*&gt;&gt;">
 		<DisplayString Condition="_Which==0">{{ internal-node }}</DisplayString>
 		<DisplayString Condition="_Which==1">{{ leaf-node={((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)_Tail).buf.chars_,[((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)_Tail).buf.size_]s8} }}</DisplayString>
-
+		<DisplayString>{{ empty }}</DisplayString>
+		
 		<Expand>
 			<!-- internal-node children -->
 			<ArrayItems Condition="_Which==0">
@@ -90,9 +196,9 @@
 	<!-- node_info_t -->
 	<Type Name="atma::_rope_::node_info_t&lt;*&gt;">
 		<!-- internal-node -->
-		<DisplayString Condition="node._Ptr &amp;&amp; node._Ptr->_Which==0">internal-node {{ chars={characters}, bytes={bytes} }}</DisplayString>
+		<DisplayString Condition="node.px &amp;&amp; node.px->variant_._Which==0">internal-node {{ chars={characters}, bytes={bytes} }}</DisplayString>
 		<!-- leaf-node -->
-		<DisplayString Condition="node._Ptr &amp;&amp; node._Ptr->_Which==1">leaf-node {{ chars={characters}, bytes={bytes}, {((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)node._Ptr->_Tail).buf.chars_,[characters]s8} }}</DisplayString>
+		<DisplayString Condition="node.px &amp;&amp; node.px->variant_._Which==1">leaf-node {{ chars={characters}, bytes={bytes}, {((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)node.px->variant_._Tail).buf.chars_,[characters]s8} }}</DisplayString>
 		<!-- invalid -->
 		<DisplayString>{{ empty }}</DisplayString>
 		
@@ -100,13 +206,14 @@
 			<Item Name="bytes">bytes</Item>
 			<Item Name="characters">characters</Item>
 			<Item Name="line_breaks">line_breaks</Item>
+			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==0" Name="children">children</Item>
 			<Item Name="node">node</Item>
 
 			<!-- internal-node members -->
-			<Item Condition="node._Ptr &amp;&amp; node._Ptr->_Which==0" Name="internal-node [children]">((atma::_rope_::node_internal_t&lt;$T1&gt;&amp;)node._Ptr->_Head).children_</Item>
+			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==0" Name="internal-node [children]">((atma::_rope_::node_internal_t&lt;$T1&gt;&amp;)node.px->variant_._Head).children_</Item>
 
 			<!-- leaf-node members -->
-			<Item Condition="node._Ptr &amp;&amp; node._Ptr->_Which==1" Name="leaf-node [text]">((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)node._Ptr->_Tail).buf.chars_,[characters]s8</Item>
+			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==1" Name="leaf-node [text]">((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)node.px->variant_._Tail).buf.chars_,[characters]s8</Item>
 		</Expand>
 	</Type>
 
