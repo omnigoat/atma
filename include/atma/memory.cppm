@@ -888,7 +888,7 @@ namespace atma::detail
 		template <sized_and_contiguous_range R>
 		auto operator ()(R&& range) -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<R>>
 		{
-			return {get_allocator(range), std::addressof(*std::begin(range)), std::size(range)};
+			return {get_allocator(range), std::ranges::data(range), std::ranges::size(range)};
 		};
 	};
 

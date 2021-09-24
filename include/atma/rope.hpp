@@ -802,7 +802,10 @@ namespace atma::_rope_
 	auto valid_children_count(node_ptr<RT> const& node) -> uint32_t
 	{
 		return !node ? 0 : node->visit(
-				[](node_internal_t<RT> const& x) { return (uint32_t)x.children_range().size(); },
+				[](node_internal_t<RT> const& x)
+				{
+					return (uint32_t)x.children_range().size();
+				},
 				[](node_leaf_t<RT> const& x) { return 0u; });
 	}
 
@@ -983,7 +986,7 @@ namespace atma::_rope_
 	inline node_leaf_t<RT>::node_leaf_t(Args&&... args)
 	{
 #if ATMA_ROPE_DEBUG_BUFFER
-		atma::memory_value_construct(atma::xfer_dest(buf), RT::buf_size);
+		atma::memory_value_construct(atma::xfer_dest(buf, RT::buf_size));
 #endif
 
 		(node_leaf_construct_(buf, std::forward<Args>(args)), ...);
@@ -1165,9 +1168,40 @@ namespace atma::_rope_
 
 			return {result};
 		}
+		// we must split our node into two
+		else
+		{
+			// something something split
+			constexpr auto left_size = RT::branching_factor / 2 + 1;
+			constexpr auto right_size = RT::branching_factor / 2;
 
-		// fallthrough
-		return {dest};
+			node_ptr<RT> ln, rn;
+
+			auto children = dest_node.children_range();
+
+			if (idx < left_size)
+			{
+				ln = make_internal_ptr<RT>(
+					xfer_src(children, idx),
+					ins_info,
+					xfer_src(children, idx, left_size - idx - 1));
+
+				rn = make_internal_ptr<RT>(
+					xfer_src(children.last(right_size)));
+			}
+			else
+			{
+				ln = make_internal_ptr<RT>(
+					xfer_src(children, idx, left_size));
+
+				rn = make_internal_ptr<RT>(
+					xfer_src(children, left_size, idx - left_size),
+					ins_info,
+					xfer_src(children, idx, right_size - (idx - left_size)));
+			}
+
+			return insert_result_t<RT>{node_info_t<RT>{ln}, node_info_t<RT>{rn}};
+		}
 	}
 
 
