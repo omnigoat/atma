@@ -32,8 +32,24 @@ SCENARIO("rope can be constructed" * doctest::skip())
 	auto B = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("B", 1));
 	atma::_rope_::node_info_t<T> B_info{B};
 
+	auto C = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("C", 1));
+	atma::_rope_::node_info_t<T> C_info{C};
+
+	auto D = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("D", 1));
+	atma::_rope_::node_info_t<T> D_info{D};
+
+	auto E = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("E", 1));
+	atma::_rope_::node_info_t<T> E_info{E};
+
+	auto F = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("F", 1));
+	atma::_rope_::node_info_t<T> F_info{F};
+
 	auto postAresult = atma::_rope_::insert_<T>(internal_node, 0, A_info);
-	auto postBresult = atma::_rope_::replace_<T>(internal_node, 0, B_info);
+	auto postBresult = atma::_rope_::insert_<T>(internal_node, 1, B_info);
+	auto postCresult = atma::_rope_::insert_<T>(internal_node, 2, C_info);
+	auto postDresult = atma::_rope_::insert_<T>(internal_node, 3, D_info);
+	auto postEresult = atma::_rope_::insert_<T>(internal_node, 2, E_info);
+	//auto postFresult = atma::_rope_::insert_<T>(internal_node, 0, F_info);
 }
 
 SCENARIO("rope can be inserted" * doctest::skip())
