@@ -869,8 +869,7 @@ namespace atma::_rope_
 	template <typename... Args>
 	inline node_internal_t<RT>::node_internal_t(Args&&... args)
 	{
-		size_t acc = 0;
-		(node_internal_construct_(acc, children_.data(), std::forward<Args>(args)), ...);
+		(node_internal_construct_(size_, children_.data(), std::forward<Args>(args)), ...);
 	}
 
 	template <typename RT>
@@ -1121,7 +1120,7 @@ namespace atma::_rope_
 #endif
 
 	template <typename RT>
-	inline auto replace_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& repl_info) -> edit_result_t<RT>
+	inline auto replace_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& repl_info) -> insert_result_t<RT>
 	{
 		ATMA_ASSERT(dest.node->is_internal());
 
@@ -1137,8 +1136,45 @@ namespace atma::_rope_
 
 		auto result = node_info_t<RT>{dest, result_node};
 
-		return edit_result_t<RT>{result};
+		return insert_result_t<RT>{result};
 	}
+
+#if 0
+	template <typename RT>
+	inline auto split_(auto const& children, size_t idx) -> insert_result_t<RT>
+	{
+		AMTA_ASSERT(children.size() > RT::branching_factor / 2);
+
+		constexpr auto left_size = RT::branching_factor / 2 + 1;
+		constexpr auto right_size = RT::branching_factor / 2;
+
+		node_ptr<RT> ln, rn;
+
+		if (idx < left_size)
+		{
+			ln = make_internal_ptr<RT>(
+				xfer_src(children, idx),
+				ins_info,
+				xfer_src(children, idx, left_size - idx - 1));
+
+			rn = make_internal_ptr<RT>(
+				xfer_src(children.last(right_size)));
+		}
+		else
+		{
+			ln = make_internal_ptr<RT>(
+				xfer_src(children, idx, left_size));
+
+			rn = make_internal_ptr<RT>(
+				xfer_src(children, left_size, idx - left_size),
+				ins_info,
+				xfer_src(children, idx, right_size - (idx - left_size)));
+		}
+
+		return insert_result_t<RT>{node_info_t<RT>{ln}, node_info_t<RT>{rn}};
+	}
+#endif
+
 
 	template <typename RT>
 	inline auto insert_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& ins_info) -> insert_result_t<RT>
@@ -1146,29 +1182,45 @@ namespace atma::_rope_
 		ATMA_ASSERT(dest.node->is_internal());
 
 		auto& dest_node = dest.node->known_internal();
-		ATMA_ASSERT(idx <= dest_node.children_size(), "you can't insert past the end");
+		ATMA_ASSERT(idx <= dest.children, "you can't insert past the end of the dest-info child count");
 
-		// we can non-destructively append the node
-		if (idx == dest_node.children_size())
+		auto children = dest_node.children_range();
+		bool insertion_is_at_back = idx == children.size();
+		bool space_for_additional_child = children.size() < RT::branching_factor;
+
+		//
+		// the simplest case is where:
+		//   a) the insertion index is at the back of children (we're appending)
+		//   b) there's space left ^_^
+		//
+		// in this case we can simply append to the children of the node, as the
+		// destination-info won't be updated and still address the original number
+		// of children
+		//
+		if (insertion_is_at_back && space_for_additional_child)
 		{
 			dest_node.insert(idx, ins_info);
-			auto const result = node_info_t<RT>{(dest + ins_info), dest.children + 1, dest.node};
+			node_info_t<RT> result{(dest + ins_info), dest.children + 1, dest.node};
 			return {result};
 		}
-		// we still have space for the node, but we'll still need
-		// to replicate this node
-		else if (!dest_node.empty_children_range().empty())
+		//
+		// the next-simplest case is when it's an insert in the middle. simply
+		// recreate the node with the child in the middle.
+		//
+		else if (!insertion_is_at_back && space_for_additional_child)
 		{
 			auto result_node = make_internal_ptr<RT>(
-				xfer_src(dest_node.children_range(idx)),
+				xfer_src(children, idx),
 				ins_info,
-				xfer_src(dest_node.children_range().last(dest_node.children_size() - idx)));
+				xfer_src(children, idx, children.size() - idx));
 
 			node_info_t<RT> result{result_node};
 
 			return {result};
 		}
-		// we must split our node into two
+		//
+		// the final case - we're out of space, so we must split the node
+		//
 		else
 		{
 			// something something split
@@ -1176,8 +1228,6 @@ namespace atma::_rope_
 			constexpr auto right_size = RT::branching_factor / 2;
 
 			node_ptr<RT> ln, rn;
-
-			auto children = dest_node.children_range();
 
 			if (idx < left_size)
 			{
@@ -1211,44 +1261,125 @@ namespace atma::_rope_
 	// additional sibling-node requiring insertion.
 	//
 	template <typename RT>
-	inline auto replace_and_insert_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& repl_info, maybe_node_info_t<RT> const& ins_info) -> insert_result_t<RT>
+	inline auto replace_and_insert_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& repl_info, maybe_node_info_t<RT> const& maybe_ins_info) -> insert_result_t<RT>
 	{
 		ATMA_ASSERT(dest.node->is_internal());
 
 		auto& dest_node = dest.node->known_internal();
 		ATMA_ASSERT(idx <= dest_node.children_size(), "you can't insert past the end");
 
-		// we can non-destructively append the node
-		if (idx == dest_node.children_size())
+		// in the simple case, this is just the replace operation
+		if (!maybe_ins_info.has_value())
 		{
-			auto result = dest;
-			++result.children;
-
-			//dest_node.empty_children_range().front() = ins_info;
-			dest_node.insert(idx, repl_info);
-
+			return replace_(dest, idx, repl_info);
+		}
+		// we can fit the additional node in
+		else if (idx == (dest_node.children_size() - 1) && dest_node.children_size() + 2 <= RT::branching_factor)
+		{
+			auto& ins_info = maybe_ins_info.value();
+			
+			auto result_node = make_internal_ptr<RT>(
+				xfer_src(dest_node.children_range(idx)),
+				repl_info,
+				ins_info,
+				xfer_src(dest_node.children_range().subspan(idx)));
+			
+			auto result = node_info_t<RT>{dest, dest.children + 2, dest.node};
 			return {result};
 		}
 		// we still have space for the node, but we'll still need
 		// to replicate this node
-		else if (!dest_node.empty_children_range().empty())
+		else if (dest_node.children_size() + 1 <= RT::branching_factor)
 		{
+			auto& ins_info = maybe_ins_info.value();
+
+			auto children = dest_node.children_range();
+
 			auto result_node = make_internal_ptr<RT>(
-				xfer_src(dest_node.children_range(idx)),
+				xfer_src(children, idx),
 				repl_info,
-				xfer_src(dest_node.children_range().last(dest_node.children_size() - idx)));
+				ins_info,
+				xfer_src(children, idx + 1, children.size() - 1 - idx));
 		
 			node_info_t<RT> result{result_node};
 
 			return {result};
 		}
+		// we need to split the node in two
+		else
+		{
+			auto& ins_info = maybe_ins_info.value();
 
-		// if we have space in our node's array, just insert
-		//if (auto empty_children = dest_node.empty_children_range(); !empty_children.empty())
-		//{
-		//	
-		//}
-		return {dest};
+			// something something split
+			auto const left_size = RT::branching_factor / 2 + 1;
+			auto const right_size = RT::branching_factor / 2;
+
+			auto children = dest_node.children_range();
+
+			node_ptr<RT> ln, rn;
+			
+			//
+			//    left-size: 3
+			//    right-size: 2
+			//
+			//  case 1: 
+			//   [a b c d]
+			//   idx: 0 or 1, insert x, y
+			//   result(s): 0] x y b | c d
+			//            : 1] a x y | c d
+			//     
+			//    i + 2 <= 3
+			// 
+			//  0 1 2 3 4 5 6 7
+			// [a b c d e f g h]
+			//              ^
+			//    repl-ins x y
+			// 
+			// [a b c d e] [f x y h]
+			// 
+			// 
+			//
+
+			// case 1: both nodes are to left of split
+			if (idx + 1 < left_size)
+			{
+				ln = make_internal_ptr<RT>(
+					xfer_src(children, idx),
+					repl_info,
+					ins_info,
+					xfer_src(children, idx + 1, left_size - (idx + 2)));
+
+				rn = make_internal_ptr<RT>(
+					xfer_src(children, left_size - 1, right_size));
+			}
+			// case 2: nodes straddle split
+			else if (idx < left_size)
+			{
+				ln = make_internal_ptr<RT>(
+					xfer_src(children, idx),
+					repl_info);
+
+				rn = make_internal_ptr<RT>(
+					ins_info,
+					xfer_src(children, idx + 1, RT::branching_factor - (idx + 1)));
+			}
+			// case 3: nodes to the right of split
+			else
+			{
+				ln = make_internal_ptr<RT>(
+					xfer_src(children, left_size));
+
+				rn = make_internal_ptr<RT>(
+					xfer_src(children, left_size, (idx - left_size)),
+					repl_info,
+					ins_info,
+					xfer_src(children, idx + 1, RT::branching_factor - (idx + 1)));
+			}
+
+			return insert_result_t<RT>{
+				node_info_t<RT>{ln},
+				node_info_t<RT>{rn}};
+		}
 
 #if 0
 		if (maybe_r_info.has_value())
