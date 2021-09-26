@@ -1242,12 +1242,12 @@ namespace atma::_rope_
 			else
 			{
 				ln = make_internal_ptr<RT>(
-					xfer_src(children, idx, left_size));
+					xfer_src(children, left_size));
 
 				rn = make_internal_ptr<RT>(
 					xfer_src(children, left_size, idx - left_size),
 					ins_info,
-					xfer_src(children, idx, right_size - (idx - left_size)));
+					xfer_src(children, idx, children.size() - idx));
 			}
 
 			return insert_result_t<RT>{node_info_t<RT>{ln}, node_info_t<RT>{rn}};
