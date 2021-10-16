@@ -575,13 +575,6 @@ namespace atma::_rope_
 
 	
 
-
-	//template <typename RT>
-	//auto build_rope(src_buf_t str) -> node_info_t<RT>
-	//{
-	//	
-	//}
-
 }
 
 // something
@@ -589,7 +582,7 @@ namespace atma::_rope_
 {
 	inline auto is_break(src_buf_t buf, size_t byte_idx) -> bool
 	{
-		ATMA_ASSERT(byte_idx < buf.size());
+		ATMA_ASSERT(byte_idx <= buf.size());
 
 		return byte_idx == 0
 			|| byte_idx == buf.size()
@@ -623,6 +616,20 @@ namespace atma::_rope_
 	}
 
 	inline auto find_split_point(src_buf_t buf, size_t byte_idx) -> size_t
+	{
+		size_t left = is_break(buf, byte_idx)
+			? byte_idx
+			: prev_break(buf, byte_idx);
+
+		size_t right = next_break(buf, left);
+
+		if (left == 0 || right != buf.size() && (byte_idx - left) >= (right - byte_idx))
+			return right;
+		else
+			return left;
+	}
+
+	inline auto find_internal_split_point(src_buf_t buf, size_t byte_idx) -> size_t
 	{
 		size_t left = (is_break(buf, byte_idx) && byte_idx != buf.size())
 			? byte_idx
@@ -791,6 +798,233 @@ namespace atma::_rope_
 
 	}
 
+
+	template <typename R, typename P>
+	concept boom = requires
+	{
+		{std::ranges::take_while_view<R, P> };
+	};
+
+	template <std::ranges::range R>
+	auto to_vector(R&& r) {
+		auto r_common = r | std::views::common;
+		return std::vector(std::ranges::begin(r_common), r_common.end());
+	}
+
+	template <std::ranges::range R>
+	auto to_vector2(R&& r) {
+		std::vector<std::ranges::range_value_t<R>> v;
+
+		// if we can get a size, reserve that much
+		if constexpr (requires { std::ranges::size(r); }) {
+			v.reserve(std::ranges::size(r));
+		}
+
+		// push all the elements
+		for (auto&& e : r) {
+			v.push_back(static_cast<decltype(e)&&>(e));
+		}
+
+		return v;
+	}
+
+
+	template <typename RT>
+	void push_node_and_collapse_(std::vector<node_info_t<RT>>& stack, node_info_t<RT> const& x, bool leaf);
+
+	template <typename RT>
+	void collapse_(std::vector<node_info_t<RT>>& stack, bool leaf);
+
+	template <typename RT>
+	void push_node_and_collapse_(std::vector<node_info_t<RT>>& stack, node_info_t<RT> const& x, bool leaf)
+	{
+		stack.push_back(x);
+
+		if (stack.size() >= 4)
+		{
+			collapse_(stack, leaf);
+		}
+	}
+
+	template <typename RT>
+	void collapse_(std::vector<node_info_t<RT>>& stack, bool leaf)
+	{
+		auto last_nodes_r = stack
+			| std::ranges::views::reverse
+			| std::ranges::views::take_while([leaf](node_info_t<RT> const& x) { return x.node->is_leaf() == leaf; })
+			| std::ranges::views::reverse
+			;
+
+		auto last_nodes = to_vector(last_nodes_r);
+
+		ATMA_ASSERT(last_nodes.size() <= 4);
+
+		if (!last_nodes.empty())
+		{
+			auto new_internal_node = make_internal_ptr<RT>(
+				xfer_src(last_nodes));
+
+			node_info_t<RT> new_internal_info{new_internal_node};
+
+			stack.erase(stack.end() - last_nodes.size(), stack.end());
+		
+			push_node_and_collapse_(stack, new_internal_info, false);
+		}
+	}
+
+
+	template <typename T>
+	inline auto ceil_div_(T x, T y)
+	{
+		return (x + y - 1) / y;
+	}
+
+	template <typename RT>
+	inline auto nodes_at_this_level_(uint const tree_depth, uint const leaves_count, uint level) -> size_t
+	{
+		auto k = leaves_count;
+		while (k > 1 && level --> 0)
+		{
+			k = ceil_div_(k, RT::branching_factor);
+		}
+
+		return k;
+	}
+
+#if 1
+	template <typename RT>
+	auto build_rope_ii_(uint const tree_depth, uint level, uint leaves_count, src_buf_t const& str) -> std::tuple<node_info_t<RT>, size_t>
+	{
+		size_t const nodes_at_this_level = nodes_at_this_level_(leaves_count, level);
+
+		size_t const nodes_here = std::pow(RT::branching_factor, level);
+
+		// at this level we are making leaves
+		if (nodes_here >= leaves_count)
+		{
+			//node_info_t<RT> result{make_leaf_ptr<RT>()}
+		}
+		else
+		{
+
+		}
+
+		// at root
+		if (nodes_here == 1)
+		{
+			//if (level == tree_depth - 1)
+		}
+		else
+		{
+			
+			auto blah = make_internal_ptr<RT>();
+		}
+
+		if ( >= leaves_count)
+		{
+
+		}
+
+		for (size_t i = 0; i != nodes_at_this_level; ++i)
+		{
+			
+		}
+
+		if (level == tree_depth)
+		{
+			// we are now at leaf-level, so make a leaf and just return that
+		}
+		else
+		{
+			auto blah = make_internal_ptr<RT>();
+
+			//uint max_nodes_at_this_level = std::pow(RT::branching_factor, level);
+
+			//auto [info, remaining_leaves] = build_rope_ii_(tree_depth, level, )
+		}
+
+		return {};
+	}
+#endif
+
+
+	template <typename RT>
+	inline auto build_rope(src_buf_t str) -> node_info_t<RT>
+	{
+		// count the number of leaves we'll need
+		auto const string_size = std::size(str);
+		auto const leaves_required = string_size / (RT::buf_size - 2);
+		
+		// find depth of tree. this does not include the leaf-level
+		size_t depth_of_tree = 0;
+		while (std::pow(RT::branching_factor, depth_of_tree + 1) < leaves_required)
+			++depth_of_tree;
+
+		size_t const nodes_required_at_depth = std::pow(RT::branching_factor, depth_of_tree);
+
+		//
+		// easy route #1
+		// ---------------
+		// just build a densely-packed tree
+		//
+		{
+			size_t const fully_packed_nodes_required = ceil_div_(leaves_required, RT::branching_factor);
+
+
+		}
+
+
+
+
+		//
+		// we can nice get 3/4 full for each inner node
+		// if we can completely fill the inner nodes
+		//
+		size_t const three_quarts = 3 * RT::branching_factor / 4;
+		size_t const nodes_required_for_three_quarts_full = std::max(ceil_div_(leaves_required, three_quarts), nodes_required_at_depth);
+		[[maybe_unused]] size_t const leaves_remaining = leaves_required - (nodes_required_for_three_quarts_full * three_quarts);
+
+		size_t const bonus_node_amount = leaves_remaining / nodes_required_for_three_quarts_full;
+
+		// at three-quarts full, there's a chance we exceed the number of nodes at this level.
+		// that would bad
+		if (nodes_required_for_three_quarts_full <= nodes_required_at_depth)
+		//{
+		//	
+		//}
+		//else
+		//{
+		//
+		//}
+
+
+#if 0
+		// remove null terminator if necessary
+		if (str[str.size() - 1] == '\0')
+			str = str.take(str.size() - 1);
+
+		std::vector<node_info_t<RT>> stack;
+
+		// case 1. the str is small enough to just be inserted as a leaf
+		while (!str.empty())
+		{
+			size_t candidate_split_idx = std::min(str.size(), RT::buf_size);
+			auto split_idx = find_split_point(str, candidate_split_idx);
+
+			auto leaf_text = str.take(split_idx);
+			str = str.skip(split_idx);
+
+			auto new_leaf = node_info_t<RT>{make_leaf_ptr<RT>(leaf_text)};
+
+			push_node_and_collapse_(stack, new_leaf, true);
+		}
+
+		collapse_(stack, true);
+		collapse_(stack, false);
+#endif
+
+		return node_info_t<RT>{};
+	}
 }
 
 
@@ -1052,73 +1286,6 @@ namespace atma::_rope_
 		maybe_node_info_t<RT> maybe_rhs;
 	};
 
-#if 0
-	template <typename RT>
-	inline auto replace_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& repl_info) -> insert_result_t<RT>
-	{
-		ATMA_ASSERT(dest.node->is_internal());
-
-		auto& dest_node = dest.node->known_internal();
-		ATMA_ASSERT(idx < dest_node.children_size(), "you can't replace at this index");
-
-		// we can non-destructively append the node
-		if (idx == dest_node.children_size())
-		{
-			dest_node.insert(idx, repl_info);
-
-			auto const result = node_info_t<RT>{dest, dest.children + 1, dest.node};
-			return {result};
-		}
-		// we still have space for the node, but we'll still need
-		// to replicate this node
-		else if (!dest_node.empty_children_range().empty())
-		{
-			auto result_node = make_internal_ptr<RT>(
-				xfer_src(dest_node.children_range(idx)),
-				repl_info,
-				xfer_src(dest_node.children_range().last(dest_node.children_size() - idx)));
-
-			node_info_t<RT> result{result_node};
-
-			return {result};
-		}
-		// we don't have any space! we must split
-		else
-		{
-			// something something split
-			constexpr auto left_size = RT::branching_factor / 2 + 1;
-			constexpr auto right_size = RT::branching_factor / 2;
-
-			node_ptr<RT> ln, rn;
-
-			auto children = dest_node.children_range();
-
-			if (idx < left_size)
-			{
-				ln = make_internal_ptr<RT>(
-					xfer_src(children, idx),
-					repl_info,
-					xfer_src(children, idx, left_size - idx));
-
-				rn = make_internal_ptr<RT>(
-					xfer_src(children, left_size, right_size));
-			}
-			else
-			{
-				ln = make_internal_ptr<RT>(
-					xfer_src(children, idx, left_size));
-
-				rn = make_internal_ptr<RT>(
-					xfer_src(children, left_size, idx - left_size),
-					repl_info,
-					xfer_src(children, idx, right_size - (idx - left_size)));
-			}
-
-			return insert_result_t<RT>{node_info_t<RT>{ln}, node_info_t<RT>{rn}};
-		}
-	}
-#endif
-
 	template <typename RT>
 	inline auto replace_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& repl_info) -> insert_result_t<RT>
 	{
@@ -1138,43 +1305,6 @@ namespace atma::_rope_
 
 		return insert_result_t<RT>{result};
 	}
-
-#if 0
-	template <typename RT>
-	inline auto split_(auto const& children, size_t idx) -> insert_result_t<RT>
-	{
-		AMTA_ASSERT(children.size() > RT::branching_factor / 2);
-
-		constexpr auto left_size = RT::branching_factor / 2 + 1;
-		constexpr auto right_size = RT::branching_factor / 2;
-
-		node_ptr<RT> ln, rn;
-
-		if (idx < left_size)
-		{
-			ln = make_internal_ptr<RT>(
-				xfer_src(children, idx),
-				ins_info,
-				xfer_src(children, idx, left_size - idx - 1));
-
-			rn = make_internal_ptr<RT>(
-				xfer_src(children.last(right_size)));
-		}
-		else
-		{
-			ln = make_internal_ptr<RT>(
-				xfer_src(children, idx, left_size));
-
-			rn = make_internal_ptr<RT>(
-				xfer_src(children, left_size, idx - left_size),
-				ins_info,
-				xfer_src(children, idx, right_size - (idx - left_size)));
-		}
-
-		return insert_result_t<RT>{node_info_t<RT>{ln}, node_info_t<RT>{rn}};
-	}
-#endif
-
 
 	template <typename RT>
 	inline auto insert_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& ins_info) -> insert_result_t<RT>
@@ -1223,7 +1353,6 @@ namespace atma::_rope_
 		//
 		else
 		{
-			// something something split
 			constexpr auto left_size = RT::branching_factor / 2 + 1;
 			constexpr auto right_size = RT::branching_factor / 2;
 
@@ -1250,11 +1379,12 @@ namespace atma::_rope_
 					xfer_src(children, idx, children.size() - idx));
 			}
 
-			return insert_result_t<RT>{node_info_t<RT>{ln}, node_info_t<RT>{rn}};
+			node_info_t<RT> lhs{ln};
+			node_info_t<RT> rhs{rn};
+
+			return insert_result_t<RT>{lhs, rhs};
 		}
 	}
-
-
 
 	//
 	// a very common operation involves a child node needing to be replaced, with a possible
@@ -1266,79 +1396,39 @@ namespace atma::_rope_
 		ATMA_ASSERT(dest.node->is_internal());
 
 		auto& dest_node = dest.node->known_internal();
-		ATMA_ASSERT(idx <= dest_node.children_size(), "you can't insert past the end");
+		ATMA_ASSERT(idx < dest_node.children_size(), "index for replacement out of bounds");
 
 		// in the simple case, this is just the replace operation
 		if (!maybe_ins_info.has_value())
 		{
 			return replace_(dest, idx, repl_info);
 		}
+
+		auto& ins_info = maybe_ins_info.value();
+
+		auto const children = dest_node.children_range();
+		bool const space_for_additional_two_children = (children.size() + 1 <= RT::branching_factor);
+
 		// we can fit the additional node in
-		else if (idx == (dest_node.children_size() - 1) && dest_node.children_size() + 2 <= RT::branching_factor)
+		if (space_for_additional_two_children)
 		{
-			auto& ins_info = maybe_ins_info.value();
-			
-			auto result_node = make_internal_ptr<RT>(
-				xfer_src(dest_node.children_range(idx)),
-				repl_info,
-				ins_info,
-				xfer_src(dest_node.children_range().subspan(idx)));
-			
-			auto result = node_info_t<RT>{dest, dest.children + 2, dest.node};
-			return {result};
-		}
-		// we still have space for the node, but we'll still need
-		// to replicate this node
-		else if (dest_node.children_size() + 1 <= RT::branching_factor)
-		{
-			auto& ins_info = maybe_ins_info.value();
-
-			auto children = dest_node.children_range();
-
 			auto result_node = make_internal_ptr<RT>(
 				xfer_src(children, idx),
 				repl_info,
 				ins_info,
-				xfer_src(children, idx + 1, children.size() - 1 - idx));
-		
-			node_info_t<RT> result{result_node};
+				xfer_src(children, idx + 1, children.size() - idx - 1));
+			
+			node_info_t<RT> result{dest + ins_info, dest.children + 1, result_node};
 
 			return {result};
 		}
 		// we need to split the node in two
 		else
 		{
-			auto& ins_info = maybe_ins_info.value();
-
-			// something something split
 			auto const left_size = RT::branching_factor / 2 + 1;
 			auto const right_size = RT::branching_factor / 2;
 
-			auto children = dest_node.children_range();
-
 			node_ptr<RT> ln, rn;
-			
-			//
-			//    left-size: 3
-			//    right-size: 2
-			//
-			//  case 1: 
-			//   [a b c d]
-			//   idx: 0 or 1, insert x, y
-			//   result(s): 0] x y b | c d
-			//            : 1] a x y | c d
-			//     
-			//    i + 2 <= 3
-			// 
-			//  0 1 2 3 4 5 6 7
-			// [a b c d e f g h]
-			//              ^
-			//    repl-ins x y
-			// 
-			// [a b c d e] [f x y h]
-			// 
-			// 
-			//
 
 			// case 1: both nodes are to left of split
 			if (idx + 1 < left_size)
@@ -1347,7 +1437,7 @@ namespace atma::_rope_
 					xfer_src(children, idx),
 					repl_info,
 					ins_info,
-					xfer_src(children, idx + 1, left_size - (idx + 2)));
+					xfer_src(children, idx + 1, left_size - idx - 2));
 
 				rn = make_internal_ptr<RT>(
 					xfer_src(children, left_size - 1, right_size));
@@ -1361,7 +1451,7 @@ namespace atma::_rope_
 
 				rn = make_internal_ptr<RT>(
 					ins_info,
-					xfer_src(children, idx + 1, RT::branching_factor - (idx + 1)));
+					xfer_src(children, idx + 1, children.size() - idx - 1));
 			}
 			// case 3: nodes to the right of split
 			else
@@ -1373,69 +1463,13 @@ namespace atma::_rope_
 					xfer_src(children, left_size, (idx - left_size)),
 					repl_info,
 					ins_info,
-					xfer_src(children, idx + 1, RT::branching_factor - (idx + 1)));
+					xfer_src(children, idx + 1, children.size() - idx - 1));
 			}
 
 			return insert_result_t<RT>{
 				node_info_t<RT>{ln},
 				node_info_t<RT>{rn}};
 		}
-
-#if 0
-		if (maybe_r_info.has_value())
-		{
-			auto const& r_info = *maybe_r_info;
-
-			if (this->replaceable(idx + 1))
-			{
-				auto sn = make_internal_ptr<RT>(
-					xfer_src(children_, idx),
-					l_info, r_info,
-					xfer_src(children_, idx + 2, RT::branching_factor - 2));
-
-				return edit_result_t<RT>{
-					node_info_t<RT>{l_info + r_info, sn},
-						maybe_node_info_t<RT>{}};
-			}
-			else
-			{
-				// something something split
-				auto left_size = RT::branching_factor / 2 + 1;
-				auto right_size = RT::branching_factor / 2;
-
-				node_ptr<RT> ln, rn;
-
-				if (idx < left_size)
-				{
-					ln = make_internal_ptr<RT>(xfer_src(children_, idx), l_info, r_info);
-					rn = make_internal_ptr<RT>(xfer_src(children_, idx, RT::branching_factor - idx - 1));
-				}
-				if (idx + 1 < left_size)
-				{
-					ln = make_internal_ptr<RT>(xfer_src(children_, idx), l_info);
-					rn = make_internal_ptr<RT>(r_info, xfer_src(children_, idx + 1, right_size));
-				}
-				else
-				{
-					ln = make_internal_ptr<RT>(xfer_src(children_, left_size));
-					rn = make_internal_ptr<RT>(l_info, r_info);
-				}
-
-				return edit_result_t<RT>{
-					node_info_t<RT>{ln},
-						node_info_t<RT>{rn}};
-			}
-		}
-		else
-		{
-			auto s = make_internal_ptr<RT>(
-				xfer_src(children_, idx),
-				l_info,
-				xfer_src(children_, idx + 1, RT::branching_factor - idx - 1));
-
-			return edit_result_t<RT>{node_info_t<RT>{l_info, s}, maybe_node_info_t<RT>()};
-		}
-#endif
 	}
 
 }
