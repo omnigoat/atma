@@ -15,6 +15,12 @@ namespace atma
 	concept sized_and_contiguous_range =
 		std::ranges::sized_range<R> &&
 		std::ranges::contiguous_range<R>;
+
+	// range_of_element_type
+	template <typename Range, typename ElementType>
+	concept range_of_element_type =
+		std::ranges::range<Range> &&
+		std::same_as<std::ranges::range_value_t<Range>, ElementType>;
 }
 
 // span
