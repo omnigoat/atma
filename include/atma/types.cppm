@@ -215,6 +215,10 @@ namespace atma
 		struct value_type_of_ii<R[N], std::void_t<>>
 			{ using type = R; };
 
+		template <typename R, size_t N>
+		struct value_type_of_ii<R(&)[N], std::void_t<>>
+			{ using type = R; };
+
 		// pointers are their pointed-to-type
 		template <typename R>
 		struct value_type_of_ii<R*, std::void_t<>>
