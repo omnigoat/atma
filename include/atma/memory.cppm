@@ -738,8 +738,8 @@ namespace atma::detail
 		// explicitly hide memxfer constructors because we must initialize size
 		using base_type::base_type;
 
-	private:
-		size_t const size_ = std::dynamic_extent;
+	protected:
+		size_t size_ = std::dynamic_extent;
 	};
 }
 
@@ -763,6 +763,7 @@ export namespace atma
 		
 		bounded_memxfer_t& operator = (bounded_memxfer_t const& rhs)
 		{
+			this->size_ = rhs.size_;
 			return (bounded_memxfer_t&)base_type::operator = (rhs);
 		}
 
@@ -854,13 +855,16 @@ namespace atma::detail
 	template <typename Tag, typename Range>
 	using bounded_memxfer_range_of_t = bounded_memxfer_t<Tag, value_type_of_t<Range>, std::dynamic_extent, allocator_type_of_t<Range>>;
 
+	template <typename T>
+	using nonconst_std_allocator = std::allocator<std::remove_const_t<T>>;
+
 	template <typename tag_type>
 	struct xfer_make_from_ptr_
 	{
 		template <typename T>
 		auto operator()(T* data) const
 		{
-			return memxfer_t<tag_type, T, std::allocator<std::remove_const_t<T>>>(data);
+			return memxfer_t<tag_type, T, nonconst_std_allocator<T>>(data);
 		}
 
 		template <typename T, typename A>
@@ -872,13 +876,19 @@ namespace atma::detail
 		template <typename T>
 		auto operator()(T* data, size_t sz) const
 		{
-			return bounded_memxfer_t<tag_type, T, std::dynamic_extent, std::allocator<std::remove_const_t<T>>>(data, sz);
+			return bounded_memxfer_t<tag_type, T, std::dynamic_extent, nonconst_std_allocator<T>>(data, sz);
 		}
 
 		template <typename T, typename A>
 		auto operator()(A&& allocator, T* data, size_t sz) const
 		{
 			return bounded_memxfer_t<tag_type, T, std::dynamic_extent, rm_ref_t<A>>(std::forward<A>(allocator), data, sz);
+		}
+
+		template <typename T, size_t N>
+		auto operator()(T (&data)[N]) const
+		{
+			return bounded_memxfer_t<tag_type, T, nonconst_std_allocator<T>>((T*)data, N);
 		}
 	};
 
