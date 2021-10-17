@@ -125,8 +125,10 @@
 		<DisplayString>src_bounded_memxfer_t&lt;{"$T1", sb}&gt;</DisplayString>
 		<Expand>
 			<!-- I can't understand the spaces for templating here... -->
-			<ExpandedItem Optional="true">(atma::memxfer_t&lt;$T1, $T2,$T3 &gt;*)this</ExpandedItem>
-			<ExpandedItem Optional="true">(atma::memxfer_t&lt;$T1,$T2 ,$T3 &gt;*)this</ExpandedItem>
+			<Item Optional="true" Name="allocator">alloc_and_ptr_.first_</Item>
+			<Item Optional="true" Name="allocator">static_cast&lt;$T2&amp;&gt;(alloc_and_ptr_)</Item>
+			<Item Optional="true" Name="data">alloc_and_ptr_.second_,[size_]</Item>
+			<Item Optional="true" Name="data">static_cast&lt;$T1&amp;&gt;(alloc_and_ptr_),[size_]</Item>
 			
 			<Item Name="size">size_</Item>
 			
