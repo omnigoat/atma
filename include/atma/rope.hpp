@@ -1429,7 +1429,7 @@ namespace atma::_rope_
 					if (info.children < min_children)
 						return std::make_tuple(false, uint());
 					
-					auto r = singular_result(internal_node.children_range(), atma::bind(&check_node<RT>, arg1, RT::minimum_branches));
+					auto r = singular_result(internal_node.children_range(), atma::bind_from<1>(&check_node<RT>, RT::minimum_branches));
 
 					if (r.has_value())
 					{
