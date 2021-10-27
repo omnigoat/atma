@@ -500,6 +500,8 @@ SCENARIO("atma::rope's internal operations work")
 					CHECK(lhs_child_node(postXresult, 2) == X);
 					CHECK(lhs_child_node(postXresult, 3) == Y);
 				}
+
+				atma::_rope_::validate_rope_(postXresult.lhs);
 			}
 		}
 	}
