@@ -282,33 +282,6 @@ namespace atma {
 	using tuple_pop_front_t = tuple_tail_t<Tuple>;
 
 
-
-
-
-	//
-	//  tuple_cat_t
-	//  -------------
-	//    concatenate N tuples/(things that implement std::get)
-	//
-	//      tuple_cat_t<std::tuple<int, float>, std::pair<double, long>, std::tuple<char>
-	//        === std::tuple<int, float, double, long, char>
-	//
-	//    this is just a hand-off to std::tuple_cat, because that code seems crazy
-	//    complex and efficient. and hard. and a dumb thing to reimplement.
-	//
-	template <typename... Tuples>
-	using tuple_cat_t = decltype(std::tuple_cat(std::declval<Tuples>()...));
-
-	template <typename... Tuples>
-	inline auto tuple_cat(Tuples&&... tuples) -> tuple_cat_t<std::decay_t<Tuples>...>
-	{
-		return std::tuple_cat(std::forward<Tuples>(tuples)...);
-	}
-
-
-
-
-
 	//
 	//  tuple_fold_t
 	//  -------------
