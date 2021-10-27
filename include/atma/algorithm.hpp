@@ -4,6 +4,8 @@
 #include <atma/tuple.hpp>
 
 #include <algorithm>
+#include <optional>
+#include <ranges>
 
 import atma.types;
 import atma.vector;
@@ -67,17 +69,6 @@ namespace atma::functors
 
 namespace atma
 {
-	// reimplement many std algorithms
-	template <typename C>
-	void sort(C& container)
-		{ std::sort(container.begin(), container.end()); }
-
-	template <typename C, typename F>
-	void sort(C& container, F&& pred)
-		{ std::sort(container.begin(), container.end(), std::forward<F>(pred)); }
-
-
-
 	template <typename C>
 	struct range_t
 	{
@@ -219,5 +210,36 @@ namespace atma
 			r = fn(r, *i);
 
 		return r;
+	}
+
+
+
+	//
+	//
+	//
+	template <std::ranges::range Range, typename F>
+	requires std::is_invocable_v<F, std::ranges::range_value_t<Range>>
+	inline auto singular_result(Range const& range, F fn) -> std::optional<std::invoke_result_t<F, std::ranges::range_value_t<Range>>>
+	{
+		if (std::empty(range))
+		{
+			return {};
+		}
+		else
+		{
+			auto iter = std::begin(range);
+			decltype(auto) r = fn(*iter);
+
+			for (auto end = std::end(range); iter != end; ++iter)
+			{
+				decltype(auto) r2 = fn(*iter);
+				if (r != r2)
+				{
+					return {};
+				}
+			}
+
+			return {r};
+		}
 	}
 }
