@@ -29,9 +29,9 @@ namespace atma {
 			static bool   const fn_ismemfn    = function_traits<F>::is_memfnptr;
 			static size_t const bindings_size = sizeof...(B);
 
-			using type = tuple_cat_t<
-				std::tuple<B...>,
-				tuple_placeholder_list_t<fn_arity + (int)fn_ismemfn - (int)bindings_size>>;
+			using type = decltype(std::tuple_cat(
+				std::declval<std::tuple<B...>>(),
+				std::declval<tuple_placeholder_list_t<fn_arity + (int)fn_ismemfn - (int)bindings_size>>()));
 		};
 
 		template <typename F, typename... B>
@@ -465,6 +465,29 @@ namespace atma {
 		return bind_t<std::remove_reference_t<F>, detail::bindings_tuple_t<Bindings...>>
 			{std::forward<F>(f), detail::forward_as_bindings(bindings...)};
 	}
+
+
+	//
+	//  bind_from
+	//  -----------
+	//  takes an index for the argument from which we will start binding
+	// 
+	//  all preceeding arguments are automatically curried
+	// 
+	//  examples:
+	//    bind_from<2>(f, "hello") === bind(arg1, arg2, "hello")
+	//    bind_from<1>(f, 4) === bind(arg1, 4)
+	//
+	template <size_t Idx, typename F, typename... Bindings>
+	inline auto bind_from(F f, Bindings&&... bindings)
+	{
+		auto const ascending_placeholders = tuple_placeholder_list_t<Idx>();
+		auto merged_bindings = std::tuple_cat(ascending_placeholders, detail::forward_as_bindings(bindings...));
+
+		return bind_t<std::remove_reference_t<F>, decltype(merged_bindings)>{std::forward<F>(f), merged_bindings};
+	}
+
+
 
 
 	//
