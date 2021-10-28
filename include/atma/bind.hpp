@@ -62,19 +62,25 @@ namespace atma
 	{
 		static int const value = Acc;
 	};
+}
 
+namespace std
+{
+	template <int I>
+	struct is_placeholder<atma::placeholder_t<I>> : std::integral_constant<int, I + 1>
+	{};
 }
 
 namespace
 {
-	atma::placeholder_t<0> const arg1;
-	atma::placeholder_t<1> const arg2;
-	atma::placeholder_t<2> const arg3;
-	atma::placeholder_t<3> const arg4;
-	atma::placeholder_t<4> const arg5;
-	atma::placeholder_t<5> const arg6;
-	atma::placeholder_t<6> const arg7;
-	atma::placeholder_t<7> const arg8;
+	inline constexpr atma::placeholder_t<0> const arg1;
+	inline constexpr atma::placeholder_t<1> const arg2;
+	inline constexpr atma::placeholder_t<2> const arg3;
+	inline constexpr atma::placeholder_t<3> const arg4;
+	inline constexpr atma::placeholder_t<4> const arg5;
+	inline constexpr atma::placeholder_t<5> const arg6;
+	inline constexpr atma::placeholder_t<6> const arg7;
+	inline constexpr atma::placeholder_t<7> const arg8;
 }
 
 
@@ -112,8 +118,8 @@ namespace atma
 
 
 	//
-	//  detail::select_bound_arg
-	//  --------------------------
+	//  select_bound_arg
+	//  -------------------
 	//    chooses the correct binding/argument:
 	//
 	//      select_bound_arg(2, std::make_tuple(4, 5)) == 2
@@ -121,12 +127,6 @@ namespace atma
 	//
 	namespace detail
 	{
-		template <typename T>
-		constexpr inline bool is_bind_expression()
-		{
-			return std::is_bind_expression_v<T>; // SERIOUSLY, "or atma::is_bind_expression" equivalent
-		}
-
 		template <typename Binding, typename Args>
 		constexpr inline decltype(auto) select_bound_arg(Binding&& b, Args&&)
 		{
@@ -134,14 +134,14 @@ namespace atma
 		}
 
 		template <size_t I, typename Args>
-		constexpr inline auto select_bound_arg(placeholder_t<I>, Args&& args)
-			-> typename std::tuple_element<I, Args>::type
+		constexpr inline decltype(auto) select_bound_arg(placeholder_t<I>, Args&& args)
 		{
 			return std::get<I>(std::forward<Args>(args));
 		}
 
-		template <typename BindExpr, typename Args, typename = std::enable_if_t<is_bind_expression<std::decay_t<BindExpr>>()>>
-		constexpr inline auto select_bound_arg(BindExpr&& bindexpr, Args&& args)
+		template <typename BindExpr, typename Args>
+		requires std::is_bind_expression_v<std::decay_t<BindExpr>>
+		constexpr inline decltype(auto) select_bound_arg(BindExpr&& bindexpr, Args&& args)
 		{
 			return std::apply(std::forward<BindExpr>(bindexpr), std::forward<Args>(args));
 		}
@@ -183,15 +183,19 @@ namespace atma
 	//
 	//  normalizing placeholders
 	//  --------------------------
-	//    sometimes the type of the placeholders in our bindings list is weird, like
-	//    `placeholder_t<0> const`, or `placeholder_t<0> const&`. this normalizes them
+	//  placeholders are forwarded as 'placeholder_t<I> const&', and we don't want
+	//  to do our type comparisons against that at all
 	//
 	namespace detail
 	{
-		template <typename T> struct normalize_placeholder_tx { using type = T; };
-		template <int I> struct normalize_placeholder_tx<placeholder_t<I> const> { using type = placeholder_t<I>; };
-		template <int I> struct normalize_placeholder_tx<placeholder_t<I> const&> { using type = placeholder_t<I>; };
-		template <int I> struct normalize_placeholder_tx<placeholder_t<I>&&> { using type = placeholder_t<I>; };
+		template <typename T>
+		struct normalize_placeholder_tx
+			{ using type = T; };
+
+		template <typename T>
+		requires (std::is_placeholder_v<std::remove_cvref_t<T>> > 0)
+		struct normalize_placeholder_tx<T>
+			{ using type = std::remove_cvref_t<T>; };
 
 		template <typename T> decltype(auto) normalize_placeholder(T&& t) { return std::forward<T>(t); }
 		template <int I> placeholder_t<I> normalize_placeholder(placeholder_t<I> const& x) { return x; }
