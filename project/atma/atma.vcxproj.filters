@@ -127,9 +127,6 @@
     <ClInclude Include="..\..\include\atma\logging.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\placeholders.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\shared_memory.hpp">
       <Filter>include</Filter>
     </ClInclude>
