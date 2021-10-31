@@ -2,7 +2,6 @@
 
 #include "hash.hpp"
 #include "math/functions.hpp"
-#include "function_traits.hpp"
 #include "meta.hpp"
 #include <atma/assert.hpp>
 
@@ -10,6 +9,7 @@
 #include <array>
 
 import atma.memory;
+import atma.types;
 
 #if USE_SPP_HASH_MAP
 

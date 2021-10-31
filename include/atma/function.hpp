@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atma/bind.hpp>
 #include <atma/tuple.hpp>
 #include <atma/function_composition.hpp>
 #include <atma/assert.hpp>
@@ -8,6 +7,7 @@
 #include <tuple>
 #include <functional>
 
+import atma.bind;
 
 // where we store the functor if we can't SFO
 namespace atma

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <atma/function_traits.hpp>
-
 #include <utility>
+
+import atma.types;
 
 // composited_abstract_t
 namespace atma

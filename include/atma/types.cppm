@@ -265,3 +265,99 @@ export namespace atma
 	template <typename R>
 	using allocator_type_of_t = typename allocator_type_of<std::remove_reference_t<R>>::type;
 }
+
+
+namespace atma::detail
+{
+	// deduce functor
+	template <typename T>
+	struct _function_traits_
+		: _function_traits_<decltype(&T::operator())>
+	{};
+
+	// deduce function-pointer
+	template <typename R, typename... Args>
+	struct _function_traits_<R(*)(Args...)>
+		: _function_traits_<R(Args...)>
+	{};
+
+	template <typename R, typename... Args>
+	struct _function_traits_<R(*)(Args...) noexcept>
+		: _function_traits_<R(Args...)>
+	{};
+
+	// deduce member-function-pointer
+	template <typename C, typename R, typename... Args>
+	struct _function_traits_<R(C::*)(Args...)>
+		: _function_traits_<R(Args...)>
+	{};
+
+	template <typename C, typename R, typename... Args>
+	struct _function_traits_<R(C::*)(Args...) noexcept>
+		: _function_traits_<R(Args...)>
+	{};
+
+	template <typename C, typename R, typename... Args>
+	struct _function_traits_<R(C::*)(Args...) const>
+		: _function_traits_<R(Args...)>
+	{};
+
+	template <typename C, typename R, typename... Args>
+	struct _function_traits_<R(C::*)(Args...) const noexcept>
+		: _function_traits_<R(Args...)>
+	{};
+
+	// remove reference
+	template <typename T>
+	struct _function_traits_<T&>
+		: _function_traits_<T>
+	{};
+
+	template <typename T>
+	struct _function_traits_<T&&>
+		: _function_traits_<T>
+	{};
+
+	// remove const/volatile
+	template <typename T>
+	struct _function_traits_<T const>
+		: _function_traits_<T>
+	{};
+
+	template <typename T>
+	struct _function_traits_<T volatile>
+		: _function_traits_<T>
+	{};
+
+	// function-type
+	template <typename R, typename... Args>
+	struct _function_traits_<R(Args...)>
+	{
+		using result_type = R;
+		using tupled_args_type = std::tuple<Args...>;
+
+		template <size_t i>
+		using arg_type = std::tuple_element_t<i, std::tuple<Args...>>;
+
+		constexpr static size_t const arity = sizeof...(Args);
+	};
+}
+
+export namespace atma
+{
+	//
+	//  function_traits_override
+	//  ---------------------------
+	//
+	template <typename T>
+	struct function_traits_override
+		: detail::_function_traits_<T>
+	{};
+
+	//
+	//  function_traits
+	//  -----------------
+	//
+	template <typename F>
+	using function_traits = function_traits_override<F>;
+}

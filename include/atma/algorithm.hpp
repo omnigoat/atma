@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atma/function_traits.hpp>
 #include <atma/tuple.hpp>
 
 #include <algorithm>
