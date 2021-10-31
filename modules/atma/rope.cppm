@@ -5,7 +5,6 @@ module;
 #include <atma/ranges/core.hpp>
 #include <atma/algorithm.hpp>
 #include <atma/utf/utf8_string.hpp>
-#include <atma/bind.hpp>
 
 #include <variant>
 #include <optional>
@@ -18,9 +17,9 @@ module;
 export module atma.rope;
 
 #if 0
+import atma.bind;
 import atma.types;
 import atma.memory;
-
 
 
 export namespace atma::_rope_

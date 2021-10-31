@@ -4,7 +4,6 @@
 #include <atma/ranges/core.hpp>
 #include <atma/algorithm.hpp>
 #include <atma/utf/utf8_string.hpp>
-#include <atma/bind.hpp>
 
 #include <variant>
 #include <optional>
@@ -16,6 +15,7 @@
 
 #define ATMA_ROPE_DEBUG_BUFFER 1
 
+import atma.bind;
 import atma.types;
 import atma.memory;
 
