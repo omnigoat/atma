@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atma/function_traits.hpp>
 #include <atma/function.hpp>
 #include <atma/ranges/core.hpp>
 

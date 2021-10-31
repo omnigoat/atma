@@ -88,9 +88,6 @@
     <ClInclude Include="..\..\include\atma\atomic.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\bind.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\bitmask.hpp">
       <Filter>include</Filter>
     </ClInclude>
@@ -228,6 +225,9 @@
     </ClCompile>
     <ClCompile Include="..\..\modules\atma\rope.cppm">
       <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\include\atma\bind.cppm">
+      <Filter>include</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

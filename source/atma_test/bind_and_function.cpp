@@ -1,8 +1,12 @@
 #include <atma/unit_test.hpp>
 
-#include <atma/bind.hpp>
 #include <atma/function.hpp>
 #include <atma/thread/engine.hpp>
+
+#include <functional>
+#include <type_traits>
+
+import atma.bind;
 
 int mul(int a, int b) { return a * b; }
 int add(int a, int b) { return a + b; }
@@ -61,6 +65,20 @@ SCENARIO_OF("bind", "bind works with various things")
 		auto b2v5 = atma::bind(&mathing_t::halve, mathing_t(), arg1);
 		auto b2v6 = atma::curry(&mathing_t::halve, &m);
 		auto b2v7 = atma::curry(&mathing_t::halve, m, 16);
+
+		auto thetest = atma::curry(b2v6);
+		thetest(16);
+
+		THEN("all b2s match each other")
+		{
+			CHECK(8 == b2v1(16, &m));
+			CHECK(8 == b2v2(16));
+			CHECK(8 == b2v3(16));
+			CHECK(8 == b2v4());
+			CHECK(8 == b2v5(16));
+			CHECK(8 == b2v6(16));
+			CHECK(8 == b2v7());
+		}
 
 		// lambda object
 		auto L = [](int x) { return x + 1; };

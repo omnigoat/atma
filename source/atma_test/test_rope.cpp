@@ -6,13 +6,13 @@
 #include <atma/ranges/core.hpp>
 #include <atma/algorithm.hpp>
 #include <atma/utf/utf8_string.hpp>
-#include <atma/bind.hpp>
 
 #include <array>
 #include <utility>
 #include <iostream>
 #include <concepts>
 
+import atma.bind;
 import atma.rope;
 import atma.memory;
 

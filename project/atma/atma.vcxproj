@@ -28,7 +28,9 @@
     <ClCompile Include="..\..\include\atma\memory.cppm" />
     <ClInclude Include="..\..\include\atma\assert.hpp" />
     <ClCompile Include="..\..\include\atma\assert.cppm" />
-    <ClInclude Include="..\..\include\atma\bind.hpp" />
+    <ClCompile Include="..\..\include\atma\bind.cppm">
+      <FileType>Document</FileType>
+    </ClCompile>
     <ClInclude Include="..\..\include\atma\bitmask.hpp" />
     <ClInclude Include="..\..\include\atma\com_ptr.hpp" />
     <ClInclude Include="..\..\include\atma\config\platform.hpp" />
