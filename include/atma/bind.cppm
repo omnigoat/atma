@@ -40,33 +40,6 @@ export namespace atma
 	template <size_t count>
 	using tuple_placeholder_list_t =
 		tuple_idxs_map_t<placeholder_t, idxs_list_t<count>>;
-
-	//
-	//  tuple_nonplaceholder_size_t
-	//  -----------------------------
-	//    when we have a tuple of {thing, thing2, thing3, placeholder_t<0>, placeholder_t<1>...},
-	//    we want to count how many things there are before the first placeholder
-	//
-	template <typename T, int Acc = 0>
-	struct tuple_nonplaceholder_size_t;
-
-	template <int Acc>
-	struct tuple_nonplaceholder_size_t<std::tuple<>, Acc>
-	{
-		static int const value = Acc;
-	};
-
-	template <typename x, typename... xs, int Acc>
-	struct tuple_nonplaceholder_size_t<std::tuple<x, xs...>, Acc>
-	{
-		static int const value = tuple_nonplaceholder_size_t<std::tuple<xs...>, Acc + 1>::value;
-	};
-
-	template <int i, typename... xs, int Acc>
-	struct tuple_nonplaceholder_size_t<std::tuple<placeholder_t<i>, xs...>, Acc>
-	{
-		static int const value = Acc;
-	};
 }
 
 export namespace std
@@ -219,13 +192,13 @@ export namespace atma
 	namespace detail
 	{
 		template <typename... Bindings>
-		using bindings_tuple_t = std::tuple<typename normalize_placeholder_tx<Bindings>::type...>;
+		inline auto forward_as_bindings(Bindings&&... bindings)
+		{
+			return std::make_tuple(detail::normalize_placeholder(std::forward<Bindings>(bindings))...);
+		}
 
 		template <typename... Bindings>
-		inline auto forward_as_bindings(Bindings&&... bindings) -> bindings_tuple_t<Bindings...>
-		{
-			return {std::forward<Bindings>(bindings)...};
-		}
+		using bindings_tuple_t = decltype(forward_as_bindings(std::declval<Bindings>()...));
 	}
 
 
@@ -462,8 +435,7 @@ export namespace atma
 			bind_iii_t(FF&& fn, BB&& bindings)
 				: fn_(std::forward<FF>(fn))
 				, bindings_(std::forward<BB>(bindings))
-			{
-			}
+			{}
 
 			decltype(auto) operator ()(Args... args) const
 			{
@@ -617,12 +589,12 @@ export namespace atma
 		// don't unnecessarily wrap a bind expression with no additional bindings
 		if constexpr (std::is_bind_expression_v<rm_ref_t<F>> && sizeof...(Bindings) == 0)
 		{
-			return f;
+			return std::forward<F>(f);
 		}
 		else
 		{
-			auto const memtype_arg = (size_t)std::is_member_function_pointer_v<F>;
-			auto const trailing_arg_count = memtype_arg + function_traits<rm_ref_t<F>>::arity - sizeof...(Bindings);
+			auto const class_type_arg_count = (size_t)std::is_member_function_pointer_v<F>;
+			auto const trailing_arg_count = class_type_arg_count + function_traits<rm_ref_t<F>>::arity - sizeof...(Bindings);
 
 			auto merged_bindings = std::tuple_cat(
 				detail::forward_as_bindings(bindings...),
