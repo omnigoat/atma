@@ -550,6 +550,13 @@ export namespace atma
 	template <typename F, typename... Bindings>
 	inline auto bind(F&& f, Bindings&&... bindings)
 	{
+		constexpr auto bindings_required = (size_t)std::is_member_function_pointer_v<F> + function_traits<rm_ref_t<F>>::arity;
+		
+		static_assert(sizeof...(bindings) == bindings_required,
+			"atma::bind - Incorrect number of arguments supplied. Check the Callable type you "
+			"are binding to, and make sure any binding to a member-function-pointer accounts "
+			"for the instance argument.");
+
 		return bind_t{std::forward<F>(f), detail::forward_as_bindings(bindings...)};
 	}
 
@@ -567,6 +574,13 @@ export namespace atma
 	template <size_t Idx, typename F, typename... Bindings>
 	inline auto bind_from(F&& f, Bindings&&... bindings)
 	{
+		constexpr auto bindings_required = (size_t)std::is_member_function_pointer_v<F> +function_traits<rm_ref_t<F>>::arity - Idx;
+
+		static_assert(sizeof...(bindings) == bindings_required,
+			"atma::bind_from - Incorrect number of arguments supplied. Check the Callable type you "
+			"are binding to, and make sure any binding to a member-function-pointer accounts "
+			"for the instance argument, and also from which index you are binding from.");
+
 		auto merged_bindings = std::tuple_cat(
 			tuple_placeholder_list_t<Idx>(),
 			detail::forward_as_bindings(bindings...));
@@ -577,11 +591,10 @@ export namespace atma
 	//
 	//  curry
 	//  -------
-	//    takes a function, and a list of bindings, and returns a functor taking those bindings
-	//    and any additional implicit bindings.
+	//  takes a function, and a list of bindings, and returns a functor taking those bindings
+	//  and any additional implicit bindings.
 	//
-	//    NOTE: this *does* require function_traits<F> to know the number of arguments, which
-	//          means you can't curry a templated function/functor. deal with it.
+	//  relies on function_traits
 	//
 	template <typename F, typename... Bindings>
 	inline auto curry(F&& f, Bindings&&... bindings)
