@@ -115,9 +115,6 @@
     <ClInclude Include="..\..\include\atma\hash_map.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\idxs.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\intrusive_ptr.hpp">
       <Filter>include</Filter>
     </ClInclude>
