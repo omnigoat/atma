@@ -6,12 +6,6 @@
 import atma.types;
 
 
-// msvc does weird things with its intrinsics
-#pragma warning(push)
-#pragma warning(disable:4305)
-
-
-
 
 namespace atma {
 
@@ -533,4 +527,3 @@ namespace atma {
 	}
 }
 
-#pragma warning(pop)

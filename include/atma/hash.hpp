@@ -1,5 +1,7 @@
 #pragma once
 
+import atma.types;
+
 namespace atma
 {
 	struct hasher_t;
