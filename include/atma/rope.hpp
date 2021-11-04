@@ -1592,16 +1592,6 @@ namespace atma
 	};
 }
 
-namespace atma
-{
-	template <typename T>
-	int fooey()
-	{
-		return 3;
-	}
-}
-
-
 
 namespace atma
 {
