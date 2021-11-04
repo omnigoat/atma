@@ -106,9 +106,6 @@
     <ClInclude Include="..\..\include\atma\function_composition.hpp">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\atma\function_traits.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\atma\hash.hpp">
       <Filter>include</Filter>
     </ClInclude>
@@ -131,9 +128,6 @@
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\atma\tuple.hpp">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\atma\unique_memory.hpp">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\atma\unit_test.hpp">
