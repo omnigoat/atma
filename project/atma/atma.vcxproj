@@ -28,15 +28,12 @@
     <ClCompile Include="..\..\include\atma\memory.cppm" />
     <ClInclude Include="..\..\include\atma\assert.hpp" />
     <ClCompile Include="..\..\include\atma\assert.cppm" />
-    <ClCompile Include="..\..\include\atma\bind.cppm">
-      <FileType>Document</FileType>
-    </ClCompile>
+    <ClCompile Include="..\..\include\atma\bind.cppm" />
     <ClInclude Include="..\..\include\atma\bitmask.hpp" />
     <ClInclude Include="..\..\include\atma\com_ptr.hpp" />
     <ClInclude Include="..\..\include\atma\config\platform.hpp" />
     <ClInclude Include="..\..\include\atma\console.hpp" />
     <ClInclude Include="..\..\include\atma\event.hpp" />
-    <ClInclude Include="..\..\include\atma\function_traits.hpp" />
     <ClInclude Include="..\..\include\atma\hash.hpp" />
     <ClInclude Include="..\..\include\atma\intrusive_ptr.hpp" />
     <ClInclude Include="..\..\include\atma\lockfree\queue.hpp" />
@@ -67,7 +64,6 @@
     <ClInclude Include="..\..\include\atma\thread\engine.hpp" />
     <ClInclude Include="..\..\include\atma\tuple.hpp" />
     <ClCompile Include="..\..\include\atma\types.cppm" />
-    <ClInclude Include="..\..\include\atma\unique_memory.hpp" />
     <ClInclude Include="..\..\include\atma\unit_test.hpp" />
     <ClInclude Include="..\..\include\atma\utf\algorithm.hpp" />
     <ClInclude Include="..\..\include\atma\utf\utf8_string.hpp" />
