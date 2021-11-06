@@ -7,12 +7,13 @@
 #include <atma/string.hpp>
 #include <atma/function.hpp>
 #include <atma/threading.hpp>
-#include <atma/vector.hpp>
 
 #include <memory>
 #include <map>
 #include <chrono>
 #include <set>
+
+import atma.vector;
 
 
 namespace rose
