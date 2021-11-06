@@ -4,10 +4,10 @@
 
 #include <atma/streams.hpp>
 #include <atma/string.hpp>
-#include <atma/unique_memory.hpp>
 
 #include <memory>
 
+import atma.memory;
 
 namespace rose
 {
@@ -129,16 +129,16 @@ namespace rose
 
 	inline auto read_into_memory(file_t& file) -> atma::unique_memory_t
 	{
-		atma::unique_memory_t memory{file.size()};
+		atma::unique_memory_t memory{atma::allocate_n, file.size()};
 		file.read(memory.begin(), file.size());
 		return memory;
 	}
 
 	inline auto read_into_memory_nt(file_t& file) -> atma::unique_memory_t
 	{
-		atma::unique_memory_t memory{file.size()};
+		atma::unique_memory_t memory{atma::allocate_n, file.size()};
 		file.read(memory.begin(), file.size() + 1);
-		memory.begin()[file.size()] = '\0';
+		memory.begin()[file.size()] = static_cast<std::byte>('\0');
 		return memory;
 	}
 
@@ -161,8 +161,9 @@ namespace rose
 				auto newline = std::find(bufp, bufend, '\n');
 				line.append(bufp, newline);
 
-				if (newline != bufend) {
-					fn(line.raw_begin(), line.raw_size());
+				if (newline != bufend)
+				{
+					fn(line.raw_begin(), line.size_bytes());
 					line.clear();
 				}
 
