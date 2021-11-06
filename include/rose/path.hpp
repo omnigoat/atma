@@ -168,7 +168,7 @@ namespace rose
 
 	inline auto path_split_range(atma::string const& p) -> path_range_t
 	{
-		return path_range_t{p.c_str(), p.raw_size()};
+		return path_range_t{p.c_str(), p.size_bytes()};
 	}
 
 	inline auto path_split_range(path_t const& p) -> path_range_t
