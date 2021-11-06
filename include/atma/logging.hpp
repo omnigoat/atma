@@ -400,7 +400,7 @@ namespace atma
 	template <typename MF, typename CF, typename TF>
 	inline auto decode_logging_data(unique_memory_t const& memory, MF&& mf, CF&& cf, TF&& tf) -> void
 	{
-		uchar const* data = memory.begin();
+		std::byte const* data = memory.begin();
 		size_t p = 0;
 
 		mf((log_style_t)data[0]);

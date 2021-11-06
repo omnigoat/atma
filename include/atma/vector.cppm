@@ -432,7 +432,10 @@ export namespace atma
 	{
 		imem_guard_lt(size_ + 1);
 
-		imem_.construct(size_, std::forward<Args>(args)...);
+		memory_construct_at(
+			imem_ + size_,
+			std::forward<Args>(args)...);
+
 		++size_;
 
 		return imem_.ptr[size_ - 1];
