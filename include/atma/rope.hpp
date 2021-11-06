@@ -220,10 +220,6 @@ namespace atma::_rope_
 		node_info_t(text_info_t const& info, node_ptr<RT> const&);
 
 		uint32_t children = 0;
-
-		// weight = total number of leaf-nodes
-		//uint16_t weight = 0;
-
 		node_ptr<RT> node;
 	};
 
@@ -244,6 +240,15 @@ namespace atma::_rope_
 //
 namespace atma::_rope_
 {
+	template <typename RT>
+	struct insert_result_t
+	{
+		node_info_t<RT> lhs;
+		maybe_node_info_t<RT> maybe_rhs;
+	};
+
+	// SERIOUSLY, make edit_result_t derive from insert_result_t I guess
+
 	template <typename RT>
 	struct edit_result_t
 	{
@@ -387,103 +392,389 @@ namespace atma::_rope_
 	}
 }
 
+
+//---------------------------------------------------------------------
 //
-//  node algorithms
+// text algorithms
+// (they aren't templated)
+// 
+//---------------------------------------------------------------------
+namespace atma::_rope_
+{
+	enum class split_bias
+	{
+		// always pick left
+		hard_left,
+		// prefer left
+		left,
+		// prefer right
+		right,
+		// always pick right
+		hard_right,
+	};
+
+	auto is_break(src_buf_t buf, size_t byte_idx) -> bool;
+	auto prev_break(src_buf_t buf, size_t byte_idx) -> size_t;
+	auto next_break(src_buf_t buf, size_t byte_idx) -> size_t;
+
+	auto find_split_point(src_buf_t buf, size_t byte_idx, split_bias bias = split_bias::right) -> size_t;
+	auto find_internal_split_point(src_buf_t buf, size_t byte_idx) -> size_t;
+}
+
+
+
+//---------------------------------------------------------------------
 //
+//  tree algorithms
+//
+//---------------------------------------------------------------------
+namespace atma::_rope_
+{
+	// calculate_text_info
+	template <typename RT>
+	auto calculate_text_info(node_ptr<RT> const& node) -> text_info_t;
+
+	// length :: returns sum number of characters of node & children
+	template <typename RT>
+	auto length(node_ptr<RT> const& x) -> size_t;
+
+	// find_for_char_idx :: returns <index-of-child-node, remaining-characters>
+	template <typename RT>
+	auto find_for_char_idx(node_internal_t<RT> const& x, size_t char_idx) -> std::tuple<size_t, size_t>;
+
+	// edit_chunk_at_char
+	// --------------------
+	// 
+	template <typename RT, typename F>
+	auto edit_chunk_at_char(node_info_t<RT> const& info, size_t char_idx, F f) -> edit_result_t<RT>;
+
+	template <typename F, typename RT>
+	auto for_all_text(F f, node_info_t<RT> const& ri);
+
+	template <typename RT>
+	auto valid_children_count(node_ptr<RT> const& node) -> uint32_t
+	{
+		return !node ? 0 : node->visit(
+			[](node_internal_t<RT> const& x)
+			{
+				return (uint32_t)x.children_range().size();
+			},
+			[](node_leaf_t<RT> const& x) { return 0u; });
+	}
+
+	// fix_seam
+	// ----------
+	// 
+	template <typename RT>
+	inline auto fix_seam(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf) -> edit_result_t<RT>;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//---------------------------------------------------------------------
+//
+//  IMPLEMENTATION :: node_info_t
+//
+//---------------------------------------------------------------------
 namespace atma::_rope_
 {
 	template <typename RT>
-	inline auto length(node_ptr<RT> const& x) -> size_t
-	{
-		return visit(size_t(), x,
-			[](node_internal_t<RT> const& x) { return x.length(); },
-			[](node_leaf_t<RT> const& x) { return size_t(); });
-	}
-
-	// returns: <index-of-child-node, remaining-characters>
-	template <typename RT>
-	inline auto find_for_char_idx(node_internal_t<RT> const& x, size_t char_idx) -> std::tuple<size_t, size_t>
-	{
-		size_t child_idx = 0;
-		size_t acc_chars = 0;
-		for (auto const& child : x.children_range())
-		{
-			if (char_idx <= acc_chars + child.characters)
-				break;
-
-			acc_chars += child.characters;
-			++child_idx;
-		}
-
-		return std::make_tuple(child_idx, char_idx - acc_chars);
-	}
-
-	template <typename RT, typename F>
-	inline auto edit_chunk_at_char(node_info_t<RT> const& info, size_t char_idx, F f) -> edit_result_t<RT>
-	{
-		return info.node->visit(
-			[&, f](node_internal_t<RT>& x)
-			{
-				// find child
-				auto [child_idx, child_rel_idx] = find_for_char_idx(x, char_idx);
-				auto const& child = x.child_at(child_idx);
-
-				// if the node is null, something has gone irrevocably wrong
-				ATMA_ASSERT(child.node);
-
-				// recurse
-				auto [l_info, r_info, has_seam] = edit_chunk_at_char(child, child_rel_idx, f);
-				auto result = x.clone_with(child_idx, l_info, r_info);
-
-				{
-					result.seam = has_seam;
-				}
-
-				return result;
-			},
-
-			[&, f](node_leaf_t<RT>& x) -> edit_result_t<RT>
-			{
-				return std::invoke(f, char_idx, info, x.buf);
-			});
-	}
+	node_info_t<RT>::node_info_t(node_ptr<RT> const& node)
+		: text_info_t{calculate_text_info(node)}
+		, children(valid_children_count(node))
+		, node(node)
+	{}
 
 	template <typename RT>
-	inline auto calculate_text_info(node_ptr<RT> const& node) -> text_info_t
-	{
-		return node->visit(
-			[](node_internal_t<RT> const& x)
-			{
-				return x.calculate_combined_info();
-			},
+	node_info_t<RT>::node_info_t(text_info_t const& info, uint32_t children, node_ptr<RT> const& node)
+		: text_info_t(info)
+		, children(children)
+		, node(node)
+	{}
 
-			[](node_leaf_t<RT> const& x)
-			{
-				return text_info_t::from_str(x.buf.data(), x.buf.size());
-			});
-	}
-
-	template <typename F, typename RT>
-	inline auto for_all_text(F f, node_info_t<RT> const& ri)
-	{
-		if (!ri.node)
-			return;
-
-		ri.node->visit(
-			[f](node_internal_t<RT> const& x)
-			{
-				x.for_each_child(atma::curry(&for_all_text<F, RT>, f));
-			},
-			[&ri, f](node_leaf_t<RT> const& x)
-			{
-				std::invoke(f, ri);
-			});
-	}
-
-
+	template <typename RT>
+	node_info_t<RT>::node_info_t(text_info_t const& info, node_ptr<RT> const& node)
+		: text_info_t(info)
+		, children(valid_children_count(node))
+		, node(node)
+	{}
 }
 
-// something
+
+//---------------------------------------------------------------------
+//
+//  IMPLEMENTATION :: node_internal_t
+//
+//---------------------------------------------------------------------
+namespace atma::_rope_
+{
+	template <typename RT>
+	inline auto node_internal_construct_(size_t& acc_count, node_info_t<RT>* dest, range_of_element_type<node_info_t<RT>> auto&& xs) -> void
+	{
+		for (auto&& x : xs)
+		{
+			atma::memory_construct_at(xfer_dest(dest + acc_count), x);
+			++acc_count;
+		}
+	}
+
+	template <typename RT>
+	inline auto node_internal_construct_(size_t& acc_count, node_info_t<RT>* dest, node_info_t<RT> const& x) -> void
+	{
+		dest[acc_count] = x;
+		++acc_count;
+	}
+
+	template <typename RT>
+	template <typename... Args>
+	inline node_internal_t<RT>::node_internal_t(Args&&... args)
+	{
+		(node_internal_construct_(size_, children_.data(), std::forward<Args>(args)), ...);
+	}
+
+	template <typename RT>
+	inline auto node_internal_t<RT>::length() const -> size_t
+	{
+		size_t result = 0;
+		for (auto const& x : children_range())
+			result += x.characters;
+		return result;
+	}
+
+	template <typename RT>
+	inline auto node_internal_t<RT>::replaceable(size_t idx) const -> bool
+	{
+		return children_[idx].node->visit(
+			[](node_internal_t<RT> const&) { return false; },
+			[&](node_leaf_t<RT> const& x) { return children_[idx].bytes == 0; });
+	}
+
+	// clones 'this', but replaces child node at @idx with the node at @l_info, and inserts @maybe_r_info
+	// if possible. if not it splits 'this' and returns an internal-node containing both nodes split from 'this'
+	template <typename RT>
+	inline auto node_internal_t<RT>::clone_with(size_t idx, node_info_t<RT> const& l_info, std::optional<node_info_t<RT>> const& maybe_r_info) const -> edit_result_t<RT>
+	{
+		//ATMA_ASSERT(idx < child_count_);
+
+		if (maybe_r_info.has_value())
+		{
+			auto const& r_info = *maybe_r_info;
+
+			if (this->replaceable(idx + 1))
+			{
+				auto sn = make_internal_ptr<RT>(
+					xfer_src(children_, idx),
+					l_info, r_info,
+					xfer_src(children_, idx + 2, RT::branching_factor - 2));
+
+				return edit_result_t<RT>{
+					node_info_t<RT>{l_info + r_info, sn},
+						maybe_node_info_t<RT>{}};
+			}
+			else
+			{
+				// something something split
+				auto left_size = RT::branching_factor / 2 + 1;
+				auto right_size = RT::branching_factor / 2;
+
+				node_ptr<RT> ln, rn;
+
+				if (idx < left_size)
+				{
+					ln = make_internal_ptr<RT>(xfer_src(children_, idx), l_info, r_info);
+					rn = make_internal_ptr<RT>(xfer_src(children_, idx, RT::branching_factor - idx - 1));
+				}
+				if (idx + 1 < left_size)
+				{
+					ln = make_internal_ptr<RT>(xfer_src(children_, idx), l_info);
+					rn = make_internal_ptr<RT>(r_info, xfer_src(children_, idx + 1, right_size));
+				}
+				else
+				{
+					ln = make_internal_ptr<RT>(xfer_src(children_, left_size));
+					rn = make_internal_ptr<RT>(l_info, r_info);
+				}
+
+				return edit_result_t<RT>{
+					node_info_t<RT>{ln},
+						node_info_t<RT>{rn}};
+			}
+		}
+		else
+		{
+			auto s = make_internal_ptr<RT>(
+				xfer_src(children_, idx),
+				l_info,
+				xfer_src(children_, idx + 1, RT::branching_factor - idx - 1));
+
+			return edit_result_t<RT>{node_info_t<RT>{l_info, s}, maybe_node_info_t<RT>()};
+		}
+	}
+
+	template <typename RT>
+	inline auto node_internal_t<RT>::calculate_combined_info() const -> text_info_t
+	{
+		return atma::foldl(children_range(), text_info_t(), functors::add);
+	}
+
+	template <typename RT>
+	inline auto node_internal_t<RT>::push(node_info_t<RT> const& x) const -> node_ptr<RT>
+	{
+		//ATMA_ASSERT(child_count_ < branching_factor);
+		return node_ptr<RT>(); ///node_internal_ptr::make(children_, child_count_, x);
+	}
+}
+
+
+//---------------------------------------------------------------------
+//
+//  IMPLEMENTATION :: node_leaf_t
+//
+//---------------------------------------------------------------------
+namespace atma::_rope_
+{
+	template <size_t Extent>
+	inline auto node_leaf_construct_(charbuf_t<Extent>& buf)
+	{}
+
+	template <size_t Extent, typename... Args>
+	inline auto node_leaf_construct_(charbuf_t<Extent>& buf, src_bounded_memxfer_t<char const> x)
+	{
+		buf.append(x);
+	}
+
+	template <typename RT>
+	template <typename... Args>
+	inline node_leaf_t<RT>::node_leaf_t(Args&&... args)
+	{
+#if ATMA_ROPE_DEBUG_BUFFER
+		atma::memory_value_construct(atma::xfer_dest(buf, RT::buf_size));
+#endif
+
+		(node_leaf_construct_(buf, std::forward<Args>(args)), ...);
+	}
+}
+
+
+//---------------------------------------------------------------------
+//
+//  IMPLEMENTATION :: node_t
+//
+//---------------------------------------------------------------------
+namespace atma::_rope_
+{
+	template <typename RT>
+	inline node_t<RT>::node_t(node_internal_t<RT> const& x)
+		: variant_{x}
+	{}
+
+	template <typename RT>
+	inline node_t<RT>::node_t(node_leaf_t<RT> const& x)
+		: variant_{x}
+	{}
+
+	template <typename RT>
+	inline bool node_t<RT>::is_internal() const
+	{
+		return variant_.index() == 0;
+	}
+
+	template <typename RT>
+	inline bool node_t<RT>::is_leaf() const
+	{
+		return variant_.index() == 1;
+	}
+
+	template <typename RT>
+	inline auto node_t<RT>::known_internal() -> node_internal_t<RT>&
+	{
+		return std::get<node_internal_t<RT>>(variant_);
+	}
+
+	template <typename RT>
+	inline auto node_t<RT>::known_leaf() -> node_leaf_t<RT>&
+	{
+		return std::get<node_leaf_t<RT>>(variant_);
+	}
+
+	// visit node with functors
+	template <typename RT>
+	template <typename... Args>
+	inline auto node_t<RT>::visit(Args&&... args)
+	{
+		return std::visit(visit_with{std::forward<Args>(args)...}, variant_);
+	}
+}
+
+
+
+//---------------------------------------------------------------------
+//
+//  IMPLEMENTATION :: text algorithms
+//
+//---------------------------------------------------------------------
 namespace atma::_rope_
 {
 	inline auto is_break(src_buf_t buf, size_t byte_idx) -> bool
@@ -521,19 +812,7 @@ namespace atma::_rope_
 		return i;
 	}
 
-	enum class split_bias
-	{
-		// always pick left
-		hard_left,
-		// prefer left
-		left,
-		// prefer right
-		right,
-		// always pick right
-		hard_right,
-	};
-
-	inline auto find_split_point(src_buf_t buf, size_t byte_idx, split_bias bias = split_bias::right) -> size_t
+	inline auto find_split_point(src_buf_t buf, size_t byte_idx, split_bias bias) -> size_t
 	{
 		size_t const left = is_break(buf, byte_idx)
 			? byte_idx
@@ -667,13 +946,104 @@ namespace atma::_rope_
 
 
 
+//---------------------------------------------------------------------
+//
+//  IMPLEMENTATION :: tree algorithms
+//
+//---------------------------------------------------------------------
 namespace atma::_rope_
 {
 	template <typename RT>
-	inline auto fix_seam(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf)
+	inline auto length(node_ptr<RT> const& x) -> size_t
 	{
-		//auto cr = _rope_::src_buf_t("\015", 1);
+		return visit(size_t(), x,
+			[](node_internal_t<RT> const& x) { return x.length(); },
+			[](node_leaf_t<RT> const& x) { return size_t(); });
+	}
 
+	// returns: <index-of-child-node, remaining-characters>
+	template <typename RT>
+	inline auto find_for_char_idx(node_internal_t<RT> const& x, size_t char_idx) -> std::tuple<size_t, size_t>
+	{
+		size_t child_idx = 0;
+		size_t acc_chars = 0;
+		for (auto const& child : x.children_range())
+		{
+			if (char_idx <= acc_chars + child.characters)
+				break;
+
+			acc_chars += child.characters;
+			++child_idx;
+		}
+
+		return std::make_tuple(child_idx, char_idx - acc_chars);
+	}
+
+	template <typename RT, typename F>
+	inline auto edit_chunk_at_char(node_info_t<RT> const& info, size_t char_idx, F f) -> edit_result_t<RT>
+	{
+		return info.node->visit(
+			[&, f](node_internal_t<RT>& x)
+			{
+				// find child
+				auto [child_idx, child_rel_idx] = find_for_char_idx(x, char_idx);
+				auto const& child = x.child_at(child_idx);
+
+				// if the node is null, something has gone irrevocably wrong
+				ATMA_ASSERT(child.node);
+
+				// recurse
+				auto [l_info, r_info, has_seam] = edit_chunk_at_char(child, child_rel_idx, f);
+				auto result = x.clone_with(child_idx, l_info, r_info);
+
+				{
+					result.seam = has_seam;
+				}
+
+				return result;
+			},
+
+			[&, f](node_leaf_t<RT>& x) -> edit_result_t<RT>
+			{
+				return std::invoke(f, char_idx, info, x.buf);
+			});
+	}
+
+	template <typename RT>
+	inline auto calculate_text_info(node_ptr<RT> const& node) -> text_info_t
+	{
+		return node->visit(
+			[](node_internal_t<RT> const& x)
+			{
+				return x.calculate_combined_info();
+			},
+
+			[](node_leaf_t<RT> const& x)
+			{
+				return text_info_t::from_str(x.buf.data(), x.buf.size());
+			});
+	}
+
+	template <typename F, typename RT>
+	inline auto for_all_text(F f, node_info_t<RT> const& ri)
+	{
+		if (!ri.node)
+			return;
+
+		ri.node->visit(
+			[f](node_internal_t<RT> const& x)
+			{
+				x.for_each_child(atma::curry(&for_all_text<F, RT>, f));
+			},
+			[&ri, f](node_leaf_t<RT> const& x)
+			{
+				std::invoke(f, ri);
+			});
+	}
+
+	template <typename RT>
+	inline auto fix_seam(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf) -> edit_result_t<RT>
+	{
 		auto const new_buf_size = buf.size() + 1;
 
 		// by definition, we should have enough space in any leaf-node to fix a seam
@@ -690,7 +1060,7 @@ namespace atma::_rope_
 				leaf_info.characters + 1,
 				leaf_info.line_breaks + (buf[leaf_info.bytes] != linebreaks::CR)};
 
-			return _rope_::edit_result_t<RT>{new_leaf_info};
+			return edit_result_t<RT>{new_leaf_info};
 		}
 		// buffer-size small enough to reallocate the node
 		else if (new_buf_size < RT::buf_edit_split_size)
@@ -709,7 +1079,7 @@ namespace atma::_rope_
 
 			auto new_leaf_info = node_info_t<RT>{new_text_info, new_node};
 
-			return _rope_::edit_result_t<RT>{new_leaf_info};
+			return edit_result_t<RT>{new_leaf_info};
 		}
 		// split the node
 		else
@@ -722,268 +1092,13 @@ namespace atma::_rope_
 				xfer_src(leaf.buf),
 				xfer_src(buf), byte_idx);
 
-			//lhs_info.characters = (uint32_t)char_idx;
-			//lhs_info.bytes = (uint32_t)byte_idx;
-			//
-			//rhs_info.bytes = (uint32_t)(leaf_info.bytes - byte_idx);
-			//rhs_info.characters = (uint32_t)(leaf_info.characters - char_idx);
 			auto rhs_node = _rope_::make_leaf_ptr<RT>(
 				xfer_src(buf, lhs_info.bytes, rhs_info.bytes));
 
-			return _rope_::edit_result_t<RT>{lhs_info, _rope_::node_info_t<RT>{rhs_info, rhs_node}};
+			return edit_result_t<RT>{lhs_info, _rope_::node_info_t<RT>{rhs_info, rhs_node}};
 		}
 
 	}
-
-}
-
-
-// node_info_t implementation
-namespace atma::_rope_
-{
-	template <typename RT>
-	auto valid_children_count(node_ptr<RT> const& node) -> uint32_t
-	{
-		return !node ? 0 : node->visit(
-				[](node_internal_t<RT> const& x)
-				{
-					return (uint32_t)x.children_range().size();
-				},
-				[](node_leaf_t<RT> const& x) { return 0u; });
-	}
-
-	template <typename RT>
-	node_info_t<RT>::node_info_t(node_ptr<RT> const& node)
-		: text_info_t{calculate_text_info(node)}
-		, children(valid_children_count(node))
-		, node(node)
-	{}
-
-	template <typename RT>
-	node_info_t<RT>::node_info_t(text_info_t const& info, uint32_t children, node_ptr<RT> const& node)
-		: text_info_t(info)
-		, children(children)
-		, node(node)
-	{}
-
-	template <typename RT>
-	node_info_t<RT>::node_info_t(text_info_t const& info, node_ptr<RT> const& node)
-		: text_info_t(info)
-		, children(valid_children_count(node))
-		, node(node)
-	{}
-}
-
-
-
-//
-// node_internal_t implementation
-//
-namespace atma::_rope_
-{
-	template <typename RT>
-	inline auto node_internal_construct_(size_t& acc_count, node_info_t<RT>* dest, range_of_element_type<node_info_t<RT>> auto&& xs) -> void
-	{
-		for (auto&& x : xs)
-		{
-			atma::memory_construct_at(xfer_dest(dest + acc_count), x);
-			++acc_count;
-		}
-	}
-
-	template <typename RT>
-	inline auto node_internal_construct_(size_t& acc_count, node_info_t<RT>* dest, node_info_t<RT> const& x) -> void
-	{
-		dest[acc_count] = x;
-		++acc_count;
-	}
-
-	template <typename RT>
-	template <typename... Args>
-	inline node_internal_t<RT>::node_internal_t(Args&&... args)
-	{
-		(node_internal_construct_(size_, children_.data(), std::forward<Args>(args)), ...);
-	}
-
-	template <typename RT>
-	inline auto node_internal_t<RT>::length() const -> size_t
-	{
-		size_t result = 0;
-		for (auto const& x : children_range())
-			result += x.characters;
-		return result;
-	}
-
-	template <typename RT>
-	inline auto node_internal_t<RT>::replaceable(size_t idx) const -> bool
-	{
-		return children_[idx].node->visit(
-			[](node_internal_t<RT> const&) { return false; },
-			[&](node_leaf_t<RT> const& x) { return children_[idx].bytes == 0; });
-	}
-
-	// clones 'this', but replaces child node at @idx with the node at @l_info, and inserts @maybe_r_info
-	// if possible. if not it splits 'this' and returns an internal-node containing both nodes split from 'this'
-	template <typename RT>
-	inline auto node_internal_t<RT>::clone_with(size_t idx, node_info_t<RT> const& l_info, std::optional<node_info_t<RT>> const& maybe_r_info) const -> edit_result_t<RT>
-	{
-		//ATMA_ASSERT(idx < child_count_);
-
-		if (maybe_r_info.has_value())
-		{
-			auto const& r_info = *maybe_r_info;
-
-			if (this->replaceable(idx + 1))
-			{
-				auto sn = make_internal_ptr<RT>(
-					xfer_src(children_, idx),
-					l_info, r_info,
-					xfer_src(children_, idx + 2, RT::branching_factor - 2));
-
-				return edit_result_t<RT>{
-					node_info_t<RT>{l_info + r_info, sn},
-						maybe_node_info_t<RT>{}};
-			}
-			else
-			{
-				// something something split
-				auto left_size = RT::branching_factor / 2 + 1;
-				auto right_size = RT::branching_factor / 2;
-
-				node_ptr<RT> ln, rn;
-
-				if (idx < left_size)
-				{
-					ln = make_internal_ptr<RT>(xfer_src(children_, idx), l_info, r_info);
-					rn = make_internal_ptr<RT>(xfer_src(children_, idx, RT::branching_factor - idx - 1));
-				}
-				if (idx + 1 < left_size)
-				{
-					ln = make_internal_ptr<RT>(xfer_src(children_, idx), l_info);
-					rn = make_internal_ptr<RT>(r_info, xfer_src(children_, idx + 1, right_size));
-				}
-				else
-				{
-					ln = make_internal_ptr<RT>(xfer_src(children_, left_size));
-					rn = make_internal_ptr<RT>(l_info, r_info);
-				}
-
-				return edit_result_t<RT>{
-					node_info_t<RT>{ln},
-						node_info_t<RT>{rn}};
-			}
-		}
-		else
-		{
-			auto s = make_internal_ptr<RT>(
-				xfer_src(children_, idx),
-				l_info,
-				xfer_src(children_, idx + 1, RT::branching_factor - idx - 1));
-
-			return edit_result_t<RT>{node_info_t<RT>{l_info, s}, maybe_node_info_t<RT>()};
-		}
-	}
-
-	template <typename RT>
-	inline auto node_internal_t<RT>::calculate_combined_info() const -> text_info_t
-	{
-		return atma::foldl(children_range(), text_info_t(), functors::add);
-	}
-
-	template <typename RT>
-	inline auto node_internal_t<RT>::push(node_info_t<RT> const& x) const -> node_ptr<RT>
-	{
-		//ATMA_ASSERT(child_count_ < branching_factor);
-		return node_ptr<RT>(); ///node_internal_ptr::make(children_, child_count_, x);
-	}
-}
-
-//
-// node_leaf_t implementation
-//
-namespace atma::_rope_
-{
-	template <size_t Extent>
-	inline auto node_leaf_construct_(charbuf_t<Extent>& buf)
-	{}
-
-	template <size_t Extent, typename... Args>
-	inline auto node_leaf_construct_(charbuf_t<Extent>& buf, src_bounded_memxfer_t<char const> x)
-	{
-		buf.append(x);
-	}
-
-	template <typename RT>
-	template <typename... Args>
-	inline node_leaf_t<RT>::node_leaf_t(Args&&... args)
-	{
-#if ATMA_ROPE_DEBUG_BUFFER
-		atma::memory_value_construct(atma::xfer_dest(buf, RT::buf_size));
-#endif
-
-		(node_leaf_construct_(buf, std::forward<Args>(args)), ...);
-	}
-}
-
-//
-// node_t implementation
-//
-namespace atma::_rope_
-{
-	template <typename RT>
-	node_t<RT>::node_t(node_internal_t<RT> const& x)
-		: variant_{x}
-	{}
-
-	template <typename RT>
-	node_t<RT>::node_t(node_leaf_t<RT> const& x)
-		: variant_{x}
-	{}
-
-	template <typename RT>
-	bool node_t<RT>::is_internal() const
-	{
-		return variant_.index() == 0;
-	}
-
-	template <typename RT>
-	bool node_t<RT>::is_leaf() const
-	{
-		return variant_.index() == 1;
-	}
-
-	template <typename RT>
-	auto node_t<RT>::known_internal() -> node_internal_t<RT>&
-	{
-		return std::get<node_internal_t<RT>>(variant_);
-	}
-
-	template <typename RT>
-	auto node_t<RT>::known_leaf() -> node_leaf_t<RT>&
-	{
-		return std::get<node_leaf_t<RT>>(variant_);
-	}
-
-	// visit node with functors
-	template <typename RT>
-	template <typename... Args>
-	auto node_t<RT>::visit(Args&&... args)
-	{
-		return std::visit(visit_with{std::forward<Args>(args)...}, variant_);
-	}
-}
-
-
-
-// algorithms
-namespace atma::_rope_
-{
-	template <typename RT>
-	struct insert_result_t
-	{
-		node_info_t<RT> lhs;
-		maybe_node_info_t<RT> maybe_rhs;
-	};
 
 	template <typename RT>
 	inline auto replace_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& repl_info) -> insert_result_t<RT>
@@ -1172,6 +1287,77 @@ namespace atma::_rope_
 	}
 
 
+	constexpr struct _validate_rope_
+	{
+	private:
+		using check_node_result_type = std::tuple<bool, uint>;
+
+		template <typename RT>
+		static auto check_node(node_info_t<RT> const& info, size_t min_children = RT::minimum_branches) -> check_node_result_type
+		{
+			ATMA_ASSERT(info.node);
+
+			return info.node->visit(
+				[&info, min_children](node_internal_t<RT> const& internal_node)
+				{
+					if (info.children < min_children)
+						return std::make_tuple(false, uint());
+
+					auto r = singular_result(internal_node.children_range(), atma::bind_from<1>(&check_node<RT>, RT::minimum_branches));
+
+					if (r.has_value())
+					{
+						auto const& [good, depth] = r.value();
+						return check_node_result_type{good, depth + 1};
+					}
+					else
+					{
+						// our children had different depths, return 1 as the depth to
+						// indicate on which level things went wrong
+						return check_node_result_type{false, 1};
+					}
+				},
+				[](node_leaf_t<RT> const& leaf) -> check_node_result_type
+				{
+					return {true, 1};
+				});
+		}
+
+	public:
+		template <typename RT>
+		auto operator ()(node_info_t<RT> const& x) const -> bool
+		{
+			// assume we're passed the root (hence '2' as the minimum branch)
+			return std::get<0>(check_node(x, 2));
+		}
+
+	} validate_rope_;
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+namespace atma::_rope_
+{
 	//
 	//
 	//
@@ -1410,59 +1596,6 @@ namespace atma::_rope_
 
 
 	// returns std::tuple<bool, std::optional<R>> if all elements were equal, optional has the value
-
-
-
-	constexpr struct _validate_rope_
-	{
-	private:
-		using check_node_result_type = std::tuple<bool, uint>;
-
-		template <typename RT>
-		static auto check_node(node_info_t<RT> const& info, size_t min_children = RT::minimum_branches) -> check_node_result_type
-		{
-			ATMA_ASSERT(info.node);
-
-			return info.node->visit(
-				[&info, min_children](node_internal_t<RT> const& internal_node)
-				{
-					if (info.children < min_children)
-						return std::make_tuple(false, uint());
-					
-					auto r = singular_result(internal_node.children_range(), atma::bind_from<1>(&check_node<RT>, RT::minimum_branches));
-
-					if (r.has_value())
-					{
-						auto const& [good, depth] = r.value();
-						return check_node_result_type{good, depth + 1};
-					}
-					else
-					{
-						// our children had different depths, return 1 as the depth to
-						// indicate on which level things went wrong
-						return check_node_result_type{false, 1};
-					}
-				},
-				[](node_leaf_t<RT> const& leaf) -> check_node_result_type
-				{
-					return {true, 1};
-				});
-		}
-
-	public:
-		template <typename RT>
-		auto operator ()(node_info_t<RT> const& x) const -> bool
-		{
-			// assume we're passed the root (hence '2' as the minimum branch)
-			return std::get<0>(check_node(x, 2));
-		}
-
-	} validate_rope_;
-	
-
-
-
-
 
 
 
