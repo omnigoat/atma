@@ -516,7 +516,7 @@ SCENARIO("atma::rope's internal operations work")
 		auto r = atma::_rope_::build_rope_niave<T>(atma::xfer_src(
 			"hello there, this is your captain speaking. "
 			"unfortunately we forgot to fill up the plane "
-			"before takeoff, sorry for the inconvenience, "
+			"before takeoff. sorry for the inconvenience, "
 			"but I'm going to need some upstanding people "
 			"to get out and push us to the closest petrol "
 			"station. for your efforts you'll be rewarded "
@@ -524,6 +524,27 @@ SCENARIO("atma::rope's internal operations work")
 			"any store within the food court."
 		));
 
+		//auto postEresult = atma::_rope_::insert_<T>(internal_info, 2, E_info);
+		//auto postFresult = atma::_rope_::insert_<T>(internal_node, 0, F_info);
+	}
+
+	GIVEN("a default-constructed rope")
+	{
+
+		test_rope_t rope;
+
+		auto r = atma::_rope_::build_rope_.operator ()<T>(atma::xfer_src(
+			"hello there, this is your captain speaking.  \n"
+			"unfortunately we forgot to fill up the plane \n"
+			"before takeoff. sorry for the inconvenience, \n"
+			"but I'm going to need some upstanding people \n"
+			"to get out and push us to the closest petrol \n"
+			"station. for your efforts you'll be rewarded \n"
+			"with a $50 gift-coupon that is redeemable at \n"
+			"any store within the food court."
+		));
+
+		std::cout << r << std::endl;
 		//auto postEresult = atma::_rope_::insert_<T>(internal_info, 2, E_info);
 		//auto postFresult = atma::_rope_::insert_<T>(internal_node, 0, F_info);
 	}
