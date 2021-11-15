@@ -473,6 +473,32 @@ namespace atma::_rope_
 
 
 
+//---------------------------------------------------------------------
+//
+//  rope
+//
+//---------------------------------------------------------------------
+namespace atma
+{
+	template <typename RopeTraits>
+	struct basic_rope_t
+	{
+		basic_rope_t();
+
+		auto push_back(char const*, size_t) -> void;
+		auto insert(size_t char_idx, char const* str, size_t sz) -> void;
+
+		template <typename F>
+		auto for_all_text(F&& f) const;
+
+		decltype(auto) root() { return (root_); }
+
+	private:
+		_rope_::node_info_t<RopeTraits> root_;
+	};
+}
+
+
 
 
 
@@ -1696,51 +1722,21 @@ namespace atma::_rope_
 
 
 
-
-
-
-namespace atma
-{
-	template <typename RopeTraits>
-	struct basic_rope_t
-	{
-		basic_rope_t();
-
-		auto push_back(char const*, size_t) -> void;
-		auto insert(size_t char_idx, char const* str, size_t sz) -> void;
-
-		template <typename RT2>
-		friend std::ostream& operator << (std::ostream&, basic_rope_t<RT2> const&);
-
-		template <typename F>
-		auto for_all_text(F&& f) const
-		{
-			_rope_::for_all_text(std::forward<F>(f), root_);
-		}
-
-		decltype(auto) root() { return root_; }
-
-	private:
-		_rope_::node_info_t<RopeTraits> root_;
-	};
-}
-
-
 namespace atma
 {
 	template <typename RT>
-	basic_rope_t<RT>::basic_rope_t()
+	inline basic_rope_t<RT>::basic_rope_t()
 		: root_(_rope_::make_leaf_ptr<RT>())
 	{}
 
 	template <typename RT>
-	auto basic_rope_t<RT>::push_back(char const* str, size_t sz) -> void
+	inline auto basic_rope_t<RT>::push_back(char const* str, size_t sz) -> void
 	{
 		this->insert(root_.characters, str, sz);
 	}
 
 	template <typename RT>
-	auto basic_rope_t<RT>::insert(size_t char_idx, char const* str, size_t sz) -> void
+	inline auto basic_rope_t<RT>::insert(size_t char_idx, char const* str, size_t sz) -> void
 	{
 		ATMA_ASSERT(char_idx <= root_.characters);
 
@@ -1764,7 +1760,14 @@ namespace atma
 	}
 
 	template <typename RT>
-	std::ostream& operator << (std::ostream& stream, basic_rope_t<RT> const& x)
+	template <typename F>
+	inline auto basic_rope_t<RT>::for_all_text(F&& f) const
+	{
+		_rope_::for_all_text(std::forward<F>(f), root_);
+	}
+
+	template <typename RT>
+	inline std::ostream& operator << (std::ostream& stream, basic_rope_t<RT> const& x)
 	{
 		x.for_all_text(
 			[&stream](_rope_::node_info_t<RT> const& info)
