@@ -1391,160 +1391,167 @@ namespace atma::_rope_
 		return (x + y - 1) / y;
 	}
 
+	template <typename RT>
 	struct build_rope_t_
 	{
-		template <typename RT>
-		inline static constexpr size_t max_level_size_v = RT::branching_factor + ceil_div<size_t>(RT::branching_factor, 2u);
+		inline static constexpr size_t max_level_size = RT::branching_factor + ceil_div<size_t>(RT::branching_factor, 2u);
 
-		template <typename RT> using level_t = std::tuple<size_t, std::array<node_info_t<RT>, max_level_size_v<RT>>>;
-		template <typename RT> using level_stack_t = std::list<level_t<RT>>;
+		using level_t = std::tuple<size_t, std::array<node_info_t<RT>, max_level_size>>;
+		using level_stack_t = std::list<level_t>;
 
-		template <typename RT> auto stack_level(level_stack_t<RT>& stack, size_t level) const -> level_t<RT>&
-		{
-			auto i = stack.begin();
-			std::advance(i, level);
-			return *i;
-		}
+		auto stack_level(level_stack_t& stack, size_t level) const -> level_t&;
+		decltype(auto) stack_level_size(level_stack_t& stack, size_t level) const { return std::get<0>(stack_level(stack, level)); }
+		decltype(auto) stack_level_array(level_stack_t& stack, size_t level) const { return std::get<1>(stack_level(stack, level)); }
+		decltype(auto) stack_level_size(level_t const& x) const { return std::get<0>(x); }
+		decltype(auto) stack_level_array(level_t const& x) const { return std::get<1>(x); }
 
-		template <typename RT> decltype(auto) stack_level_size(level_stack_t<RT>& stack, size_t level) const { return std::get<0>(stack_level(stack, level)); }
-		template <typename RT> decltype(auto) stack_level_array(level_stack_t<RT>& stack, size_t level) const { return std::get<1>(stack_level(stack, level)); }
+		void stack_push(level_stack_t& stack, int level, node_info_t<RT> const& insertee) const;
+		auto stack_finish(level_stack_t& stack) const -> node_info_t<RT>;
 
-		template <typename RT> decltype(auto) stack_level_size(level_t<RT> const& x) const { return std::get<0>(x); }
-		template <typename RT> decltype(auto) stack_level_array(level_t<RT> const& x) const { return std::get<1>(x); }
-
-		template <typename RT>
-		void stack_push(level_stack_t<RT>& stack, int level, node_info_t<RT> const& insertee) const
-		{
-			// if we're asking for one level more than we currently have, assume it's
-			// a correctly functioning request and create it
-			if (level == stack.size())
-			{
-				stack.emplace_back();
-			}
-
-			// if we've reached maximum capacity of this level, then we _definitely_
-			// have enough nodes to create at least two nodes one level higher
-			if (stack_level_size(stack, level) == max_level_size_v<RT>)
-			{
-				auto& array = stack_level_array(stack, level);
-
-				// take the @bf leftmost nodes and construct a node one level higher
-				node_info_t<RT> higher_level_node{make_internal_ptr<RT>(
-					xfer_src(array.data(), RT::branching_factor) )};
-
-				// erase those node-infos and move the trailing ones to the front
-				// don't forget to reset the size
-				{
-					auto const remainder_size = max_level_size_v<RT> - RT::branching_factor;
-
-					atma::memory_default_construct(
-						xfer_dest(array.data(), RT::branching_factor));
-
-					atma::memory_copy(
-						xfer_dest(array.data(), remainder_size),
-						xfer_src(array.data() + RT::branching_factor));
-
-					atma::memory_default_construct(
-						xfer_dest(array.data() + RT::branching_factor, remainder_size));
-
-					stack_level_size(stack, level) = remainder_size;
-				}
-
-				// insert our higher-level node into our stack one level higher
-				stack_push(stack, level + 1, higher_level_node);
-			}
-
-			// insert our node
-			auto& array = stack_level_array(stack, level);
-			array[stack_level_size(stack, level)++] = insertee;
-		}
-
-		template <typename RT>
-		auto stack_finish(level_stack_t<RT>& stack) const -> node_info_t<RT>
-		{
-			int i = 0;
-			for (auto level_iter = stack.begin(); level_iter != stack.end(); ++level_iter, ++i)
-			{
-				auto const level_size = stack_level_size(*level_iter);
-				auto const& level_array = stack_level_array(*level_iter);
-				
-				if (i == stack.size() - 1 && level_size == 1)
-				{
-					// we're at the top-most level and we have one node. that
-					// means we have our root. this is our terminating condition.
-
-					return level_array[0];
-				}
-				else if (level_size <= RT::branching_factor)
-				{
-					// we don't have too many nodes (by design of algorithm, we
-					// have between branching-facotr/2 to branching-factor), so
-					// we can put them into one internal node and insert that above
-
-					node_info_t<RT> higher_level_node{make_internal_ptr<RT>(
-						xfer_src(level_array.data(), level_size))};
-
-					stack_push(stack, i + 1, higher_level_node);
-				}
-				else
-				{
-					// we have too many nodes to roll up into one internal node, so
-					// split the remaining nodes into two, making sure to balance
-					// them as to not invalidate the invariants of the btree
-
-					auto const lhs_size = ceil_div<size_t>(level_size, 2);
-					auto const rhs_size = level_size - lhs_size;
-
-					node_info_t<RT> higher_level_lhs_node{make_internal_ptr<RT>(
-						xfer_src(level_array.data(), lhs_size))};
-
-					node_info_t<RT> higher_level_rhs_node{make_internal_ptr<RT>(
-						xfer_src(level_array.data() + lhs_size, rhs_size))};
-
-					stack_push(stack, i + 1, higher_level_lhs_node);
-					stack_push(stack, i + 1, higher_level_rhs_node);
-				}
-			}
-
-			return node_info_t<RT>{};
-		}
-
-		template <typename RT>
-		auto operator ()(src_buf_t str) const -> basic_rope_t<RT>
-		{
-			// remove null terminator if necessary
-			if (str[str.size() - 1] == '\0')
-				str = str.take(str.size() - 1);
-
-			level_stack_t<RT> stack{1};
-
-			// case 1. the str is small enough to just be inserted as a leaf
-			while (!str.empty())
-			{
-				size_t candidate_split_idx = std::min(str.size(), RT::buf_size);
-				auto split_idx = find_split_point(str, candidate_split_idx, split_bias::hard_left);
-
-				auto leaf_text = str.take(split_idx);
-				str = str.skip(split_idx);
-
-				auto new_leaf = node_info_t<RT>{make_leaf_ptr<RT>(leaf_text)};
-
-				stack_push(stack, 0, new_leaf);
-			}
-
-			// stack fixup
-			auto r = stack_finish(stack);
-			basic_rope_t<RT> result;
-			result.root() = r;
-			return result;
-		}
+		auto operator ()(src_buf_t str) const -> basic_rope_t<RT>;
 	};
 
-	inline constexpr build_rope_t_ build_rope_;
+	template <typename RT>
+	inline constexpr build_rope_t_<RT> build_rope_;
 }
 
+namespace atma::_rope_
+{
+	template <typename RT>
+	inline auto build_rope_t_<RT>::stack_level(level_stack_t& stack, size_t level) const -> level_t&
+	{
+		auto i = stack.begin();
+		std::advance(i, level);
+		return *i;
+	}
 
+	template <typename RT>
+	inline void build_rope_t_<RT>::stack_push(level_stack_t& stack, int level, node_info_t<RT> const& insertee) const
+	{
+		// if we're asking for one level more than we currently have, assume it's
+		// a correctly functioning request and create it
+		if (level == stack.size())
+		{
+			stack.emplace_back();
+		}
 
+		// if we've reached maximum capacity of this level, then we _definitely_
+		// have enough nodes to create at least two nodes one level higher
+		if (stack_level_size(stack, level) == max_level_size)
+		{
+			auto& array = stack_level_array(stack, level);
+
+			// take the @bf leftmost nodes and construct a node one level higher
+			node_info_t<RT> higher_level_node{make_internal_ptr<RT>(
+				xfer_src(array.data(), RT::branching_factor))};
+
+			// erase those node-infos and move the trailing ones to the front
+			// don't forget to reset the size
+			{
+				auto const remainder_size = max_level_size - RT::branching_factor;
+
+				atma::memory_default_construct(
+					xfer_dest(array.data(), RT::branching_factor));
+
+				atma::memory_copy(
+					xfer_dest(array.data(), remainder_size),
+					xfer_src(array.data() + RT::branching_factor));
+
+				atma::memory_default_construct(
+					xfer_dest(array.data() + RT::branching_factor, remainder_size));
+
+				stack_level_size(stack, level) = remainder_size;
+			}
+
+			// insert our higher-level node into our stack one level higher
+			stack_push(stack, level + 1, higher_level_node);
+		}
+
+		// insert our node
+		auto& array = stack_level_array(stack, level);
+		array[stack_level_size(stack, level)++] = insertee;
+	}
+
+	template <typename RT>
+	inline auto build_rope_t_<RT>::stack_finish(level_stack_t& stack) const -> node_info_t<RT>
+	{
+		int i = 0;
+		for (auto level_iter = stack.begin(); level_iter != stack.end(); ++level_iter, ++i)
+		{
+			auto const level_size = stack_level_size(*level_iter);
+			auto const& level_array = stack_level_array(*level_iter);
+
+			if (i == stack.size() - 1 && level_size == 1)
+			{
+				// we're at the top-most level and we have one node. that
+				// means we have our root. this is our terminating condition.
+
+				return level_array[0];
+			}
+			else if (level_size <= RT::branching_factor)
+			{
+				// we don't have too many nodes (by design of algorithm, we
+				// have between branching-facotr/2 to branching-factor), so
+				// we can put them into one internal node and insert that above
+
+				node_info_t<RT> higher_level_node{make_internal_ptr<RT>(
+					xfer_src(level_array.data(), level_size))};
+
+				stack_push(stack, i + 1, higher_level_node);
+			}
+			else
+			{
+				// we have too many nodes to roll up into one internal node, so
+				// split the remaining nodes into two, making sure to balance
+				// them as to not invalidate the invariants of the btree
+
+				auto const lhs_size = ceil_div<size_t>(level_size, 2);
+				auto const rhs_size = level_size - lhs_size;
+
+				node_info_t<RT> higher_level_lhs_node{make_internal_ptr<RT>(
+					xfer_src(level_array.data(), lhs_size))};
+
+				node_info_t<RT> higher_level_rhs_node{make_internal_ptr<RT>(
+					xfer_src(level_array.data() + lhs_size, rhs_size))};
+
+				stack_push(stack, i + 1, higher_level_lhs_node);
+				stack_push(stack, i + 1, higher_level_rhs_node);
+			}
+		}
+
+		return node_info_t<RT>{};
+	}
+
+	template <typename RT>
+	inline auto build_rope_t_<RT>::operator ()(src_buf_t str) const -> basic_rope_t<RT>
+	{
+		// remove null terminator if necessary
+		if (str[str.size() - 1] == '\0')
+			str = str.take(str.size() - 1);
+
+		level_stack_t stack;
+
+		// case 1. the str is small enough to just be inserted as a leaf
+		while (!str.empty())
+		{
+			size_t candidate_split_idx = std::min(str.size(), RT::buf_size);
+			auto split_idx = find_split_point(str, candidate_split_idx, split_bias::hard_left);
+
+			auto leaf_text = str.take(split_idx);
+			str = str.skip(split_idx);
+
+			auto new_leaf = node_info_t<RT>{make_leaf_ptr<RT>(leaf_text)};
+
+			stack_push(stack, 0, new_leaf);
+		}
+
+		// stack fixup
+		auto r = stack_finish(stack);
+		basic_rope_t<RT> result;
+		result.root() = r;
+		return result;
+	}
+}
 
 
 
