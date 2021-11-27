@@ -1614,51 +1614,9 @@ namespace atma::_rope_
 	//
 	//
 	//
-#if 0
-	template <typename RT>
-	using node_info_stack_t = std::vector<node_info_t<RT>*>;
 
-	constexpr struct _insert_node_
-	{
-		template <typename RT>
-		auto operator ()(node_info_stack_t<RT>& stack, node_ptr<RT> dest, size_t idx, node_ptr<RT> ins) const -> node_info_t<RT>
-		{
-			node_info_t<RT> ins_info{ins};
-			return this->operator ()(stack, dest, idx, ins_info);
-		}
 
-		template <typename RT>
-		auto operator ()(node_info_stack_t<RT>& stack, node_ptr<RT> dest, size_t idx, node_info_t<RT> ins_info) const -> node_info_t<RT>
-		{
-			ATMA_ASSERT(!stack.empty());
-			ATMA_ASSERT(dest->is_internal());
-			//ATMA_ASSERT(ins->is_leaf());
-
-			auto& desti = dest->known_internal();
-
-			auto* info = stack.top();
-			ATMA_ASSERT(info->node == dest);
-
-			// no space to insert this node, we must split
-			if (desti.empty_range().empty())
-			{
-
-			}
-
-			return stack.pop();
-		}
-
-	private:
-		//template <typename RT>
-		//auto insert_(node_info_t<RT>& result, node_info_stack_t<RT>& stack, node_info_t<RT>& dest, node_ptr<RT> ins) const -> node_info_t<RT>
-		//{
-		//	return dest;
-		//}
-
-	} insert_node_;
-#endif
-
-	constexpr struct _append_node_
+	constexpr struct append_node_t_
 	{
 	private:
 		template <typename RT>
