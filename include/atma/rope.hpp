@@ -1774,7 +1774,7 @@ namespace atma::_rope_
 
 
 	template <typename RT>
-	inline auto build_rope_niave(src_buf_t str) -> node_info_t<RT>
+	inline auto build_rope_naive(src_buf_t str) -> node_info_t<RT>
 	{
 		// remove null terminator if necessary
 		if (str[str.size() - 1] == '\0')
