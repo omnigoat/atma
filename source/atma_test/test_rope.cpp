@@ -508,32 +508,9 @@ SCENARIO("atma::rope's internal operations work")
 
 
 
-	GIVEN("a default-constructed rope")
+	GIVEN("our test passage of text")
 	{
-		
-		test_rope_t rope;
-
-		auto r = atma::_rope_::build_rope_niave<T>(atma::xfer_src(
-			"hello there, this is your captain speaking. "
-			"unfortunately we forgot to fill up the plane "
-			"before takeoff. sorry for the inconvenience, "
-			"but I'm going to need some upstanding people "
-			"to get out and push us to the closest petrol "
-			"station. for your efforts you'll be rewarded "
-			"with a $50 gift-coupon that is redeemable at "
-			"any store within the food court."
-		));
-
-		//auto postEresult = atma::_rope_::insert_<T>(internal_info, 2, E_info);
-		//auto postFresult = atma::_rope_::insert_<T>(internal_node, 0, F_info);
-	}
-
-	GIVEN("a default-constructed rope")
-	{
-
-		test_rope_t rope;
-
-		auto r = atma::_rope_::build_rope_.operator ()<T>(atma::xfer_src(
+		char const* passage = 
 			"hello there, this is your captain speaking.  \n"
 			"unfortunately we forgot to fill up the plane \n"
 			"before takeoff. sorry for the inconvenience, \n"
@@ -541,13 +518,32 @@ SCENARIO("atma::rope's internal operations work")
 			"to get out and push us to the closest petrol \n"
 			"station. for your efforts you'll be rewarded \n"
 			"with a $50 gift-coupon that is redeemable at \n"
-			"any store within the food court."
-		));
+			"any store within the food court.";
 
-		std::cout << r << std::endl;
-		//auto postEresult = atma::_rope_::insert_<T>(internal_info, 2, E_info);
-		//auto postFresult = atma::_rope_::insert_<T>(internal_node, 0, F_info);
+		auto const passage_size = strlen(passage);
+
+		WHEN("we call build_rope_naive")
+		{
+			auto node_info = atma::_rope_::build_rope_naive<T>(atma::xfer_src(passage, passage_size));
+
+			THEN("something something")
+			{
+
+			}
+		}
+
+		WHEN("we call build_rope_")
+		{
+			auto rope = atma::_rope_::build_rope_<T>(atma::xfer_src(passage, passage_size));
+
+			THEN("something something")
+			{
+				std::cout << rope << std::endl;
+			}
+		}
 	}
+
+	
 }
 
 SCENARIO("rope can be inserted" * doctest::skip())
