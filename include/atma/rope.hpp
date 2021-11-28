@@ -458,6 +458,16 @@ namespace atma::_rope_
 	{
 		return !x ? default_value : std::invoke(&node_t<RT>::template visit<std::remove_reference_t<Fs>...>, *x, std::forward<Fs>(fs)...);
 	}
+
+	template <typename RT, typename... Fs>
+	auto visit_(node_ptr<RT> const& x, Fs... fs)
+	requires std::is_same_v<void, decltype(x->visit(std::forward<Fs>(fs)...))>
+	{
+		if (x)
+		{
+			x->visit(std::forward<Fs>(fs)...);
+		}
+	}
 }
 
 //---------------------------------------------------------------------
@@ -494,8 +504,9 @@ namespace atma::_rope_
 	template <typename RT>
 	auto find_for_char_idx(node_internal_t<RT> const& x, size_t char_idx) -> std::tuple<size_t, size_t>;
 
+	// for_all_text :: visits each leaf in sequence and invokes f(std::string_view)
 	template <typename F, typename RT>
-	auto for_all_text(F f, node_info_t<RT> const& ri);
+	auto for_all_text(F f, node_info_t<RT> const& ri) -> void;
 }
 
 
@@ -1090,6 +1101,30 @@ namespace atma::_rope_
 			[](node_internal_t<RT> const& x) { return (uint32_t)x.children_range().size(); },
 			[](node_leaf_t<RT> const& x) -> uint32_t { return 0u; });
 	}
+}
+
+
+//---------------------------------------------------------------------
+//
+//  IMPLEMENTATION :: non-mutating tree algorithms
+//
+//---------------------------------------------------------------------
+namespace atma::_rope_
+{
+	template <typename F, typename RT>
+	inline auto for_all_text(F f, node_info_t<RT> const& ri) -> void
+	{
+		visit_(ri.node,
+			[f](node_internal_t<RT> const& x)
+			{
+				x.for_each_child(atma::curry(&for_all_text<F, RT>, f));
+			},
+			[&ri, f](node_leaf_t<RT> const& x)
+			{
+				auto bufview = std::string_view{ri.node->known_leaf().buf.data(), ri.bytes};
+				std::invoke(f, bufview);
+			});
+	}
 
 	// returns: <index-of-child-node, remaining-characters>
 	template <typename RT>
@@ -1107,34 +1142,6 @@ namespace atma::_rope_
 		}
 
 		return std::make_tuple(child_idx, char_idx - acc_chars);
-	}
-}
-
-
-//---------------------------------------------------------------------
-//
-//  IMPLEMENTATION :: tree algorithms
-//
-//---------------------------------------------------------------------
-namespace atma::_rope_
-{
-
-
-	template <typename F, typename RT>
-	inline auto for_all_text(F f, node_info_t<RT> const& ri)
-	{
-		if (!ri.node)
-			return;
-
-		ri.node->visit(
-			[f](node_internal_t<RT> const& x)
-			{
-				x.for_each_child(atma::curry(&for_all_text<F, RT>, f));
-			},
-			[&ri, f](node_leaf_t<RT> const& x)
-			{
-				std::invoke(f, ri);
-			});
 	}
 }
 
@@ -2073,12 +2080,7 @@ namespace atma
 	template <typename RT>
 	inline std::ostream& operator << (std::ostream& stream, basic_rope_t<RT> const& x)
 	{
-		x.for_all_text(
-			[&stream](_rope_::node_info_t<RT> const& info)
-			{
-				stream << std::string_view(info.node->known_leaf().buf.data(), info.bytes);
-			});
-
+		x.for_all_text([&stream](std::string_view str) { stream << str; });
 		return stream;
 	}
 
