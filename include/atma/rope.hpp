@@ -446,6 +446,19 @@ namespace atma::_rope_
 	auto find_internal_split_point(src_buf_t buf, size_t byte_idx) -> size_t;
 }
 
+//---------------------------------------------------------------------
+// 
+//  visit
+// 
+//---------------------------------------------------------------------
+namespace atma::_rope_
+{
+	template <typename R, typename RT, typename... Fs>
+	auto visit_(R default_value, node_ptr<RT> const& x, Fs... fs) -> R
+	{
+		return !x ? default_value : std::invoke(&node_t<RT>::template visit<std::remove_reference_t<Fs>...>, *x, std::forward<Fs>(fs)...);
+	}
+}
 
 //---------------------------------------------------------------------
 // 
@@ -462,7 +475,7 @@ namespace atma::_rope_
 	template <typename RT>
 	auto text_info_of(node_ptr<RT> const&) -> text_info_t;
 
-	// valid_children_count :: just counts how many children are initialized
+	// valid_children_count :: initialized children (or just counts how many children are initialized
 	//   for an internal-node. returns 0 for a leaf-node.
 	template <typename RT>
 	auto valid_children_count(node_ptr<RT> const& node) -> uint32_t;
@@ -1057,32 +1070,25 @@ namespace atma::_rope_
 	template <typename RT>
 	inline auto length(node_ptr<RT> const& x) -> size_t
 	{
-		return visit(size_t(), x,
+		return visit_(size_t(), x,
 			[](node_internal_t<RT> const& x) { return x.length(); },
 			[](node_leaf_t<RT> const& x) { return size_t(); });
 	}
 
 	template <typename RT>
-	inline auto text_info_of(node_ptr<RT> const& node) -> text_info_t
+	inline auto text_info_of(node_ptr<RT> const& x) -> text_info_t
 	{
-		return node->visit(
-			[](node_internal_t<RT> const& x)
-			{
-				return x.calculate_combined_info();
-			},
-
-			[](node_leaf_t<RT> const& x)
-			{
-				return text_info_t::from_str(x.buf.data(), x.buf.size());
-			});
+		return visit_(text_info_t{}, x,
+			[](node_internal_t<RT> const& x) { return x.calculate_combined_info(); },
+			[](node_leaf_t<RT> const& x) { return text_info_t::from_str(x.buf.data(), x.buf.size()); });
 	}
 
 	template <typename RT>
-	inline auto valid_children_count(node_ptr<RT> const& node) -> uint32_t
+	inline auto valid_children_count(node_ptr<RT> const& x) -> uint32_t
 	{
-		return !node ? 0 : node->visit(
+		return visit_(uint32_t(), x,
 			[](node_internal_t<RT> const& x) { return (uint32_t)x.children_range().size(); },
-			[](node_leaf_t<RT> const& x) { return 0u; });
+			[](node_leaf_t<RT> const& x) -> uint32_t { return 0u; });
 	}
 
 	// returns: <index-of-child-node, remaining-characters>
