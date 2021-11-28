@@ -1118,39 +1118,7 @@ namespace atma::_rope_
 //---------------------------------------------------------------------
 namespace atma::_rope_
 {
-	
 
-	template <typename RT, typename F>
-	inline auto edit_chunk_at_char(node_info_t<RT> const& info, size_t char_idx, F f) -> edit_result_t<RT>
-	{
-		return info.node->visit(
-			[&, f](node_internal_t<RT>& x)
-			{
-				// find child
-				auto [child_idx, child_rel_idx] = find_for_char_idx(x, char_idx);
-				auto const& child = x.child_at(child_idx);
-
-				// if the node is null, something has gone irrevocably wrong
-				ATMA_ASSERT(child.node);
-
-				// recurse
-				auto [l_info, r_info, has_seam] = edit_chunk_at_char(child, child_rel_idx, f);
-				auto result = x.clone_with(child_idx, l_info, r_info);
-
-				{
-					result.seam = has_seam;
-				}
-
-				return result;
-			},
-
-			[&, f](node_leaf_t<RT>& x) -> edit_result_t<RT>
-			{
-				return std::invoke(f, char_idx, info, x.buf);
-			});
-	}
-
-	
 
 	template <typename F, typename RT>
 	inline auto for_all_text(F f, node_info_t<RT> const& ri)
@@ -1373,6 +1341,34 @@ namespace atma::_rope_
 //---------------------------------------------------------------------
 namespace atma::_rope_
 {
+	template <typename RT, typename F>
+	inline auto edit_chunk_at_char(node_info_t<RT> const& info, size_t char_idx, F f) -> edit_result_t<RT>
+	{
+		return info.node->visit(
+			[&, f](node_internal_t<RT>& x)
+			{
+				// find child
+				auto [child_idx, child_rel_idx] = find_for_char_idx(x, char_idx);
+				auto const& child = x.child_at(child_idx);
+
+				// if the node is null, something has gone irrevocably wrong
+				ATMA_ASSERT(child.node);
+
+				// recurse
+				auto [l_info, r_info, has_seam] = edit_chunk_at_char(child, child_rel_idx, f);
+				auto result = x.clone_with(child_idx, l_info, r_info);
+
+				result.seam = has_seam;
+
+				return result;
+			},
+
+			[&, f](node_leaf_t<RT>& x) -> edit_result_t<RT>
+			{
+				return std::invoke(f, char_idx, info, x.buf);
+			});
+	}
+
 	template <typename RT>
 	inline auto insert(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf, src_buf_t insbuf) -> edit_result_t<RT>
 	{
@@ -1445,7 +1441,6 @@ namespace atma::_rope_
 			return _rope_::edit_result_t<RT>{lhs_info, rhs_info};
 		}
 	}
-
 
 	template <typename RT>
 	inline auto fix_seam_(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf) -> edit_result_t<RT>
