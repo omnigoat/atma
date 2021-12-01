@@ -105,33 +105,28 @@ namespace atma::_rope_
 //
 namespace atma
 {
+	template <size_t BranchingFactor, size_t BufferSize>
+	struct rope_basic_traits
+	{
+		// how many children an internal node has
+		constexpr static size_t const branching_factor = BranchingFactor;
+		constexpr static size_t const minimum_branches = branching_factor / 2;
+
+		// rope-buffer size
+		constexpr static size_t const buf_size = BufferSize;
+
+		constexpr static size_t buf_edit_max_size = buf_size - 2;
+		constexpr static size_t buf_edit_split_size = (buf_size / 2) - (buf_size / 32);
+		constexpr static size_t buf_edit_split_drift_size = (buf_size / 32);
+	};
+
 	struct rope_default_traits
-	{
-		// how many children an internal node has
-		constexpr static size_t const branching_factor = 4;
-		constexpr static size_t const minimum_branches = branching_factor / 2;
-
-		// rope-buffer size
-		constexpr static size_t const buf_size = 512;
-
-		constexpr static size_t buf_edit_max_size = buf_size - 2;
-		constexpr static size_t buf_edit_split_size = (buf_size / 2) - (buf_size / 32);
-		constexpr static size_t buf_edit_split_drift_size = (buf_size / 32);
-	};
-
+		: rope_basic_traits<4, 512>
+	{};
+	
 	struct rope_test_traits
-	{
-		// how many children an internal node has
-		constexpr static size_t const branching_factor = 4;
-		constexpr static size_t const minimum_branches = branching_factor / 2;
-
-		// rope-buffer size
-		constexpr static size_t const buf_size = 9;
-
-		constexpr static size_t buf_edit_max_size = buf_size - 2;
-		constexpr static size_t buf_edit_split_size = (buf_size / 2) - (buf_size / 32);
-		constexpr static size_t buf_edit_split_drift_size = (buf_size / 32);
-	};
+		: rope_basic_traits<4, 9>
+	{};
 }
 
 
