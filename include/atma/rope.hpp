@@ -892,7 +892,6 @@ namespace atma::_rope_
 }
 
 
-
 //---------------------------------------------------------------------
 //
 //  IMPLEMENTATION :: text algorithms
@@ -1068,7 +1067,6 @@ namespace atma::_rope_
 			node_info_t<RT>{new_rhs});
 	}
 }
-
 
 
 //---------------------------------------------------------------------
@@ -1383,7 +1381,7 @@ namespace atma::_rope_
 
 		// determine if the first character in our incoming text is an lf character,
 		// and we're trying to insert this text at the front of this chunk. if we
-		// are doing that, then we want to insert the lf character is the previous
+		// are doing that, then we want to insert the lf character in the previous
 		// logical chunk, so if it may tack onto any cr character at the end of that
 		// previous chunk, resulting in us only counting them as one line-break
 		bool inserting_at_front = char_idx == 0;
@@ -1450,7 +1448,7 @@ namespace atma::_rope_
 	}
 
 	template <typename RT>
-	inline auto fix_seam_(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf) -> edit_result_t<RT>
+	inline auto fix_seam_(node_info_t<RT> const& leaf_info, size_t char_idx, charbuf_t<RT::buf_size>& buf) -> edit_result_t<RT>
 	{
 		auto const new_buf_size = buf.size() + 1;
 
