@@ -294,6 +294,7 @@ namespace atma::_rope_
 
 		auto push(node_info_t<RT> const&) const -> node_ptr<RT>;
 		auto child_at(size_t idx) const -> node_info_t<RT> const& { return children_[idx]; }
+		auto child_at(size_t idx) -> node_info_t<RT>& { return children_[idx]; }
 		
 		static constexpr size_t all_children = ~size_t();
 
@@ -549,11 +550,15 @@ namespace atma::_rope_
 		-> edit_result_t<RT>;
 
 	template <typename RT>
-	auto insert(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf, src_buf_t insbuf)
+	auto insert(size_t char_idx, node_info_t<RT> const& dest, src_buf_t insbuf)
 		-> edit_result_t<RT>;
 
 	// private functions
 	
+	template <typename RT>
+	auto insert_leaf_(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf, src_buf_t insbuf)
+		-> edit_result_t<RT>;
+
 	template <typename RT>
 	auto fix_seam_(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf)
 		-> edit_result_t<RT>;
@@ -1358,6 +1363,13 @@ namespace atma::_rope_
 				auto [l_info, r_info, has_seam] = edit_chunk_at_char(child, child_rel_idx, f);
 				auto result = x.clone_with(child_idx, l_info, r_info);
 
+				if (child_idx > 0)
+				{
+					[[maybe_unused]] auto& prev_child = x.child_at(child_idx - 1);
+
+					// how do we insert into sub-branch?
+				}
+
 				result.seam = has_seam;
 
 				return result;
@@ -1370,7 +1382,24 @@ namespace atma::_rope_
 	}
 
 	template <typename RT>
-	inline auto insert(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf, src_buf_t insbuf) -> edit_result_t<RT>
+	inline auto insert(size_t char_idx, node_info_t<RT> const& dest, src_buf_t insbuf) -> edit_result_t<RT>
+	{
+		auto [left, right, has_seam] = edit_chunk_at_char(dest, char_idx,
+			[insbuf](size_t char_idx, _rope_::node_info_t<RT> const& leaf_info, _rope_::charbuf_t<RT::buf_size>& buf)
+			{
+				return insert_leaf_(char_idx, leaf_info, buf, insbuf);
+			});
+
+		if (has_seam)
+		{
+			// ??
+		}
+
+		return {left, right, has_seam};
+	}
+
+	template <typename RT>
+	inline auto insert_leaf_(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf, src_buf_t insbuf) -> edit_result_t<RT>
 	{
 		ATMA_ASSERT(!insbuf.empty());
 
@@ -1404,39 +1433,35 @@ namespace atma::_rope_
 
 			auto affix_string_info = _rope_::text_info_t::from_str(insbuf.data(), insbuf.size());
 			auto result_info = leaf_info + affix_string_info;
+
 			return _rope_::edit_result_t<RT>{result_info, {}, has_seam};
 		}
 		// append is wanted, but immutable data is in the way. reallocate & append
-		else if (can_fit_in_chunk && byte_idx_is_at_end && !buf_is_appendable)
+		else if (can_fit_in_chunk) // && byte_idx_is_at_end && !buf_is_appendable)
 		{
 			auto affix_string_info = _rope_::text_info_t::from_str(insbuf.data(), insbuf.size());
 			auto result_info = leaf_info + affix_string_info;
 
-			result_info.node = _rope_::make_leaf_ptr<RT>(
-				xfer_src(buf, leaf_info.bytes),
-				insbuf);
+			if (byte_idx_is_at_end)
+			{
+				result_info.node = _rope_::make_leaf_ptr<RT>(
+					xfer_src(buf, byte_idx),
+					insbuf);
+			}
+			else
+			{
+				result_info.node = _rope_::make_leaf_ptr<RT>(
+					xfer_src(buf, byte_idx),
+					insbuf,
+					xfer_src(buf).skip(byte_idx));
+			}
 
 			return _rope_::edit_result_t<RT>(result_info, {}, has_seam);
 		}
-		// we can fit everything into one chunk, but we are inserting into the middle
-		else if (can_fit_in_chunk && !byte_idx_is_at_end)
+		// any other case: splitting is required
+		else
 		{
-			auto affix_string_info = _rope_::text_info_t::from_str(insbuf.data(), insbuf.size());
-			auto result_info = leaf_info + affix_string_info;
-
-			result_info.node = _rope_::make_leaf_ptr<RT>(
-				xfer_src(buf, byte_idx),
-				insbuf,
-				xfer_src(buf).skip(byte_idx));
-
-			return _rope_::edit_result_t<RT>(result_info, {}, has_seam);
-		}
-
-		// splitting is required
-		{
-			auto& leaf = leaf_info.node->known_leaf();
-
-			auto [lhs_info, rhs_info] = _rope_::insert_and_redistribute<RT>(leaf_info, xfer_src(leaf.buf), insbuf, byte_idx);
+			auto [lhs_info, rhs_info] = _rope_::insert_and_redistribute<RT>(leaf_info, xfer_src(buf), insbuf, byte_idx);
 
 			return _rope_::edit_result_t<RT>{lhs_info, rhs_info};
 		}
@@ -2042,24 +2067,16 @@ namespace atma
 	template <typename RT>
 	inline auto basic_rope_t<RT>::insert(size_t char_idx, char const* str, size_t sz) -> void
 	{
-		ATMA_ASSERT(char_idx <= root_.characters);
+		auto [left, right, seam] = _rope_::insert(char_idx, root_, xfer_src(str, sz));
 
-		auto [lhs_info, rhs_info, seam] = edit_chunk_at_char(root_, char_idx,
-			[str, sz](size_t char_idx, _rope_::node_info_t<RT> const& leaf_info, _rope_::charbuf_t<RT::buf_size>& buf)
-			{
-				return _rope_::insert(char_idx, leaf_info, buf, xfer_src(str, sz));
-			});
-
-		if (rhs_info.has_value())
+		if (right.has_value())
 		{
-			(_rope_::text_info_t&)root_ = lhs_info + *rhs_info;
-			if (!lhs_info.node)
-				lhs_info.node = root_.node;
-			root_.node = _rope_::make_internal_ptr<RT>(lhs_info, *rhs_info);
+			(_rope_::text_info_t&)root_ = left + *right;
+			root_.node = _rope_::make_internal_ptr<RT>(left, *right);
 		}
 		else
 		{
-			root_ = lhs_info;
+			root_ = left;
 		}
 	}
 
