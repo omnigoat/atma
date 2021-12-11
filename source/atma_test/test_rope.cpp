@@ -555,9 +555,9 @@ SCENARIO("seams" * doctest::skip())
 
 		THEN("")
 		{
-			rope.push_back("abdef\r", 6);
-			rope.push_back("123456", 6);
-			rope.insert(6, "\nxy", 3);
+			rope.push_back("abdefg", 6);
+			rope.push_back("\n123456", 7);
+			rope.insert(6, "\r", 1);
 
 			std::cout << rope << std::endl;
 		}
