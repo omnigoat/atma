@@ -381,8 +381,8 @@ namespace atma::_rope_
 	struct node_t : atma::ref_counted_of<node_t<RT>>
 	{
 		node_t() = default;
-		node_t(node_internal_t<RT> const& x);
-		node_t(node_leaf_t<RT> const& x);
+		node_t(node_internal_t<RT> const&);
+		node_t(node_leaf_t<RT> const&);
 
 		bool is_internal() const;
 		bool is_leaf() const;
@@ -545,9 +545,22 @@ namespace atma::_rope_
 //---------------------------------------------------------------------
 namespace atma::_rope_
 {
-	template <typename RT, typename F>
-	auto edit_chunk_at_char(node_info_t<RT> const& info, size_t char_idx, F f)
-		-> edit_result_t<RT>;
+	template <typename RT>
+	struct edit_chunk_at_char_t
+	{
+		using stack_t = atma::vector<node_ptr<RT>>;
+
+		template <typename F>
+		auto operator ()(node_info_t<RT> const& info, size_t char_idx, F f) const
+			-> edit_result_t<RT>;
+
+		template <typename F>
+		auto operator ()(node_info_t<RT> const& info, size_t char_idx, F f, stack_t&) const
+			-> edit_result_t<RT>;
+	};
+
+	template <typename RT>
+	inline constexpr edit_chunk_at_char_t<RT> edit_chunk_at_char;
 
 	template <typename RT>
 	auto insert(size_t char_idx, node_info_t<RT> const& dest, src_buf_t insbuf)
@@ -556,7 +569,7 @@ namespace atma::_rope_
 	// private functions
 	
 	template <typename RT>
-	auto insert_leaf_(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf, src_buf_t insbuf)
+	auto insert_leaf_(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf, src_buf_t insbuf, typename edit_chunk_at_char_t<RT>::stack_t&)
 		-> edit_result_t<RT>;
 
 	template <typename RT>
@@ -1351,10 +1364,21 @@ namespace atma::_rope_
 //  IMPLEMENTATION :: text-tree functions
 //
 //---------------------------------------------------------------------
+
+// edit_chunk_at_char
 namespace atma::_rope_
 {
-	template <typename RT, typename F>
-	inline auto edit_chunk_at_char(node_info_t<RT> const& info, size_t char_idx, F f) -> edit_result_t<RT>
+	template <typename RT>
+	template <typename F>
+	auto edit_chunk_at_char_t<RT>::operator ()(node_info_t<RT> const& info, size_t char_idx, F f) const -> edit_result_t<RT>
+	{
+		stack_t stack;
+		return this->operator ()(info, char_idx, f, stack);
+	}
+
+	template <typename RT>
+	template <typename F>
+	auto edit_chunk_at_char_t<RT>::operator ()(node_info_t<RT> const& info, size_t char_idx, F f, stack_t& stack) const -> edit_result_t<RT>
 	{
 		return info.node->visit(
 			[&, f](node_internal_t<RT>& x)
@@ -1367,7 +1391,8 @@ namespace atma::_rope_
 				ATMA_ASSERT(child.node);
 
 				// recurse
-				auto [l_info, r_info, has_seam] = edit_chunk_at_char(child, child_rel_idx, f);
+				stack.push_back(info.node);
+				auto [l_info, r_info, has_seam] = edit_chunk_at_char<RT>(child, child_rel_idx, f, stack);
 				auto result = x.clone_with(child_idx, l_info, r_info);
 
 				if (child_idx > 0)
@@ -1385,17 +1410,27 @@ namespace atma::_rope_
 
 			[&, f](node_leaf_t<RT>& x) -> edit_result_t<RT>
 			{
-				return std::invoke(f, char_idx, info, x.buf);
+				if constexpr (std::is_invocable_v<F, size_t, node_info_t<RT> const&, charbuf_t<RT::buf_size>&, stack_t&>)
+				{
+					return std::invoke(f, char_idx, info, x.buf, stack);
+				}
+				else
+				{
+					return std::invoke(f, char_idx, info, x.buf);
+				}
 			});
 	}
+}
 
+namespace atma::_rope_
+{
 	template <typename RT>
 	inline auto insert(size_t char_idx, node_info_t<RT> const& dest, src_buf_t insbuf) -> edit_result_t<RT>
 	{
-		auto [left, right, has_seam] = edit_chunk_at_char(dest, char_idx,
-			[insbuf](size_t char_idx, _rope_::node_info_t<RT> const& leaf_info, _rope_::charbuf_t<RT::buf_size>& buf)
+		auto [left, right, has_seam] = edit_chunk_at_char<RT>(dest, char_idx,
+			[insbuf](size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf, typename edit_chunk_at_char_t<RT>::stack_t& stack)
 			{
-				return insert_leaf_(char_idx, leaf_info, buf, insbuf);
+				return insert_leaf_(char_idx, leaf_info, buf, insbuf, stack);
 			});
 
 		if (has_seam)
@@ -1407,7 +1442,7 @@ namespace atma::_rope_
 	}
 
 	template <typename RT>
-	inline auto insert_leaf_(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf, src_buf_t insbuf) -> edit_result_t<RT>
+	inline auto insert_leaf_(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf, src_buf_t insbuf, typename edit_chunk_at_char_t<RT>::stack_t&) -> edit_result_t<RT>
 	{
 		ATMA_ASSERT(!insbuf.empty());
 
