@@ -902,10 +902,12 @@ namespace atma::_rope_
 	inline auto is_break(src_buf_t buf, size_t byte_idx) -> bool
 	{
 		ATMA_ASSERT(byte_idx <= buf.size());
+		
+		bool const is_buffer_boundary = (byte_idx == 0 || byte_idx == buf.size());
+		bool const is_utf_codepoint_boundary = (buf[byte_idx] >> 6) != 0b10;
+		bool const is_not_mid_crlf = !is_buffer_boundary || buf[byte_idx - 1] != 0x0d || buf[byte_idx] != 0x0a;
 
-		return byte_idx == 0
-			|| byte_idx == buf.size()
-			|| (buf[byte_idx] >> 6 != !0b10) && (buf[byte_idx - 1] != 0x0d || buf[byte_idx] != 0x0a);
+		return is_buffer_boundary || is_utf_codepoint_boundary && is_not_mid_crlf;
 	}
 
 	inline auto prev_break(src_buf_t buf, size_t byte_idx) -> size_t
@@ -986,8 +988,11 @@ namespace atma::_rope_
 		-> std::tuple<node_info_t<RT>, node_info_t<RT>>
 	{
 		ATMA_ASSERT(!insbuf.empty());
-		ATMA_ASSERT(byte_idx < hostbuf.size());
-		ATMA_ASSERT(utf8_byte_is_leading((byte const)hostbuf[byte_idx]));
+		//ATMA_ASSERT(byte_idx < hostbuf.size());
+		if (byte_idx < hostbuf.size())
+		{
+			ATMA_ASSERT(utf8_byte_is_leading((byte const)hostbuf[byte_idx]));
+		}
 
 		// determine split point
 		size_t split_idx = 0;
@@ -1015,7 +1020,9 @@ namespace atma::_rope_
 					;
 			}
 
-			split_idx = bufcopy_start + find_split_point(xfer_src(splitbuf, splitbuf_size), midpoint - bufcopy_start);
+			split_idx = bufcopy_start + find_split_point(
+				xfer_src(splitbuf),
+				midpoint - bufcopy_start);
 
 			insbuf_split_idx
 				= (ins_end_idx <= split_idx) ? 0
@@ -1368,6 +1375,7 @@ namespace atma::_rope_
 					[[maybe_unused]] auto& prev_child = x.child_at(child_idx - 1);
 
 					// how do we insert into sub-branch?
+					insert(prev_child.characters, prev_child, "\n");
 				}
 
 				result.seam = has_seam;
@@ -1408,9 +1416,9 @@ namespace atma::_rope_
 		// are doing that, then we want to insert the lf character in the previous
 		// logical chunk, so if it may tack onto any cr character at the end of that
 		// previous chunk, resulting in us only counting them as one line-break
-		bool inserting_at_front = char_idx == 0;
-		bool lf_at_front = insbuf[0] == charcodes::lf;
-		bool has_seam = inserting_at_front && lf_at_front;
+		bool const inserting_at_front = char_idx == 0;
+		bool const lf_at_front = insbuf[0] == charcodes::lf;
+		bool const has_seam = inserting_at_front && lf_at_front;
 		if (has_seam)
 		{
 			insbuf = insbuf.skip(1);
@@ -1424,7 +1432,7 @@ namespace atma::_rope_
 		// sure that the byte_idx of the character is actually the last byte_idx of the buffer
 		bool buf_is_appendable = leaf_info.bytes == buf.size();
 		bool byte_idx_is_at_end = leaf_info.bytes == byte_idx;
-		bool can_fit_in_chunk = leaf_info.bytes + insbuf.size() < RT::buf_edit_max_size;
+		bool can_fit_in_chunk = leaf_info.bytes + insbuf.size() <= RT::buf_edit_max_size;
 
 		// simple append is possible
 		if (can_fit_in_chunk && byte_idx_is_at_end && buf_is_appendable)
@@ -1436,8 +1444,8 @@ namespace atma::_rope_
 
 			return _rope_::edit_result_t<RT>{result_info, {}, has_seam};
 		}
-		// append is wanted, but immutable data is in the way. reallocate & append
-		else if (can_fit_in_chunk) // && byte_idx_is_at_end && !buf_is_appendable)
+		// we're not appending, but we can fit within the chunk: reallocate & insert
+		else if (can_fit_in_chunk)
 		{
 			auto affix_string_info = _rope_::text_info_t::from_str(insbuf.data(), insbuf.size());
 			auto result_info = leaf_info + affix_string_info;
