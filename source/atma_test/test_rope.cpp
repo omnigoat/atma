@@ -546,6 +546,26 @@ SCENARIO("atma::rope's internal operations work")
 	
 }
 
+
+SCENARIO("seams" * doctest::skip())
+{
+	GIVEN("a default-constructed rope")
+	{
+		test_rope_t rope;
+
+		THEN("")
+		{
+			rope.push_back("abdef\r", 6);
+			rope.push_back("123456", 6);
+			rope.insert(6, "\nxy", 3);
+
+			std::cout << rope << std::endl;
+		}
+	}
+}
+
+
+
 SCENARIO("rope can be inserted" * doctest::skip())
 {
 	GIVEN("a default-constructed rope")
