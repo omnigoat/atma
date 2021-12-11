@@ -568,7 +568,6 @@ namespace atma::_rope_
 
 	// private functions
 	
-	template <typename RT>
 	auto insert_leaf_(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf, src_buf_t insbuf, typename edit_chunk_at_char_t<RT>::stack_t&)
 		-> edit_result_t<RT>;
 
@@ -1444,7 +1443,13 @@ namespace atma::_rope_
 	template <typename RT>
 	inline auto insert_leaf_(size_t char_idx, node_info_t<RT> const& leaf_info, charbuf_t<RT::buf_size>& buf, src_buf_t insbuf, typename edit_chunk_at_char_t<RT>::stack_t&) -> edit_result_t<RT>
 	{
-		ATMA_ASSERT(!insbuf.empty());
+		ATMA_ASSERT(insbuf.size() < RT::buf_edit_max_size);
+
+		// early out
+		if (insbuf.empty())
+		{
+			return {leaf_info};
+		}
 
 		// determine if the first character in our incoming text is an lf character,
 		// and we're trying to insert this text at the front of this chunk. if we
@@ -1460,7 +1465,6 @@ namespace atma::_rope_
 		}
 
 		auto byte_idx = utf8_charseq_idx_to_byte_idx(buf.data(), buf.size(), char_idx);
-		//auto combined_bytes_size = leaf_info.bytes + insbuf.size();
 
 		// if we want to append, we must first make sure that the (immutable, remember) buffer
 		// does not have any trailing information used by other trees. secondly, we must make
