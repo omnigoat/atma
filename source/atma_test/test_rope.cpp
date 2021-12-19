@@ -18,17 +18,22 @@ import atma.memory;
 
 using test_rope_t = atma::basic_rope_t<atma::rope_test_traits>;
 
+int blam()
+{
+	return std::max(4, 5);
+}
+
 SCENARIO("atma::rope's internal operations work")
 {
 	using T = atma::rope_test_traits;
 
 	// just quickly grab the node for an insert/edit-result
 	auto lhs_internal_node = [](auto&& x) -> decltype(auto) { return x.lhs.node->known_internal(); };
-	auto lhs_children = [&](auto&& x) { return lhs_internal_node(x).children_range(); };
+	auto lhs_children = [&](auto&& x) { return lhs_internal_node(x).children(); };
 	auto lhs_child_node = [&](auto&& x, size_t idx) -> decltype(auto) { return lhs_children(x)[idx].node; };
 
 	auto rhs_internal_node = [](auto&& x) -> decltype(auto) { return x.maybe_rhs.value().node->known_internal(); };
-	auto rhs_children = [&](auto&& x) { return rhs_internal_node(x).children_range(); };
+	auto rhs_children = [&](auto&& x) { return rhs_internal_node(x).children(); };
 	auto rhs_child_node = [&](auto&& x, size_t idx) -> decltype(auto) { return rhs_children(x)[idx].node; };
 
 
