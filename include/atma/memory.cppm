@@ -584,8 +584,34 @@ namespace atma
 		constexpr ~memxfer_t() = default;
 
 		// default-constructor only allowed if allocator doesn't hold state
-		constexpr memxfer_t(T* ptr = nullptr)
+		constexpr explicit memxfer_t()
 		requires std::is_empty_v<allocator_type>
+			: alloc_and_ptr_(allocator_type(), nullptr)
+		{}
+
+		// so this is written real fucking weird because it needs to be templated.
+		// if it is not templated, then there are two available overloads for a
+		// statically-sized array: the one in (derived type) bounded_memxfer_t, and
+		// this one, which decays the static-array to a pointer.
+		//
+		// with the two possible overloads, C++ tries to find the best match for the
+		// argument-types. for some fucking strange reason, C++ will prefer non-
+		// templated methods over templated ones. if the argument is a static-array,
+		// and our two methods look like this...
+		// 
+		//   memxfer_t(T* ptr) { ... }
+		// 
+		//   template <size_t N>
+		//   bounded_memxfer_t(T(&arr)[N]) { ... }
+		// 
+		// ... then c++ will prefer the one in the base class, and DECAY THE ARRAY.
+		// 
+		// how dumb is that? the method that takes a statically-sized array is
+		// obviously a better fit, regardless of if it's templated. sigh.
+		//
+		template <typename Y>
+		constexpr memxfer_t(Y ptr)
+		requires std::is_empty_v<allocator_type> && std::is_same_v<Y, T*>
 			: alloc_and_ptr_(allocator_type(), ptr)
 		{}
 
@@ -760,13 +786,20 @@ export namespace atma
 
 		// inherit constructors
 		using base_type::base_type;
-		
+
+		// constructors
+		template <size_t N>
+		constexpr bounded_memxfer_t(T(&arra)[N])
+		requires std::is_empty_v<allocator_type>
+			: base_type(allocator_type(), static_cast<T*>(arra), N)
+		{}
+
+		// assignment operators
 		bounded_memxfer_t& operator = (bounded_memxfer_t const& rhs)
 		{
 			this->size_ = rhs.size_;
 			return (bounded_memxfer_t&)base_type::operator = (rhs);
 		}
-
 
 		// element access
 		auto begin()       -> value_type* { return this->alloc_and_ptr_.second(); }
