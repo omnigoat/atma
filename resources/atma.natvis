@@ -171,7 +171,7 @@
 	<!-- rope_node_t -->
 	<Type Name="atma::_rope_::node_t&lt;*&gt;">
 		<DisplayString Condition="variant_._Which==0">{{ internal-node }}</DisplayString>
-		<DisplayString Condition="variant_._Which==1">{{ leaf-node={((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)variant_._Tail).buf.chars_,[((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)variant_._Tail).buf.size_]s8} }}</DisplayString>
+		<DisplayString Condition="variant_._Which==1">{{ leaf-node-buffer={((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)variant_._Tail).buf.chars_,[((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)variant_._Tail).buf.size_]s8} }}</DisplayString>
 		<DisplayString>{{ empty }}</DisplayString>
 		
 		<Expand>
@@ -184,8 +184,8 @@
 			</ArrayItems>
 
 			<!-- leaf-node information -->
-			<Item Condition="variant_._Which==1" Name="size">((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)variant_._Tail).buf.size_</Item>
-			<Item Condition="variant_._Which==1" Name="buf">((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)variant_._Tail).buf</Item>
+			<Item Condition="variant_._Which==1" Name="buffer-size">((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)variant_._Tail).buf.size_</Item>
+			<Item Condition="variant_._Which==1" Name="buffer-data">((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)variant_._Tail).buf</Item>
 		</Expand>
 	</Type>
 
@@ -202,13 +202,15 @@
 		<!-- internal-node -->
 		<DisplayString Condition="node.px &amp;&amp; node.px->variant_._Which==0">node_info :: internal-node {{ chars={characters}, bytes={bytes} }}</DisplayString>
 		<!-- leaf-node -->
-		<DisplayString Condition="node.px &amp;&amp; node.px->variant_._Which==1">node_info :: leaf-node {{ chars={characters}, bytes={bytes}, {((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)node.px->variant_._Tail).buf.chars_,[characters]s8} }}</DisplayString>
+		<DisplayString Condition="node.px &amp;&amp; node.px->variant_._Which==1">node_info :: leaf-node {{ chars={characters}, bytes={bytes}, {((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)node.px->variant_._Tail).buf.chars_ + dropped_bytes,[bytes]s8} }}</DisplayString>
 		<!-- invalid -->
 		<DisplayString>{{ empty }}</DisplayString>
 		
 		<Expand>
 			<Item Name="bytes">bytes</Item>
 			<Item Name="characters">characters</Item>
+			<Item Name="dropped_bytes">dropped_bytes</Item>
+			<Item Name="dropped_characters">dropped_characters</Item>
 			<Item Name="line_breaks">line_breaks</Item>
 			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==0" Name="children">children</Item>
 			<Item Name="node">node</Item>
