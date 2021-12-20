@@ -220,14 +220,22 @@ namespace atma::_rope_
 
 	inline auto operator + (text_info_t const& lhs, text_info_t const& rhs) -> text_info_t
 	{
-		// I actually have no idea about what impact there is of adding the
-		// dropped members together. probably none, but... ?
 		return text_info_t{
 			(uint16_t)(lhs.bytes + rhs.bytes),
 			(uint16_t)(lhs.characters + rhs.characters),
 			(uint16_t)(lhs.dropped_bytes + rhs.dropped_characters),
 			(uint16_t)(lhs.dropped_characters + rhs.dropped_characters),
 			(uint16_t)(lhs.line_breaks + rhs.line_breaks)};
+	}
+
+	inline auto operator - (text_info_t const& lhs, text_info_t const& rhs) -> text_info_t
+	{
+		return text_info_t{
+			(uint16_t)(lhs.bytes - rhs.bytes),
+			(uint16_t)(lhs.characters - rhs.characters),
+			(uint16_t)(lhs.dropped_bytes - rhs.dropped_characters),
+			(uint16_t)(lhs.dropped_characters - rhs.dropped_characters),
+			(uint16_t)(lhs.line_breaks - rhs.line_breaks)};
 	}
 }
 
@@ -257,6 +265,12 @@ namespace atma::_rope_
 	inline auto operator + (node_info_t<RT> const& lhs, text_info_t const& rhs) -> node_info_t<RT>
 	{
 		return node_info_t<RT>{(text_info_t&)lhs + rhs, lhs.node};
+	}
+
+	template <typename RT>
+	inline auto operator - (node_info_t<RT> const& lhs, text_info_t const& rhs) -> node_info_t<RT>
+	{
+		return node_info_t<RT>{(text_info_t&)lhs - rhs, lhs.node};
 	}
 }
 
@@ -310,10 +324,17 @@ namespace atma::_rope_
 
 		auto length() const -> size_t;
 
-		auto push(node_info_t<RT> const&) const -> node_ptr<RT>;
 		auto child_at(size_t idx) const -> node_info_t<RT> const& { return children_[idx]; }
 		auto child_at(size_t idx) -> node_info_t<RT>& { return children_[idx]; }
 		
+		auto try_child_at(int idx) -> maybe_node_info_t<RT>
+		{
+			if (0 <= idx && idx < size_)
+				return children_[idx];
+			else
+				return {};
+		}
+
 		static constexpr size_t all_children = ~size_t();
 
 		auto insert(size_t idx, node_info_t<RT> const& info)
@@ -577,8 +598,8 @@ namespace atma::_rope_
 
 	// navigate_to_back_leaf
 
-	template <typename RT, typename F, typename G>
-	auto navigate_to_back_leaf(node_info_t<RT> const& info, F downfn, G upfn);
+	template <typename RT, typename F, typename G = decltype(navigate_upwards_passthrough_<RT, size_t, F>)>
+	auto navigate_to_back_leaf(node_info_t<RT> const& info, F downfn, G upfn = navigate_upwards_passthrough_<RT, size_t, F>);
 }
 
 //---------------------------------------------------------------------
@@ -592,8 +613,8 @@ namespace atma::_rope_
 namespace atma::_rope_
 {
 	template <typename RT>
-	auto stitch_upwards_simple_(node_info_t<RT> const&, node_internal_t<RT>&, size_t child_idx, node_info_t<RT> const&)
-		-> node_info_t<RT>;
+	auto stitch_upwards_simple_(node_info_t<RT> const&, node_internal_t<RT>&, size_t child_idx, maybe_node_info_t<RT> const&)
+		-> maybe_node_info_t<RT>;
 
 	template <typename RT>
 	auto stitch_upwards_(node_info_t<RT> const&, node_internal_t<RT>&, size_t child_idx, edit_result_t<RT> const&)
@@ -609,7 +630,7 @@ namespace atma::_rope_
 	// insert
 
 	template <typename RT>
-	auto insert(size_t char_idx, node_info_t<RT> const& dest, src_buf_t insbuf)
+	auto insert(size_t char_idx, node_info_t<RT> const& dest, src_buf_t const& insbuf)
 		-> edit_result_t<RT>;
 }
 
@@ -643,7 +664,7 @@ namespace atma::_rope_
 
 	template <typename RT>
 	auto append_lf_(node_info_t<RT> const& leaf_info, node_leaf_t<RT>&, size_t char_idx)
-		-> node_info_t<RT>;
+		-> maybe_node_info_t<RT>;
 }
 
 
@@ -796,20 +817,28 @@ namespace atma::_rope_
 namespace atma::_rope_
 {
 	template <typename RT>
-	inline auto node_internal_construct_(size_t& acc_count, node_info_t<RT>* dest, range_of_element_type<node_info_t<RT>> auto&& xs) -> void
+	inline auto node_internal_construct_(size_t& acc_count, node_info_t<RT>* dest, node_info_t<RT> const& x) -> void
 	{
-		for (auto&& x : xs)
+		atma::memory_construct_at(xfer_dest(dest + acc_count), x);
+		++acc_count;
+	}
+
+	template <typename RT>
+	inline auto node_internal_construct_(size_t& acc_count, node_info_t<RT>* dest, maybe_node_info_t<RT> const& x) -> void
+	{
+		if (x)
 		{
-			atma::memory_construct_at(xfer_dest(dest + acc_count), x);
-			++acc_count;
+			node_internal_construct_(acc_count, dest, *x);
 		}
 	}
 
 	template <typename RT>
-	inline auto node_internal_construct_(size_t& acc_count, node_info_t<RT>* dest, node_info_t<RT> const& x) -> void
+	inline auto node_internal_construct_(size_t& acc_count, node_info_t<RT>* dest, range_of_element_type<node_info_t<RT>> auto&& xs) -> void
 	{
-		dest[acc_count] = x;
-		++acc_count;
+		for (auto&& x : xs)
+		{
+			node_internal_construct_(acc_count, dest, x);
+		}
 	}
 
 	template <typename RT>
@@ -894,13 +923,6 @@ namespace atma::_rope_
 	inline auto node_internal_t<RT>::calculate_combined_info() const -> text_info_t
 	{
 		return atma::foldl(children(), text_info_t(), functors::add);
-	}
-
-	template <typename RT>
-	inline auto node_internal_t<RT>::push(node_info_t<RT> const& x) const -> node_ptr<RT>
-	{
-		//ATMA_ASSERT(child_count_ < branching_factor);
-		return node_ptr<RT>(); ///node_internal_ptr::make(children_, child_count_, x);
 	}
 }
 
@@ -1533,88 +1555,134 @@ namespace atma::_rope_
 //  IMPLEMENTATION :: text-tree functions
 //
 //---------------------------------------------------------------------
-
 namespace atma::_rope_
 {
 	template <typename RT>
-	inline auto stitch_upwards_(node_info_t<RT> const& info, node_internal_t<RT>& node, size_t child_idx, edit_result_t<RT> const& er) -> edit_result_t<RT>
+	auto mend_left_seam(seam_t seam, maybe_node_info_t<RT> const& sibling_node, node_info_t<RT> const& seam_node) -> std::tuple<seam_t, std::optional<std::tuple<node_info_t<RT>, node_info_t<RT>>>>
 	{
-		auto [left_info, maybe_right_info, seam] = er;
-
-		[[maybe_unused]] bool has_left_seam = (seam & seam_t::left) != seam_t::none;
-		[[maybe_unused]] bool has_right_seam = (seam & seam_t::right) != seam_t::none;
-
-		std::vector<node_info_t<RT>> new_children; // SERIOUSLY, fixed_vector?
-
-		// this will be bopped around a bit
-		auto child_in_question = left_info;
-
-		// copy all preceding nodes that are definitively untouched
-		if (child_idx >= 2)
+		if (seam == seam_t::none)
 		{
-			std::copy(node.children().begin(), node.children().begin() + child_idx - 2, std::back_inserter(new_children));
+			return {seam_t::none, {}};
+		}
+		else if (sibling_node)
+		{
+			// drop lf from the front of the next leaf. if this returns an empty optional,
+			// then that leaf didn't have an lf at the front, and we are just going to
+			// leave this cr as is... just, dangling there
+			auto sibling_node_prime = navigate_to_back_leaf(*sibling_node,
+				append_lf_<RT>,
+				stitch_upwards_simple_<RT>);
+
+			// append cr to seamed leaf
+			if (sibling_node_prime)
+			{
+				auto seam_node_prime = navigate_to_back_leaf(seam_node,
+					drop_lf_<RT>,
+					stitch_upwards_simple_<RT>);
+
+				ATMA_ASSERT(seam_node_prime);
+
+				return {seam_t::none, std::make_tuple(*sibling_node_prime, *seam_node_prime)};
+			}
 		}
 
-		bool const has_left_sibling = child_idx > 0;
-		bool const has_right_sibling = child_idx + 1 < node.children().size();
+		return {seam, {}};
+	}
 
-		// if we have a cr at the end of our previous chunk
-		if (has_left_seam && has_left_sibling)
+	template <typename RT>
+	auto mend_right_seam(seam_t seam, node_info_t<RT> const& seam_node, maybe_node_info_t<RT> const& sibling_node) -> std::tuple<seam_t, std::optional<std::tuple<node_info_t<RT>, node_info_t<RT>>>>
+	{
+		if (seam == seam_t::none)
 		{
-			//auto [drop_ navigate_to_back_leaf(node.child_at(child_idx - 1), )
+			return { seam_t::none, {} };
 		}
-
-		seam_t const now_has_right_seam = [&]
+		else if (sibling_node)
 		{
-			// if we don't have a right seam, well we don't have a right seam
-			if (!has_right_seam)
+			// drop lf from the front of the next leaf. if this returns an empty optional,
+			// then that leaf didn't have an lf at the front, and we are just going to
+			// leave this cr as is... just, dangling there
+			auto sibling_node_prime = navigate_to_front_leaf(*sibling_node,
+				drop_lf_<RT>);
+
+			// append cr to seamed leaf
+			if (sibling_node_prime)
 			{
-				return seam_t::none;
+				auto seam_node_prime = navigate_to_back_leaf(seam_node,
+					append_lf_<RT>,
+					stitch_upwards_simple_<RT>);
+
+				return { seam_t::none, std::make_tuple(*seam_node_prime, *sibling_node_prime) };
 			}
-			// we have a right seam, and we have an immediate sibling to our right.
-			// we will check to see if the next logical leaf has an lf at the front,
-			// and if so we will drop it and put it in our child
-			else if (has_right_sibling)
-			{
-				auto const& rightmost_child_in_question = maybe_right_info.value_or(left_info);
-				auto const& next_child_info = node.child_at(child_idx + 1);
-
-				// drop lf from the front of the next leaf. if this returns an empty optional,
-				// then that leaf didn't have an lf at the front, and we are just going to
-				// leave this cr as is... just, dangling there
-				auto maybe_info = navigate_to_front_leaf(next_child_info,
-					drop_lf_<RT>);
-
-				// append cr to seamed leaf
-				if (maybe_info.has_value())
-				{
-					child_in_question = navigate_to_back_leaf(rightmost_child_in_question,
-						append_lf_<RT>,
-						stitch_upwards_simple_<RT>);
-
-					new_children.push_back(child_in_question);
-					new_children.push_back(*maybe_info);
-				}
-
-				return seam_t::none;
-			}
-			else
-			{
-				return seam_t::right;
-			}
-		}();
-
-		auto result_node = make_internal_ptr<RT>(xfer_src(new_children));
-		return {result_node, maybe_node_info_t<RT>{}, now_has_right_seam};
+		}
+		
+		return { seam, {} };
 	}
 }
 
 namespace atma::_rope_
 {
 	template <typename RT>
-	inline auto stitch_upwards_simple_(node_info_t<RT> const& info, node_internal_t<RT>& node, size_t child_idx, node_info_t<RT> const& child_info) -> node_info_t<RT>
+	inline auto stitch_upwards_(node_info_t<RT> const& info, node_internal_t<RT>& node, size_t child_idx, edit_result_t<RT> const& er) -> edit_result_t<RT>
 	{
-		auto [left, right, seam] = node.clone_with(child_idx, child_info);
+		auto const& [left_info, maybe_right_info, seam] = er;
+
+		// no seam, no worries
+		if (seam == seam_t::none)
+		{
+			return er;
+		}
+
+		seam_t const left_seam = (seam & seam_t::left);
+		seam_t const right_seam = (seam & seam_t::right);
+
+		// the two (might be one!) nodes of our edit-result are sitting in the middle
+		// two positions of these children. the potentially-stitched siblings will lie
+		// on either side.
+		[[maybe_unused]] std::array<maybe_node_info_t<RT>, 4> mended_children{
+			node.try_child_at((int)child_idx - 1),
+			maybe_node_info_t<RT>{left_info},
+			maybe_right_info,
+			node.try_child_at((int)child_idx + 1)};
+
+		auto [mended_left_seam, maybe_mended_left_nodes] = mend_left_seam(left_seam, mended_children[0], *mended_children[1]);
+		if (maybe_mended_left_nodes)
+		{
+			mended_children[0] = std::get<0>(*maybe_mended_left_nodes);
+			mended_children[1] = std::get<1>(*maybe_mended_left_nodes);
+		}
+
+		auto& right_seam_node = mended_children[2] ? *mended_children[2] : *mended_children[1];
+		auto [mended_right_seam, maybe_mended_right_nodes] = mend_right_seam(right_seam, right_seam_node, mended_children[3]);
+		if (maybe_mended_right_nodes)
+		{
+			right_seam_node = std::get<0>(*maybe_mended_right_nodes);
+			mended_children[3] = std::get<1>(*maybe_mended_right_nodes);
+		}
+
+		auto result_node = (child_idx > 0)
+			? make_internal_ptr<RT>(
+				xfer_src(node.children().first(child_idx - 1)),
+				mended_children[0], mended_children[1], mended_children[2], mended_children[3],
+				xfer_src(node.children().subspan(child_idx + 1)))
+			: make_internal_ptr<RT>(
+				mended_children[0], mended_children[1], mended_children[2], mended_children[3],
+				xfer_src(node.children().subspan(child_idx + 2)));
+
+		return {result_node, maybe_node_info_t<RT>{}, mended_left_seam | mended_right_seam};
+	}
+}
+
+namespace atma::_rope_
+{
+	template <typename RT>
+	inline auto stitch_upwards_simple_(node_info_t<RT> const& info, node_internal_t<RT>& node, size_t child_idx, maybe_node_info_t<RT> const& child_info) -> maybe_node_info_t<RT>
+	{
+		if (!child_info)
+		{
+			return {};
+		}
+
+		auto [left, right, seam] = node.clone_with(child_idx, *child_info);
 		
 		ATMA_ASSERT(!right);
 		ATMA_ASSERT(seam == seam_t::none);
@@ -1642,17 +1710,9 @@ namespace atma::_rope_
 namespace atma::_rope_
 {
 	template <typename RT>
-	inline auto insert(size_t char_idx, node_info_t<RT> const& dest, src_buf_t insbuf) -> edit_result_t<RT>
+	inline auto insert(size_t char_idx, node_info_t<RT> const& dest, src_buf_t const& insbuf) -> edit_result_t<RT>
 	{
-		auto [left, right, seam] = edit_chunk_at_char(dest, char_idx,
-			std::bind(insert_small_text_<RT>, arg1, arg2, arg3, insbuf));
-
-		if (seam != seam_t::none)
-		{
-			// ??
-		}
-
-		return {left, right, seam};
+		return edit_chunk_at_char(dest, char_idx, std::bind(insert_small_text_<RT>, arg1, arg2, arg3, insbuf));
 	}
 }
 
@@ -1756,16 +1816,28 @@ namespace atma::_rope_
 
 namespace atma::_rope_
 {
+#define ATMA_ROPE_ASSERT_LEAF_INFO_AND_BUF_IN_SYNC(info, buf) \
+	do { \
+		ATMA_ASSERT((info).dropped_bytes + (info).bytes == (buf).size()); \
+	} while(0)
+
+
+
 	// drop_lf_
 
 	template <typename RT>
 	inline auto drop_lf_(node_info_t<RT> const& leaf_info, node_leaf_t<RT>& leaf, size_t) -> maybe_node_info_t<RT>
 	{
+		ATMA_ROPE_ASSERT_LEAF_INFO_AND_BUF_IN_SYNC(leaf_info, leaf.buf);
+
 		if (leaf.buf[leaf_info.dropped_bytes] == charcodes::lf)
 		{
-			auto result = leaf_info;
-			++result.dropped_bytes;
-			++result.dropped_characters;
+			ATMA_ASSERT(leaf_info.line_breaks > 0);
+
+			auto result = leaf_info
+				+ text_info_t{.dropped_bytes = 1, .dropped_characters = 1}
+				- text_info_t{.bytes = 1, .characters = 1, .line_breaks = 1};
+
 			return { result };
 		}
 		else
@@ -1775,13 +1847,8 @@ namespace atma::_rope_
 	}
 
 	// append_lf_
-	#define ATMA_ROPE_ASSERT_LEAF_INFO_AND_BUF_IN_SYNC(info, buf) \
-		do { \
-			ATMA_ASSERT((info).dropped_bytes + (info).bytes == (buf).size()); \
-		} while(0)
-
 	template <typename RT>
-	inline auto append_lf_(node_info_t<RT> const& leaf_info, node_leaf_t<RT>& leaf, size_t) -> node_info_t<RT>
+	inline auto append_lf_(node_info_t<RT> const& leaf_info, node_leaf_t<RT>& leaf, size_t) -> maybe_node_info_t<RT>
 	{
 		ATMA_ROPE_ASSERT_LEAF_INFO_AND_BUF_IN_SYNC(leaf_info, leaf.buf);
 		
@@ -1797,9 +1864,12 @@ namespace atma::_rope_
 		//    previous two points
 		//
 		bool const has_trailing_cr = !leaf.buf.empty() && leaf.buf.back() == '\r';
-		bool const can_fit_in_chunk = leaf.buf.size() + 1 <= RT::buf_size;
+		if (!has_trailing_cr)
+		{
+			return {};
+		}
 
-		ATMA_ASSERT(has_trailing_cr);
+		bool const can_fit_in_chunk = leaf.buf.size() + 1 <= RT::buf_size;
 		ATMA_ASSERT(can_fit_in_chunk);
 
 		leaf.buf.append("\n", 1);
