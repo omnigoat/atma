@@ -126,9 +126,7 @@ namespace atma
 		: rope_basic_traits<4, 512>
 	{};
 	
-	struct rope_test_traits
-		: rope_basic_traits<4, 9>
-	{};
+	using rope_test_traits = rope_basic_traits<4, 9>;
 }
 
 
@@ -359,7 +357,8 @@ namespace atma::_rope_
 			return std::span<node_info_t<RT> const>(children_.data(), limit);
 		}
 
-		auto clone_with(size_t idx, node_info_t<RT> const&, maybe_node_info_t<RT> const& = {}) const -> edit_result_t<RT>;
+		auto clone_with(size_t idx, node_info_t<RT> const&) const -> node_info_t<RT>;
+		auto clone_with(size_t idx, node_info_t<RT> const&, maybe_node_info_t<RT> const&) const -> edit_result_t<RT>;
 
 		auto calculate_combined_info() const -> text_info_t;
 
@@ -464,6 +463,7 @@ namespace atma::_rope_
 		hard_right,
 	};
 
+	auto is_seam(char, char) -> bool;
 	auto is_break(src_buf_t buf, size_t byte_idx) -> bool;
 	auto prev_break(src_buf_t buf, size_t byte_idx) -> size_t;
 	auto next_break(src_buf_t buf, size_t byte_idx) -> size_t;
@@ -612,6 +612,15 @@ namespace atma::_rope_
 //---------------------------------------------------------------------
 namespace atma::_rope_
 {
+	template <typename RT, typename F>
+	auto edit_chunk_at_char(node_info_t<RT> const& info, size_t char_idx, F f)
+		-> edit_result_t<RT>;
+}
+
+namespace atma::_rope_
+{
+	// stitching/mending
+
 	template <typename RT>
 	auto stitch_upwards_simple_(node_info_t<RT> const&, node_internal_t<RT>&, size_t child_idx, maybe_node_info_t<RT> const&)
 		-> maybe_node_info_t<RT>;
@@ -620,9 +629,17 @@ namespace atma::_rope_
 	auto stitch_upwards_(node_info_t<RT> const&, node_internal_t<RT>&, size_t child_idx, edit_result_t<RT> const&)
 		-> edit_result_t<RT>;
 
-	template <typename RT, typename F>
-	auto edit_chunk_at_char(node_info_t<RT> const& info, size_t char_idx, F f)
-		-> edit_result_t<RT>;
+
+	template <typename RT>
+	using mend_result_type = std::tuple<seam_t, std::optional<std::tuple<node_info_t<RT>, node_info_t<RT>>>>;
+
+	template <typename RT>
+	auto mend_left_seam_(seam_t, maybe_node_info_t<RT> const& sibling_node, node_info_t<RT> const& seam_node)
+		-> mend_result_type<RT>;
+
+	template <typename RT>
+	auto mend_right_seam_(seam_t, node_info_t<RT> const& seam_node, maybe_node_info_t<RT> const& sibling_node)
+		-> mend_result_type<RT>;
 }
 
 namespace atma::_rope_
@@ -857,6 +874,17 @@ namespace atma::_rope_
 		return result;
 	}
 
+	template <typename RT>
+	inline auto node_internal_t<RT>::clone_with(size_t idx, node_info_t<RT> const& info) const -> node_info_t<RT>
+	{
+		auto result_node = make_internal_ptr<RT>(
+			xfer_src(children_, idx),
+			info,
+			xfer_src(children_, idx + 1, RT::branching_factor - idx - 1));
+
+		return node_info_t<RT>{result_node};
+	}
+
 	// clones 'this', but replaces child node at @idx with the node at @l_info, and inserts @maybe_r_info
 	// if possible. if not it splits 'this' and returns an internal-node containing both nodes split from 'this'
 	template <typename RT>
@@ -915,7 +943,7 @@ namespace atma::_rope_
 				l_info,
 				xfer_src(children_, idx + 1, RT::branching_factor - idx - 1));
 
-			return edit_result_t<RT>{node_info_t<RT>{l_info, s}, maybe_node_info_t<RT>()};
+			return edit_result_t<RT>{node_info_t<RT>{s}, maybe_node_info_t<RT>()};
 		}
 	}
 
@@ -1015,13 +1043,18 @@ namespace atma::_rope_
 //---------------------------------------------------------------------
 namespace atma::_rope_
 {
+	inline auto is_seam(char x, char y) -> bool
+	{
+		return x == charcodes::cr && y == charcodes::lf;
+	}
+
 	inline auto is_break(src_buf_t buf, size_t byte_idx) -> bool
 	{
 		ATMA_ASSERT(byte_idx <= buf.size());
 		
 		bool const is_buffer_boundary = (byte_idx == 0 || byte_idx == buf.size());
 		bool const is_utf_codepoint_boundary = (buf[byte_idx] >> 6) != 0b10;
-		bool const is_not_mid_crlf = !is_buffer_boundary || buf[byte_idx - 1] != 0x0d || buf[byte_idx] != 0x0a;
+		bool const is_not_mid_crlf = !is_buffer_boundary || !is_seam(buf[byte_idx - 1], buf[byte_idx]);
 
 		return is_buffer_boundary || is_utf_codepoint_boundary && is_not_mid_crlf;
 	}
@@ -1557,74 +1590,44 @@ namespace atma::_rope_
 //---------------------------------------------------------------------
 namespace atma::_rope_
 {
-	template <typename RT>
-	auto mend_left_seam(seam_t seam, maybe_node_info_t<RT> const& sibling_node, node_info_t<RT> const& seam_node) -> std::tuple<seam_t, std::optional<std::tuple<node_info_t<RT>, node_info_t<RT>>>>
+	// edit_chunk_at_char
+
+	template <typename RT, typename F>
+	inline auto edit_chunk_at_char(node_info_t<RT> const& info, size_t char_idx, F payload_function) -> edit_result_t<RT>
 	{
-		if (seam == seam_t::none)
-		{
-			return {seam_t::none, {}};
-		}
-		else if (sibling_node)
-		{
-			// drop lf from the front of the next leaf. if this returns an empty optional,
-			// then that leaf didn't have an lf at the front, and we are just going to
-			// leave this cr as is... just, dangling there
-			auto sibling_node_prime = navigate_to_back_leaf(*sibling_node,
-				append_lf_<RT>,
-				stitch_upwards_simple_<RT>);
-
-			// append cr to seamed leaf
-			if (sibling_node_prime)
-			{
-				auto seam_node_prime = navigate_to_back_leaf(seam_node,
-					drop_lf_<RT>,
-					stitch_upwards_simple_<RT>);
-
-				ATMA_ASSERT(seam_node_prime);
-
-				return {seam_t::none, std::make_tuple(*sibling_node_prime, *seam_node_prime)};
-			}
-		}
-
-		return {seam, {}};
-	}
-
-	template <typename RT>
-	auto mend_right_seam(seam_t seam, node_info_t<RT> const& seam_node, maybe_node_info_t<RT> const& sibling_node) -> std::tuple<seam_t, std::optional<std::tuple<node_info_t<RT>, node_info_t<RT>>>>
-	{
-		if (seam == seam_t::none)
-		{
-			return { seam_t::none, {} };
-		}
-		else if (sibling_node)
-		{
-			// drop lf from the front of the next leaf. if this returns an empty optional,
-			// then that leaf didn't have an lf at the front, and we are just going to
-			// leave this cr as is... just, dangling there
-			auto sibling_node_prime = navigate_to_front_leaf(*sibling_node,
-				drop_lf_<RT>);
-
-			// append cr to seamed leaf
-			if (sibling_node_prime)
-			{
-				auto seam_node_prime = navigate_to_back_leaf(seam_node,
-					append_lf_<RT>,
-					stitch_upwards_simple_<RT>);
-
-				return { seam_t::none, std::make_tuple(*seam_node_prime, *sibling_node_prime) };
-			}
-		}
-		
-		return { seam, {} };
+		return navigate_to_leaf(info, char_idx,
+			find_for_char_idx<RT>,
+			payload_function,
+			stitch_upwards_<RT>);
 	}
 }
+
 
 namespace atma::_rope_
 {
 	template <typename RT>
+	inline auto stitch_upwards_simple_(node_info_t<RT> const& info, node_internal_t<RT>& node, size_t child_idx, maybe_node_info_t<RT> const& child_info) -> maybe_node_info_t<RT>
+	{
+		return (child_info)
+			? maybe_node_info_t<RT>{ node.clone_with(child_idx, *child_info) }
+			: maybe_node_info_t<RT>{};
+	}
+
+	template <typename RT>
 	inline auto stitch_upwards_(node_info_t<RT> const& info, node_internal_t<RT>& node, size_t child_idx, edit_result_t<RT> const& er) -> edit_result_t<RT>
 	{
 		auto const& [left_info, maybe_right_info, seam] = er;
+
+		// validate that there's no seam between our two edit-result nodes. this
+		// should have been caught in whatever edit operation was performed. stitching
+		// the tree and melding crlf pairs is for siblings
+		if (maybe_right_info && left_info.node->is_leaf())
+		{
+			auto const& leftleaf = left_info.node->known_leaf();
+			auto const& rightleaf = maybe_right_info->node->known_leaf();
+
+			ATMA_ASSERT(!is_seam(leftleaf.buf.back(), rightleaf.buf[maybe_right_info->dropped_bytes]));
+		}
 
 		// no seam, no worries
 		if (seam == seam_t::none)
@@ -1644,20 +1647,26 @@ namespace atma::_rope_
 			maybe_right_info,
 			node.try_child_at((int)child_idx + 1)};
 
-		auto [mended_left_seam, maybe_mended_left_nodes] = mend_left_seam(left_seam, mended_children[0], *mended_children[1]);
+		// left seam
+		auto const [mended_left_seam, maybe_mended_left_nodes] = mend_left_seam_(left_seam, mended_children[0], *mended_children[1]);
 		if (maybe_mended_left_nodes)
 		{
 			mended_children[0] = std::get<0>(*maybe_mended_left_nodes);
 			mended_children[1] = std::get<1>(*maybe_mended_left_nodes);
 		}
 
+		// right seam
 		auto& right_seam_node = mended_children[2] ? *mended_children[2] : *mended_children[1];
-		auto [mended_right_seam, maybe_mended_right_nodes] = mend_right_seam(right_seam, right_seam_node, mended_children[3]);
+		auto const [mended_right_seam, maybe_mended_right_nodes] = mend_right_seam_(right_seam, right_seam_node, mended_children[3]);
 		if (maybe_mended_right_nodes)
 		{
 			right_seam_node = std::get<0>(*maybe_mended_right_nodes);
 			mended_children[3] = std::get<1>(*maybe_mended_right_nodes);
 		}
+
+		// validate that when we take the trailing subspan we will not
+		// begin the subspan past the end. _at_ the end is fine (it's a nop)
+		ATMA_ASSERT(child_idx + 2 <= node.children().size());
 
 		auto result_node = (child_idx > 0)
 			? make_internal_ptr<RT>(
@@ -1670,42 +1679,76 @@ namespace atma::_rope_
 
 		return {result_node, maybe_node_info_t<RT>{}, mended_left_seam | mended_right_seam};
 	}
-}
 
-namespace atma::_rope_
-{
 	template <typename RT>
-	inline auto stitch_upwards_simple_(node_info_t<RT> const& info, node_internal_t<RT>& node, size_t child_idx, maybe_node_info_t<RT> const& child_info) -> maybe_node_info_t<RT>
+	inline auto mend_left_seam_(seam_t seam, maybe_node_info_t<RT> const& sibling_node, node_info_t<RT> const& seam_node) -> mend_result_type<RT>
 	{
-		if (!child_info)
+		if (seam == seam_t::none)
 		{
-			return {};
+			return {seam_t::none, {}};
+		}
+		else if (sibling_node)
+		{
+			// append lf to the back of the previous leaf. if this returns an empty optional,
+			// then that leaf didn't have a trailing cr at the end, and we are just going to
+			// leave this lf as it is... sitting all pretty at the front
+			auto sibling_node_prime = navigate_to_back_leaf(*sibling_node,
+				append_lf_<RT>,
+				stitch_upwards_simple_<RT>);
+
+			if (sibling_node_prime)
+			{
+				// drop lf from seam node
+				auto seam_node_prime = navigate_to_back_leaf(seam_node,
+					drop_lf_<RT>,
+					stitch_upwards_simple_<RT>);
+
+				ATMA_ASSERT(seam_node_prime);
+
+				return {seam_t::none, std::make_tuple(*sibling_node_prime, *seam_node_prime)};
+			}
+			else
+			{
+				return {seam_t::none, {}};
+			}
 		}
 
-		auto [left, right, seam] = node.clone_with(child_idx, *child_info);
-		
-		ATMA_ASSERT(!right);
-		ATMA_ASSERT(seam == seam_t::none);
-
-		auto result = node_info_t<RT>{left};
-		return result;
+		return {seam, {}};
 	}
-}
 
-namespace atma::_rope_
-{
-	// edit_chunk_at_char
-
-	template <typename RT, typename F>
-	inline auto edit_chunk_at_char(node_info_t<RT> const& info, size_t char_idx, F payload_function) -> edit_result_t<RT>
+	template <typename RT>
+	inline auto mend_right_seam_(seam_t seam, node_info_t<RT> const& seam_node, maybe_node_info_t<RT> const& sibling_node) -> mend_result_type<RT>
 	{
-		return navigate_to_leaf(info, char_idx,
-			find_for_char_idx<RT>,
-			payload_function,
-			stitch_upwards_<RT>);
+		if (seam == seam_t::none)
+		{
+			return {seam_t::none, {}};
+		}
+		else if (sibling_node)
+		{
+			// drop lf from the front of the next leaf. if this returns an empty optional,
+			// then that leaf didn't have an lf at the front, and we are just going to
+			// leave this cr as is... just, dangling there
+			auto sibling_node_prime = navigate_to_front_leaf(*sibling_node,
+				drop_lf_<RT>);
+
+			if (sibling_node_prime)
+			{
+				// append cr to seamed leaf
+				auto seam_node_prime = navigate_to_back_leaf(seam_node,
+					append_lf_<RT>,
+					stitch_upwards_simple_<RT>);
+
+				return {seam_t::none, std::make_tuple(*seam_node_prime, *sibling_node_prime)};
+			}
+			else
+			{
+				return {seam_t::none, {}};
+			}
+		}
+
+		return {seam, {}};
 	}
 }
-
 
 namespace atma::_rope_
 {
