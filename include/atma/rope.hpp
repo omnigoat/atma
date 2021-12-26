@@ -653,17 +653,8 @@ namespace atma::_rope_
 	// insert_small_text_
 
 	template <typename RT>
-	struct insert_small_text_t_
-	{
-		using charbuf_t = charbuf_t<RT::buf_size>;
-		//using nav_stack_t = typename edit_chunk_at_char_t<RT>::nav_stack_t;
-
-		auto operator ()(node_info_t<RT> const& leaf_info, node_leaf_t<RT>&, size_t char_idx, src_buf_t insbuf) const
-			-> edit_result_t<RT>;
-	};
-
-	template <typename RT>
-	inline constexpr insert_small_text_t_<RT> insert_small_text_;
+	auto insert_small_text_(node_info_t<RT> const& leaf_info, node_leaf_t<RT>&, size_t char_idx, src_buf_t insbuf)
+		-> edit_result_t<RT>;
 }
 
 namespace atma::_rope_
@@ -1761,7 +1752,7 @@ namespace atma::_rope_
 	// insert_small_text_
 
 	template <typename RT>
-	inline auto insert_small_text_t_<RT>::operator ()(node_info_t<RT> const& leaf_info, node_leaf_t<RT>& leaf, size_t char_idx, src_buf_t insbuf) const -> edit_result_t<RT>
+	inline auto insert_small_text_(node_info_t<RT> const& leaf_info, node_leaf_t<RT>& leaf, size_t char_idx, src_buf_t insbuf) -> edit_result_t<RT>
 	{
 		ATMA_ASSERT(insbuf.size() <= RT::buf_edit_max_size);
 
@@ -1862,9 +1853,6 @@ namespace atma::_rope_
 	} while(0)
 
 
-
-	// drop_lf_
-
 	template <typename RT>
 	inline auto drop_lf_(node_info_t<RT> const& leaf_info, node_leaf_t<RT>& leaf, size_t) -> maybe_node_info_t<RT>
 	{
@@ -1886,7 +1874,6 @@ namespace atma::_rope_
 		}
 	}
 
-	// append_lf_
 	template <typename RT>
 	inline auto append_lf_(node_info_t<RT> const& leaf_info, node_leaf_t<RT>& leaf, size_t) -> maybe_node_info_t<RT>
 	{
@@ -1903,7 +1890,7 @@ namespace atma::_rope_
 		//    to the limit of the buffer. this assumption is validated by the
 		//    previous two points
 		//
-		bool const has_trailing_cr = !leaf.buf.empty() && leaf.buf.back() == '\r';
+		bool const has_trailing_cr = !leaf.buf.empty() && leaf.buf.back() == charcodes::cr;
 		if (!has_trailing_cr)
 		{
 			return {};
@@ -1912,7 +1899,7 @@ namespace atma::_rope_
 		bool const can_fit_in_chunk = leaf.buf.size() + 1 <= RT::buf_size;
 		ATMA_ASSERT(can_fit_in_chunk);
 
-		leaf.buf.append("\n", 1);
+		leaf.buf.push_back(charcodes::lf);
 		auto result_info = leaf_info + text_info_t{.bytes = 1, .characters = 1};
 		return result_info;
 	}
