@@ -122,10 +122,7 @@ namespace atma
 		constexpr static size_t buf_edit_split_drift_size = (buf_size / 32);
 	};
 
-	struct rope_default_traits
-		: rope_basic_traits<4, 512>
-	{};
-	
+	using rope_default_traits = rope_basic_traits<4, 512>;
 	using rope_test_traits = rope_basic_traits<4, 9>;
 }
 
@@ -2459,16 +2456,33 @@ namespace atma
 	template <typename RT>
 	inline auto basic_rope_t<RT>::insert(size_t char_idx, char const* str, size_t sz) -> void
 	{
-		auto [left, right, seam] = _rope_::insert(char_idx, root_, xfer_src(str, sz));
+		// determine if we've got a "big" string
+		//  - if we do, make a new rope and splice it into our rope
+		//  - if we don't, chunkify it (even for one chunk), and insert piece-by-piece
 
-		if (right.has_value())
+		_rope_::edit_result_t<RT> edit_result;
+		if (sz < RT::buf_edit_max_size)
 		{
-			(_rope_::text_info_t&)root_ = left + *right;
-			root_.node = _rope_::make_internal_ptr<RT>(left, *right);
+			edit_result = _rope_::insert(char_idx, root_, xfer_src(str, sz));
+		}
+		else if (sz < RT::buf_edit_max_size * 6)
+		{
+			// chunkify
+			for (size_t i = 0; i != sz; )
+			{
+				[[maybe_unused]] size_t chunk_size = std::min((sz - i), RT::buf_edit_max_size);
+				
+			}
+		}
+
+		if (edit_result.right.has_value())
+		{
+			(_rope_::text_info_t&)root_ = edit_result.left + *edit_result.right;
+			root_.node = _rope_::make_internal_ptr<RT>(edit_result.left, *edit_result.right);
 		}
 		else
 		{
-			root_ = left;
+			root_ = edit_result.left;
 		}
 	}
 
