@@ -476,19 +476,19 @@ namespace atma::_rope_
 //---------------------------------------------------------------------
 namespace atma::_rope_
 {
-	template <typename R, typename RT, typename... Fs>
-	auto visit_(R default_value, node_ptr<RT> const& x, Fs... fs) -> R
+	template <typename R, typename RT, typename... Fd>
+	auto visit_(R default_value, node_ptr<RT> const& x, Fd... fs) -> R
 	{
-		return !x ? default_value : std::invoke(&node_t<RT>::template visit<std::remove_reference_t<Fs>...>, *x, std::forward<Fs>(fs)...);
+		return !x ? default_value : std::invoke(&node_t<RT>::template visit<std::remove_reference_t<Fd>...>, *x, std::forward<Fd>(fs)...);
 	}
 
-	template <typename RT, typename... Fs>
-	auto visit_(node_ptr<RT> const& x, Fs... fs)
-	requires std::is_same_v<void, decltype(x->visit(std::forward<Fs>(fs)...))>
+	template <typename RT, typename... Fd>
+	auto visit_(node_ptr<RT> const& x, Fd... fs)
+	requires std::is_same_v<void, decltype(x->visit(std::forward<Fd>(fs)...))>
 	{
 		if (x)
 		{
-			x->visit(std::forward<Fs>(fs)...);
+			x->visit(std::forward<Fd>(fs)...);
 		}
 	}
 }
@@ -577,16 +577,16 @@ namespace atma::_rope_
 	//
 	// this function ...
 	//
-	template <typename RT, typename Data, typename Fd>
-	using navigate_to_leaf_result_type_t = std::invoke_result_t<Fd, node_info_t<RT> const&, node_leaf_t<RT>&, Data>;
+	template <typename RT, typename Data, typename Fp>
+	using navigate_to_leaf_result_type_t = std::invoke_result_t<Fp, node_info_t<RT> const&, node_leaf_t<RT>&, Data>;
 
-	template <typename RT, typename Data, typename Fd>
-	auto navigate_upwards_passthrough_(node_info_t<RT> const&, node_internal_t<RT>&, size_t, navigate_to_leaf_result_type_t<RT, Data, Fd> const&)
-		-> navigate_to_leaf_result_type_t<RT, Data, Fd>;
+	template <typename RT, typename Data, typename Fp>
+	auto navigate_upwards_passthrough_(node_info_t<RT> const&, node_internal_t<RT>&, size_t, navigate_to_leaf_result_type_t<RT, Data, Fp> const&)
+		-> navigate_to_leaf_result_type_t<RT, Data, Fp>;
 
-	template <typename RT, typename Data, typename Fs, typename Fd, typename Fu>
-	auto navigate_to_leaf(node_info_t<RT> const& info, Data, Fs&& select_fn, Fd&& down_fn, Fu&& up_fn)
-		-> navigate_to_leaf_result_type_t<RT, Data, Fd>;
+	template <typename RT, typename Data, typename Fd, typename Fp, typename Fu>
+	auto navigate_to_leaf(node_info_t<RT> const& info, Data, Fd&& down_fn, Fp&& payload_fn, Fu&& up_fn)
+		-> navigate_to_leaf_result_type_t<RT, Data, Fp>;
 
 	// // navigate_to_front_leaf
 
@@ -1529,27 +1529,134 @@ namespace atma::_rope_
 		}
 	}
 
-	template <typename RT, typename Data, typename Fd>
-	inline auto navigate_upwards_passthrough_(node_info_t<RT> const&, node_internal_t<RT>&, size_t, navigate_to_leaf_result_type_t<RT, Data, Fd> const& x)
-		-> navigate_to_leaf_result_type_t<RT, Data, Fd>
+	template <typename RT, typename Data, typename Fp>
+	inline auto navigate_upwards_passthrough_(node_info_t<RT> const&, node_internal_t<RT>&, size_t, navigate_to_leaf_result_type_t<RT, Data, Fp> const& x)
+		-> navigate_to_leaf_result_type_t<RT, Data, Fp>
 	{
 		return x;
 	}
 
-	template <typename RT, typename Data, typename Fs, typename Fd, typename Fu>
-	inline auto navigate_to_leaf(node_info_t<RT> const& info, Data data, Fs&& select_fn, Fd&& down_fn, Fu&& up_fn) -> navigate_to_leaf_result_type_t<RT, Data, Fd>
+
+	template <typename RT, typename Data, typename Fd, typename Fp, typename Fu>
+	inline auto navigate_to_leaf(node_info_t<RT> const& info, Data data, Fd&& down_fn, Fp&& payload_fn, Fu&& up_fn) -> navigate_to_leaf_result_type_t<RT, Data, Fp>
 	{
+		// okay so this function seems massive and complex, but 90% of the code is constexpr bools determining
+		// exactly the function-signatures of the user-supplied functions, so users don't have to place a bunch
+		// of random args when they don't need them. the actual algorithm and real code is dead simple:
+		//
+		//  1) leaf nodes: call payload_fn and return that
+		//  2) internal nodes:
+		//     a) call down_fn to figure out which child to navigate to
+		//     b) recurse onto that child
+		//     c) with the result from our recursion, call up_fn and return that as the result
+		//     d) fin.
+		//
+		using result_type = navigate_to_leaf_result_type_t<RT, Data, Fp>;
+
+		constexpr bool const select_function_returns_child_idx =
+			std::is_invocable_r_v<
+				std::tuple<size_t>,
+				Fd, node_internal_t<RT>&, Data>;
+
+		constexpr bool const select_function_returns_child_idx_and_data =
+			std::is_invocable_r_v<
+				std::tuple<size_t, Data>,
+				Fd, node_internal_t<RT>&, Data>;
+
+		constexpr bool const select_function_returns_child_idx_and_info =
+			std::is_invocable_r_v<
+				std::tuple<size_t, node_info_t<RT>>,
+				Fd, node_internal_t<RT>&, Data>;
+
+		constexpr bool const select_function_returns_child_idx_and_info_and_data =
+			std::is_invocable_r_v<
+				std::tuple<size_t, node_info_t<RT>, Data>,
+				Fd, node_internal_t<RT>&, Data>;
+
+		constexpr bool const up_fn_takes_only_child_idx =
+			std::is_invocable_v<
+				Fu, node_info_t<RT> const&, node_internal_t<RT>&,
+				size_t,
+				result_type>;
+
+		constexpr bool const up_fn_takes_only_child_idx_and_data =
+			std::is_invocable_v<
+				Fu, node_info_t<RT> const&, node_internal_t<RT>&,
+				size_t, Data,
+				result_type>;
+
+		constexpr bool const up_fn_takes_both_child_idx_and_info =
+			std::is_invocable_v<
+				Fu, node_info_t<RT> const&, node_internal_t<RT>&,
+				size_t, node_info_t<RT>&,
+				result_type>;
+
+		constexpr bool const up_fn_takes_both_child_idx_and_info_and_data =
+			std::is_invocable_v<
+				Fu, node_info_t<RT> const&, node_internal_t<RT>&,
+				size_t, node_info_t<RT>&, Data,
+				result_type>;
+
+		auto const down_fn_prime = [&](node_internal_t<RT>& x, Data data)
+		{
+			if constexpr (select_function_returns_child_idx)
+			{
+				auto [child_idx] = std::invoke(std::forward<Fd>(down_fn), x, data);
+				auto&& child_info = x.child_at(child_idx);
+				return std::make_tuple(child_idx, std::ref(child_info), data);
+			}
+			else if constexpr (select_function_returns_child_idx_and_data)
+			{
+				auto [child_idx, data_prime] = std::invoke(std::forward<Fd>(down_fn), x, data);
+				auto&& child_info = x.child_at(child_idx);
+				return std::make_tuple(child_idx, std::ref(child_info), data_prime);
+			}
+			else if constexpr (select_function_returns_child_idx_and_info)
+			{
+				auto [child_idx, child_info] = std::invoke(std::forward<Fd>(down_fn), x, data);
+				return std::make_tuple(child_idx, std::ref(child_info), data);
+			}
+			else if constexpr (select_function_returns_child_idx_and_info_and_data)
+			{
+				return std::invoke(std::forward<Fd>(down_fn), x, data);
+			}
+			else
+			{
+				static_assert(false, "bad select return-type");
+			}
+		};
+
+		auto const up_fn_prime = [&](node_info_t<RT> const& info, node_internal_t<RT>& x, size_t child_idx, node_info_t<RT> const& child_info, Data data, result_type result)
+		{
+			if constexpr (up_fn_takes_only_child_idx)
+				return std::invoke(std::forward<Fu>(up_fn), info, x, child_idx, result);
+			else if constexpr (up_fn_takes_only_child_idx_and_data)
+				return std::invoke(std::forward<Fu>(up_fn), info, x, child_idx, data, result);
+			else if constexpr (up_fn_takes_both_child_idx_and_info)
+				return std::invoke(std::forward<Fu>(up_fn), info, x, child_idx, child_info, result);
+			else if constexpr (up_fn_takes_both_child_idx_and_info_and_data)
+				return std::invoke(std::forward<Fu>(up_fn), info, x, child_idx, child_info, data, result);
+			else
+				static_assert(false, "bad up-function signature");
+		};
+
+		// yeah this is literally all the Real Code there actually is...
 		return info.node->visit(
 			[&](node_internal_t<RT>& x)
 			{
-				auto [child_idx, data_prime] = std::invoke(select_fn, x, data);
-				auto&& child = x.child_at(child_idx);
-				auto result = navigate_to_leaf(child, data_prime, select_fn, down_fn, up_fn);
-				return std::invoke(up_fn, info, x, child_idx, result);
+				auto [child_idx, child_info, data_prime] = down_fn_prime(x, data);
+
+				auto result = navigate_to_leaf(
+					child_info, data_prime,
+					std::forward<Fd>(down_fn),
+					std::forward<Fp>(payload_fn),
+					std::forward<Fu>(up_fn));
+
+				return up_fn_prime(info, x, child_idx, child_info, data_prime, result);
 			},
 			[&](node_leaf_t<RT>& x)
 			{
-				return std::invoke(down_fn, info, x, data);
+				return std::invoke(std::forward<Fp>(payload_fn), info, x, data);
 			});
 	}
 
@@ -1557,7 +1664,7 @@ namespace atma::_rope_
 	inline auto navigate_to_front_leaf(node_info_t<RT> const& info, F f, G g)
 	{
 		return navigate_to_leaf(info, size_t(),
-			[](node_internal_t<RT>& x, size_t) { return std::make_tuple(0, 0); },
+			[](node_internal_t<RT>& x, size_t) { return std::make_tuple(0); },
 			f, g);
 	}
 
@@ -1565,7 +1672,7 @@ namespace atma::_rope_
 	auto navigate_to_back_leaf(node_info_t<RT> const& info, F f, G g)
 	{
 		return navigate_to_leaf(info, size_t(),
-			[](node_internal_t<RT>& x, size_t) { return std::make_tuple(x.children().size() - 1, x.children().size() - 1); },
+			[](node_internal_t<RT>& x, size_t) { return std::make_tuple(x.children().size() - 1); },
 			f, g);
 	}
 }
@@ -1721,7 +1828,7 @@ namespace atma::_rope_
 
 			if (sibling_node_prime)
 			{
-				// append cr to seamed leaf
+				// append lf to seamed leaf
 				auto seam_node_prime = navigate_to_back_leaf(seam_node,
 					append_lf_<RT>,
 					stitch_upwards_simple_<RT>);
@@ -2448,11 +2555,11 @@ namespace atma
 		//  - if we don't, chunkify it (even for one chunk), and insert piece-by-piece
 
 		_rope_::edit_result_t<RT> edit_result;
-		if (sz < RT::buf_edit_max_size)
+		if (sz <= RT::buf_edit_max_size)
 		{
 			edit_result = _rope_::insert(char_idx, root_, xfer_src(str, sz));
 		}
-		else if (sz < RT::buf_edit_max_size * 6)
+		else if (sz <= RT::buf_edit_max_size * 6)
 		{
 			// chunkify
 			for (size_t i = 0; i != sz; )
