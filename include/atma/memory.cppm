@@ -1030,6 +1030,34 @@ export namespace atma
 	constexpr auto xfer_src  = detail::xfer_range_maker_<src_memory_tag_t>();
 }
 
+// shortcut for half-open ranges ??
+export namespace atma
+{
+	template <typename T>
+	inline auto xfer_dest_between(T* ptr, size_t from, size_t to)
+	{
+		return xfer_dest(ptr, from, to - from);
+	}
+
+	template <typename T>
+	inline auto xfer_src_between(T* ptr, size_t from, size_t to)
+	{
+		return xfer_src(ptr, from, to - from);
+	}
+
+	template <std::ranges::contiguous_range Range>
+	inline auto xfer_dest_between(Range&& range, size_t from, size_t to)
+	{
+		return xfer_dest(std::forward<Range>(range), from, to - from);
+	}
+
+	template <std::ranges::contiguous_range Range>
+	inline auto xfer_src_between(Range&& range, size_t from, size_t to)
+	{
+		return xfer_src(std::forward<Range>(range), from, to - from);
+	}
+}
+
 
 
 
