@@ -2063,6 +2063,13 @@ namespace atma::_rope_
 
 				return {{}, info};
 			}
+			else if (split_idx == children_size - 1)
+			{
+				auto left = make_internal_ptr<RT>(
+					xfer_src(children, split_idx));
+
+				return {left, *split_child_right};
+			}
 			else if (split_idx == 1)
 			{
 				// there is a singular node to the left. we don't want to make an internal
@@ -2073,7 +2080,7 @@ namespace atma::_rope_
 					*split_child_right,
 					xfer_src_between(children, split_idx + 1, children_size));
 
-				return {children[0], right};
+				return {children.front(), right};
 			}
 			else
 			{
@@ -2089,10 +2096,74 @@ namespace atma::_rope_
 		}
 		else if (!split_child_right)
 		{
+			if (split_idx == 0)
+			{
+				// we split the front node, but it only returned "to the left",
+				// which means no split occurred and we only need return the left
+				// result directly, and repackage nodes 1...n
 
+				auto right = make_internal_ptr<RT>(
+					xfer_src_between(children, 1, children_size));
+
+				return {*split_child_left, right};
+			}
+			else if (split_idx == children_size - 1)
+			{
+				// no blah
+
+				return {info, {}};
+			}
+			else if (split_idx == children_size - 2)
+			{
+				auto left = make_internal_ptr<RT>(
+					xfer_src(children, split_idx),
+					*split_child_left);
+
+				return {left, children.back()};
+			}
+			else
+			{
+				auto left = make_internal_ptr<RT>(
+					xfer_src(children, split_idx),
+					*split_child_left);
+
+				auto right = make_internal_ptr<RT>(
+					xfer_src_between(children, split_idx + 1, children_size));
+
+				return {left, right};
+			}
 		}
+		else
+		{
+			if (split_idx == 0)
+			{
+				auto right = make_internal_ptr<RT>(
+					*split_child_right,
+					xfer_src_between(children, split_idx + 1, children_size));
 
-		return result;
+				return {*split_child_left, right};
+			}
+			else if (split_idx == children_size - 1)
+			{
+				auto left = make_internal_ptr<RT>(
+					xfer_src(children, split_idx),
+					*split_child_left);
+
+				return {left, *split_child_right};
+			}
+			else
+			{
+				auto left = make_internal_ptr<RT>(
+					xfer_src(children, split_idx),
+					*split_child_left);
+
+				auto right = make_internal_ptr<RT>(
+					*split_child_right,
+					xfer_src_between(children, split_idx + 1, children_size));
+
+				return {left, right};
+			}
+		}
 	}
 
 	template <typename RT>
