@@ -550,7 +550,13 @@ SCENARIO("atma::rope's internal operations work")
 		WHEN("we split the rope")
 		{
 			auto rope = atma::_rope_::build_rope_<T>(atma::xfer_src(passage, passage_size));
-			auto result = rope.split(5);
+			auto [left, right] = rope.split(9);
+
+			std::cout << std::endl;
+			std::cout << "left:\n>" << left << "<\n\nright:\n>" << right << "<\n" << std::endl;
+
+			atma::_rope_::validate_rope_(left.root());
+			atma::_rope_::validate_rope_(right.root());
 		}
 
 	}
