@@ -750,6 +750,9 @@ namespace atma::_rope_
 	public:
 		template <typename RT>
 		auto operator ()(node_info_t<RT> const& x) const -> bool;
+
+		template <typename RT>
+		auto internal_node(node_info_t<RT> const& x) const -> bool;
 	};
 
 	constexpr validate_rope_t_ validate_rope_;
@@ -2045,12 +2048,41 @@ namespace atma::_rope_
 		// validate assumptions:
 		//  - split_idx is valid
 		//  - either @left, @right, or both are valid
-		//  - valid children are valid trees
 		ATMA_ASSERT(split_idx < children_size);
 		ATMA_ASSERT(split_child_left || split_child_right);
-		ATMA_ASSERT(!split_child_left || validate_rope_(*split_child_left));
-		ATMA_ASSERT(!split_child_right || validate_rope_(*split_child_right));
 
+		// validate invariants of the split-nodes' children, if the split-nodes
+		// were internal nodes (and not leaf nodes, obv).
+		//
+		// we do this because it's possible our children are no longer valid after
+		// splitting - that's okay, as long as THEIR children are valid, we can
+		// in this step rearrange those sub-children into new direct children of us
+		// to balance everything
+		//
+		// this also means for some of our shortcut algorithms where we return a sub-child
+		// node we are not breaking our recursive algorithm
+		{
+			if (split_child_left && (*split_child_left).node->is_internal())
+			{
+				auto const& lin = split_child_left->node->known_internal();
+				for (auto const& x : lin.children())
+				{
+					ATMA_ASSERT(validate_rope_.internal_node(x));
+				}
+			}
+
+			if (split_child_right && (*split_child_right).node->is_internal())
+			{
+				auto const& lin = split_child_right->node->known_internal();
+				for (auto const& x : lin.children())
+				{
+					ATMA_ASSERT(validate_rope_.internal_node(x));
+				}
+			}
+		}
+
+		//bool const is_leaf_valid = validate_rope_.internal_node(*split_child_left);
+		//bool const is_leaf_valid = validate_rope_.internal_node(*split_child_left);
 
 		if (!split_child_left)
 		{
@@ -2109,8 +2141,6 @@ namespace atma::_rope_
 			}
 			else if (split_idx == children_size - 1)
 			{
-				// no blah
-
 				return {info, {}};
 			}
 			else if (split_idx == children_size - 2)
@@ -2466,6 +2496,12 @@ namespace atma::_rope_
 	{
 		// assume we're passed the root (hence '2' as the minimum branch)
 		return std::get<0>(check_node(x, 2));
+	}
+
+	template <typename RT>
+	inline auto validate_rope_t_::internal_node(node_info_t<RT> const& x) const -> bool
+	{
+		return std::get<0>(check_node(x, RT::minimum_branches));
 	}
 }
 

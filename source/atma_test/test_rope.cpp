@@ -546,23 +546,47 @@ SCENARIO("atma::rope's internal operations work")
 				std::cout << rope << std::endl;
 			}
 		}
-
-		WHEN("we split the rope")
-		{
-			auto rope = atma::_rope_::build_rope_<T>(atma::xfer_src(passage, passage_size));
-			auto [left, right] = rope.split(9);
-
-			std::cout << std::endl;
-			std::cout << "left:\n>" << left << "<\n\nright:\n>" << right << "<\n" << std::endl;
-
-			atma::_rope_::validate_rope_(left.root());
-			atma::_rope_::validate_rope_(right.root());
-		}
-
 	}
 
 	
 }
+
+
+
+SCENARIO("splitting" * doctest::skip())
+{
+	GIVEN("a default-constructed rope")
+	{
+		char const* passage =
+			"hello there, this is your captain speaking.  \n"
+			"unfortunately we forgot to fill up the plane \n"
+			"before takeoff. sorry for the inconvenience, \n"
+			"but I'm going to need some upstanding people \n"
+			"to get out and push us to the closest petrol \n"
+			"station. for your efforts you'll be rewarded \n"
+			"with a $50 gift-coupon that is redeemable at \n"
+			"any store within the food court.";
+
+		auto const passage_size = strlen(passage);
+
+		using rope_test_traits_2 = atma::rope_basic_traits<8, 9>;
+
+		auto rope = atma::_rope_::build_rope_<rope_test_traits_2>(atma::xfer_src(passage, passage_size));
+
+		WHEN("we split the rope")
+		{
+			auto [left, right] = rope.split(9 * 5 + 4);
+
+			ATMA_ASSERT(atma::_rope_::validate_rope_(left.root()));
+			ATMA_ASSERT(atma::_rope_::validate_rope_(right.root()));
+
+			std::cout << std::endl;
+			std::cout << "left:\n>" << left << "<\n\nright:\n>" << right << "<\n" << std::endl;
+		}
+
+	}
+}
+
 
 
 SCENARIO("seams" * doctest::skip())
