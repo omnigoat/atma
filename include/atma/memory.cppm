@@ -784,6 +784,8 @@ export namespace atma
 		using subspan_type = bounded_memxfer_t<Tag, T, detail::subextent_v<Extent, Offset, Count>, allocator_type>;
 		using dynamic_subspan_type = bounded_memxfer_t<Tag, T, std::dynamic_extent, A>;
 
+		using base_type::extent_v;
+
 		// inherit constructors
 		using base_type::base_type;
 
@@ -829,6 +831,10 @@ export namespace atma
 
 		template <size_t N> constexpr auto skip() const { return this->subspan<N>(); }
 		template <size_t N> constexpr auto take() const { return this->subspan<0, N>(); }
+		
+		template <size_t N>
+		requires (extent_v != std::dynamic_extent)
+		constexpr auto last() const { return this->subspan<extent_v - N>(); }
 
 		// run-time subviews
 		constexpr auto subspan(size_t offset, size_t count = std::dynamic_extent) const -> dynamic_subspan_type
@@ -843,6 +849,7 @@ export namespace atma
 
 		constexpr auto skip(size_t n) const { return this->subspan(n); }
 		constexpr auto take(size_t n) const { return this->subspan(0, n); }
+		constexpr auto last(size_t n) const { return this->subspan(this->size() - n); }
 	};
 }
 
