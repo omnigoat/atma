@@ -850,6 +850,7 @@ export namespace atma
 		constexpr auto skip(size_t n) const { return this->subspan(n); }
 		constexpr auto take(size_t n) const { return this->subspan(0, n); }
 		constexpr auto last(size_t n) const { return this->subspan(this->size() - n); }
+		constexpr auto drop(size_t n) const { return this->subspan(0, this->size() - n); }
 	};
 }
 
