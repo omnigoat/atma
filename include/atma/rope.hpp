@@ -1623,37 +1623,48 @@ namespace atma::_rope_
 		}
 	}
 
+	template <typename RT>
+	struct tree_and_height_t
+	{
+		node_info_t<RT> info;
+		size_t height = 0;
+	};
 
 	template <typename RT>
-	inline auto tree_merge_nodes_(node_info_t<RT> const& left, node_info_t<RT> const& right) -> node_info_t<RT>
+	inline auto tree_merge_nodes_(tree_and_height_t<RT> const& left, tree_and_height_t<RT> const& right) -> tree_and_height_t<RT>
 	{
 		// validate assumptions:
 		//  - both nodes are leaves, or both are internal
-		ATMA_ASSERT(left.node->is_leaf() == right.node->is_leaf());
+		//  - both nodes are at the same height
+		ATMA_ASSERT(left.info.node->is_leaf() == right.info.node->is_leaf());
+		ATMA_ASSERT(left.height == right.height);
 
-		auto result_text_info = static_cast<text_info_t const&>(left) + static_cast<text_info_t const&>(right);
+		auto result_text_info = static_cast<text_info_t const&>(left.info) + static_cast<text_info_t const&>(right.info);
 
-		if (left.node->is_leaf())
+		if (left.info.node->is_leaf())
 		{
-			auto result_node = make_internal_ptr<RT>(left, right);
-			return node_info_t<RT>{result_text_info, result_node};
+			// we know the height is two because we've just added an internal
+			// node above our two leaf nodes
+
+			auto result_node = make_internal_ptr<RT>(left.info, right.info);
+			return {node_info_t<RT>{result_text_info, result_node}, 2};
 		}
 		else
 		{
-			auto const& li = left.node->known_internal();
-			auto const& ri = right.node->known_internal();
+			auto const& li = left.info.node->known_internal();
+			auto const& ri = right.info.node->known_internal();
 
 			// case 1: both nodes are saturated enough where we can just make a node above
 			if (li.children().size() >= RT::minimum_branches && ri.children().size() >= RT::minimum_branches)
 			{
-				auto result_node = make_internal_ptr<RT>(left, right);
-				return node_info_t<RT>{result_text_info, result_node};
+				auto result_node = make_internal_ptr<RT>(left.info, right.info);
+				return {node_info_t<RT>{result_text_info, result_node}, left.height + 1};
 			}
 			// case 2: both nodes are so unsaturated that we can merge the children into a new node
 			else if (size_t const children_count = li.children().size() + ri.children().size(); children_count <= RT::branching_factor)
 			{
 				auto result_node = make_internal_ptr<RT>(li.children(), ri.children());
-				return node_info_t<RT>{result_text_info, result_node};
+				return {node_info_t<RT>{result_text_info, result_node}, left.height};
 			}
 			// case 3: we need to redistribute
 			else
@@ -1688,24 +1699,71 @@ namespace atma::_rope_
 					ATMA_ASSERT(result_text_info == new_result_info);
 				}
 
-				return node_info_t<RT>{result_text_info, result_node};
+				return {node_info_t<RT>{result_text_info, result_node}, left.height + 1};
 			}
 		}
 	}
 
 
 	template <typename RT>
-	inline auto tree_concat_(node_info_t<RT> const& left, size_t left_depth, node_info_t<RT> const& right, size_t right_depth) -> node_info_t<RT>
+	inline auto tree_concat_(tree_and_height_t<RT> const& left, tree_and_height_t<RT> const& right) -> tree_and_height_t<RT>
 	{
 		// if they're the same height, we can just merge the roots together,
 		// or make a new root above the two
-		if (left_depth == right_depth)
+		if (left.height < right.height)
+		{
+			ATMA_ASSERT(right.height > 0);
+			ATMA_ASSERT(right.info.node->is_internal());
+
+			auto right_children = right.info.node->known_internal().children();
+
+			auto subtree = tree_concat_(left, {right_children.front(), right.height - 1});
+
+			if (subtree.height == left.height)
+			{
+				// if the subtree height is the same as the starting height, it means
+				// that we were able to merge the children of the LHS & RHS fully into
+				// one node, and we can just replace the front node of our larger tree
+				// (which in this case is right)
+
+				node_info_t<RT> result{make_internal_ptr<RT>(subtree.info, xfer_src(right_children).skip(1))};
+				return {result, right.height};
+			}
+			else
+			{
+				// if our subtree is taller than left, it means we redristributed (or
+				// didn't need to) our nodes into two, and placed a 'root' above them,
+				// growing the tree. this means the new subtree is the right height to
+				// merge with us (sans the front node which was merged already)
+
+				auto n2 = make_internal_ptr<RT>(xfer_src(right_children).skip(1));
+				return tree_concat_(subtree, {n2, right.height});
+			}
+		}
+		else if (right.height < left.height)
+		{
+			ATMA_ASSERT(left.height > 0);
+			ATMA_ASSERT(left.info.node->is_internal());
+
+			auto left_children = left.info.node->known_internal().children();
+
+			auto subtree = tree_concat_({left_children.back(), left.height - 1}, right);
+
+			if (subtree.height == right.height)
+			{
+				node_info_t<RT> result{make_internal_ptr<RT>(xfer_src(left_children).drop(1), subtree.info)};
+				return {result, left.height};
+			}
+			else
+			{
+				auto n2 = make_internal_ptr<RT>(xfer_src(left_children).drop(1));
+				return tree_concat_({n2, left.height}, subtree);
+			}
+		}
+		else
 		{
 			return tree_merge_nodes_(left, right);
 		}
-
-		// auto a = left_depth < right_depth ? right.node : left.node;
-		return left;
 	}
 
 
@@ -2153,10 +2211,10 @@ namespace atma::_rope_
 	template <typename RT>
 	inline auto split_up_fn_(node_info_t<RT> const& info, node_internal_t<RT> const& node, size_t split_idx, split_result_t<RT> const& result) -> split_result_t<RT>
 	{
-		auto const& [split_left_child, split_left_depth, split_right_child, split_right_depth] = result;
+		auto const& [split_left_child, split_left_height, split_right_child, split_right_height] = result;
 
 		auto const& children = node.children();
-		size_t const children_size = children.size();
+		size_t const children_size = info.children;
 
 		// validate assumptions:
 		//  - split_idx is valid
@@ -2210,18 +2268,18 @@ namespace atma::_rope_
 			if (split_idx == 0)
 			{
 				// our child-node didn't need to split, which means the char-idx requested
-				// ended up at the very front of the very front node (for any given depth).
+				// ended up at the very front of the very front node (for any given height).
 				// also, OUR split-idx is at the front, which means there's still nothing
 				// to the 'left' to return. we can just return ourselves to the right
 
-				return {{}, 0, info, split_right_depth};
+				return {{}, 0, info, split_right_height};
 			}
 			else if (split_idx == children_size - 1)
 			{
 				auto left = make_internal_ptr<RT>(
 					xfer_src(children, split_idx));
 
-				return {left, split_left_depth + 1, *split_right_child, split_right_depth};
+				return {left, split_left_height + 1, *split_right_child, split_right_height};
 			}
 			else if (split_idx == 1)
 			{
@@ -2233,7 +2291,7 @@ namespace atma::_rope_
 					*split_right_child,
 					xfer_src_between(children, split_idx + 1, children_size));
 
-				return {children.front(), split_left_depth, right, split_right_depth + 1};
+				return {children.front(), split_left_height, right, split_right_height + 1};
 			}
 			else
 			{
@@ -2244,7 +2302,7 @@ namespace atma::_rope_
 					*split_right_child,
 					xfer_src_between(children, split_idx + 1, children_size));
 
-				return {left, split_left_depth + 1, right, split_right_depth + 1};
+				return {left, split_left_height + 1, right, split_right_height + 1};
 			}
 		}
 		else if (!split_right_child)
@@ -2290,39 +2348,53 @@ namespace atma::_rope_
 		{
 			if (split_idx == 0)
 			{
-				node_ptr<RT> right;
+				node_info_t<RT> right;
 
 				if (is_right_valid)
 				{
-					auto n = make_internal_ptr<RT>(xfer_src_between(children, split_idx + 1, children_size));
-
-					tree_concat_(node_info_t<RT>(n), split_right_depth + 1, split_right_child, split_right_depth);
+					right = node_info_t<RT>{
+						make_internal_ptr<RT>(
+							split_right_child,
+							xfer_src_between(children, split_idx + 1, children_size))};
 				}
 				else
 				{
-					//auto n = make_internal_ptr<RT>(
-					//	xfer_src_between(children, split_idx + 1, children_size));
-					//
-					//tree_concat_(node_info_t<RT>(n), split_right_depth + 1, split_right_child, split_right_depth);
-					auto nn = tree_concat_(split_right_child, split_right_depth, children[split_idx + 1], split_right_depth);
+					node_info_t<RT> our_split_children_rhs{
+						make_internal_ptr<RT>(xfer_src_between(children, split_idx + 1, children_size))};
 
-					right = make_internal_ptr<RT>(
-						nn,
-						xfer_src_between(children, split_idx + 1, children_size));
+					right = tree_concat_<RT>(
+						{split_right_child, split_right_height},
+						{our_split_children_rhs, split_right_height + 1}).info;
 				}
 
-				return {split_left_child, split_left_depth, right, split_right_depth + 1};
+				return {split_left_child, split_left_height, right, split_right_height + 1};
 			}
 			else if (split_idx == children_size - 1)
 			{
-				auto left = make_internal_ptr<RT>(
-					xfer_src(children, split_idx),
-					split_left_child);
+				node_info_t<RT> left;
 
-				return {left, split_left_depth + 1, split_right_child, split_right_depth};
+				if (is_left_valid)
+				{
+					left = node_info_t<RT>{
+						make_internal_ptr<RT>(
+							xfer_src(children, split_idx),
+							split_left_child)};
+				}
+				else
+				{
+					node_info_t<RT> our_split_children_lhs{
+						make_internal_ptr<RT>(xfer_src(children, split_idx))};
+
+					left = tree_concat_<RT>(
+						{our_split_children_lhs, split_left_height + 1},
+						{split_left_child, split_left_height}).info;
+				}
+
+				return {left, split_left_height + 1, split_right_child, split_right_height};
 			}
 			else
 			{
+#if 0
 				auto left = make_internal_ptr<RT>(
 					xfer_src(children, split_idx),
 					split_left_child);
@@ -2331,7 +2403,48 @@ namespace atma::_rope_
 					split_right_child,
 					xfer_src_between(children, split_idx + 1, children_size));
 
-				return {left, split_left_depth + 1, right, split_right_depth + 1};
+				return {left, split_left_height + 1, right, split_right_height + 1};
+#endif
+				tree_and_height_t<RT> left;
+				tree_and_height_t<RT> right;
+
+				if (is_left_valid)
+				{
+					left = {node_info_t<RT>{
+						make_internal_ptr<RT>(
+							xfer_src(children, split_idx),
+							split_left_child)},
+						split_left_height + 1};
+				}
+				else
+				{
+					node_info_t<RT> our_split_children_lhs{
+						make_internal_ptr<RT>(xfer_src(children, split_idx))};
+
+					left = tree_concat_<RT>(
+						{our_split_children_lhs, split_left_height + 1},
+						{split_left_child, split_left_height});
+				}
+
+				if (is_right_valid)
+				{
+					right = {node_info_t<RT>{
+						make_internal_ptr<RT>(
+							split_right_child,
+							xfer_src_between(children, split_idx + 1, children_size))},
+						split_right_height + 1};
+				}
+				else
+				{
+					node_info_t<RT> our_split_children_rhs{
+						make_internal_ptr<RT>(xfer_src_between(children, split_idx + 1, children_size))};
+
+					right = tree_concat_<RT>(
+						{split_right_child, split_right_height},
+						{our_split_children_rhs, split_right_height + 1});
+				}
+
+				return {left.info, left.height, right.info, right.height};
 			}
 		}
 	}
