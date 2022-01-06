@@ -584,6 +584,17 @@ SCENARIO("splitting" * doctest::skip())
 			std::cout << "left:\n>" << left << "<\n\nright:\n>" << right << "<\n" << std::endl;
 		}
 
+		WHEN("we split the rope")
+		{
+			auto [left, right] = rope.split(9 * 9 - 3);
+
+			ATMA_ASSERT(atma::_rope_::validate_rope_(left.root()));
+			ATMA_ASSERT(atma::_rope_::validate_rope_(right.root()));
+
+			std::cout << std::endl;
+			std::cout << "left:\n>" << left << "<\n\nright:\n>" << right << "<\n" << std::endl;
+		}
+
 	}
 }
 
