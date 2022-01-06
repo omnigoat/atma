@@ -678,9 +678,26 @@ namespace atma::_rope_
 	auto insert(size_t char_idx, node_info_t<RT> const& dest, src_buf_t const& insbuf)
 		-> edit_result_t<RT>;
 
+}
+
+namespace atma::_rope_
+{
 	// split
+
 	template <typename RT>
-	using split_result_t = std::tuple<node_info_t<RT>, size_t, node_info_t<RT>, size_t>;
+	struct tree_and_depth_t
+	{
+		node_info_t<RT> info;
+		size_t depth = 0;
+	};
+
+	template <typename RT>
+	struct split_result_t
+	{
+		size_t tree_depth = 0;
+		tree_and_depth_t<RT> left, right;
+		//std::tuple<node_info_t<RT>, size_t, node_info_t<RT>, size_t>;
+	};
 
 	template <typename RT>
 	auto split(node_info_t<RT> const&, size_t char_idx) -> split_result_t<RT>;
@@ -1624,13 +1641,6 @@ namespace atma::_rope_
 	}
 
 	template <typename RT>
-	struct tree_and_height_t
-	{
-		node_info_t<RT> info;
-		size_t height = 0;
-	};
-
-	template <typename RT>
 	inline auto tree_merge_nodes_(tree_and_height_t<RT> const& left, tree_and_height_t<RT> const& right) -> tree_and_height_t<RT>
 	{
 		// validate assumptions:
@@ -2151,8 +2161,10 @@ namespace atma::_rope_
 	}
 
 	template <typename RT>
-	inline auto split_payload_(node_info_t<RT> const& leaf_info, node_leaf_t<RT> const& leaf, size_t char_idx) -> split_result_t<RT>
+	inline auto split_payload_(node_info_t<RT> const& leaf_info, node_leaf_t<RT> const& leaf, std::tuple<size_t, size_t> char_idx_and_height) -> split_result_t<RT>
 	{
+		auto const& [char_idx, height] = char_idx_and_height;
+
 		auto byte_idx = leaf.byte_idx_from_char_idx(leaf_info, char_idx);
 		auto split_idx = leaf_info.dropped_bytes + byte_idx;
 
@@ -2163,7 +2175,7 @@ namespace atma::_rope_
 			// for the lhs, and for the rhs we can just pass along our
 			// existing node, as it does not need to be modified
 
-			return {make_leaf_ptr<RT>(), 1, leaf_info, 1};
+			return {height, make_leaf_ptr<RT>(), height, leaf_info, height};
 		}
 		else if (byte_idx == leaf_info.dropped_bytes + leaf_info.bytes)
 		{
@@ -2171,7 +2183,7 @@ namespace atma::_rope_
 			// let's instead return a no-result for the rhs, and pass this
 			// node on the lhs.
 
-			return {leaf_info, 1, make_leaf_ptr<RT>(), 1};
+			return {height, leaf_info, height, make_leaf_ptr<RT>(), height};
 		}
 		else
 		{
@@ -2181,37 +2193,14 @@ namespace atma::_rope_
 			auto left = make_leaf_ptr<RT>(xfer_src(leaf.buf.data() + leaf_info.dropped_bytes, byte_idx));
 			auto right = make_leaf_ptr<RT>(xfer_src(leaf.buf.data() + split_idx, leaf.buf.size() - split_idx));
 
-			return {left, 1, right, 1};
+			return {1, left, 1, right, 1};
 		}
 	}
 
-	//
-	//    [   |   |   |   ]       - info/node
-	//      0  [1]  2   3         - child_idx
-	//     /   /     \   \ .
-	//    N   N       N   N       
-	//
-	//   [left,right]             - result
-
-
-	//
-	// before split:
-	// 
-	//         [0|1|2|3]
-	//           /
-	//      [a|b|c|d]
-	//
-	// what we receive:
-	// 
-	//         [0|1|2|3]
-	//           /
-	//    ------------
-	//    [a|b|c] [d] - result: two 
-	
 	template <typename RT>
 	inline auto split_up_fn_(node_info_t<RT> const& info, node_internal_t<RT> const& node, size_t split_idx, split_result_t<RT> const& result) -> split_result_t<RT>
 	{
-		auto const& [split_left_child, split_left_height, split_right_child, split_right_height] = result;
+		auto const& [orig_height, split_left, split_right] = result;
 
 		auto const& children = node.children();
 		size_t const children_size = info.children;
@@ -2220,7 +2209,7 @@ namespace atma::_rope_
 		//  - split_idx is valid
 		//  - either @left, @right, or both are valid
 		ATMA_ASSERT(split_idx < children_size);
-		//ATMA_ASSERT(split_left_child || split_right_child);
+		//ATMA_ASSERT(split_left.info || split_right.info);
 
 		// validate invariants of the split-nodes' children, if the split-nodes
 		// were internal nodes (and not leaf nodes, obv).
@@ -2234,18 +2223,18 @@ namespace atma::_rope_
 		// node we are not breaking our recursive algorithm
 #if 0
 		{
-			if (split_left_child && (*split_left_child).node->is_internal())
+			if (split_left.info && (*split_left.info).node->is_internal())
 			{
-				auto const& lin = split_left_child->node->known_internal();
+				auto const& lin = split_left.info->node->known_internal();
 				for (auto const& x : lin.children())
 				{
 					ATMA_ASSERT(validate_rope_.internal_node(x));
 				}
 			}
 
-			if (split_right_child && (*split_right_child).node->is_internal())
+			if (split_right.info && (*split_right.info).node->is_internal())
 			{
-				auto const& lin = split_right_child->node->known_internal();
+				auto const& lin = split_right.info->node->known_internal();
 				for (auto const& x : lin.children())
 				{
 					ATMA_ASSERT(validate_rope_.internal_node(x));
@@ -2254,16 +2243,16 @@ namespace atma::_rope_
 		}
 #endif
 		// let's assume that all children of our children (if they exist) are valid.
-		[[maybe_unused]] bool const is_left_valid = !split_left_child.node->is_internal()
-			|| split_left_child.node->known_internal().children().size() >= RT::minimum_branches;
+		[[maybe_unused]] bool const is_left_valid = !split_left.info.node->is_internal()
+			|| split_left.info.node->known_internal().children().size() >= RT::minimum_branches;
 
-		[[maybe_unused]] bool const is_right_valid = !split_right_child.node->is_internal()
-			|| split_right_child.node->known_internal().children().size() >= RT::minimum_branches;
+		[[maybe_unused]] bool const is_right_valid = !split_right.info.node->is_internal()
+			|| split_right.info.node->known_internal().children().size() >= RT::minimum_branches;
 
-		//bool const is_leaf_valid = validate_rope_.internal_node(*split_left_child);
-		//bool const is_leaf_valid = validate_rope_.internal_node(*split_left_child);
+		//bool const is_leaf_valid = validate_rope_.internal_node(*split_left.info);
+		//bool const is_leaf_valid = validate_rope_.internal_node(*split_left.info);
 #if 0
-		if (!split_left_child)
+		if (!split_left.info)
 		{
 			if (split_idx == 0)
 			{
@@ -2272,14 +2261,14 @@ namespace atma::_rope_
 				// also, OUR split-idx is at the front, which means there's still nothing
 				// to the 'left' to return. we can just return ourselves to the right
 
-				return {{}, 0, info, split_right_height};
+				return {{}, 0, info, split_right.height};
 			}
 			else if (split_idx == children_size - 1)
 			{
 				auto left = make_internal_ptr<RT>(
 					xfer_src(children, split_idx));
 
-				return {left, split_left_height + 1, *split_right_child, split_right_height};
+				return {left, split_left.height + 1, *split_right.info, split_right.height};
 			}
 			else if (split_idx == 1)
 			{
@@ -2288,10 +2277,10 @@ namespace atma::_rope_
 				// directly - the tree is probably shrinking on the left side
 
 				auto right = make_internal_ptr<RT>(
-					*split_right_child,
+					*split_right.info,
 					xfer_src_between(children, split_idx + 1, children_size));
 
-				return {children.front(), split_left_height, right, split_right_height + 1};
+				return {children.front(), split_left.height, right, split_right.height + 1};
 			}
 			else
 			{
@@ -2299,13 +2288,13 @@ namespace atma::_rope_
 					xfer_src(children, split_idx));
 
 				auto right = make_internal_ptr<RT>(
-					*split_right_child,
+					*split_right.info,
 					xfer_src_between(children, split_idx + 1, children_size));
 
-				return {left, split_left_height + 1, right, split_right_height + 1};
+				return {left, split_left.height + 1, right, split_right.height + 1};
 			}
 		}
-		else if (!split_right_child)
+		else if (!split_right.info)
 		{
 			if (split_idx == 0)
 			{
@@ -2316,7 +2305,7 @@ namespace atma::_rope_
 				auto right = make_internal_ptr<RT>(
 					xfer_src_between(children, 1, children_size));
 
-				return {*split_left_child, right};
+				return {*split_left.info, right};
 			}
 			else if (split_idx == children_size - 1)
 			{
@@ -2326,7 +2315,7 @@ namespace atma::_rope_
 			{
 				auto left = make_internal_ptr<RT>(
 					xfer_src(children, split_idx),
-					*split_left_child);
+					*split_left.info);
 
 				return {left, children.back()};
 			}
@@ -2334,7 +2323,7 @@ namespace atma::_rope_
 			{
 				auto left = make_internal_ptr<RT>(
 					xfer_src(children, split_idx),
-					*split_left_child);
+					*split_left.info);
 
 				auto right = make_internal_ptr<RT>(
 					xfer_src_between(children, split_idx + 1, children_size));
@@ -2354,7 +2343,7 @@ namespace atma::_rope_
 				{
 					right = node_info_t<RT>{
 						make_internal_ptr<RT>(
-							split_right_child,
+							split_right.info,
 							xfer_src_between(children, split_idx + 1, children_size))};
 				}
 				else
@@ -2363,11 +2352,11 @@ namespace atma::_rope_
 						make_internal_ptr<RT>(xfer_src_between(children, split_idx + 1, children_size))};
 
 					right = tree_concat_<RT>(
-						{split_right_child, split_right_height},
-						{our_split_children_rhs, split_right_height + 1}).info;
+						{split_right.info, split_right.height},
+						{our_split_children_rhs, split_right.height + 1}).info;
 				}
 
-				return {split_left_child, split_left_height, right, split_right_height + 1};
+				return {orig_height + 1, split_left, {right, split_right.height + 1}};
 			}
 			else if (split_idx == children_size - 1)
 			{
@@ -2378,7 +2367,7 @@ namespace atma::_rope_
 					left = node_info_t<RT>{
 						make_internal_ptr<RT>(
 							xfer_src(children, split_idx),
-							split_left_child)};
+							split_left.info)};
 				}
 				else
 				{
@@ -2386,74 +2375,84 @@ namespace atma::_rope_
 						make_internal_ptr<RT>(xfer_src(children, split_idx))};
 
 					left = tree_concat_<RT>(
-						{our_split_children_lhs, split_left_height + 1},
-						{split_left_child, split_left_height}).info;
+						{our_split_children_lhs, split_left.height + 1},
+						{split_left.info, split_left.height}).info;
 				}
 
-				return {left, split_left_height + 1, split_right_child, split_right_height};
+				return {orig_height + 1, {left, split_left.height + 1}, split_right};
 			}
 			else
 			{
 #if 0
 				auto left = make_internal_ptr<RT>(
 					xfer_src(children, split_idx),
-					split_left_child);
+					split_left.info);
 
 				auto right = make_internal_ptr<RT>(
-					split_right_child,
+					split_right.info,
 					xfer_src_between(children, split_idx + 1, children_size));
 
-				return {left, split_left_height + 1, right, split_right_height + 1};
+				return {left, split_left.height + 1, right, split_right.height + 1};
 #endif
 				tree_and_height_t<RT> left;
 				tree_and_height_t<RT> right;
 
-				if (is_left_valid)
-				{
-					left = {node_info_t<RT>{
-						make_internal_ptr<RT>(
-							xfer_src(children, split_idx),
-							split_left_child)},
-						split_left_height + 1};
-				}
-				else
+				//if (is_left_valid)
+				//{
+				//	node_info_t<RT> our_split_children_lhs{
+				//		make_internal_ptr<RT>(xfer_src(children, split_idx))};
+				//
+				//	left = tree_concat_<RT>(
+				//		{our_split_children_lhs, orig_height + 1},
+				//		{split_left.info, split_left.height});
+				//}
+				//else
 				{
 					node_info_t<RT> our_split_children_lhs{
 						make_internal_ptr<RT>(xfer_src(children, split_idx))};
 
 					left = tree_concat_<RT>(
-						{our_split_children_lhs, split_left_height + 1},
-						{split_left_child, split_left_height});
+						{our_split_children_lhs, orig_height + 1},
+						{split_left.info, split_left.height});
 				}
 
-				if (is_right_valid)
-				{
-					right = {node_info_t<RT>{
-						make_internal_ptr<RT>(
-							split_right_child,
-							xfer_src_between(children, split_idx + 1, children_size))},
-						split_right_height + 1};
-				}
-				else
+				//if (is_right_valid)
+				//{
+				//	right = {node_info_t<RT>{
+				//		make_internal_ptr<RT>(
+				//			split_right.info,
+				//			xfer_src_between(children, split_idx + 1, children_size))},
+				//		orig_height};
+				//}
+				//else
 				{
 					node_info_t<RT> our_split_children_rhs{
 						make_internal_ptr<RT>(xfer_src_between(children, split_idx + 1, children_size))};
 
 					right = tree_concat_<RT>(
-						{split_right_child, split_right_height},
-						{our_split_children_rhs, split_right_height + 1});
+						{split_right.info, split_right.height},
+						{our_split_children_rhs, orig_height + 1});
 				}
 
-				return {left.info, left.height, right.info, right.height};
+				return {orig_height + 1, left, right};
 			}
 		}
+	}
+
+	// returns: <index-of-child-node, remaining-characters>
+	template <typename RT>
+	inline auto find_for_char_idx_acc_height(node_internal_t<RT> const& x, std::tuple<size_t, size_t> char_idx_and_height) -> std::tuple<size_t, std::tuple<size_t, size_t>>
+	{
+		auto [idx, char_idx] = find_for_char_idx(x, std::get<0>(char_idx_and_height));
+
+		return {idx, {char_idx, std::get<1>(char_idx_and_height) + 1}};
 	}
 
 	template <typename RT>
 	inline auto split(node_info_t<RT> const& dest, size_t char_idx) -> split_result_t<RT>
 	{
-		return navigate_to_leaf(dest, char_idx,
-			&find_for_char_idx<RT>,
+		return navigate_to_leaf(dest, std::make_tuple(char_idx, size_t(1)),
+			&find_for_char_idx_acc_height<RT>,
 			&split_payload_<RT>,
 			&split_up_fn_<RT>);
 	}
@@ -3191,8 +3190,8 @@ namespace atma
 	template <typename RT>
 	inline auto basic_rope_t<RT>::split(size_t char_idx) const -> std::tuple<basic_rope_t<RT>, basic_rope_t<RT>>
 	{
-		auto [left, left_depth, right, right_depth] = _rope_::split(root_, char_idx);
-		return { basic_rope_t{left}, basic_rope_t{right} };
+		auto [depth, left, right] = _rope_::split(root_, char_idx);
+		return { basic_rope_t{left.info}, basic_rope_t{right.info} };
 	}
 
 
