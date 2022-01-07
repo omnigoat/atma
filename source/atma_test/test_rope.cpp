@@ -553,7 +553,7 @@ SCENARIO("atma::rope's internal operations work")
 
 
 
-SCENARIO("splitting" * doctest::skip())
+SCENARIO("splitting")
 {
 	GIVEN("a default-constructed rope")
 	{
@@ -575,15 +575,16 @@ SCENARIO("splitting" * doctest::skip())
 
 		WHEN("we split the rope")
 		{
-			auto [left, right] = rope.split(9 * 5 + 4);
+			for (int i = 0; i != passage_size; ++i)
+			{
+				auto [left, right] = rope.split(i);
 
-			ATMA_ASSERT(atma::_rope_::validate_rope_(left.root()));
-			ATMA_ASSERT(atma::_rope_::validate_rope_(right.root()));
-
-			std::cout << std::endl;
-			std::cout << "left:\n>" << left << "<\n\nright:\n>" << right << "<\n" << std::endl;
+				CHECK(atma::_rope_::validate_rope_(left.root()));
+				CHECK(atma::_rope_::validate_rope_(right.root()));
+			}
 		}
 
+#if 0
 		WHEN("we split the rope")
 		{
 			auto [left, right] = rope.split(9 * 9 - 3);
@@ -594,7 +595,7 @@ SCENARIO("splitting" * doctest::skip())
 			std::cout << std::endl;
 			std::cout << "left:\n>" << left << "<\n\nright:\n>" << right << "<\n" << std::endl;
 		}
-
+#endif
 	}
 }
 
