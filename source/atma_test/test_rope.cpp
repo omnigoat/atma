@@ -28,13 +28,17 @@ SCENARIO("atma::rope's internal operations work")
 	using T = atma::rope_test_traits;
 
 	// just quickly grab the node for an insert/edit-result
-	auto lhs_internal_node = [](auto&& x) -> decltype(auto) { return x.lhs.node->known_internal(); };
-	auto lhs_children = [&](auto&& x) { return lhs_internal_node(x).children(); };
-	auto lhs_child_node = [&](auto&& x, size_t idx) -> decltype(auto) { return lhs_children(x)[idx].node; };
+	auto internal_node_of = [](auto&& x) -> decltype(auto) { return x.node->known_internal(); };
+	auto children_of = [&](auto&& x) -> decltype(auto) { return internal_node_of(x).children(); };
+	auto child_node_at = [&](auto&& x, size_t idx) -> decltype(auto) { return children_of(x)[idx].node; };
 
-	auto rhs_internal_node = [](auto&& x) -> decltype(auto) { return x.maybe_rhs.value().node->known_internal(); };
-	auto rhs_children = [&](auto&& x) { return rhs_internal_node(x).children(); };
-	auto rhs_child_node = [&](auto&& x, size_t idx) -> decltype(auto) { return rhs_children(x)[idx].node; };
+	auto lhs_internal_node = [&](auto&& x) -> decltype(auto) { return internal_node_of(x.lhs); };
+	auto lhs_children = [&](auto&& x) { return children_of(x.lhs); };
+	auto lhs_child_node = [&](auto&& x, size_t idx) -> decltype(auto) { return child_node_at(x.lhs, idx); };
+
+	auto rhs_internal_node = [&](auto&& x) -> decltype(auto) { return internal_node_of(x.maybe_rhs.value()); };
+	auto rhs_children = [&](auto&& x) { return children_of(x.maybe_rhs.value()); };
+	auto rhs_child_node = [&](auto&& x, size_t idx) -> decltype(auto) { return child_node_at(x.maybe_rhs.value(), idx); };
 
 
 
@@ -426,25 +430,20 @@ SCENARIO("atma::rope's internal operations work")
 			{
 				auto postXresult = atma::_rope_::replace_<T>(internal_info, 2, X_info);
 
-				THEN("the insert-result contains only one node")
-				{
-					CHECK(!postXresult.maybe_rhs.has_value());
-				}
-
 				THEN("the lhs node-info is four nodes worth")
 				{
-					CHECK(postXresult.lhs.bytes == 4);
-					CHECK(postXresult.lhs.characters == 4);
-					CHECK(postXresult.lhs.children == 4);
+					CHECK(postXresult.bytes == 4);
+					CHECK(postXresult.characters == 4);
+					CHECK(postXresult.children == 4);
 				}
 
-				THEN("the lhs node contains A, B, X, D")
+				THEN("the node now contains A, B, X, D")
 				{
-					CHECK(lhs_children(postXresult).size() == 4);
-					CHECK(lhs_child_node(postXresult, 0) == A);
-					CHECK(lhs_child_node(postXresult, 1) == B);
-					CHECK(lhs_child_node(postXresult, 2) == X);
-					CHECK(lhs_child_node(postXresult, 3) == D);
+					CHECK(children_of(postXresult).size() == 4);
+					CHECK(child_node_at(postXresult, 0) == A);
+					CHECK(child_node_at(postXresult, 1) == B);
+					CHECK(child_node_at(postXresult, 2) == X);
+					CHECK(child_node_at(postXresult, 3) == D);
 				}
 			}
 		}
