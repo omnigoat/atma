@@ -609,6 +609,14 @@ namespace atma::_rope_
 //---------------------------------------------------------------------
 namespace atma::_rope_
 {
+	//
+	// node-splitting
+	// ----------------
+	//   given an idx these functions will return the lhs & rhs to either side
+	//   of that idx. if only one child is to the left/right of the idx, that child
+	//   will be returned directly at one less height. otherwise, the children
+	//   as a group will be returned as children of a tree of the same height
+	//
 	template <typename RT>
 	auto node_split_across_lhs_(tree_and_height_t<RT> const&, size_t idx)
 		-> tree_and_height_t<RT>;
@@ -728,6 +736,14 @@ namespace atma::_rope_
 
 	template <typename RT>
 	auto split(node_info_t<RT> const&, size_t char_idx) -> split_result_t<RT>;
+
+	template <typename RT>
+	auto split_up_fn_(node_info_t<RT> const& info, node_internal_t<RT> const& node, size_t split_idx, split_result_t<RT> const& result)
+		-> split_result_t<RT>;
+
+	template <typename RT>
+	auto split_payload_(node_info_t<RT> const& leaf_info, node_leaf_t<RT> const& leaf, std::tuple<size_t, size_t> char_idx_and_height)
+		-> split_result_t<RT>;
 }
 
 namespace atma::_rope_
