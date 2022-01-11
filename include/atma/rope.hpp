@@ -341,17 +341,10 @@ namespace atma::_rope_
 
 		static constexpr size_t all_children = ~size_t();
 
-		auto insert(size_t idx, node_info_t<RT> const& info)
+		auto append(node_info_t<RT> const& info)
 		{
 			ATMA_ASSERT(size_ != RT::branching_factor);
-			ATMA_ASSERT(idx <= size_);
-
-			for (int i = RT::branching_factor; i--> (idx + 1); )
-			{
-				children_[i] = children_[i - 1];
-			}
-
-			children_[idx] = info;
+			children_[size_] = info;
 			++size_;
 		}
 
@@ -451,6 +444,109 @@ namespace atma::_rope_
 		return node_ptr<RT>::make(node_leaf_t<RT>{std::forward<Args>(args)...});
 	}
 }
+
+
+
+//---------------------------------------------------------------------
+//
+//  test thing
+// 
+//---------------------------------------------------------------------
+namespace atma::_rope_
+{
+	// niu = node-info utility
+
+	template <typename RT>
+	struct niu_internal_t
+	{
+		niu_internal_t(node_info_t<RT> const& info, node_internal_t<RT>& node)
+			: info(info)
+			, node(node)
+		{}
+
+	private:
+		node_info_t<RT> const& info;
+		node_internal_t<RT>& node;
+	};
+}
+
+
+
+
+
+//---------------------------------------------------------------------
+//
+//  rope
+//
+//---------------------------------------------------------------------
+namespace atma
+{
+	template <typename RopeTraits>
+	struct basic_rope_t
+	{
+		basic_rope_t();
+
+		auto push_back(char const*, size_t) -> void;
+		auto insert(size_t char_idx, char const* str, size_t sz) -> void;
+
+		auto split(size_t char_idx) const -> std::tuple<basic_rope_t<RopeTraits>, basic_rope_t<RopeTraits>>;
+
+		template <typename F>
+		auto for_all_text(F&& f) const;
+
+		decltype(auto) root() { return (root_); }
+
+	private:
+		basic_rope_t(_rope_::node_info_t<RopeTraits> const&);
+
+	private:
+		_rope_::node_info_t<RopeTraits> root_;
+	};
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -776,36 +872,6 @@ namespace atma::_rope_
 
 
 
-
-//---------------------------------------------------------------------
-//
-//  rope
-//
-//---------------------------------------------------------------------
-namespace atma
-{
-	template <typename RopeTraits>
-	struct basic_rope_t
-	{
-		basic_rope_t();
-
-		auto push_back(char const*, size_t) -> void;
-		auto insert(size_t char_idx, char const* str, size_t sz) -> void;
-
-		auto split(size_t char_idx) const -> std::tuple<basic_rope_t<RopeTraits>, basic_rope_t<RopeTraits>>;
-
-		template <typename F>
-		auto for_all_text(F&& f) const;
-
-		decltype(auto) root() { return (root_); }
-
-	private:
-		basic_rope_t(_rope_::node_info_t<RopeTraits> const&);
-
-	private:
-		_rope_::node_info_t<RopeTraits> root_;
-	};
-}
 
 
 
@@ -1422,7 +1488,7 @@ namespace atma::_rope_
 
 		if (insertion_is_at_back && space_for_additional_child)
 		{
-			dest_node.insert(dest.children, insertee);
+			dest_node.append(insertee);
 
 			auto result = node_info_t<RT>{
 				dest + static_cast<text_info_t const&>(insertee),
@@ -1469,7 +1535,7 @@ namespace atma::_rope_
 		//
 		if (insertion_is_at_back && space_for_additional_child)
 		{
-			dest_node.insert(idx, ins_info);
+			dest_node.append(ins_info);
 			node_info_t<RT> result{(dest + ins_info), dest.children + 1, dest.node};
 			return {result};
 		}
