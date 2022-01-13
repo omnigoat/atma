@@ -63,7 +63,7 @@ SCENARIO("atma::rope's internal operations work")
 		// test insert where we have space
 		AND_GIVEN("a default-created internal-node")
 		{
-			auto internal_node = atma::_rope_::make_internal_ptr<T>();
+			auto internal_node = atma::_rope_::make_internal_ptr<T>(1u);
 			auto internal_info = atma::_rope_::node_info_t<T>{internal_node};
 
 			WHEN("we _rope_::insert_ into our internal-node the node A at index 0")
@@ -175,7 +175,7 @@ SCENARIO("atma::rope's internal operations work")
 		// test insert_ with splitting
 		AND_GIVEN("a fully-saturated internal-node of [A, B, C, D]")
 		{
-			auto internal_node = atma::_rope_::make_internal_ptr<T>(A_info, B_info, C_info, D_info);
+			auto internal_node = atma::_rope_::make_internal_ptr<T>(2u, A_info, B_info, C_info, D_info);
 			auto internal_info = atma::_rope_::node_info_t<T>{internal_node};
 
 			WHEN("we insert X at index 0")
@@ -377,7 +377,7 @@ SCENARIO("atma::rope's internal operations work")
 
 		AND_GIVEN("a fully-saturated internal-node of [A, B, C, D]")
 		{
-			auto internal_node = atma::_rope_::make_internal_ptr<T>(A_info, B_info, C_info, D_info);
+			auto internal_node = atma::_rope_::make_internal_ptr<T>(2u, A_info, B_info, C_info, D_info);
 			auto internal_info = atma::_rope_::node_info_t<T>{internal_node};
 
 			AND_WHEN("we insert X at index 0")
@@ -423,7 +423,7 @@ SCENARIO("atma::rope's internal operations work")
 		// test replace_
 		AND_GIVEN("a fully-saturated internal-node of [A, B, C, D]")
 		{
-			auto internal_node = atma::_rope_::make_internal_ptr<T>(A_info, B_info, C_info, D_info);
+			auto internal_node = atma::_rope_::make_internal_ptr<T>(2u, A_info, B_info, C_info, D_info);
 			auto internal_info = atma::_rope_::node_info_t<T>{internal_node};
 
 			WHEN("we call replace_() at index 2 with node X")
@@ -452,7 +452,7 @@ SCENARIO("atma::rope's internal operations work")
 		// test replace_and_insert_
 		AND_GIVEN("a fully-saturated internal-node of [A, B, C]")
 		{
-			auto internal_node = atma::_rope_::make_internal_ptr<T>(A_info, B_info, C_info);
+			auto internal_node = atma::_rope_::make_internal_ptr<T>(2u, A_info, B_info, C_info);
 			auto internal_info = atma::_rope_::node_info_t<T>{internal_node};
 
 			WHEN("we call replace_and_insert_() at index 2 with node X & nil")
