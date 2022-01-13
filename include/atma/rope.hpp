@@ -372,9 +372,13 @@ namespace atma::_rope_
 			}
 		}
 
+		//size_t const height;
+
 	private:
 		std::array<node_info_t<RT>, RT::branching_factor> children_;
 		size_t size_ = 0;
+		//size_t size_ : 32 = 0;
+		//size_t height_ : 32 = 0;
 	};
 
 }
@@ -430,8 +434,14 @@ namespace atma::_rope_
 	private:
 		std::variant<node_internal_t<RT>, node_leaf_t<RT>> variant_;
 	};
+}
 
 
+//
+// make_internal_ptr / make_leaf_ptr
+//
+namespace atma::_rope_
+{
 	template <typename RT, typename... Args>
 	inline node_ptr<RT> make_internal_ptr(Args&&... args)
 	{
@@ -454,19 +464,26 @@ namespace atma::_rope_
 //---------------------------------------------------------------------
 namespace atma::_rope_
 {
-	// niu = node-info utility
+	// inu = info-node utility
 
 	template <typename RT>
-	struct niu_internal_t
+	struct inu_internal_t
 	{
-		niu_internal_t(node_info_t<RT> const& info, node_internal_t<RT>& node)
-			: info(info)
-			, node(node)
+		inu_internal_t(node_info_t<RT> const& info, node_internal_t<RT>& node, size_t height)
+			: info_(info)
+			, node_(node)
+			, height_(height)
 		{}
 
+		auto children() const
+		{
+			return node_.children(info_.children);
+		}
+
 	private:
-		node_info_t<RT> const& info;
-		node_internal_t<RT>& node;
+		node_info_t<RT> const& info_;
+		node_internal_t<RT>& node_;
+		size_t height_ = 0;
 	};
 }
 
@@ -1866,10 +1883,7 @@ namespace atma::_rope_
 
 				node_info_t<RT> result = replace_(right.info, 0, subtree.info);
 				ATMA_ROPE_VERIFY_INFO_SYNC(result);
-				return {result, left.height};
-
-				//node_info_t<RT> result{make_internal_ptr<RT>(subtree.info, xfer_src(right_children).skip(1))};
-				//return {result, right.height};
+				return {result, right.height};
 			}
 			else if (subtree.height == right.height - 1)
 			{
