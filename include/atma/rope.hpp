@@ -328,55 +328,27 @@ namespace atma::_rope_
 
 		auto length() const -> size_t;
 
-		auto child_at(size_t idx) const -> node_info_t<RT> const& { return children_[idx]; }
-		auto child_at(size_t idx) -> node_info_t<RT>& { return children_[idx]; }
+		auto child_at(size_t idx) const -> node_info_t<RT> const&;
+		auto child_at(size_t idx) -> node_info_t<RT>&;
 		
-		auto try_child_at(int idx) -> maybe_node_info_t<RT>
-		{
-			if (0 <= idx && idx < size_)
-				return children_[idx];
-			else
-				return {};
-		}
+		auto try_child_at(int idx) -> maybe_node_info_t<RT>;
 
 		static constexpr size_t all_children = ~size_t();
 
-		auto append(node_info_t<RT> const& info)
-		{
-			ATMA_ASSERT(size_ != RT::branching_factor);
-			children_[size_] = info;
-			++size_;
-		}
+		auto append(node_info_t<RT> const& info);
 
-		auto children(size_t limit = all_children) const
-		{
-			limit = (limit == all_children) ? size_ : limit;
-			ATMA_ASSERT(limit <= RT::branching_factor);
-
-			return std::span<node_info_t<RT> const>(children_.data(), limit);
-		}
+		auto children(size_t limit = all_children) const;
 
 		auto calculate_combined_info() const -> text_info_t;
 
 		template <typename F>
-		void for_each_child(F f) const
-		{
-			for (auto& x : children_)
-			{
-				if (!x.node)
-					break;
-
-				std::invoke(f, x);
-			}
-		}
+		void for_each_child(F f) const;
 
 		size_t const height;
 
 	private:
 		std::array<node_info_t<RT>, RT::branching_factor> children_;
 		size_t size_ = 0;
-		//size_t size_ : 32 = 0;
-		//size_t height_ : 32 = 0;
 	};
 
 }
@@ -468,21 +440,33 @@ namespace atma::_rope_
 	template <typename RT>
 	struct inu_internal_t
 	{
-		inu_internal_t(node_info_t<RT> const& info, node_internal_t<RT>& node, size_t height)
+		inu_internal_t(node_info_t<RT> const& info, node_internal_t<RT>& node)
 			: info_(info)
 			, node_(node)
-			, height_(height)
 		{}
+
+		inu_internal_t(node_info_t<RT> const& info)
+			: inu_internal_t{info, info.node->known_internal()}
+		{}
+
+		auto height() const
+		{
+			return node_.height;
+		}
 
 		auto children() const
 		{
 			return node_.children(info_.children);
 		}
 
+		auto inu_back() const
+		{
+			return inu_internal_t{node_.children().back()};
+		}
+
 	private:
 		node_info_t<RT> const& info_;
 		node_internal_t<RT>& node_;
-		size_t height_ = 0;
 	};
 }
 
@@ -1083,7 +1067,62 @@ namespace atma::_rope_
 	template <typename RT>
 	inline auto node_internal_t<RT>::calculate_combined_info() const -> text_info_t
 	{
-		return atma::foldl(children(), text_info_t(), functors::add);
+		return atma::foldl(children(), text_info_t{}, functors::add);
+	}
+
+	template <typename RT>
+	inline auto node_internal_t<RT>::child_at(size_t idx) const -> node_info_t<RT> const&
+	{
+		ATMA_ASSERT(idx < size_);
+
+		return children_[idx];
+	}
+
+	template <typename RT>
+	inline auto node_internal_t<RT>::child_at(size_t idx) -> node_info_t<RT>&
+	{
+		ATMA_ASSERT(idx < size_);
+
+		return children_[idx];
+	}
+
+	template <typename RT>
+	inline auto node_internal_t<RT>::try_child_at(int idx) -> maybe_node_info_t<RT>
+	{
+		if (0 <= idx && idx < size_)
+			return children_[idx];
+		else
+			return {};
+	}
+
+	template <typename RT>
+	inline auto node_internal_t<RT>::append(node_info_t<RT> const& info)
+	{
+		ATMA_ASSERT(size_ != RT::branching_factor);
+		children_[size_] = info;
+		++size_;
+	}
+
+	template <typename RT>
+	inline auto node_internal_t<RT>::children(size_t limit) const
+	{
+		limit = (limit == all_children) ? size_ : limit;
+		ATMA_ASSERT(limit <= RT::branching_factor);
+
+		return std::span<node_info_t<RT> const>(children_.data(), limit);
+	}
+
+	template <typename RT>
+	template <typename F>
+	inline void node_internal_t<RT>::for_each_child(F f) const
+	{
+		for (auto& x : children_)
+		{
+			if (!x.node)
+				break;
+
+			std::invoke(f, x);
+		}
 	}
 }
 
@@ -1953,30 +1992,32 @@ namespace atma::_rope_
 				ATMA_ASSERT(ins_right);
 				return tree_merge_nodes_<RT>({ins_left, left.height}, {*ins_right, left.height});
 			}
-			else if (auto subtree = tree_concat_({left_children.back(), left.height - 1}, right); subtree.height == right.height)
+			else 
 			{
-				node_info_t<RT> result{replace_(left.info, left_children.size() - 1, subtree.info)};
-				ATMA_ROPE_VERIFY_INFO_SYNC(result);
-				return {result, left.height};
-			}
-			else if (subtree.height == left.height - 1)
-			{
-				auto left_prime = make_internal_ptr<RT>(
-					left.height,
-					xfer_src(left_children).drop(1));
+				auto subtree = tree_concat_(
+					{left_children.back(), left.height - 1},
+					right);
 
-				return tree_merge_nodes_({left_prime, left.height}, subtree);
-			}
-			else if (subtree.height == left.height)
-			{
-				// we successfully merged the whole tree
+				if (subtree.height == left.height - 1)
+				{
+					auto left_prime = replace_(
+						left,
+						left.info.children - 1,
+						subtree);
 
-				return subtree;
-			}
-			else
-			{
-				ATMA_ASSERT(false, "oh no");
-				return {};
+					return left_prime;
+				}
+				else if (subtree.height == left.height)
+				{
+					auto left_prime_node = make_internal_ptr<RT>(left.height, xfer_src(left_children).drop(1));
+					auto left_prime = tree_and_height_t<RT>{left_prime_node, left.height};
+					return tree_merge_nodes_(left_prime, subtree);
+				}
+				else
+				{
+					ATMA_ASSERT(false, "oh no");
+					return {};
+				}
 			}
 		}
 		else
@@ -2882,8 +2923,9 @@ namespace atma::_rope_
 			auto& array = stack_level_array(stack, level);
 
 			// take the @bf leftmost nodes and construct a node one level higher
+			// note: level is zero-indexed, so +2
 			node_info_t<RT> higher_level_node{make_internal_ptr<RT>(
-				size_t(level),
+				size_t(level + 2),
 				xfer_src(array.data(), RT::branching_factor))};
 
 			// erase those node-infos and move the trailing ones to the front
@@ -2936,7 +2978,7 @@ namespace atma::_rope_
 				// we can put them into one internal node and insert that above
 
 				node_info_t<RT> higher_level_node{make_internal_ptr<RT>(
-					size_t(level),
+					size_t(level + 2),
 					xfer_src(level_array.data(), level_size))};
 
 				stack_push(stack, level + 1, higher_level_node);
@@ -2951,11 +2993,11 @@ namespace atma::_rope_
 				auto const rhs_size = level_size - lhs_size;
 
 				node_info_t<RT> higher_level_lhs_node{make_internal_ptr<RT>(
-					size_t(level),
+					size_t(level + 2),
 					xfer_src(level_array.data(), lhs_size))};
 
 				node_info_t<RT> higher_level_rhs_node{make_internal_ptr<RT>(
-					size_t(level),
+					size_t(level + 2),
 					xfer_src(level_array.data() + lhs_size, rhs_size))};
 
 				stack_push(stack, level + 1, higher_level_lhs_node);
@@ -3240,6 +3282,24 @@ namespace atma
 				[[maybe_unused]] size_t chunk_size = std::min((sz - i), RT::buf_edit_max_size);
 				
 			}
+		}
+		else
+		{
+			auto [depth, left, right] = _rope_::split(root_, char_idx);
+			auto ins = _rope_::build_rope_<RT>(xfer_src(str, sz));
+
+			std::cout << "left:>" << basic_rope_t{left.info} << "<\n\n" << std::endl;
+			std::cout << "right:>" << basic_rope_t{right.info} << "<\n\n" << std::endl;
+
+			auto tr1 = _rope_::tree_concat_<RT>(
+				left,
+				{ins.root(), ins.root().node->height()});
+
+			auto tr2 = _rope_::tree_concat_<RT>(
+				tr1,
+				right);
+
+			edit_result.left = tr2.info;
 		}
 
 		if (edit_result.right.has_value())

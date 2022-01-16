@@ -176,6 +176,7 @@
 		
 		<Expand>
 			<Item Condition="variant_._Which==0" Name="size">((atma::_rope_::node_internal_t&lt;$T1&gt;&amp;)variant_._Head).size_</Item>
+			<Item Condition="variant_._Which==0" Name="height">((atma::_rope_::node_internal_t&lt;$T1&gt;&amp;)variant_._Head).height</Item>
 			
 			<!-- internal-node children -->
 			<ArrayItems Condition="variant_._Which==0">
