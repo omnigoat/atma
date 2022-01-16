@@ -1935,38 +1935,28 @@ namespace atma::_rope_
 				ATMA_ASSERT(ins_right);
 				return tree_merge_nodes_<RT>({ins_left, right.height}, {*ins_right, right.height});
 			}
-			else if (auto subtree = tree_concat_(left, {right_children.front(), right.height - 1}); subtree.height == left.height)
-			{
-				// if the subtree height is the same as the starting height, it means
-				// that we were able to merge the children of the LHS & RHS fully into
-				// one node, and we can just replace the front node of our larger tree
-				// (which in this case is right)
-
-				node_info_t<RT> result = replace_(right.info, 0, subtree.info);
-				ATMA_ROPE_VERIFY_INFO_SYNC(result);
-				return {result, right.height};
-			}
-			else if (subtree.height == right.height - 1)
-			{
-				// if our subtree is taller than left, it means we redristributed (or
-				// didn't need to) our nodes into two, and placed a 'root' above them,
-				// growing the tree. this means the new subtree is the right height to
-				// merge with us (sans the front node which was merged already)
-
-				auto n2 = make_internal_ptr<RT>(
-					right.height,
-					xfer_src(right_children).skip(1));
-
-				return tree_concat_(subtree, {n2, right.height});
-			}
-			else if (subtree.height == right.height)
-			{
-				return subtree;
-			}
 			else
 			{
-				ATMA_ASSERT(false, "oh no");
-				return {};
+				auto subtree = tree_concat_(left, {right_children.front(), right.height - 1});
+
+				if (subtree.height == right.height - 1)
+				{
+					auto result = replace_(right, 0, subtree);
+					return result;
+				}
+				else if (subtree.height == right.height)
+				{
+					auto n2 = make_internal_ptr<RT>(
+						right.height,
+						xfer_src(right_children).skip(1));
+
+					return tree_merge_nodes_(subtree, {n2, right.height});
+				}
+				else
+				{
+					ATMA_ASSERT(false, "oh no");
+					return {};
+				}
 			}
 		}
 		else if (right.height < left.height)
