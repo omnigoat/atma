@@ -552,7 +552,7 @@ SCENARIO("atma::rope's internal operations work")
 
 
 
-SCENARIO("splitting")
+SCENARIO("inserting" * doctest::skip())
 {
 	GIVEN("a default-constructed rope")
 	{
@@ -565,8 +565,13 @@ SCENARIO("splitting")
 			"station. for your efforts you'll be rewarded \n"
 			"with a $50 gift-coupon that is redeemable at \n"
 			"any store within the food court.";
-
 		auto const passage_size = strlen(passage);
+
+		auto const* insert = 
+			"haha just kidding. what I actually need is \n"
+			"for everyone to get under the plane and blow \n"
+			"upwards to keep us flying. ";
+		auto const insert_size = strlen(insert);
 
 		using rope_test_traits_2 = atma::rope_basic_traits<8, 9>;
 
@@ -574,27 +579,64 @@ SCENARIO("splitting")
 
 		WHEN("we split the rope")
 		{
-			for (int i = 0; i != passage_size; ++i)
-			{
-				auto [left, right] = rope.split(i);
+			rope.insert(239, insert, insert_size);
 
-				CHECK(atma::_rope_::validate_rope_(left.root()));
-				CHECK(atma::_rope_::validate_rope_(right.root()));
+			THEN("something something")
+			{
+				std::cout << rope << std::endl;
+			}
+		}
+	}
+}
+
+
+SCENARIO("splitting" * doctest::skip())
+{
+	GIVEN("a standard passage")
+	{
+		char const* passage =
+			"hello there, this is your captain speaking.  \n"
+			"unfortunately we forgot to fill up the plane \n"
+			"before takeoff. sorry for the inconvenience, \n"
+			"but I'm going to need some upstanding people \n"
+			"to get out and push us to the closest petrol \n"
+			"station. for your efforts you'll be rewarded \n"
+			"with a $50 gift-coupon that is redeemable at \n"
+			"any store within the food court.";
+
+		auto const passage_size = strlen(passage);
+	
+		AND_GIVEN("a default-constructed rope of <4, 9>")
+		{
+			auto rope = atma::_rope_::build_rope_<atma::rope_basic_traits<4, 9>>(atma::xfer_src(passage, passage_size));
+
+			WHEN("we split the rope")
+			{
+				for (int i = 0; i != passage_size; ++i)
+				{
+					auto [left, right] = rope.split(i);
+
+					CHECK(atma::_rope_::validate_rope_(left.root()));
+					CHECK(atma::_rope_::validate_rope_(right.root()));
+				}
 			}
 		}
 
-#if 0
-		WHEN("we split the rope")
+		AND_GIVEN("a default-constructed rope of <8, 9>")
 		{
-			auto [left, right] = rope.split(9 * 9 - 3);
+			auto rope = atma::_rope_::build_rope_<atma::rope_basic_traits<8, 9>>(atma::xfer_src(passage, passage_size));
 
-			ATMA_ASSERT(atma::_rope_::validate_rope_(left.root()));
-			ATMA_ASSERT(atma::_rope_::validate_rope_(right.root()));
+			WHEN("we split the rope")
+			{
+				for (int i = 0; i != passage_size; ++i)
+				{
+					auto [left, right] = rope.split(i);
 
-			std::cout << std::endl;
-			std::cout << "left:\n>" << left << "<\n\nright:\n>" << right << "<\n" << std::endl;
+					CHECK(atma::_rope_::validate_rope_(left.root()));
+					CHECK(atma::_rope_::validate_rope_(right.root()));
+				}
+			}
 		}
-#endif
 	}
 }
 
