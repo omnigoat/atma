@@ -875,15 +875,9 @@ namespace atma::_rope_
 	auto stitch_upwards_simple_(node_info_t<RT> const&, node_internal_t<RT>&, size_t child_idx, maybe_node_info_t<RT> const&)
 		-> maybe_node_info_t<RT>;
 
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT>
-	auto stitch_upwards_(node_info_t<RT> const&, node_internal_t<RT>&, size_t child_idx, edit_result_t<RT> const&)
-		-> edit_result_t<RT>;
-#else
 	template <typename RT>
 	auto stitch_upwards_(tree_branch_t<RT> const&, size_t child_idx, edit_result_t<RT> const&)
 		-> edit_result_t<RT>;
-#endif
 
 
 	//
@@ -891,18 +885,6 @@ namespace atma::_rope_
 	//
 	// this function ...
 	//
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT, typename Data, typename Fp>
-	using navigate_to_leaf_result_t = std::invoke_result_t<Fp, node_info_t<RT> const&, node_leaf_t<RT>&, Data>;
-
-	template <typename RT, typename Data, typename Fp>
-	auto navigate_upwards_passthrough_(node_info_t<RT> const&, node_internal_t<RT>&, size_t, navigate_to_leaf_result_t<RT, Data, Fp> const&)
-		-> navigate_to_leaf_result_t<RT, Data, Fp>;
-
-	template <typename RT, typename Data, typename Fd, typename Fp, typename Fu>
-	auto navigate_to_leaf(node_info_t<RT> const& info, Data, Fd&& down_fn, Fp&& payload_fn, Fu&& up_fn)
-		-> navigate_to_leaf_result_t<RT, Data, Fp>;
-#else
 	template <typename RT, typename Data, typename Fp>
 	using navigate_to_leaf_result_t = std::invoke_result_t<Fp, tree_leaf_t<RT> const&, Data>;
 
@@ -913,7 +895,6 @@ namespace atma::_rope_
 	template <typename RT, typename Data, typename Fd, typename Fp, typename Fu>
 	auto navigate_to_leaf(tree_t<RT> const& info, Data, Fd&& down_fn, Fp&& payload_fn, Fu&& up_fn)
 		-> navigate_to_leaf_result_t<RT, Data, Fp>;
-#endif
 
 	// navigate_to_front_leaf
 
@@ -939,15 +920,9 @@ namespace atma::_rope_
 //---------------------------------------------------------------------
 namespace atma::_rope_
 {
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT, typename F>
-	auto edit_chunk_at_char(node_info_t<RT> const& info, size_t char_idx, F&& f)
-		-> edit_result_t<RT>;
-#else
 	template <typename RT, typename F>
 	auto edit_chunk_at_char(tree_t<RT> const& tree, size_t char_idx, F&& payload_function)
 		-> edit_result_t<RT>;
-#endif
 }
 
 namespace atma::_rope_
@@ -982,34 +957,13 @@ namespace atma::_rope_
 {
 	// split
 
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT>
-	struct split_result_t
-	{
-		size_t tree_height = 0;
-		tree_and_height_t<RT> left, right;
-	};
-#else
 	template <typename RT>
 	struct split_result_t
 	{
 		size_t tree_height = 0;
 		tree_t<RT> left, right;
 	};
-#endif
 
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT>
-	auto split(node_info_t<RT> const&, size_t char_idx) -> split_result_t<RT>;
-
-	template <typename RT>
-	auto split_up_fn_(node_info_t<RT> const& info, node_internal_t<RT> const& node, size_t split_idx, split_result_t<RT> const& result)
-		-> split_result_t<RT>;
-
-	template <typename RT>
-	auto split_payload_(node_info_t<RT> const& leaf_info, node_leaf_t<RT> const& leaf, std::tuple<size_t, size_t> char_idx_and_height)
-		-> split_result_t<RT>;
-#else
 	template <typename RT>
 	auto split(tree_t<RT> const&, size_t char_idx) -> split_result_t<RT>;
 
@@ -1020,7 +974,6 @@ namespace atma::_rope_
 	template <typename RT>
 	auto split_payload_(tree_leaf_t<RT> const&, size_t char_idx)
 		-> split_result_t<RT>;
-#endif
 
 }
 
@@ -1028,16 +981,9 @@ namespace atma::_rope_
 {
 	// insert_small_text_
 
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT>
-	auto insert_small_text_(node_info_t<RT> const& leaf_info, node_leaf_t<RT>&, size_t char_idx, src_buf_t insbuf)
-		-> edit_result_t<RT>;
-#else
 	template <typename RT>
 	auto insert_small_text_(tree_leaf_t<RT> const&, size_t char_idx, src_buf_t const& insbuf)
 		-> edit_result_t<RT>;
-#endif
-
 }
 
 namespace atma::_rope_
@@ -2041,99 +1987,6 @@ namespace atma::_rope_
 		} \
 		while (0)
 
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT>
-	inline auto tree_merge_nodes_(tree_and_height_t<RT> const& left, tree_and_height_t<RT> const& right) -> tree_and_height_t<RT>
-	{
-		// validate assumptions:
-		//  - both nodes are leaves, or both are internal
-		//  - both nodes are at the same height
-		ATMA_ASSERT(left.info.node->is_leaf() == right.info.node->is_leaf());
-		ATMA_ASSERT(left.height == right.height);
-
-		if constexpr (ATMA_ENABLE_ASSERTS)
-		{
-			node_info_t<RT> right_node_info_temp{right.info.node};
-			ATMA_ASSERT(right_node_info_temp == right.info);
-		}
-
-		auto result_text_info = 
-			static_cast<text_info_t const&>(left.info) + 
-			static_cast<text_info_t const&>(right.info);
-
-		if (left.info.node->is_leaf())
-		{
-			// we know the height is two because we've just added an internal
-			// node above our two leaf nodes
-
-			auto result_node = make_internal_ptr<RT>(2u, left.info, right.info);
-			return {node_info_t<RT>{result_text_info, result_node}, 2};
-		}
-		
-		auto const& li = left.info.node->known_internal();
-		auto const& ri = right.info.node->known_internal();
-
-		if (left.info.children >= RT::minimum_branches && right.info.children >= RT::minimum_branches)
-		{
-			// both nodes are saturated enough where we can just make a node above
-
-			auto result_node = make_internal_ptr<RT>(left.height + 1, left.info, right.info);
-			return {node_info_t<RT>{result_text_info, result_node}, left.height + 1};
-		}
-		else if (size_t const children_count = left.info.children + right.info.children; children_count <= RT::branching_factor)
-		{
-			// both nodes are so UNsaturated that we can merge the children into a new node
-
-			auto result_node = make_internal_ptr<RT>(
-				left.height,
-				li.children(left.info.children),
-				ri.children(right.info.children));
-
-			return {node_info_t<RT>{result_text_info, result_node}, left.height};
-		}
-		else
-		{
-			// nodes are too unbalanced. we need to redistribute. sum the nodes and
-			// split in half, make sure left has majority in uneven cases
-
-			size_t const new_right_children_count = children_count / 2;
-			size_t const new_left_children_count = children_count - new_right_children_count;
-
-			size_t const take_from_left_for_left = std::min(new_left_children_count, li.children().size());
-			size_t const take_from_right_for_left = new_left_children_count - take_from_left_for_left;
-			size_t const take_from_right_for_right = std::min(new_right_children_count, ri.children().size());
-			size_t const take_from_left_for_right = new_right_children_count - take_from_right_for_right;
-
-			auto new_left_node = make_internal_ptr<RT>(
-				left.height,
-				xfer_src(li.children(), take_from_left_for_left),
-				xfer_src(ri.children(), take_from_right_for_left));
-
-			node_info_t<RT> new_left_info{new_left_node};
-
-			auto new_right_node = make_internal_ptr<RT>(
-				right.height,
-				xfer_src(li.children()).last(take_from_left_for_right),
-				xfer_src(ri.children()).last(take_from_right_for_right));
-
-			node_info_t<RT> new_right_info{new_right_node};
-
-			auto result_node = make_internal_ptr<RT>(
-				left.height + 1,
-				new_left_info,
-				new_right_info);
-
-
-			if constexpr (ATMA_ENABLE_ASSERTS)
-			{
-				auto new_result_info = static_cast<text_info_t const&>(new_left_info) + static_cast<text_info_t const&>(new_right_info);
-				ATMA_ASSERT(result_text_info == new_result_info);
-			}
-
-			return {node_info_t<RT>{result_text_info, result_node}, left.height + 1};
-		}
-	}
-#else
 	template <typename RT>
 	inline auto tree_merge_nodes_(node_info_t<RT> const& left, node_info_t<RT> const& right) -> node_info_t<RT>
 	{
@@ -2227,58 +2080,7 @@ namespace atma::_rope_
 			return node_info_t<RT>{result_text_info, result_node};
 		}
 	}
-#endif
 
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT>
-	auto node_split_across_lhs_(tree_and_height_t<RT> const& tree, size_t idx) -> tree_and_height_t<RT>
-	{
-		if (idx == 0)
-		{
-			// no children I guess!
-			return {make_leaf_ptr<RT>(), 1};
-		}
-		else if (idx == tree.info.children - 1)
-		{
-			// all children from first node
-			return tree;
-		}
-		else if (idx == 1)
-		{
-			return {tree.info.node->known_internal().child_at(0), tree.height - 1};
-		}
-		else
-		{
-			return {make_internal_ptr<RT>(tree.height, tree.info.node->known_internal().children().subspan(0, idx)), tree.height};
-		}
-	}
-
-	template <typename RT>
-	auto node_split_across_rhs_(tree_and_height_t<RT> const& tree, size_t idx) -> tree_and_height_t<RT>
-	{
-		ATMA_ASSERT(idx < tree.info.children);
-
-		if (idx == tree.info.children - 1)
-		{
-			// no children I guess!
-			return {make_leaf_ptr<RT>(), 1};
-		}
-		else if (idx == tree.info.children - 2)
-		{
-			return {tree.info.node->known_internal().child_at(tree.info.children - 1), tree.height - 1};
-		}
-		else
-		{
-			return {make_internal_ptr<RT>(tree.height, xfer_src_between(tree.info.node->known_internal().children(), idx + 1, tree.info.children)), tree.height};
-		}
-	}
-
-	template <typename RT>
-	auto node_split_across_(tree_and_height_t<RT> const& tree, size_t idx) -> std::tuple<tree_and_height_t<RT>, tree_and_height_t<RT>>
-	{
-		return {node_split_across_lhs_(tree, idx), node_split_across_rhs_(tree, idx)};
-	}
-#else
 	template <typename RT>
 	auto node_split_across_lhs_(tree_branch_t<RT> const& branch, size_t idx) -> tree_t<RT>
 	{
@@ -2330,8 +2132,6 @@ namespace atma::_rope_
 	{
 		return {node_split_across_lhs_(tree, idx), node_split_across_rhs_(tree, idx)};
 	}
-#endif
-
 
 	template <typename RT>
 	inline auto tree_concat_(tree_t<RT> const& left, tree_t<RT> const& right) -> tree_t<RT>
@@ -2456,168 +2256,7 @@ namespace atma::_rope_
 
 
 
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT, typename Data, typename Fp>
-	inline auto navigate_upwards_passthrough_(node_info_t<RT> const&, node_internal_t<RT>&, size_t, navigate_to_leaf_result_t<RT, Data, Fp> const& x)
-		-> navigate_to_leaf_result_t<RT, Data, Fp>
-	{
-		return x;
-	}
 
-	template <typename RT, typename Data, typename Fd, typename Fp, typename Fu>
-	inline auto navigate_to_leaf(node_info_t<RT> const& info, Data data, Fd&& down_fn, Fp&& payload_fn, Fu&& up_fn) -> navigate_to_leaf_result_t<RT, Data, Fp>
-	{
-		// okay so this function seems massive and complex, but 90% of the code is constexpr bools determining
-		// exactly the function-signatures of the user-supplied functions, so users don't have to place a bunch
-		// of random args when they don't need them. the actual algorithm and real code is dead simple:
-		//
-		//  1) leaf nodes: call payload_fn and return that
-		//  2) internal nodes:
-		//     a) call down_fn to figure out which child to navigate to
-		//     b) recurse onto that child
-		//     c) with the result from our recursion, call up_fn and return that as the result
-		//     d) fin.
-		//
-		using result_type = navigate_to_leaf_result_t<RT, Data, Fp>;
-
-		constexpr bool const select_function_returns_child_idx =
-			std::is_invocable_r_v<
-				std::tuple<size_t>,
-				Fd, node_internal_t<RT>&, Data>;
-
-		constexpr bool const select_function_returns_child_idx_and_data =
-			std::is_invocable_r_v<
-				std::tuple<size_t, Data>,
-				Fd, node_internal_t<RT>&, Data>;
-
-		constexpr bool const select_function_returns_child_idx_and_info =
-			std::is_invocable_r_v<
-				std::tuple<size_t, node_info_t<RT>>,
-				Fd, node_internal_t<RT>&, Data>;
-
-		constexpr bool const select_function_returns_child_idx_and_info_and_data =
-			std::is_invocable_r_v<
-				std::tuple<size_t, node_info_t<RT>, Data>,
-				Fd, node_internal_t<RT>&, Data>;
-
-		constexpr bool const up_fn_takes_only_child_idx =
-			std::is_invocable_v<
-				Fu, node_info_t<RT> const&, node_internal_t<RT>&,
-				size_t,
-				result_type>;
-
-		constexpr bool const up_fn_takes_only_child_idx_and_data =
-			std::is_invocable_v<
-				Fu, node_info_t<RT> const&, node_internal_t<RT>&,
-				size_t, Data,
-				result_type>;
-
-		constexpr bool const up_fn_takes_both_child_idx_and_info =
-			std::is_invocable_v<
-				Fu, node_info_t<RT> const&, node_internal_t<RT>&,
-				size_t, node_info_t<RT>&,
-				result_type>;
-
-		constexpr bool const up_fn_takes_both_child_idx_and_info_and_data =
-			std::is_invocable_v<
-				Fu, node_info_t<RT> const&, node_internal_t<RT>&,
-				size_t, node_info_t<RT>&, Data,
-				result_type>;
-
-		auto const down_fn_prime = [&](node_internal_t<RT>& x, Data data)
-		{
-			if constexpr (select_function_returns_child_idx)
-			{
-				auto [child_idx] = std::invoke(std::forward<Fd>(down_fn), x, data);
-				auto&& child_info = x.child_at(child_idx);
-				return std::make_tuple(child_idx, std::ref(child_info), data);
-			}
-			else if constexpr (select_function_returns_child_idx_and_data)
-			{
-				auto [child_idx, data_prime] = std::invoke(std::forward<Fd>(down_fn), x, data);
-				auto&& child_info = x.child_at(child_idx);
-				return std::make_tuple(child_idx, std::ref(child_info), data_prime);
-			}
-			else if constexpr (select_function_returns_child_idx_and_info)
-			{
-				auto [child_idx, child_info] = std::invoke(std::forward<Fd>(down_fn), x, data);
-				return std::make_tuple(child_idx, std::ref(child_info), data);
-			}
-			else if constexpr (select_function_returns_child_idx_and_info_and_data)
-			{
-				return std::invoke(std::forward<Fd>(down_fn), x, data);
-			}
-			else
-			{
-				static_assert(false, "bad select return-type");
-			}
-		};
-
-		auto const up_fn_prime = [&](node_info_t<RT> const& info, node_internal_t<RT>& x, size_t child_idx, node_info_t<RT> const& child_info, Data data, result_type result)
-		{
-			if constexpr (up_fn_takes_only_child_idx)
-				return std::invoke(std::forward<Fu>(up_fn), info, x, child_idx, result);
-			else if constexpr (up_fn_takes_only_child_idx_and_data)
-				return std::invoke(std::forward<Fu>(up_fn), info, x, child_idx, data, result);
-			else if constexpr (up_fn_takes_both_child_idx_and_info)
-				return std::invoke(std::forward<Fu>(up_fn), info, x, child_idx, child_info, result);
-			else if constexpr (up_fn_takes_both_child_idx_and_info_and_data)
-				return std::invoke(std::forward<Fu>(up_fn), info, x, child_idx, child_info, data, result);
-			else
-				static_assert(false, "bad up-function signature");
-		};
-
-		// yeah this is literally all the Real Code there actually is...
-		return info.node->visit(
-			[&](node_internal_t<RT>& x)
-			{
-				auto [child_idx, child_info, data_prime] = down_fn_prime(x, data);
-
-				auto result = navigate_to_leaf(
-					child_info, data_prime,
-					std::forward<Fd>(down_fn),
-					std::forward<Fp>(payload_fn),
-					std::forward<Fu>(up_fn));
-
-				return up_fn_prime(info, x, child_idx, child_info, data_prime, result);
-			},
-			[&](node_leaf_t<RT>& x)
-			{
-				if constexpr (std::is_invocable_v<Fp, decltype(info), decltype(x)>)
-					return std::invoke(std::forward<Fp>(payload_fn), info, x);
-				else if constexpr (std::is_invocable_v<Fp, decltype(info), decltype(x), decltype(data)>)
-					return std::invoke(std::forward<Fp>(payload_fn), info, x, data);
-				else
-					static_assert(false, "bad function signature for payload-function");
-			});
-	}
-
-	template <typename RT, typename Fp, typename Fu>
-	inline auto navigate_to_front_leaf(node_info_t<RT> const& info, Fp&& payload_fn, Fu&& up_fn)
-	{
-		return navigate_to_leaf(info, size_t(),
-			[](node_internal_t<RT>& x, size_t) { return std::make_tuple(0); },
-			std::forward<Fp>(payload_fn),
-			std::forward<Fu>(up_fn));
-	}
-
-	template <typename RT, typename Fp>
-	inline auto navigate_to_front_leaf(node_info_t<RT> const& info, Fp&& payload_fn)
-	{
-		return navigate_to_front_leaf(info,
-			std::forward<Fp>(payload_fn),
-			&navigate_upwards_passthrough_<RT, size_t, Fp>);
-	}
-
-	template <typename RT, typename Fp, typename Fu>
-	auto navigate_to_back_leaf(node_info_t<RT> const& info, Fp&& payload_fn, Fu&& up_fn)
-	{
-		return navigate_to_leaf(info, size_t(),
-			[](node_internal_t<RT>& x, size_t) { return std::make_tuple(x.children().size() - 1); },
-			std::forward<Fp>(payload_fn),
-			std::forward<Fu>(up_fn));
-	}
-#else
 	template <typename RT, typename Data, typename Fp>
 	inline auto navigate_upwards_passthrough_(tree_branch_t<RT> const&, size_t, navigate_to_leaf_result_t<RT, Data, Fp> const& x) -> navigate_to_leaf_result_t<RT, Data, Fp>
 	{
@@ -2779,8 +2418,6 @@ namespace atma::_rope_
 			std::forward<Fp>(payload_fn),
 			std::forward<Fu>(up_fn));
 	}
-#endif
-
 }
 
 
@@ -2792,16 +2429,7 @@ namespace atma::_rope_
 namespace atma::_rope_
 {
 	// edit_chunk_at_char
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT, typename F>
-	inline auto edit_chunk_at_char(node_info_t<RT> const& info, size_t char_idx, F&& payload_function) -> edit_result_t<RT>
-	{
-		return navigate_to_leaf(info, char_idx,
-			find_for_char_idx<RT>,
-			std::forward<F>(payload_function),
-			stitch_upwards_<RT>);
-	}
-#else
+
 	template <typename RT, typename F>
 	inline auto edit_chunk_at_char(tree_t<RT> const& tree, size_t char_idx, F&& payload_function) -> edit_result_t<RT>
 	{
@@ -2810,7 +2438,6 @@ namespace atma::_rope_
 			std::forward<F>(payload_function),
 			stitch_upwards_<RT>);
 	}
-#endif
 }
 
 
@@ -2968,20 +2595,6 @@ namespace atma::_rope_
 
 namespace atma::_rope_
 {
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT>
-	inline auto insert(size_t char_idx, node_info_t<RT> const& dest, src_buf_t const& insbuf) -> edit_result_t<RT>
-	{
-		if constexpr (false && "microsoft have fixed their compiler")
-		{
-			return edit_chunk_at_char(dest, char_idx, std::bind(insert_small_text_<RT>, arg1, arg2, arg3, insbuf));
-		}
-		else
-		{
-			return edit_chunk_at_char(dest, char_idx, [&](auto&& a, auto&& b, auto&& c) { return insert_small_text_<RT>(a, b, c, insbuf); });
-		}
-	}
-#else
 	template <typename RT>
 	inline auto insert(size_t char_idx, node_info_t<RT> const& dest, src_buf_t const& insbuf) -> edit_result_t<RT>
 	{
@@ -2995,46 +2608,7 @@ namespace atma::_rope_
 				[&](tree_leaf_t<RT> const& leaf, size_t char_idx) { return insert_small_text_<RT>(leaf, char_idx, insbuf); });
 		}
 	}
-#endif
 
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT>
-	inline auto split_payload_(node_info_t<RT> const& leaf_info, node_leaf_t<RT> const& leaf, std::tuple<size_t, size_t> char_idx_and_height) -> split_result_t<RT>
-	{
-		auto const& [char_idx, height] = char_idx_and_height;
-
-		auto byte_idx = leaf.byte_idx_from_char_idx(leaf_info, char_idx);
-		auto split_idx = leaf_info.dropped_bytes + byte_idx;
-
-		if (byte_idx == leaf_info.dropped_bytes)
-		{
-			// we are asking to split directly at the front of our buffer.
-			// so... we're not doing that. we're instead return a no-result
-			// for the lhs, and for the rhs we can just pass along our
-			// existing node, as it does not need to be modified
-
-			return {1, make_leaf_ptr<RT>(), 1, leaf_info, 1};
-		}
-		else if (byte_idx == leaf_info.dropped_bytes + leaf_info.bytes)
-		{
-			// in this case, we are asking to split at the end of our buffer.
-			// let's instead return a no-result for the rhs, and pass this
-			// node on the lhs.
-
-			return {1, leaf_info, 1, make_leaf_ptr<RT>(), 1};
-		}
-		else
-		{
-			// okay, our char-idx has landed us in the middle of our buffer.
-			// split the buffer into two and return both nodes.
-
-			auto left = make_leaf_ptr<RT>(xfer_src(leaf.buf.data() + leaf_info.dropped_bytes, byte_idx));
-			auto right = make_leaf_ptr<RT>(xfer_src(leaf.buf.data() + split_idx, leaf.buf.size() - split_idx));
-
-			return {1, left, 1, right, 1};
-		}
-	}
-#else
 	template <typename RT>
 	inline auto split_payload_(tree_leaf_t<RT> const& leaf, size_t char_idx) -> split_result_t<RT>
 	{
@@ -3068,123 +2642,7 @@ namespace atma::_rope_
 			return {1, left, right};
 		}
 	}
-#endif
 
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT>
-	inline auto split_up_fn_(node_info_t<RT> const& info, node_internal_t<RT> const& node, size_t split_idx, split_result_t<RT> const& result) -> split_result_t<RT>
-	{
-		auto const& [orig_height, split_left, split_right] = result;
-		
-		// "we", in this stack-frame, are one level higher than what was returned in result
-		size_t const our_height = orig_height + 1;
-		auto const self = tree_and_height_t<RT>{info, our_height};
-
-		// validate assumptions:
-		//
-		//  - split_idx is valid
-		//
-		ATMA_ASSERT(split_idx < info.children);
-		//
-		// validate invariants of the split-nodes' children, if the split-nodes
-		// were internal nodes (and not leaf nodes, obv).
-		//
-		// we do this because it's possible our children are no longer valid after
-		// splitting - that's okay, as long as THEIR children are valid, we can
-		// in this step rearrange those sub-children into new direct children of us
-		// to balance everything
-		//
-		// this also means for some of our shortcut algorithms where we return a sub-child
-		// node we are not breaking our recursive algorithm
-		//
-		if constexpr (false)
-		{
-			if (split_left.info && (*split_left.info).node->is_internal())
-			{
-				auto const& lin = split_left.info->node->known_internal();
-				for (auto const& x : lin.children())
-				{
-					ATMA_ASSERT(validate_rope_.internal_node(x));
-				}
-			}
-
-			if (split_right.info && (*split_right.info).node->is_internal())
-			{
-				auto const& lin = split_right.info->node->known_internal();
-				for (auto const& x : lin.children())
-				{
-					ATMA_ASSERT(validate_rope_.internal_node(x));
-				}
-			}
-		}
-
-		if (split_idx == 0)
-		{
-			// with split_idx equalling zero, the node at idx 0 has been split in two, and
-			// thus there's no LHS upon which to merge split_left - we simply pass along
-			// split_left up the callstack. the RHS must be joined to split_right appropriately
-
-			if (is_saturated(split_right.info) && split_right.height == orig_height)
-			{
-				// optimization: if split_right is a valid child-node, just change idx 0 to split_right
-
-				auto right = replace_(self, split_idx, split_right);
-				return {our_height, split_left, right};
-			}
-			else
-			{
-				auto rhs_children = node_split_across_rhs_<RT>(
-					self,
-					split_idx);
-
-				auto right = tree_concat_<RT>(
-					split_right,
-					rhs_children);
-
-				return {our_height, split_left, right};
-			}
-		}
-		else if (split_idx == info.children - 1)
-		{
-			if (is_saturated(split_left.info) && split_left.height == orig_height)
-			{
-				// optimization: if split_left is a valid child-node, just replace
-				// the last node of our children to split_left
-
-				auto left = replace_(self, split_idx, split_left);
-				return {our_height, left, split_right};
-			}
-			else
-			{
-				auto lhs_children = node_split_across_lhs_<RT>(
-					self,
-					split_idx);
-
-				auto left = tree_concat_<RT>(
-					lhs_children,
-					split_left);
-
-				return {our_height, left, split_right};
-			}
-		}
-		else
-		{
-			auto [our_lhs_children, our_rhs_children] = node_split_across_<RT>(
-				self,
-				split_idx);
-
-			auto left = tree_concat_<RT>(
-				our_lhs_children,
-				split_left);
-
-			auto right = tree_concat_<RT>(
-				split_right,
-				our_rhs_children);
-
-			return {our_height, left, right};
-		}
-	}
-#else
 	template <typename RT>
 	inline auto split_up_fn_(tree_branch_t<RT> const& dest, size_t split_idx, split_result_t<RT> const& result) -> split_result_t<RT>
 	{
@@ -3297,37 +2755,14 @@ namespace atma::_rope_
 			return {our_height, left, right};
 		}
 	}
-#endif
 
-#if USE_OLD_TREE_AND_HEIGHT
-	// returns: <index-of-child-node, remaining-characters>
-	template <typename RT>
-	inline auto find_for_char_idx_acc_height(node_internal_t<RT> const& x, std::tuple<size_t, size_t> char_idx_and_height) -> std::tuple<size_t, std::tuple<size_t, size_t>>
-	{
-		auto [idx, char_idx] = find_for_char_idx(x, std::get<0>(char_idx_and_height));
-
-		return {idx, {char_idx, std::get<1>(char_idx_and_height) + 1}};
-	}
-#else
 	// returns: <index-of-child-node, remaining-characters>
 	template <typename RT>
 	inline auto tree_find_for_char_idx(tree_branch_t<RT> const& x, size_t char_idx) -> std::tuple<size_t, size_t>
 	{
 		return find_for_char_idx(x.info().node->known_internal(), char_idx);
 	}
-#endif
 
-
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT>
-	inline auto split(node_info_t<RT> const& dest, size_t char_idx) -> split_result_t<RT>
-	{
-		return navigate_to_leaf(dest, std::make_tuple(char_idx, size_t(1)),
-			&find_for_char_idx_acc_height<RT>,
-			&split_payload_<RT>,
-			&split_up_fn_<RT>);
-	}
-#else
 	template <typename RT>
 	inline auto split(tree_t<RT> const& tree, size_t char_idx) -> split_result_t<RT>
 	{
@@ -3336,17 +2771,11 @@ namespace atma::_rope_
 			&split_payload_<RT>,
 			&split_up_fn_<RT>);
 	}
-#endif
-
 }
 
 namespace atma::_rope_
 {
 	// insert_small_text_
-#if USE_OLD_TREE_AND_HEIGHT
-	template <typename RT>
-	inline auto insert_small_text_(node_info_t<RT> const& leaf_info, node_leaf_t<RT>& leaf, size_t char_idx, src_buf_t insbuf) -> edit_result_t<RT>
-#else
 	template <typename RT>
 	inline auto insert_small_text_2_(node_info_t<RT> const& leaf_info, node_leaf_t<RT>& leaf, size_t char_idx, src_buf_t insbuf) -> edit_result_t<RT>;
 
@@ -3358,7 +2787,6 @@ namespace atma::_rope_
 
 	template <typename RT>
 	inline auto insert_small_text_2_(node_info_t<RT> const& leaf_info, node_leaf_t<RT>& leaf, size_t char_idx, src_buf_t insbuf) -> edit_result_t<RT>
-#endif
 	{
 		ATMA_ASSERT(insbuf.size() <= RT::buf_edit_max_size);
 
