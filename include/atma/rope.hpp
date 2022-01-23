@@ -2263,12 +2263,32 @@ namespace atma::_rope_
 		return x;
 	}
 
+	// navigate_to_leaf_selection_selector_
+
+	template <typename RT, typename Fd, typename Data>
+	inline auto navigate_to_leaf_selection_selector_(tree_branch_t<RT> const& branch, Fd&& down_fn, Data data)
+	requires std::is_invocable_r_v<std::tuple<size_t>, Fd, tree_branch_t<RT> const&, Data>
+	{
+		auto [child_idx] = std::invoke(std::forward<Fd>(down_fn), branch, data);
+		auto&& child_info = branch.child_at((int)child_idx);
+		return std::make_tuple(child_idx, std::ref(child_info), data);
+	}
+
+	template <typename RT, typename Fd, typename Data>
+	inline auto navigate_to_leaf_selection_selector_(tree_branch_t<RT> const& branch, Fd&& down_fn, Data data)
+	requires std::is_invocable_r_v<std::tuple<size_t, Data>, Fd, tree_branch_t<RT> const&, Data>
+	{
+		auto [child_idx, data_prime] = std::invoke(std::forward<Fd>(down_fn), branch, data);
+		auto&& child_info = branch.child_at((int)child_idx);
+		return std::make_tuple(child_idx, std::ref(child_info), data_prime);
+	}
+
+
+
 	template <typename RT, typename Data, typename Fd, typename Fp, typename Fu>
 	inline auto navigate_to_leaf(tree_t<RT> const& tree, Data data, Fd&& down_fn, Fp&& payload_fn, Fu&& up_fn) -> navigate_to_leaf_result_t<RT, Data, Fp>
 	{
-		// okay so this function seems massive and complex, but 90% of the code is constexpr bools determining
-		// exactly the function-signatures of the user-supplied functions, so users don't have to place a bunch
-		// of random args when they don't need them. the actual algorithm and real code is dead simple:
+		// the algorithm here is dead simple:
 		//
 		//  1) leaf nodes: call payload_fn and return that
 		//  2) internal nodes:
@@ -2277,100 +2297,13 @@ namespace atma::_rope_
 		//     c) with the result from our recursion, call up_fn and return that as the result
 		//     d) fin.
 		//
-		using result_type = navigate_to_leaf_result_t<RT, Data, Fp>;
-
-		constexpr bool const select_function_returns_child_idx =
-			std::is_invocable_r_v<
-				std::tuple<size_t>,
-				Fd, tree_branch_t<RT> const&, Data>;
-
-		constexpr bool const select_function_returns_child_idx_and_data =
-			std::is_invocable_r_v<
-				std::tuple<size_t, Data>,
-				Fd, tree_branch_t<RT> const&, Data>;
-
-		constexpr bool const select_function_returns_child_idx_and_info =
-			std::is_invocable_r_v<
-				std::tuple<size_t, node_info_t<RT>>,
-				Fd, tree_branch_t<RT> const&, Data>;
-
-		constexpr bool const select_function_returns_child_idx_and_info_and_data =
-			std::is_invocable_r_v<
-				std::tuple<size_t, node_info_t<RT>, Data>,
-				Fd, tree_branch_t<RT> const&, Data>;
-
-		constexpr bool const up_fn_takes_only_child_idx =
-			std::is_invocable_v<
-				Fu, tree_branch_t<RT> const&,
-				size_t,
-				result_type>;
-
-		constexpr bool const up_fn_takes_only_child_idx_and_data =
-			std::is_invocable_v<
-				Fu, tree_branch_t<RT> const&,
-				size_t, Data,
-				result_type>;
-
-		constexpr bool const up_fn_takes_both_child_idx_and_info =
-			std::is_invocable_v<
-				Fu, tree_branch_t<RT> const&,
-				size_t, node_info_t<RT>&,
-				result_type>;
-
-		constexpr bool const up_fn_takes_both_child_idx_and_info_and_data =
-			std::is_invocable_v<
-				Fu, tree_branch_t<RT> const&,
-				size_t, node_info_t<RT>&, Data,
-				result_type>;
-
-		auto const down_fn_prime = [&](tree_branch_t<RT> const& x, Data data)
-		{
-			if constexpr (select_function_returns_child_idx)
-			{
-				auto [child_idx] = std::invoke(std::forward<Fd>(down_fn), x, data);
-				auto&& child_info = x.child_at((int)child_idx);
-				return std::make_tuple(child_idx, std::ref(child_info), data);
-			}
-			else if constexpr (select_function_returns_child_idx_and_data)
-			{
-				auto [child_idx, data_prime] = std::invoke(std::forward<Fd>(down_fn), x, data);
-				auto&& child_info = x.child_at((int)child_idx);
-				return std::make_tuple(child_idx, std::ref(child_info), data_prime);
-			}
-			else if constexpr (select_function_returns_child_idx_and_info)
-			{
-				auto [child_idx, child_info] = std::invoke(std::forward<Fd>(down_fn), x, data);
-				return std::make_tuple(child_idx, std::ref(child_info), data);
-			}
-			else if constexpr (select_function_returns_child_idx_and_info_and_data)
-			{
-				return std::invoke(std::forward<Fd>(down_fn), x, data);
-			}
-			else
-			{
-				static_assert(false, "bad select return-type");
-			}
-		};
-
-		auto const up_fn_prime = [&](tree_branch_t<RT> const& tree, size_t child_idx, node_info_t<RT> const& child_info, Data data, result_type result)
-		{
-			if constexpr (up_fn_takes_only_child_idx)
-				return std::invoke(std::forward<Fu>(up_fn), tree, child_idx, result);
-			else if constexpr (up_fn_takes_only_child_idx_and_data)
-				return std::invoke(std::forward<Fu>(up_fn), tree, child_idx, data, result);
-			else if constexpr (up_fn_takes_both_child_idx_and_info)
-				return std::invoke(std::forward<Fu>(up_fn), tree, child_idx, child_info, result);
-			else if constexpr (up_fn_takes_both_child_idx_and_info_and_data)
-				return std::invoke(std::forward<Fu>(up_fn), tree, child_idx, child_info, data, result);
-			else
-				static_assert(false, "bad up-function signature");
-		};
-
-		// yeah this is literally all the Real Code there actually is...
 		return tree.info().node->visit(
 			[&](node_internal_t<RT>& x)
 			{
-				auto [child_idx, child_info, data_prime] = down_fn_prime(tree.as_branch(), data);
+				auto [child_idx, child_info, data_prime] = navigate_to_leaf_selection_selector_(
+					tree.as_branch(),
+					std::forward<Fd>(down_fn),
+					data);
 
 				auto result = navigate_to_leaf(
 					tree_t<RT>{child_info}, data_prime,
@@ -2378,7 +2311,7 @@ namespace atma::_rope_
 					std::forward<Fp>(payload_fn),
 					std::forward<Fu>(up_fn));
 
-				return up_fn_prime(tree.as_branch(), child_idx, child_info, data_prime, result);
+				return std::invoke(std::forward<Fu>(up_fn), tree.as_branch(), child_idx, result);
 			},
 			[&](node_leaf_t<RT>& x)
 			{
