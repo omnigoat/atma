@@ -2315,14 +2315,7 @@ namespace atma::_rope_
 			},
 			[&](node_leaf_t<RT>& x)
 			{
-				auto const& leaf = tree.as_leaf();
-
-				if constexpr (std::is_invocable_v<Fp, decltype(leaf)>)
-					return std::invoke(std::forward<Fp>(payload_fn), leaf);
-				else if constexpr (std::is_invocable_v<Fp, decltype(leaf), decltype(data)>)
-					return std::invoke(std::forward<Fp>(payload_fn), leaf, data);
-				else
-					static_assert(false, "bad function signature for payload-function");
+				return std::invoke(std::forward<Fp>(payload_fn), tree.as_leaf(), data);
 			});
 	}
 
