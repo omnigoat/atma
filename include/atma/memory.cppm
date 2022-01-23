@@ -847,10 +847,19 @@ export namespace atma
 			return {this->get_allocator(), this->data() + begin, (end - begin)};
 		}
 
+		// length-based views
 		constexpr auto skip(size_t n) const { return this->subspan(n); }
 		constexpr auto take(size_t n) const { return this->subspan(0, n); }
 		constexpr auto last(size_t n) const { return this->subspan(this->size() - n); }
 		constexpr auto drop(size_t n) const { return this->subspan(0, this->size() - n); }
+
+		// index-based views
+		constexpr auto from(size_t n) const { return this->subspan(n); }
+		constexpr auto to(size_t n) const { return this->subspan(0, n); }
+		constexpr auto from_to(size_t idx_from, size_t idx_to) const { return this->subspan(idx_from, idx_to - idx_from); }
+
+		//
+		constexpr auto split(size_t n) const { return std::make_tuple(this->subspan(0, n), this->subspan(n)); }
 	};
 }
 
