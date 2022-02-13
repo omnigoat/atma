@@ -481,104 +481,80 @@ namespace atma::_rope_
 	template <typename RT> struct tree_leaf_t;
 
 	template <typename RT>
-	struct tree_t
+	struct tree_t : protected node_info_t<RT>
 	{
-		tree_t(node_info_t<RT> const& info, node_t<RT>& node)
-			: info_(info)
-			, node_(node)
+		tree_t(node_info_t<RT> const& info)
+			: node_info_t<RT>{info}
 		{}
 
-		tree_t(node_info_t<RT> const& info)
-			: tree_t{info, *info.node}
+		tree_t(node_ptr<RT> const& x)
+			: node_info_t<RT>{x}
 		{}
 
 		tree_t(tree_branch_t<RT> const& tree);
-
 		tree_t(tree_leaf_t<RT> const& tree);
 
-		explicit tree_t(node_t<RT>& node)
-			: info_(node)
-			, node_(node)
-		{}
+		operator node_info_t<RT> const& () const { return static_cast<node_info_t<RT> const&>(*this); }
 
-		auto info() const -> node_info_t<RT> const& { return (info_); }
-		auto node() const -> node_t<RT>& { return (node_); }
+		auto info() const -> node_info_t<RT> const& { return *static_cast<node_info_t<RT> const*>(this); }
+		auto node() const -> node_t<RT>& { return *this->node_info_t<RT>::node; }
 
+		auto height() const { return node().height(); }
 
-		auto height() const { return node_.height(); }
-
-		auto is_saturated() const { return info_.children >= RT::branching_factor / 2; }
+		auto is_saturated() const { return info().children >= RT::branching_factor / 2; }
 
 		// children as viewed by info
 		auto children() const
 		{
-			return node_.visit(
-				[&](node_internal_t<RT> const& x) -> node_internal_t<RT>::children_type { return x.children(info_.children); },
+			return node().visit(
+				[&](node_internal_t<RT> const& x) -> node_internal_t<RT>::children_type { return x.children(info().children); },
 				[](node_leaf_t<RT> const&) -> node_internal_t<RT>::children_type { return typename node_internal_t<RT>::children_type{}; });
 		}
 
 		auto backing_children() const
 		{
-			return node_.visit(
+			return node().visit(
 				[](node_internal_t<RT> const& x) { return x.children(); },
 				[](node_leaf_t<RT> const&) { return typename node_internal_t<RT>::children_type{}; });
 		}
 
 		auto has_space_for_another_child() const
 		{
-			return node_.is_internal() && node_.as_branch().children().size() < RT::branching_factor;
+			return node().is_internal() && node().as_branch().children().size() < RT::branching_factor;
 		}
 
-		auto as_branch() const -> tree_branch_t<RT> { return {info_, node_.as_branch()}; }
-		auto as_leaf() const -> tree_leaf_t<RT> { return {info_, node_.as_leaf()}; }
+		auto as_branch() const -> tree_branch_t<RT> { return {info()}; }
+		auto as_leaf() const -> tree_leaf_t<RT> { return {info()}; }
 		//auto inu_back() const { return inu_internal_t{node_.children().back()}; }
-
-	private:
-		node_info_t<RT> const& info_;
-		node_t<RT>& node_;
 	};
 
 
 
 
 	template <typename RT>
-	struct tree_branch_t
+	struct tree_branch_t : tree_t<RT>
 	{
-		tree_branch_t(node_info_t<RT> const& info, node_internal_t<RT>& node)
-			: info_(info)
-			, node_(node)
-		{}
+		using tree_t<RT>::tree_t;
 
-		tree_branch_t(node_info_t<RT> const& info)
-			: tree_t{info, info.node->as_branch()}
-		{}
-
-		auto info() const -> node_info_t<RT> const& { return info_; }
-		auto node() const -> node_internal_t<RT>& { return node_; }
-
-		auto height() const { return node_.height(); }
-
+		auto node() const -> node_internal_t<RT>& { return static_cast<node_internal_t<RT>&>(this->tree_t<RT>::node()); }
+		
 		// children as viewed by info
 		auto children() const
 		{
-			return node_.children(info_.children);
+			return node().children(node_info_t<RT>::children);
 		}
 
-		auto child_at(int idx) const -> node_info_t<RT> const& { return node_.children()[idx]; }
+		auto child_at(int idx) const -> node_info_t<RT> const& { return node().children()[idx]; }
 
 		auto backing_children() const
 		{
-			return node_.children();
+			return node().children();
 		}
 
 		auto has_space_for_another_child() const
 		{
-			return node_.children().size() < RT::branching_factor;
+			return node().children().size() < RT::branching_factor;
 		}
-
-	private:
-		node_info_t<RT> const& info_;
-		node_internal_t<RT>& node_;
 	};
 
 
@@ -613,17 +589,16 @@ namespace atma::_rope_
 	};
 
 
-
-
 	template <typename RT>
 	inline tree_t<RT>::tree_t(tree_branch_t<RT> const& tree)
-		: tree_t{tree.info(), *tree.info().node}
+		: tree_t{tree.info()}
 	{}
 
 	template <typename RT>
 	inline tree_t<RT>::tree_t(tree_leaf_t<RT> const& tree)
-		: tree_t{tree.info(), *tree.info().node}
+		: tree_t{tree.info()}
 	{}
+
 }
 
 
