@@ -811,19 +811,6 @@ namespace atma::_rope_
 	template <typename RT>
 	auto replace_and_insert_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& repl_info, maybe_node_info_t<RT> const& maybe_ins_info)
 		-> insert_result_t<RT>;
-
-
-	template <typename RT>
-	struct tree_and_height_t
-	{
-		node_info_t<RT> info;
-		size_t height = 0;
-	};
-
-
-	template <typename RT>
-	auto replace_(tree_and_height_t<RT> const& dest, size_t idx, tree_and_height_t<RT> const& replacee)
-		-> tree_and_height_t<RT>;
 }
 
 
@@ -852,16 +839,16 @@ namespace atma::_rope_
 	//   as a group will be returned as children of a tree of the same height
 	//
 	template <typename RT>
-	auto node_split_across_lhs_(tree_and_height_t<RT> const&, size_t idx)
-		-> tree_and_height_t<RT>;
+	auto node_split_across_lhs_(tree_branch_t<RT> const&, size_t idx)
+		-> tree_t<RT>;
 
 	template <typename RT>
-	auto node_split_across_rhs_(tree_and_height_t<RT> const&, size_t idx)
-		-> tree_and_height_t<RT>;
+	auto node_split_across_rhs_(tree_branch_t<RT> const&, size_t idx)
+		-> tree_t<RT>;
 
 	template <typename RT>
-	auto node_split_across_(tree_and_height_t<RT> const& tree, size_t idx)
-		-> std::tuple<tree_and_height_t<RT>, tree_and_height_t<RT>>;
+	auto node_split_across_(tree_branch_t<RT> const& tree, size_t idx)
+		-> std::tuple<tree_t<RT>, tree_t<RT>>;
 
 
 	//
@@ -1692,14 +1679,6 @@ namespace atma::_rope_
 	}
 
 	template <typename RT>
-	auto replace_(tree_and_height_t<RT> const& dest, size_t idx, tree_and_height_t<RT> const& replacee) -> tree_and_height_t<RT>
-	{
-		ATMA_ASSERT(dest.height == replacee.height + 1);
-
-		return {replace_(dest.info, idx, replacee.info), dest.height};
-	}
-
-	template <typename RT>
 	inline auto append_(node_info_t<RT> const& dest, node_info_t<RT> const& insertee) -> node_info_t<RT>
 	{
 		ATMA_ASSERT(dest.node->is_internal(), "append_: called on non-internal node");
@@ -2255,7 +2234,6 @@ namespace atma::_rope_
 						left.height(),
 						xfer_src(left_children).drop(1));
 
-					//auto left_prime = tree_and_height_t<RT>{left_prime_node, left.height()};
 					return tree_merge_nodes_(node_info_t<RT>{left_prime_node}, subtree.info());
 				}
 				else
