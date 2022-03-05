@@ -491,13 +491,12 @@ namespace atma::_rope_
 			: node_info_t<RT>{x}
 		{}
 
-		tree_t(tree_branch_t<RT> const& tree);
-		tree_t(tree_leaf_t<RT> const& tree);
-
-		operator node_info_t<RT> const& () const { return static_cast<node_info_t<RT> const&>(*this); }
+		operator node_info_t<RT>& () const { return *static_cast<node_info_t<RT>*>(this); }
+		operator node_info_t<RT> const& () const { return *static_cast<node_info_t<RT> const*>(this); }
 
 		auto info() const -> node_info_t<RT> const& { return *static_cast<node_info_t<RT> const*>(this); }
 		auto node() const -> node_t<RT>& { return *this->node_info_t<RT>::node; }
+		
 
 		auto height() const { return node().height(); }
 
@@ -525,7 +524,6 @@ namespace atma::_rope_
 
 		auto as_branch() const -> tree_branch_t<RT> { return {info()}; }
 		auto as_leaf() const -> tree_leaf_t<RT> { return {info()}; }
-		//auto inu_back() const { return inu_internal_t{node_.children().back()}; }
 	};
 
 
@@ -538,22 +536,25 @@ namespace atma::_rope_
 
 		auto node() const -> node_internal_t<RT>& { return static_cast<node_internal_t<RT>&>(this->tree_t<RT>::node()); }
 		
+		operator tree_t<RT>& () { return *static_cast<tree_t<RT>*>(this); }
+		operator tree_t<RT> const& () const { return *static_cast<tree_t<RT> const*>(this); }
+
 		// children as viewed by info
 		auto children() const
 		{
-			return node().children(node_info_t<RT>::children);
+			return this->node().children(node_info_t<RT>::children);
 		}
 
-		auto child_at(int idx) const -> node_info_t<RT> const& { return node().children()[idx]; }
+		auto child_at(int idx) const -> node_info_t<RT> const& { return this->node().children()[idx]; }
 
 		auto backing_children() const
 		{
-			return node().children();
+			return this->node().children();
 		}
 
 		auto has_space_for_another_child() const
 		{
-			return node().children().size() < RT::branching_factor;
+			return this->node().children().size() < RT::branching_factor;
 		}
 	};
 
@@ -561,44 +562,24 @@ namespace atma::_rope_
 
 
 	template <typename RT>
-	struct tree_leaf_t
+	struct tree_leaf_t : tree_t<RT>
 	{
-		tree_leaf_t(node_info_t<RT> const& info, node_leaf_t<RT>& node)
-			: info_(info)
-			, node_(node)
-		{}
+		using tree_t<RT>::tree_t;
 
-		tree_leaf_t(node_info_t<RT> const& info)
-			: tree_leaf_t{info, info.node->as_leaf()}
-		{}
+		operator tree_t<RT>& () { return *static_cast<tree_t<RT>*>(this); }
+		operator tree_t<RT> const& () const { return *static_cast<tree_t<RT> const*>(this); }
 
-		auto info() const -> node_info_t<RT> const& { return info_; }
-		auto node() const -> node_leaf_t<RT>& { return node_; }
+		auto node() const -> node_leaf_t<RT>& { return static_cast<node_leaf_t<RT>&>(this->tree_t<RT>::node()); }
+
 		auto height() const { return 1; }
 
-		auto data() const -> src_buf_t { return xfer_src(node_.buf.data() + info_.dropped_bytes, info_.bytes); }
+		auto data() const -> src_buf_t { return xfer_src(this->node().buf.data() + this->info().dropped_bytes, this->info().bytes); }
 
 		auto byte_idx_from_char_idx(size_t char_idx) const -> size_t
 		{
-			return utf8_charseq_idx_to_byte_idx(node_.buf.data() + info_.dropped_bytes, info_.bytes, char_idx);
+			return utf8_charseq_idx_to_byte_idx(this->node().buf.data() + this->info().dropped_bytes, this->info().bytes, char_idx);
 		}
-
-	private:
-		node_info_t<RT> const& info_;
-		node_leaf_t<RT>& node_;
 	};
-
-
-	template <typename RT>
-	inline tree_t<RT>::tree_t(tree_branch_t<RT> const& tree)
-		: tree_t{tree.info()}
-	{}
-
-	template <typename RT>
-	inline tree_t<RT>::tree_t(tree_leaf_t<RT> const& tree)
-		: tree_t{tree.info()}
-	{}
-
 }
 
 
