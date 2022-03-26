@@ -481,24 +481,41 @@ namespace atma::_rope_
 	template <typename RT> struct tree_leaf_t;
 
 	template <typename RT>
-	struct tree_t : protected node_info_t<RT>
+	struct tree_base_t : node_info_t<RT>
 	{
-		tree_t(node_info_t<RT> const& info)
-			: node_info_t<RT>{info}
-		{}
+		using node_info_t<RT>::node_info_t;
 
-		tree_t(node_ptr<RT> const& x)
+		tree_base_t(node_info_t<RT> const& x)
 			: node_info_t<RT>{x}
 		{}
 
-		operator node_info_t<RT>& () const { return *static_cast<node_info_t<RT>*>(this); }
-		operator node_info_t<RT> const& () const { return *static_cast<node_info_t<RT> const*>(this); }
+	private:
+		using text_info_t::bytes;
+		using text_info_t::characters;
+		using text_info_t::dropped_bytes;
+		using text_info_t::dropped_characters;
+		using text_info_t::line_breaks;
+		using text_info_t::_pad_;
 
-		auto info() const -> node_info_t<RT> const& { return *static_cast<node_info_t<RT> const*>(this); }
+		using node_info_t<RT>::children;
+		using node_info_t<RT>::node;
+	};
+
+	template <typename RT>
+	struct tree_t : tree_base_t<RT>
+	{
+		tree_t(node_info_t<RT> const& info)
+			: tree_base_t<RT>{info}
+		{}
+
+		tree_t(node_ptr<RT> const& x)
+			: tree_base_t<RT>{x}
+		{}
+
+		auto info() const -> node_info_t<RT> const& { return static_cast<node_info_t<RT> const&>(*this); }
 		auto node() const -> node_t<RT>& { return *this->node_info_t<RT>::node; }
-		
 
-		auto height() const { return node().height(); }
+		auto height() const { return this->node().height(); }
 
 		auto is_saturated() const { return info().children >= RT::branching_factor / 2; }
 
@@ -522,8 +539,8 @@ namespace atma::_rope_
 			return node().is_internal() && node().as_branch().children().size() < RT::branching_factor;
 		}
 
-		auto as_branch() const -> tree_branch_t<RT> { return {info()}; }
-		auto as_leaf() const -> tree_leaf_t<RT> { return {info()}; }
+		auto as_branch() const -> tree_branch_t<RT> const& { return static_cast<tree_branch_t<RT> const&>(*this); }
+		auto as_leaf() const -> tree_leaf_t<RT> const& { return static_cast<tree_leaf_t<RT> const&>(*this); }
 	};
 
 
@@ -536,13 +553,10 @@ namespace atma::_rope_
 
 		auto node() const -> node_internal_t<RT>& { return static_cast<node_internal_t<RT>&>(this->tree_t<RT>::node()); }
 		
-		operator tree_t<RT>& () { return *static_cast<tree_t<RT>*>(this); }
-		operator tree_t<RT> const& () const { return *static_cast<tree_t<RT> const*>(this); }
-
 		// children as viewed by info
 		auto children() const
 		{
-			return this->node().children(node_info_t<RT>::children);
+			return this->node().children(this->info().children);
 		}
 
 		auto child_at(int idx) const -> node_info_t<RT> const& { return this->node().children()[idx]; }
@@ -555,6 +569,11 @@ namespace atma::_rope_
 		auto has_space_for_another_child() const
 		{
 			return this->node().children().size() < RT::branching_factor;
+		}
+
+		auto append(node_info_t<RT> const& x)
+		{
+			return this->node().append(x);
 		}
 	};
 
@@ -1699,9 +1718,41 @@ namespace atma::_rope_
 	}
 
 	template <typename RT>
-	inline auto append_(tree_t<RT> const& dest, tree_t<RT> const& insertee) -> tree_t<RT>
+	inline auto append_(tree_branch_t<RT> const& dest, tree_t<RT> const& insertee) -> tree_t<RT>
 	{
-		return {append_(dest.info(), insertee.info())};
+		ATMA_ASSERT(dest.children().size() < RT::branching_factor, "append_: insufficient space");
+
+		auto const& children = dest.children();
+
+		// if we are only aware of X nodes, and the underlying node has
+		// exactly X nodes, then 
+		bool const underlying_node_has_identical_nodes = dest.node().children().size() == children.size();
+		
+		if (underlying_node_has_identical_nodes && dest.has_space_for_another_child())
+		{
+			dest.node().append(insertee);
+
+			auto result = node_info_t<RT>{
+				dest + insertee,
+				(uint32_t)children.size() + 1,
+				dest.info().node};
+
+			return result;
+		}
+		else
+		{
+			auto result_node = make_internal_ptr<RT>(
+				dest.height(),
+				children,
+				insertee);
+
+			auto result = node_info_t<RT>{
+				dest + insertee,
+				(uint32_t)children.size() + 1,
+				result_node};
+
+			return result;
+		}
 	}
 
 	template <typename RT>
@@ -2184,7 +2235,7 @@ namespace atma::_rope_
 			
 			if (right_is_saturated && right_is_one_level_below_left && left.has_space_for_another_child())
 			{
-				auto n = append_(left, right);
+				auto n = append_(left.as_branch(), right);
 				//ATMA_ROPE_VERIFY_INFO_SYNC(n);
 				return n;
 			}
