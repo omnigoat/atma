@@ -298,6 +298,11 @@ SCENARIO("atma::rope's internal operations work")
 			
 			WHEN("we insert X at index 3")
 			{
+				// 0 1 2 3
+				// A B C D
+				//       ^
+				// 
+				// A B C | X D
 				auto postXresult = atma::_rope_::insert_<T>(internal_info, 3, X_info);
 
 				THEN("the insert-result contains two node-infos (a split node)")
