@@ -15,7 +15,7 @@ namespace atma
 {
 	struct ref_counted
 	{
-		virtual ~ref_counted() {}
+		//virtual ~ref_counted() {}
 
 		template <typename T>
 		auto shared_from_this_as() -> intrusive_ptr<T>
