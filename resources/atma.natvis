@@ -170,23 +170,23 @@
 
 	<!-- rope_node_t -->
 	<Type Name="atma::_rope_::node_t&lt;*&gt;">
-		<DisplayString Condition="variant_._Which==0">{{ internal-node }}</DisplayString>
-		<DisplayString Condition="variant_._Which==1">{{ leaf-node-buffer={((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)variant_._Tail).buf.chars_,[((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)variant_._Tail).buf.size_]s8} }}</DisplayString>
+		<DisplayString Condition="node_type_==node_type_t::branch">{{ internal-node }}</DisplayString>
+		<DisplayString Condition="node_type_==node_type_t::leaf">{{ leaf-node-buffer={((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)*this).buf.chars_,[((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)*this).buf.size_]s8} }}</DisplayString>
 		<DisplayString>{{ empty }}</DisplayString>
 		
 		<Expand>
-			<Item Condition="variant_._Which==0" Name="size">((atma::_rope_::node_internal_t&lt;$T1&gt;&amp;)variant_._Head).size_</Item>
-			<Item Condition="variant_._Which==0" Name="height">((atma::_rope_::node_internal_t&lt;$T1&gt;&amp;)variant_._Head).height</Item>
+			<Item Condition="node_type_==node_type_t::branch" Name="size">((atma::_rope_::node_internal_t&lt;$T1&gt;*)this)->size_</Item>
+			<Item Condition="node_type_==node_type_t::branch" Name="height">((atma::_rope_::node_internal_t&lt;$T1&gt;*)this)->height_</Item>
 			
 			<!-- internal-node children -->
-			<ArrayItems Condition="variant_._Which==0">
+			<ArrayItems Condition="node_type_==node_type_t::branch">
 				<Size>$T1::branching_factor</Size>
-				<ValuePointer>((atma::_rope_::node_internal_t&lt;$T1&gt;&amp;)variant_._Head).children_._Elems</ValuePointer>
+				<ValuePointer>((atma::_rope_::node_internal_t&lt;$T1&gt;*)this)->children_._Elems</ValuePointer>
 			</ArrayItems>
 
 			<!-- leaf-node information -->
-			<Item Condition="variant_._Which==1" Name="buffer-size">((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)variant_._Tail).buf.size_</Item>
-			<Item Condition="variant_._Which==1" Name="buffer-data">((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)variant_._Tail).buf</Item>
+			<Item Condition="node_type_==node_type_t::leaf" Name="buffer-size">((atma::_rope_::node_leaf_t&lt;$T1&gt;*)this)->buf.size_</Item>
+			<Item Condition="node_type_==node_type_t::leaf" Name="buffer-data">((atma::_rope_::node_leaf_t&lt;$T1&gt;*)this)->buf</Item>
 		</Expand>
 	</Type>
 
@@ -201,9 +201,9 @@
 	<!-- node_info_t -->
 	<Type Name="atma::_rope_::node_info_t&lt;*&gt;">
 		<!-- internal-node -->
-		<DisplayString Condition="node.px &amp;&amp; node.px->variant_._Which==0">node_info :: internal-node {{ chars={characters}, bytes={bytes} }}</DisplayString>
+		<DisplayString Condition="node.px &amp;&amp; node.px->node_type_==node_type_t::branch">node_info :: internal-node {{ chars={characters}, bytes={bytes} }}</DisplayString>
 		<!-- leaf-node -->
-		<DisplayString Condition="node.px &amp;&amp; node.px->variant_._Which==1">node_info :: leaf-node {{ chars={characters}, bytes={bytes}, {((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)node.px->variant_._Tail).buf.chars_ + dropped_bytes,[bytes]s8} }}</DisplayString>
+		<DisplayString Condition="node.px &amp;&amp; node.px->node_type_==node_type_t::leaf">node_info :: leaf-node {{ chars={characters}, bytes={bytes}, {((atma::_rope_::node_leaf_t&lt;$T1&gt;*)node.px)->buf.chars_ + dropped_bytes,[bytes]s8} }}</DisplayString>
 		<!-- invalid -->
 		<DisplayString>{{ empty }}</DisplayString>
 		
@@ -213,14 +213,14 @@
 			<Item Name="dropped_bytes">dropped_bytes</Item>
 			<Item Name="dropped_characters">dropped_characters</Item>
 			<Item Name="line_breaks">line_breaks</Item>
-			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==0" Name="children">children</Item>
+			<Item Condition="node.px &amp;&amp; node.px->node_type_==node_type_t::branch" Name="children">children</Item>
 			<Item Name="node">node</Item>
 
 			<!-- internal-node members -->
-			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==0" Name="[internal-node children]">((atma::_rope_::node_internal_t&lt;$T1&gt;&amp;)node.px->variant_._Head).children_</Item>
+			<Item Condition="node.px &amp;&amp; node.px->node_type_==node_type_t::branch" Name="[internal-node children]">((atma::_rope_::node_internal_t&lt;$T1&gt;*)node.px)->children_</Item>
 
 			<!-- leaf-node members -->
-			<Item Condition="node.px &amp;&amp; node.px->variant_._Which==1" Name="[leaf-node text]">((atma::_rope_::node_leaf_t&lt;$T1&gt;&amp;)node.px->variant_._Tail).buf.chars_,[characters]s8</Item>
+			<Item Condition="node.px &amp;&amp; node.px->node_type_==node_type_t::leaf" Name="[leaf-node text]">((atma::_rope_::node_leaf_t&lt;$T1&gt;*)node.px)->buf.chars_,[characters]s8</Item>
 		</Expand>
 	</Type>
 
