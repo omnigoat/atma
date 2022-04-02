@@ -334,3 +334,14 @@ namespace atma
 	}
 }
 
+
+namespace atma
+{
+	template <typename R, typename T>
+	requires std::is_convertible_v<R*, T*>
+	inline auto polymorphic_cast(intrusive_ptr<T> const& x) -> intrusive_ptr<R>
+	{
+		return intrusive_ptr<R>(dynamic_cast<R*>(x.get()));
+	}
+}
+
