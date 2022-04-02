@@ -476,7 +476,7 @@ namespace atma::_rope_
 
 //---------------------------------------------------------------------
 //
-//  test thing
+//  trees
 // 
 //---------------------------------------------------------------------
 namespace atma::_rope_
@@ -633,7 +633,6 @@ namespace atma
 		friend struct _rope_::build_rope_t_<RopeTraits>;
 	};
 }
-
 
 
 
@@ -2313,6 +2312,8 @@ namespace atma::_rope_
 	inline auto navigate_to_leaf_selection_selector_(tree_branch_t<RT> const& branch, Fd&& down_fn, Data data)
 	requires std::is_invocable_r_v<std::tuple<size_t>, Fd, tree_branch_t<RT> const&, Data>
 	{
+		// version where down_fn doesn't return data
+
 		auto [child_idx] = std::invoke(std::forward<Fd>(down_fn), branch, data);
 		auto&& child_info = branch.child_at((int)child_idx);
 		return std::make_tuple(child_idx, std::ref(child_info), data);
@@ -2322,6 +2323,8 @@ namespace atma::_rope_
 	inline auto navigate_to_leaf_selection_selector_(tree_branch_t<RT> const& branch, Fd&& down_fn, Data data)
 	requires std::is_invocable_r_v<std::tuple<size_t, Data>, Fd, tree_branch_t<RT> const&, Data>
 	{
+		// version where down_fn (possibly) mutates data and returns it
+
 		auto [child_idx, data_prime] = std::invoke(std::forward<Fd>(down_fn), branch, data);
 		auto&& child_info = branch.child_at((int)child_idx);
 		return std::make_tuple(child_idx, std::ref(child_info), data_prime);
