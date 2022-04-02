@@ -111,7 +111,7 @@ namespace atma::_rope_
 		return (x + y - 1) / y;
 	}
 
-
+	template <typename> struct build_rope_t_;
 }
 
 
@@ -620,13 +620,15 @@ namespace atma
 		template <typename F>
 		auto for_all_text(F&& f) const;
 
-		decltype(auto) root() { return (root_); }
+		decltype(auto) root() const { return (root_); }
 
 	private:
 		basic_rope_t(_rope_::node_info_t<RopeTraits> const&);
 
 	private:
 		_rope_::node_info_t<RopeTraits> root_;
+
+		friend struct _rope_::build_rope_t_<RopeTraits>;
 	};
 }
 
@@ -3200,8 +3202,7 @@ namespace atma::_rope_
 
 		// stack fixup
 		auto r = stack_finish(stack);
-		basic_rope_t<RT> result;
-		result.root() = r;
+		basic_rope_t<RT> result{r};
 		return result;
 	}
 }
