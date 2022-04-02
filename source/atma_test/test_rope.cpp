@@ -380,51 +380,6 @@ SCENARIO("atma::rope's internal operations work")
 			}
 		}
 
-		AND_GIVEN("a fully-saturated internal-node of [A, B, C, D]")
-		{
-			auto internal_node = atma::_rope_::make_internal_ptr<T>(2u, A_info, B_info, C_info, D_info);
-			auto internal_info = atma::_rope_::node_info_t<T>{internal_node};
-
-			AND_WHEN("we insert X at index 0")
-			{
-				auto postXresult = atma::_rope_::insert_<T>(internal_info, 0, X_info);
-
-				THEN("the insert-result contains two node-infos (a split node)")
-				{
-					CHECK(postXresult.maybe_rhs.has_value());
-				}
-
-				THEN("the lhs node-info is three nodes worth")
-				{
-					CHECK(postXresult.lhs.bytes == 3);
-					CHECK(postXresult.lhs.characters == 3);
-					CHECK(postXresult.lhs.children == 3);
-				}
-
-				THEN("the lhs node contains X, A, B")
-				{
-					CHECK(lhs_children(postXresult).size() == 3);
-					CHECK(lhs_child_node(postXresult, 0) == X);
-					CHECK(lhs_child_node(postXresult, 1) == A);
-					CHECK(lhs_child_node(postXresult, 2) == B);
-				}
-
-				THEN("the rhs node-info is two nodes worth")
-				{
-					CHECK(postXresult.maybe_rhs.value().bytes == 2);
-					CHECK(postXresult.maybe_rhs.value().characters == 2);
-					CHECK(postXresult.maybe_rhs.value().children == 2);
-				}
-
-				THEN("the rhs node contains C, D")
-				{
-					CHECK(rhs_children(postXresult).size() == 2);
-					CHECK(rhs_child_node(postXresult, 0) == C);
-					CHECK(rhs_child_node(postXresult, 1) == D);
-				}
-			}
-		}
-
 		// test replace_
 		AND_GIVEN("a fully-saturated internal-node of [A, B, C, D]")
 		{
@@ -455,7 +410,7 @@ SCENARIO("atma::rope's internal operations work")
 
 
 		// test replace_and_insert_
-		AND_GIVEN("a fully-saturated internal-node of [A, B, C]")
+		AND_GIVEN("an internal-node of [A, B, C]")
 		{
 			auto internal_node = atma::_rope_::make_internal_ptr<T>(2u, A_info, B_info, C_info);
 			auto internal_info = atma::_rope_::node_info_t<T>{internal_node};
@@ -556,8 +511,34 @@ SCENARIO("atma::rope's internal operations work")
 }
 
 
+SCENARIO("equality")
+{
+	GIVEN("a rope constructed with a known passage")
+	{
+		char const* passage =
+			"hello there, this is your captain speaking.  \n"
+			"unfortunately we forgot to fill up the plane \n"
+			"before takeoff. sorry for the inconvenience, \n"
+			"but I'm going to need some upstanding people \n"
+			"to get out and push us to the closest petrol \n"
+			"station. for your efforts you'll be rewarded \n"
+			"with a $50 gift-coupon that is redeemable at \n"
+			"any store within the food court.";
+		auto const passage_size = strlen(passage);
 
-SCENARIO("inserting" * doctest::skip())
+		auto rope = atma::_rope_::build_rope_<atma::rope_test_traits>(atma::xfer_src(passage, passage_size));
+
+		WHEN("we compare against said passage as a char const*")
+		THEN("it returns true")
+		{
+			CHECK(rope == passage);
+		}
+	}
+}
+
+
+#if 0
+SCENARIO("inserting")
 {
 	GIVEN("a default-constructed rope")
 	{
@@ -593,6 +574,9 @@ SCENARIO("inserting" * doctest::skip())
 		}
 	}
 }
+#endif
+
+
 
 
 SCENARIO("splitting" * doctest::skip())
