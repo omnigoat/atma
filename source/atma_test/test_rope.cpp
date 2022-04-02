@@ -545,10 +545,10 @@ SCENARIO("atma::rope's internal operations work")
 		{
 			auto rope = atma::_rope_::build_rope_<T>(atma::xfer_src(passage, passage_size));
 
-			THEN("something something")
-			{
-				std::cout << rope << std::endl;
-			}
+			//THEN("something something")
+			//{
+			//	std::cout << rope << std::endl;
+			//}
 		}
 	}
 
@@ -586,10 +586,10 @@ SCENARIO("inserting" * doctest::skip())
 		{
 			rope.insert(239, insert, insert_size);
 
-			THEN("something something")
-			{
-				std::cout << rope << std::endl;
-			}
+			//THEN("something something")
+			//{
+			//	std::cout << rope << std::endl;
+			//}
 		}
 	}
 }
