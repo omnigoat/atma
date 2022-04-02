@@ -635,6 +635,25 @@ namespace atma
 }
 
 
+namespace atma
+{
+	template <typename RT>
+	struct basic_rope_char_iterator_t
+	{
+		basic_rope_char_iterator_t(basic_rope_t<RT> const& rope);
+
+		auto operator ++() -> basic_rope_char_iterator_t&;
+
+	private:
+		basic_rope_t<RT> const& rope_;
+		_rope_::node_leaf_ptr<RT> leaf_;
+		size_t leaf_characters_ = 0;
+		size_t idx_ = 0;
+	};
+}
+
+
+
 
 
 
@@ -3432,6 +3451,7 @@ namespace atma
 	template <typename RT>
 	inline auto basic_rope_t<RT>::operator == (std::string_view) const -> bool
 	{
+		auto iter = basic_rope_char_iterator_t<RT>{*this};
 		return false;
 	}
 
@@ -3522,5 +3542,94 @@ namespace atma
 
 	using rope_t = basic_rope_t<rope_default_traits>;
 }
+
+
+
+
+
+
+
+
+
+
+
+namespace atma
+{
+	template <typename RT>
+	inline basic_rope_char_iterator_t<RT>::basic_rope_char_iterator_t(basic_rope_t<RT> const& rope)
+		: rope_(rope)
+	{
+		using namespace _rope_;
+
+		std::tie(leaf_, leaf_characters_) = navigate_to_front_leaf<RT>(rope.root(), [](tree_leaf_t<RT> const& leaf, size_t)
+			{
+				return std::make_tuple(node_leaf_ptr<RT>{&leaf.node()}, leaf.info().characters);
+			});
+	}
+
+	template <typename RT>
+	inline auto basic_rope_char_iterator_t<RT>::operator ++() -> basic_rope_char_iterator_t<RT>&
+	{
+		using namespace _rope_;
+
+		++idx_;
+
+		if (idx_ == rope_.size())
+			return *this;
+
+		if (idx_ == leaf_characters_)
+		{
+			// exceeded this leaf, time to move to next leaf
+			std::tie(leaf_, leaf_characters_) = navigate_to_leaf(rope_.root(), idx_,
+				&tree_find_for_char_idx<RT>,
+				[](tree_leaf_t<RT> const& leaf, size_t)
+				{
+					return std::make_tuple(node_leaf_ptr<RT>{&leaf.node()}, leaf.info().characters);
+				});
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
