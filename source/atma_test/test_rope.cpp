@@ -529,7 +529,7 @@ SCENARIO("equality")
 		auto rope = atma::_rope_::build_rope_<atma::rope_test_traits>(atma::xfer_src(passage, passage_size));
 
 		WHEN("we compare against said passage as a char const*")
-		THEN("it returns true")
+		THEN("the rope equates to the passage")
 		{
 			CHECK(rope == passage);
 		}
