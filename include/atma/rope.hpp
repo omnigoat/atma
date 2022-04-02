@@ -622,6 +622,9 @@ namespace atma
 
 		decltype(auto) root() const { return (root_); }
 
+		// size in characters
+		auto size() const -> size_t { return root_.characters; }
+
 		auto operator == (std::string_view) const -> bool;
 
 	private:
@@ -643,12 +646,14 @@ namespace atma
 		basic_rope_char_iterator_t(basic_rope_t<RT> const& rope);
 
 		auto operator ++() -> basic_rope_char_iterator_t&;
+		auto operator  *() -> utf8_char_t;
 
 	private:
 		basic_rope_t<RT> const& rope_;
 		_rope_::node_leaf_ptr<RT> leaf_;
 		size_t leaf_characters_ = 0;
 		size_t idx_ = 0;
+		size_t rel_idx_ = 0;
 	};
 }
 
@@ -903,8 +908,8 @@ namespace atma::_rope_
 	auto navigate_upwards_passthrough_(tree_branch_t<RT> const&, size_t, navigate_to_leaf_result_t<RT, Data, Fp> const&)
 		-> navigate_to_leaf_result_t<RT, Data, Fp>;
 
-	template <typename RT, typename Data, typename Fd, typename Fp, typename Fu>
-	auto navigate_to_leaf(tree_t<RT> const& info, Data, Fd&& down_fn, Fp&& payload_fn, Fu&& up_fn)
+	template <typename RT, typename Data, typename Fd, typename Fp, typename Fu = decltype(&navigate_upwards_passthrough_<RT, Data, Fp>)>
+	auto navigate_to_leaf(tree_t<RT> const& info, Data, Fd&& down_fn, Fp&& payload_fn, Fu&& up_fn = navigate_upwards_passthrough_<RT, Data, Fp>)
 		-> navigate_to_leaf_result_t<RT, Data, Fp>;
 
 	// navigate_to_front_leaf
@@ -1627,7 +1632,7 @@ namespace atma::_rope_
 		size_t acc_chars = 0;
 		for (auto const& child : x.children())
 		{
-			if (char_idx <= acc_chars + child.characters)
+			if (char_idx < acc_chars + child.characters)
 				break;
 
 			acc_chars += child.characters;
@@ -3449,10 +3454,19 @@ namespace atma
 	{}
 
 	template <typename RT>
-	inline auto basic_rope_t<RT>::operator == (std::string_view) const -> bool
+	inline auto basic_rope_t<RT>::operator == (std::string_view string) const -> bool
 	{
 		auto iter = basic_rope_char_iterator_t<RT>{*this};
-		return false;
+
+		auto blah = utf8_const_range_t{string.begin(), string.end()};
+		for (auto&& x : blah)
+		{
+			if (*iter != x)
+				return false;
+			++iter;
+		}
+
+		return true;
 	}
 
 	template <typename RT>
@@ -3573,20 +3587,31 @@ namespace atma
 		using namespace _rope_;
 
 		++idx_;
+		++rel_idx_;
 
 		if (idx_ == rope_.size())
 			return *this;
 
-		if (idx_ == leaf_characters_)
+		if (rel_idx_ == leaf_characters_)
 		{
 			// exceeded this leaf, time to move to next leaf
-			std::tie(leaf_, leaf_characters_) = navigate_to_leaf(rope_.root(), idx_,
+			std::tie(leaf_, leaf_characters_) = navigate_to_leaf<RT>(tree_t<RT>{rope_.root()}, idx_,
 				&tree_find_for_char_idx<RT>,
 				[](tree_leaf_t<RT> const& leaf, size_t)
 				{
 					return std::make_tuple(node_leaf_ptr<RT>{&leaf.node()}, leaf.info().characters);
 				});
+
+			rel_idx_ = 0;
 		}
+
+		return *this;
+	}
+
+	template <typename RT>
+	inline auto basic_rope_char_iterator_t<RT>::operator *() -> utf8_char_t
+	{
+		return utf8_char_t{leaf_->buf.data() + rel_idx_};
 	}
 }
 
