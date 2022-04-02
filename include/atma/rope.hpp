@@ -622,6 +622,8 @@ namespace atma
 
 		decltype(auto) root() const { return (root_); }
 
+		auto operator == (std::string_view) const -> bool;
+
 	private:
 		basic_rope_t(_rope_::node_info_t<RopeTraits> const&);
 
@@ -3425,6 +3427,12 @@ namespace atma
 	{}
 
 	template <typename RT>
+	inline auto basic_rope_t<RT>::operator == (std::string_view) const -> bool
+	{
+		return false;
+	}
+
+	template <typename RT>
 	inline auto basic_rope_t<RT>::push_back(char const* str, size_t sz) -> void
 	{
 		this->insert(root_.characters, str, sz);
@@ -3456,8 +3464,8 @@ namespace atma
 			auto [depth, left, right] = _rope_::split(_rope_::tree_t<RT>{root_}, char_idx);
 			auto ins = _rope_::build_rope_<RT>(xfer_src(str, sz));
 
-			std::cout << "left:>" << basic_rope_t{left.info()} << "<\n\n" << std::endl;
-			std::cout << "right:>" << basic_rope_t{right.info()} << "<\n\n" << std::endl;
+			//std::cout << "left:>" << basic_rope_t{left.info()} << "<\n\n" << std::endl;
+			//std::cout << "right:>" << basic_rope_t{right.info()} << "<\n\n" << std::endl;
 
 			auto tr1 = _rope_::tree_concat_<RT>(
 				_rope_::tree_t<RT>{left.info()},
