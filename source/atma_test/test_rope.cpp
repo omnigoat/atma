@@ -1,6 +1,6 @@
 #include <atma/unit_test.hpp>
 #include <atma/utf/utf8_string.hpp>
-#include <atma/rope.hpp>
+//#include <atma/rope.hpp>
 #include <atma/assert.hpp>
 #include <atma/intrusive_ptr.hpp>
 #include <atma/ranges/core.hpp>

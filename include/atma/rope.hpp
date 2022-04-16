@@ -1,4 +1,4 @@
-#if 1
+#if 0
 #include <atma/assert.hpp>
 #include <atma/intrusive_ptr.hpp>
 #include <atma/ranges/core.hpp>
