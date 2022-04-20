@@ -1327,6 +1327,14 @@ export namespace atma
 // destruct
 export namespace atma
 {
+	template <memory_concept Memory>
+	inline auto memory_destruct_at(Memory&& dest) -> void
+	{
+		auto&& allocator = get_allocator(dest);
+		using allocator_traits = detail::allocator_traits_of_t<decltype(allocator)>;
+		allocator_traits::destroy(allocator, dest.begin());
+	}
+
 	template <typename DT, typename DA>
 	inline auto memory_destruct(dest_bounded_memxfer_t<DT, DA> dest_range) -> void
 	{
@@ -1519,5 +1527,47 @@ export namespace atma
 				std::data(src),
 				std::size(src));
 		},
+	};
+}
+
+export namespace atma
+{
+	constexpr auto memory_compare = functor_list_t
+	{
+		[](auto&& lhs, auto&& rhs, size_t sz)
+		requires memory_concept<decltype(lhs)> && memory_concept<decltype(rhs)>
+		{
+			constexpr bool lhs_is_bounded = bounded_memory_concept<decltype(lhs)>;
+			constexpr bool rhs_is_bounded = bounded_memory_concept<decltype(rhs)>;
+
+			ATMA_ASSERT(sz != unbounded_memory_size);
+
+			if constexpr (lhs_is_bounded)
+				ATMA_ASSERT(sz <= lhs.size());
+			if constexpr (rhs_is_bounded)
+				ATMA_ASSERT(sz <= rhs.size());
+
+			return ::memcmp(std::data(lhs), std::data(rhs), sz);
+		},
+
+		[](auto&& lhs, auto&& rhs)
+		requires bounded_memory_concept<decltype(lhs)> && bounded_memory_concept<decltype(rhs)>
+		{
+			auto const lhs_sz = std::size(lhs);
+			auto const rhs_sz = std::size(rhs);
+
+			if (lhs_sz < rhs_sz)
+			{
+				return (int)lhs_sz;
+			}
+			else if (rhs_sz < lhs_sz)
+			{
+				return (int)rhs_sz;
+			}
+			else
+			{
+				return ::memcmp(std::data(lhs), std::data(rhs), lhs_sz);
+			}
+		}
 	};
 }

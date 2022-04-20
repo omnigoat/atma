@@ -75,7 +75,7 @@
       <SubSystem>Console</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>$(TargetPath) -r=atma_console</Command>
+      <Command>REM $(TargetPath) -r=atma_console</Command>
     </PostBuildEvent>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
