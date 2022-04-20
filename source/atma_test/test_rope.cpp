@@ -1,6 +1,7 @@
 #include <atma/unit_test.hpp>
 #include <atma/utf/utf8_string.hpp>
 #include <atma/assert.hpp>
+#include <atma/rope.hpp>
 #include <atma/intrusive_ptr.hpp>
 #include <atma/ranges/core.hpp>
 #include <atma/algorithm.hpp>
@@ -12,7 +13,7 @@
 #include <concepts>
 
 import atma.bind;
-import atma.rope;
+//import atma.rope;
 import atma.memory;
 
 using test_rope_t = atma::basic_rope_t<atma::rope_test_traits>;
@@ -43,7 +44,7 @@ SCENARIO("atma::rope's internal operations work")
 
 
 
-	GIVEN("several leaf nodes (\"A\", \"B\", \"C\"...) and corresopnding node-infos")
+	GIVEN("several leaf nodes (\"A\", \"B\", \"C\"...) and corresponding node-infos")
 	{
 		auto A = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("A", 1));
 		auto B = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("B", 1));
@@ -532,8 +533,35 @@ SCENARIO("equality")
 		{
 			CHECK(rope == passage);
 		}
+
+		AND_GIVEN("another rope of the same passage")
+		{
+			char const* passage2 =
+				" there, this is your captain speaking.  \n"
+				"unfortunately we forgot to fill up the plane \n"
+				"before takeoff. sorry for the inconvenience, \n"
+				"but I'm going to need some upstanding people \n"
+				"to get out and push us to the closest petrol \n"
+				"station. for your efforts you'll be rewarded \n"
+				"with a $50 gift-coupon that is redeemable at \n"
+				"any store within the food court.";
+
+			auto const passage2_size = strlen(passage2);
+
+			auto rope2 = atma::_rope_::build_rope_<atma::rope_test_traits>(atma::xfer_src(passage2, passage2_size));
+			rope2.insert(0, "hello", 5);
+
+			WHEN("we compare the two")
+			THEN("the ropes equate to each other")
+			{
+				rope == rope2;
+				CHECK(rope == rope2);
+			}
+		}
 	}
 }
+
+
 
 
 #if 0
@@ -578,7 +606,7 @@ SCENARIO("inserting")
 
 
 
-SCENARIO("splitting" * doctest::skip())
+SCENARIO("splitting")
 {
 	GIVEN("a standard passage")
 	{

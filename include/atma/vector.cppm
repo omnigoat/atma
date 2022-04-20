@@ -76,6 +76,7 @@ export namespace atma
 
 		auto push_back(T&&) -> void;
 		auto push_back(T const&) -> void;
+		auto pop_back() -> void;
 
 		template <typename... Args>
 		auto emplace_back(Args&&... args) -> reference;
@@ -427,6 +428,19 @@ export namespace atma
 			std::forward<T>(x));
 
 		++size_;
+	}
+
+	template <typename T, typename A>
+	inline auto vector<T, A>::pop_back() -> void
+	{
+		ATMA_ASSERT(size_);
+
+		memory_destruct_at(
+			xfer_dest(imem_, size_ - 1));
+
+		--size_;
+
+		imem_guard_gt(size_);
 	}
 
 	template <typename T, typename A>
