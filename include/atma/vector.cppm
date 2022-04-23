@@ -436,7 +436,7 @@ export namespace atma
 		ATMA_ASSERT(size_);
 
 		memory_destruct_at(
-			xfer_dest(imem_, size_ - 1));
+			xfer_dest(imem_ + size_ - 1));
 
 		--size_;
 
