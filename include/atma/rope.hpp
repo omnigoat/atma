@@ -1940,10 +1940,9 @@ namespace atma::_rope_
 		auto& ins_info = maybe_ins_info.value();
 
 		auto const children = dest_node.children();
-		bool const space_for_additional_two_children = (children.size() + 1 <= RT::branching_factor);
 
 		// we can fit the additional node in
-		if (space_for_additional_two_children)
+		if (dest_node.has_space_for_another_child())
 		{
 			auto result_node = make_internal_ptr<RT>(
 				dest_node.height(),
@@ -1952,7 +1951,7 @@ namespace atma::_rope_
 				ins_info,
 				xfer_src(children, idx + 1, children.size() - idx - 1));
 
-			node_info_t<RT> result{dest + ins_info, dest.children + 1, result_node};
+			auto result = node_info_t<RT>{result_node};
 
 			return {result};
 		}
@@ -2473,10 +2472,6 @@ namespace atma::_rope_
 			right_seam_node = std::get<0>(*maybe_mended_right_nodes);
 			mended_children[3] = std::get<1>(*maybe_mended_right_nodes);
 		}
-
-		// validate that when we take the trailing subspan we will not
-		// begin the subspan past the end. _at_ the end is fine (it's a nop)
-		ATMA_ASSERT(child_idx + 2 <= node.children().size());
 
 		node_info_t<RT>       result_lhs_info;
 		maybe_node_info_t<RT> result_rhs_info;
@@ -3447,20 +3442,42 @@ namespace atma
 		_rope_::basic_leaf_iterator_t<RT> sentinel;
 
 		// loop through leaves for both ropes
+		size_t lhs_offset = 0;
+		size_t rhs_offset = 0;
 		while (lhs_leaf_iter != sentinel && rhs_leaf_iter != sentinel)
 		{
-			auto lhsd = lhs_leaf_iter->data();
-			auto rhsd = rhs_leaf_iter->data();
+			auto lhsd = lhs_leaf_iter->data().from(lhs_offset);
+			auto rhsd = rhs_leaf_iter->data().from(rhs_offset);
 
 			if (auto r = memory_compare(lhsd, rhsd); r == 0)
 			{
 				// memory contents compared completely, keep going
 				++lhs_leaf_iter;
 				++rhs_leaf_iter;
-			}
-			else if (r == -(int)std::size(lhsd))
-			{
 
+				lhs_offset = rhs_offset = 0;
+			}
+			else if (r == std::size(rhsd))
+			{
+				// memory contents compared equally, but rhs ran out of characters
+
+				++rhs_leaf_iter;
+				lhs_offset = r;
+				rhs_offset = 0;
+			}
+			else if (-r == std::size(lhsd))
+			{
+				// memory contents compared equally, but lhs ran out of characters
+
+				++lhs_leaf_iter;
+				lhs_offset = 0;
+				rhs_offset = -r;
+			}
+			else
+			{
+				// did not compare equally
+
+				return false;
 			}
 
 		}
@@ -3626,7 +3643,7 @@ namespace atma::_rope_
 		tree_stack_.push_back({rope.root(), 0});
 		while (std::get<0>(tree_stack_.back()).children()[0].node->is_internal())
 		{
-			tree_stack_.emplace_back(std::get<0>(tree_stack_.back()).children().front(), 0);
+			tree_stack_.push_back({std::get<0>(tree_stack_.back()).children().front(), 0});
 		}
 	}
 
@@ -3636,8 +3653,9 @@ namespace atma::_rope_
 		auto* parent = &std::get<0>(tree_stack_.back());
 		auto* idx = &std::get<1>(tree_stack_.back());
 
-		++* idx;
+		++*idx;
 
+		// walk up the stack
 		while (*idx == parent->children().size())
 		{
 			tree_stack_.pop_back();
@@ -3650,8 +3668,24 @@ namespace atma::_rope_
 			{
 				parent = &std::get<0>(tree_stack_.back());
 				idx = &std::get<1>(tree_stack_.back());
-				++* idx;
+				++*idx;
 			}
+		}
+
+		ATMA_ASSERT(!tree_stack_.empty() && std::get<0>(tree_stack_.back()).info().node.get());
+
+		auto get_deepest_child = [&]() -> node_info_t<RT>
+			{ return std::get<0>(tree_stack_.back()).child_at(std::get<1>(tree_stack_.back())); };
+
+		ATMA_ASSERT(!tree_stack_.empty() && std::get<0>(tree_stack_.back()).info().node.get());
+
+		// walk back down
+		while (get_deepest_child().node->is_internal())
+		{
+			auto child = get_deepest_child();
+			tree_stack_.push_back({child, 0});
+
+			ATMA_ASSERT(!tree_stack_.empty() && std::get<0>(tree_stack_.back()).info().node.get());
 		}
 
 		return *this;
