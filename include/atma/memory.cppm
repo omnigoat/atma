@@ -1332,7 +1332,7 @@ export namespace atma
 	{
 		auto&& allocator = get_allocator(dest);
 		using allocator_traits = detail::allocator_traits_of_t<decltype(allocator)>;
-		allocator_traits::destroy(allocator, dest.begin());
+		allocator_traits::destroy(allocator, std::data(dest));
 	}
 
 	template <typename DT, typename DA>
@@ -1558,7 +1558,7 @@ export namespace atma
 
 			if (lhs_sz < rhs_sz)
 			{
-				return (int)lhs_sz;
+				return -(int)lhs_sz;
 			}
 			else if (rhs_sz < lhs_sz)
 			{
