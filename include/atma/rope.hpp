@@ -294,20 +294,8 @@ namespace atma::_rope_
 }
 
 
-//
-// edit_result_t
-//
 namespace atma::_rope_
 {
-	template <typename RT>
-	struct insert_result_t
-	{
-		node_info_t<RT> lhs;
-		maybe_node_info_t<RT> maybe_rhs;
-	};
-
-	// SERIOUSLY, make edit_result_t derive from insert_result_t I guess
-
 	enum class seam_t
 	{
 		none = 0,
@@ -317,17 +305,63 @@ namespace atma::_rope_
 
 	inline seam_t operator & (seam_t lhs, seam_t rhs) { return seam_t{static_cast<int>(lhs) & static_cast<int>(rhs)}; }
 	inline seam_t operator | (seam_t lhs, seam_t rhs) { return seam_t{static_cast<int>(lhs) | static_cast<int>(rhs)}; }
+}
 
-
+//
+// insert_result_t / edit_result_t
+//
+namespace atma::_rope_
+{
 	template <typename RT>
-	struct edit_result_t
+	struct insert_result_t
 	{
 		node_info_t<RT> left;
 		maybe_node_info_t<RT> right;
+	};
+
+	template <typename RT>
+	struct edit_result_t : insert_result_t<RT>
+	{
+		edit_result_t() = default;
+
+		edit_result_t(node_info_t<RT> left, maybe_node_info_t<RT> right = {}, seam_t seam = seam_t::none)
+			: insert_result_t<RT>{left, right}
+			, seam(seam)
+		{}
+
 		seam_t seam = seam_t::none;
+
+		template <size_t I>
+		auto& get() const
+		{
+			if constexpr (I == 0) return this->left;
+			if constexpr (I == 1) return this->right;
+			if constexpr (I == 2) return this->seam;
+		}
 	};
 }
 
+namespace std
+{
+	// destructure edit_result_t
+
+	template <typename RT>
+	struct tuple_size<::atma::_rope_::edit_result_t<RT>>
+		: integral_constant<size_t, 3>
+		{};
+
+	template <typename RT>
+	struct tuple_element<0, ::atma::_rope_::edit_result_t<RT>>
+		{ using type = ::atma::_rope_::node_info_t<RT>; };
+
+	template <typename RT>
+	struct tuple_element<1, ::atma::_rope_::edit_result_t<RT>>
+		{ using type = ::atma::_rope_::maybe_node_info_t<RT>; };
+
+	template <typename RT>
+	struct tuple_element<2, ::atma::_rope_::edit_result_t<RT>>
+		{ using type = ::atma::_rope_::seam_t; };
+}
 
 //
 // node_t
@@ -2188,8 +2222,8 @@ namespace atma::_rope_
 			if (left_is_saturated && left_is_one_level_below_right && right_branch.node().has_space_for_another_child())
 			{
 				auto n = insert_(right_branch, 0, left);
-				ATMA_ASSERT(!n.maybe_rhs);
-				return {n.lhs};
+				ATMA_ASSERT(!n.right);
+				return {n.left};
 			}
 			else if (left_is_saturated && left_is_one_level_below_right)
 			{
@@ -2478,7 +2512,7 @@ namespace atma::_rope_
 
 		auto blah = replace_and_insert_(branch, child_idx, left_info, maybe_right_info);
 
-		return {blah.lhs, blah.maybe_rhs, mended_left_seam | mended_right_seam};
+		return {blah.left, blah.right, mended_left_seam | mended_right_seam};
 	}
 
 	template <typename RT>
