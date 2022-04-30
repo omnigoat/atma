@@ -32,13 +32,13 @@ SCENARIO("atma::rope's internal operations work")
 	auto children_of = [&](auto&& x) -> decltype(auto) { return internal_node_of(x).children(); };
 	auto child_node_at = [&](auto&& x, size_t idx) -> decltype(auto) { return children_of(x)[idx].node; };
 
-	auto lhs_internal_node = [&](auto&& x) -> decltype(auto) { return internal_node_of(x.lhs); };
-	auto lhs_children = [&](auto&& x) { return children_of(x.lhs); };
-	auto lhs_child_node = [&](auto&& x, size_t idx) -> decltype(auto) { return child_node_at(x.lhs, idx); };
+	auto lhs_internal_node = [&](auto&& x) -> decltype(auto) { return internal_node_of(x.left); };
+	auto lhs_children = [&](auto&& x) { return children_of(x.left); };
+	auto lhs_child_node = [&](auto&& x, size_t idx) -> decltype(auto) { return child_node_at(x.left, idx); };
 
-	auto rhs_internal_node = [&](auto&& x) -> decltype(auto) { return internal_node_of(x.maybe_rhs.value()); };
-	auto rhs_children = [&](auto&& x) { return children_of(x.maybe_rhs.value()); };
-	auto rhs_child_node = [&](auto&& x, size_t idx) -> decltype(auto) { return child_node_at(x.maybe_rhs.value(), idx); };
+	auto rhs_internal_node = [&](auto&& x) -> decltype(auto) { return internal_node_of(x.right.value()); };
+	auto rhs_children = [&](auto&& x) { return children_of(x.right.value()); };
+	auto rhs_child_node = [&](auto&& x, size_t idx) -> decltype(auto) { return child_node_at(x.right.value(), idx); };
 
 
 
@@ -72,14 +72,14 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the insert-result does not contain a rhs")
 				{
-					CHECK(!postAresult.maybe_rhs.has_value());
+					CHECK(!postAresult.right.has_value());
 				}
 
 				THEN("the text-info is the sum information of A")
 				{
-					CHECK(postAresult.lhs.bytes == 1);
-					CHECK(postAresult.lhs.characters == 1);
-					CHECK(postAresult.lhs.children == 1);
+					CHECK(postAresult.left.bytes == 1);
+					CHECK(postAresult.left.characters == 1);
+					CHECK(postAresult.left.children == 1);
 				}
 
 				THEN("there is one child node that matches A")
@@ -92,18 +92,18 @@ SCENARIO("atma::rope's internal operations work")
 			WHEN("we _rope_::insert_ into our internal-node the node A at index 0, and node B at index 1")
 			{
 				auto postAresult = atma::_rope_::insert_<T>(internal_info, 0, A_info);
-				auto postBresult = atma::_rope_::insert_<T>(postAresult.lhs, 1, B_info);
+				auto postBresult = atma::_rope_::insert_<T>(postAresult.left, 1, B_info);
 
 				THEN("the insert-result does not contain a rhs")
 				{
-					CHECK(!postBresult.maybe_rhs.has_value());
+					CHECK(!postBresult.right.has_value());
 				}
 
 				THEN("the text-info is the sum information of A & B")
 				{
-					CHECK(postBresult.lhs.bytes == 2);
-					CHECK(postBresult.lhs.characters == 2);
-					CHECK(postBresult.lhs.children == 2);
+					CHECK(postBresult.left.bytes == 2);
+					CHECK(postBresult.left.characters == 2);
+					CHECK(postBresult.left.children == 2);
 				}
 
 				THEN("there are two nodes that match A & B")
@@ -117,20 +117,20 @@ SCENARIO("atma::rope's internal operations work")
 			WHEN("into internal-node we _rope_::insert_ nodes A, B, C, D at indices 0, 1, 2, 3 to saturate the node")
 			{
 				auto postAresult = atma::_rope_::insert_<T>(internal_info, 0, A_info);
-				auto postBresult = atma::_rope_::insert_<T>(postAresult.lhs, 1, B_info);
-				auto postCresult = atma::_rope_::insert_<T>(postBresult.lhs, 2, C_info);
-				auto postDresult = atma::_rope_::insert_<T>(postCresult.lhs, 3, D_info);
+				auto postBresult = atma::_rope_::insert_<T>(postAresult.left, 1, B_info);
+				auto postCresult = atma::_rope_::insert_<T>(postBresult.left, 2, C_info);
+				auto postDresult = atma::_rope_::insert_<T>(postCresult.left, 3, D_info);
 
 				THEN("the insert-result does not contain a rhs")
 				{
-					CHECK(!postDresult.maybe_rhs.has_value());
+					CHECK(!postDresult.right.has_value());
 				}
 
 				THEN("the text-info is the sum information of A & B")
 				{
-					CHECK(postDresult.lhs.bytes == 4);
-					CHECK(postDresult.lhs.characters == 4);
-					CHECK(postDresult.lhs.children == 4);
+					CHECK(postDresult.left.bytes == 4);
+					CHECK(postDresult.left.characters == 4);
+					CHECK(postDresult.left.children == 4);
 				}
 
 				THEN("there are four nodes that match A, B, C, D")
@@ -145,20 +145,20 @@ SCENARIO("atma::rope's internal operations work")
 			WHEN("into internal-node we _rope_::insert_ nodes A, B, C, D at index 0 each time")
 			{
 				auto postAresult = atma::_rope_::insert_<T>(internal_info, 0, A_info);
-				auto postBresult = atma::_rope_::insert_<T>(postAresult.lhs, 0, B_info);
-				auto postCresult = atma::_rope_::insert_<T>(postBresult.lhs, 0, C_info);
-				auto postDresult = atma::_rope_::insert_<T>(postCresult.lhs, 0, D_info);
+				auto postBresult = atma::_rope_::insert_<T>(postAresult.left, 0, B_info);
+				auto postCresult = atma::_rope_::insert_<T>(postBresult.left, 0, C_info);
+				auto postDresult = atma::_rope_::insert_<T>(postCresult.left, 0, D_info);
 
 				THEN("the insert-result does not contain a rhs")
 				{
-					CHECK(!postDresult.maybe_rhs.has_value());
+					CHECK(!postDresult.right.has_value());
 				}
 
 				THEN("the text-info is the sum information of A,B,C,D")
 				{
-					CHECK(postDresult.lhs.bytes == 4);
-					CHECK(postDresult.lhs.characters == 4);
-					CHECK(postDresult.lhs.children == 4);
+					CHECK(postDresult.left.bytes == 4);
+					CHECK(postDresult.left.characters == 4);
+					CHECK(postDresult.left.children == 4);
 				}
 
 				THEN("there are four nodes that match A, B, C, D, but in REVERSE ORDER")
@@ -184,17 +184,17 @@ SCENARIO("atma::rope's internal operations work")
 			
 				THEN("the insert-result contains two node-infos (a split node)")
 				{
-					CHECK(postXresult.maybe_rhs.has_value());
+					CHECK(postXresult.right.has_value());
 				}
 
-				THEN("the lhs node-info is three nodes worth")
+				THEN("the left node-info is three nodes worth")
 				{
-					CHECK(postXresult.lhs.bytes == 3);
-					CHECK(postXresult.lhs.characters == 3);
-					CHECK(postXresult.lhs.children == 3);
+					CHECK(postXresult.left.bytes == 3);
+					CHECK(postXresult.left.characters == 3);
+					CHECK(postXresult.left.children == 3);
 				}
 
-				THEN("the lhs node contains X, A, B")
+				THEN("the left node contains X, A, B")
 				{
 					CHECK(lhs_children(postXresult).size() == 3);
 					CHECK(lhs_child_node(postXresult, 0) == X);
@@ -204,9 +204,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the rhs node-info is two nodes worth")
 				{
-					CHECK(postXresult.maybe_rhs.value().bytes == 2);
-					CHECK(postXresult.maybe_rhs.value().characters == 2);
-					CHECK(postXresult.maybe_rhs.value().children == 2);
+					CHECK(postXresult.right.value().bytes == 2);
+					CHECK(postXresult.right.value().characters == 2);
+					CHECK(postXresult.right.value().children == 2);
 				}
 
 				THEN("the rhs node contains C, D")
@@ -224,17 +224,17 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the insert-result contains two node-infos (a split node)")
 				{
-					CHECK(postXresult.maybe_rhs.has_value());
+					CHECK(postXresult.right.has_value());
 				}
 
-				THEN("the lhs node-info is three nodes worth")
+				THEN("the left node-info is three nodes worth")
 				{
-					CHECK(postXresult.lhs.bytes == 3);
-					CHECK(postXresult.lhs.characters == 3);
-					CHECK(postXresult.lhs.children == 3);
+					CHECK(postXresult.left.bytes == 3);
+					CHECK(postXresult.left.characters == 3);
+					CHECK(postXresult.left.children == 3);
 				}
 
-				THEN("the lhs node contains A, X, B")
+				THEN("the left node contains A, X, B")
 				{
 					CHECK(lhs_children(postXresult).size() == 3);
 					CHECK(lhs_child_node(postXresult, 0) == A);
@@ -244,9 +244,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the rhs node-info is two nodes worth")
 				{
-					CHECK(postXresult.maybe_rhs.value().bytes == 2);
-					CHECK(postXresult.maybe_rhs.value().characters == 2);
-					CHECK(postXresult.maybe_rhs.value().children == 2);
+					CHECK(postXresult.right.value().bytes == 2);
+					CHECK(postXresult.right.value().characters == 2);
+					CHECK(postXresult.right.value().children == 2);
 				}
 
 				THEN("the rhs node contains C, D")
@@ -263,17 +263,17 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the insert-result contains two node-infos (a split node)")
 				{
-					CHECK(postXresult.maybe_rhs.has_value());
+					CHECK(postXresult.right.has_value());
 				}
 
-				THEN("the lhs node-info is three nodes worth")
+				THEN("the left node-info is three nodes worth")
 				{
-					CHECK(postXresult.lhs.bytes == 3);
-					CHECK(postXresult.lhs.characters == 3);
-					CHECK(postXresult.lhs.children == 3);
+					CHECK(postXresult.left.bytes == 3);
+					CHECK(postXresult.left.characters == 3);
+					CHECK(postXresult.left.children == 3);
 				}
 
-				THEN("the lhs node contains A, B, X")
+				THEN("the left node contains A, B, X")
 				{
 					CHECK(lhs_children(postXresult).size() == 3);
 					CHECK(lhs_child_node(postXresult, 0) == A);
@@ -283,9 +283,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the rhs node-info is two nodes worth")
 				{
-					CHECK(postXresult.maybe_rhs.value().bytes == 2);
-					CHECK(postXresult.maybe_rhs.value().characters == 2);
-					CHECK(postXresult.maybe_rhs.value().children == 2);
+					CHECK(postXresult.right.value().bytes == 2);
+					CHECK(postXresult.right.value().characters == 2);
+					CHECK(postXresult.right.value().children == 2);
 				}
 
 				THEN("the rhs node contains C, D")
@@ -307,17 +307,17 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the insert-result contains two node-infos (a split node)")
 				{
-					CHECK(postXresult.maybe_rhs.has_value());
+					CHECK(postXresult.right.has_value());
 				}
 
-				THEN("the lhs node-info is three nodes worth")
+				THEN("the left node-info is three nodes worth")
 				{
-					CHECK(postXresult.lhs.bytes == 3);
-					CHECK(postXresult.lhs.characters == 3);
-					CHECK(postXresult.lhs.children == 3);
+					CHECK(postXresult.left.bytes == 3);
+					CHECK(postXresult.left.characters == 3);
+					CHECK(postXresult.left.children == 3);
 				}
 
-				THEN("the lhs node contains A, B, C")
+				THEN("the left node contains A, B, C")
 				{
 					CHECK(lhs_children(postXresult).size() == 3);
 					CHECK(lhs_child_node(postXresult, 0) == A);
@@ -327,9 +327,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the rhs node-info is two nodes worth")
 				{
-					CHECK(postXresult.maybe_rhs.value().bytes == 2);
-					CHECK(postXresult.maybe_rhs.value().characters == 2);
-					CHECK(postXresult.maybe_rhs.value().children == 2);
+					CHECK(postXresult.right.value().bytes == 2);
+					CHECK(postXresult.right.value().characters == 2);
+					CHECK(postXresult.right.value().children == 2);
 				}
 
 				THEN("the rhs node contains X, D")
@@ -346,17 +346,17 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the insert-result contains two node-infos (a split node)")
 				{
-					CHECK(postXresult.maybe_rhs.has_value());
+					CHECK(postXresult.right.has_value());
 				}
 
-				THEN("the lhs node-info is three nodes worth")
+				THEN("the left node-info is three nodes worth")
 				{
-					CHECK(postXresult.lhs.bytes == 3);
-					CHECK(postXresult.lhs.characters == 3);
-					CHECK(postXresult.lhs.children == 3);
+					CHECK(postXresult.left.bytes == 3);
+					CHECK(postXresult.left.characters == 3);
+					CHECK(postXresult.left.children == 3);
 				}
 
-				THEN("the lhs node contains A, B, C")
+				THEN("the left node contains A, B, C")
 				{
 					CHECK(lhs_children(postXresult).size() == 3);
 					CHECK(lhs_child_node(postXresult, 0) == A);
@@ -366,9 +366,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the rhs node-info is two nodes worth")
 				{
-					CHECK(postXresult.maybe_rhs.value().bytes == 2);
-					CHECK(postXresult.maybe_rhs.value().characters == 2);
-					CHECK(postXresult.maybe_rhs.value().children == 2);
+					CHECK(postXresult.right.value().bytes == 2);
+					CHECK(postXresult.right.value().characters == 2);
+					CHECK(postXresult.right.value().children == 2);
 				}
 
 				THEN("the rhs node contains D, X")
@@ -390,7 +390,7 @@ SCENARIO("atma::rope's internal operations work")
 			{
 				auto postXresult = atma::_rope_::replace_<T>(internal_info, 2, X_info);
 
-				THEN("the lhs node-info is four nodes worth")
+				THEN("the left node-info is four nodes worth")
 				{
 					CHECK(postXresult.bytes == 4);
 					CHECK(postXresult.characters == 4);
@@ -421,17 +421,17 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the insert-result contains only one node")
 				{
-					CHECK(!postXresult.maybe_rhs.has_value());
+					CHECK(!postXresult.right.has_value());
 				}
 
-				THEN("the lhs node-info is three nodes worth")
+				THEN("the left node-info is three nodes worth")
 				{
-					CHECK(postXresult.lhs.bytes == 3);
-					CHECK(postXresult.lhs.characters == 3);
-					CHECK(postXresult.lhs.children == 3);
+					CHECK(postXresult.left.bytes == 3);
+					CHECK(postXresult.left.characters == 3);
+					CHECK(postXresult.left.children == 3);
 				}
 
-				THEN("the lhs node contains A, B, X")
+				THEN("the left node contains A, B, X")
 				{
 					CHECK(lhs_children(postXresult).size() == 3);
 					CHECK(lhs_child_node(postXresult, 0) == A);
@@ -446,17 +446,17 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the insert-result contains only one node")
 				{
-					CHECK(!postXresult.maybe_rhs.has_value());
+					CHECK(!postXresult.right.has_value());
 				}
 
-				THEN("the lhs node-info is four nodes worth")
+				THEN("the left node-info is four nodes worth")
 				{
-					CHECK(postXresult.lhs.bytes == 4);
-					CHECK(postXresult.lhs.characters == 4);
-					CHECK(postXresult.lhs.children == 4);
+					CHECK(postXresult.left.bytes == 4);
+					CHECK(postXresult.left.characters == 4);
+					CHECK(postXresult.left.children == 4);
 				}
 
-				THEN("the lhs node contains A, B, X, Y")
+				THEN("the left node contains A, B, X, Y")
 				{
 					CHECK(lhs_children(postXresult).size() == 4);
 					CHECK(lhs_child_node(postXresult, 0) == A);
@@ -465,7 +465,7 @@ SCENARIO("atma::rope's internal operations work")
 					CHECK(lhs_child_node(postXresult, 3) == Y);
 				}
 
-				atma::_rope_::validate_rope_(postXresult.lhs);
+				atma::_rope_::validate_rope_(postXresult.left);
 			}
 		}
 	}
