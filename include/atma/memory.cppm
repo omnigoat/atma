@@ -1558,11 +1558,13 @@ export namespace atma
 
 			if (lhs_sz < rhs_sz)
 			{
-				return -(int)lhs_sz;
+				auto r = ::memcmp(std::data(lhs), std::data(rhs), lhs_sz);
+				return r ? r : -(int)lhs_sz;
 			}
 			else if (rhs_sz < lhs_sz)
 			{
-				return (int)rhs_sz;
+				auto r = ::memcmp(std::data(lhs), std::data(rhs), rhs_sz);
+				return r ? r : (int)rhs_sz;
 			}
 			else
 			{
