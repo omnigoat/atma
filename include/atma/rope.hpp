@@ -3389,7 +3389,7 @@ namespace atma::_rope_
 			}
 		}
 
-		return node_info_t<RT>{};
+		return root;
 	}
 
 }
@@ -3488,13 +3488,11 @@ namespace atma
 				// memory contents compared completely, keep going
 				++lhs_leaf_iter;
 				++rhs_leaf_iter;
-
 				lhs_offset = rhs_offset = 0;
 			}
 			else if (r == std::size(rhsd))
 			{
 				// memory contents compared equally, but rhs ran out of characters
-
 				++rhs_leaf_iter;
 				lhs_offset = r;
 				rhs_offset = 0;
@@ -3502,7 +3500,6 @@ namespace atma
 			else if (-r == std::size(lhsd))
 			{
 				// memory contents compared equally, but lhs ran out of characters
-
 				++lhs_leaf_iter;
 				lhs_offset = 0;
 				rhs_offset = -r;
@@ -3510,13 +3507,13 @@ namespace atma
 			else
 			{
 				// did not compare equally
-
 				return false;
 			}
-
 		}
 
-		return true;
+		// exhausted leaves to compare (all tested equal), so if we exhausted
+		// both ropes equally, then they were completely equal
+		return (lhs_leaf_iter == sentinel && rhs_leaf_iter == sentinel);
 	}
 
 	template <typename RT>
