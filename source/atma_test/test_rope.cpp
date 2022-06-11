@@ -469,9 +469,10 @@ SCENARIO("atma::rope's internal operations work")
 			}
 		}
 	}
+}
 
-
-
+SCENARIO("rope can be build from text")
+{
 	GIVEN("our test passage of text")
 	{
 		char const* passage = 
@@ -488,22 +489,32 @@ SCENARIO("atma::rope's internal operations work")
 
 		WHEN("we call build_rope_naive")
 		{
-			auto node_info = atma::_rope_::build_rope_naive<T>(atma::xfer_src(passage, passage_size));
+			auto node_info = atma::_rope_::build_rope_naive<atma::rope_test_traits>(atma::xfer_src(passage, passage_size));
 
-			THEN("something something")
+			THEN("the rope root node-info matches the passage")
 			{
-
+				CHECK(node_info.bytes == passage_size);
+				CHECK(node_info.characters == passage_size);
+				CHECK(node_info.dropped_bytes == 0);
+				CHECK(node_info.dropped_characters == 0);
+				CHECK(node_info.line_breaks == 7);
 			}
 		}
 
 		WHEN("we call build_rope_")
 		{
-			auto rope = atma::_rope_::build_rope_<T>(atma::xfer_src(passage, passage_size));
+			auto rope = atma::_rope_::build_rope_<atma::rope_test_traits>(atma::xfer_src(passage, passage_size));
 
-			//THEN("something something")
-			//{
-			//	std::cout << rope << std::endl;
-			//}
+			THEN("the rope root node-info matches the passage")
+			{
+				auto const& root = rope.root();
+
+				CHECK(root.bytes == passage_size);
+				CHECK(root.characters == passage_size);
+				CHECK(root.dropped_bytes == 0);
+				CHECK(root.dropped_characters == 0);
+				CHECK(root.line_breaks == 7);
+			}
 		}
 	}
 
@@ -511,7 +522,7 @@ SCENARIO("atma::rope's internal operations work")
 }
 
 
-SCENARIO("equality")
+SCENARIO("atma::rope equality operators function")
 {
 	GIVEN("a known passage as a char const*")
 	{
