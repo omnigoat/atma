@@ -716,37 +716,15 @@ namespace atma::_rope_
 		basic_leaf_iterator_t(basic_rope_t<RT> const& rope);
 
 		auto operator ++() -> basic_leaf_iterator_t<RT>&;
-		auto operator  *() -> tree_leaf_t<RT>;
+		auto operator  *() const -> tree_leaf_t<RT> const&;
+		auto operator ->() const -> tree_leaf_t<RT> const*;
 
 	private:
 		atma::vector<std::tuple<tree_branch_t<RT>, int>> tree_stack_;
 
 		template <typename RT2>
-		friend inline auto operator == (basic_leaf_iterator_t<RT2> const& lhs, basic_leaf_iterator_t<RT2> const& rhs) -> bool
-		{
-			return std::ranges::equal(lhs.tree_stack_, rhs.tree_stack_);
-		}
+		friend auto operator == (basic_leaf_iterator_t<RT2> const& lhs, basic_leaf_iterator_t<RT2> const& rhs) -> bool;
 	};
-
-#if 0
-	template <typename RT>
-	inline auto operator == (basic_leaf_iterator_t<RT> const& lhs, basic_leaf_iterator_t<RT> const& rhs) -> bool
-	{
-		return std::ranges::equal(lhs.tree_stack_, rhs.tree_stack_);
-
-		//auto lhsi = tree_stack_.begin();
-		//auto rhsi = rhs.tree_stack_.begin();
-		//
-		//for (;;)
-		//{
-		//	if (*lhsi != *rhsi)
-		//		return false;
-		//}
-		//
-		//return true;
-	}
-#endif
-
 }
 
 
@@ -3723,11 +3701,23 @@ namespace atma::_rope_
 	}
 
 	template <typename RT>
-	inline auto basic_leaf_iterator_t<RT>::operator *() -> tree_leaf_t<RT>
+	inline auto basic_leaf_iterator_t<RT>::operator *() const -> tree_leaf_t<RT> const&
 	{
-		auto const& [branch, idx] = tree_stack_.back();
+		auto& [branch, idx] = tree_stack_.back();
+		return static_cast<tree_leaf_t<RT> const&>(branch.child_at(idx));
+	}
 
-		return tree_leaf_t<RT>{branch.child_at(idx)};
+	template <typename RT>
+	inline auto basic_leaf_iterator_t<RT>::operator ->() const -> tree_leaf_t<RT> const*
+	{
+		auto& [branch, idx] = tree_stack_.back();
+		return static_cast<tree_leaf_t<RT> const*>(&branch.child_at(idx));
+	}
+
+	template <typename RT>
+	inline auto operator == (basic_leaf_iterator_t<RT> const& lhs, basic_leaf_iterator_t<RT> const& rhs) -> bool
+	{
+		return std::ranges::equal(lhs.tree_stack_, rhs.tree_stack_);
 	}
 }
 
