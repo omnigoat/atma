@@ -6,6 +6,7 @@ module;
 
 export module atma.vector;
 
+import atma.types;
 import atma.aligned_allocator;
 import atma.memory;
 

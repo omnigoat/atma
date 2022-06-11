@@ -507,7 +507,7 @@ SCENARIO_TEMPLATE("xfer_dest() or xfer_src() is called", xfer, XFER_TYPE_COMBINA
 
 		THEN("we can call with arguments {basic-memory}")
 		{
-			atma::basic_memory_t<xfer::value_type, xfer::allocator_type> memory;
+			atma::basic_memory_t<typename xfer::value_type, typename xfer::allocator_type> memory;
 			SCOPED_BASIC_MEMORY_ALLOCATION(memory, 4);
 
 			[[maybe_unused]] auto d = xfer_make(memory);
