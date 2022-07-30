@@ -12,7 +12,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\atma\algorithm.hpp" />
-    <ClCompile Include="..\..\include\atma\aligned_allocator.cppm" />
     <ClInclude Include="..\..\include\atma\arena_allocator.hpp" />
     <ClInclude Include="..\..\include\atma\atomic.hpp" />
     <ClInclude Include="..\..\include\atma\ebo_pair.hpp" />
@@ -25,10 +24,7 @@
     <ClInclude Include="..\..\include\atma\lockfree_list.hpp" />
     <ClInclude Include="..\..\include\atma\logging.hpp" />
     <ClInclude Include="..\..\include\atma\math\functions.hpp" />
-    <ClCompile Include="..\..\include\atma\memory.cppm" />
     <ClInclude Include="..\..\include\atma\assert.hpp" />
-    <ClCompile Include="..\..\include\atma\assert.cppm" />
-    <ClCompile Include="..\..\include\atma\bind.cppm" />
     <ClInclude Include="..\..\include\atma\bitmask.hpp" />
     <ClInclude Include="..\..\include\atma\com_ptr.hpp" />
     <ClInclude Include="..\..\include\atma\config\platform.hpp" />
@@ -46,7 +42,6 @@
     <ClInclude Include="..\..\include\atma\math\vector4f.hpp" />
     <ClInclude Include="..\..\include\atma\math\vector4i.hpp" />
     <ClInclude Include="..\..\include\atma\lockfree_queue.hpp" />
-    <ClCompile Include="..\..\include\atma\meta.cppm" />
     <ClInclude Include="..\..\include\atma\platform\allocation.hpp" />
     <ClInclude Include="..\..\include\atma\platform\interop.hpp" />
     <ClInclude Include="..\..\include\atma\preprocessor.hpp" />
@@ -62,11 +57,9 @@
     <ClInclude Include="..\..\include\atma\threading.hpp" />
     <ClInclude Include="..\..\include\atma\thread\engine.hpp" />
     <ClInclude Include="..\..\include\atma\tuple.hpp" />
-    <ClCompile Include="..\..\include\atma\types.cppm" />
     <ClInclude Include="..\..\include\atma\unit_test.hpp" />
     <ClInclude Include="..\..\include\atma\utf\algorithm.hpp" />
     <ClInclude Include="..\..\include\atma\utf\utf8_string.hpp" />
-    <ClCompile Include="..\..\include\atma\vector.cppm" />
     <ClInclude Include="..\..\vendor\doctest\doctest.h" />
   </ItemGroup>
   <ItemGroup>
@@ -75,8 +68,15 @@
     </Natvis>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\modules\atma\aligned_allocator.cppm" />
+    <ClCompile Include="..\..\modules\atma\assert.cppm" />
+    <ClCompile Include="..\..\modules\atma\bind.cppm" />
     <ClCompile Include="..\..\modules\atma\intrusive_ptr.cppm" />
+    <ClCompile Include="..\..\modules\atma\memory.cppm" />
+    <ClCompile Include="..\..\modules\atma\meta.cppm" />
     <ClCompile Include="..\..\modules\atma\rope.cppm" />
+    <ClCompile Include="..\..\modules\atma\types.cppm" />
+    <ClCompile Include="..\..\modules\atma\vector.cppm" />
     <ClCompile Include="..\..\source\include_guide.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Distribution|x64'">true</ExcludedFromBuild>

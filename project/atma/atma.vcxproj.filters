@@ -193,31 +193,31 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\source\include_guide.cpp" />
-    <ClCompile Include="..\..\include\atma\meta.cppm">
-      <Filter>include</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\include\atma\assert.cppm">
-      <Filter>include</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\include\atma\types.cppm">
-      <Filter>include</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\include\atma\vector.cppm">
-      <Filter>include</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\include\atma\aligned_allocator.cppm">
-      <Filter>include</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\include\atma\memory.cppm">
-      <Filter>include</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\modules\atma\rope.cppm">
       <Filter>modules</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\include\atma\bind.cppm">
-      <Filter>include</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\modules\atma\intrusive_ptr.cppm">
+      <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\atma\aligned_allocator.cppm">
+      <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\atma\assert.cppm">
+      <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\atma\bind.cppm">
+      <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\atma\memory.cppm">
+      <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\atma\meta.cppm">
+      <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\atma\types.cppm">
+      <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\atma\vector.cppm">
       <Filter>modules</Filter>
     </ClCompile>
   </ItemGroup>
