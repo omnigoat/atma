@@ -4,9 +4,10 @@
 
 #include <atma/config/platform.hpp>
 #include <atma/assert.hpp>
-#include <atma/intrusive_ptr.hpp>
 
 #include <filesystem>
+
+import atma.intrusive_ptr;
 
 
 namespace stdfs = std::filesystem;

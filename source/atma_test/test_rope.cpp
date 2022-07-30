@@ -2,7 +2,6 @@
 #include <atma/utf/utf8_string.hpp>
 #include <atma/assert.hpp>
 #include <atma/rope.hpp>
-#include <atma/intrusive_ptr.hpp>
 #include <atma/ranges/core.hpp>
 #include <atma/algorithm.hpp>
 #include <atma/utf/utf8_string.hpp>
@@ -15,13 +14,37 @@
 import atma.bind;
 //import atma.rope;
 import atma.memory;
+import atma.intrusive_ptr;
 
 using test_rope_t = atma::basic_rope_t<atma::rope_test_traits>;
 
-int blam()
+int test()
 {
-	return std::max(4, 5);
+	using T = atma::rope_test_traits;
+	
+	//atma::_rope_::text_info_t ti;
+	//atma::_rope_::node_ptr<T> np;
+	//atma::enable_intrusive_ptr_make::template make<atma::_rope_::node_info_t<T>>(ti, np);
+
+	atma::_rope_::node_ptr<T>::make(atma::_rope_::node_type_t::leaf, 1u);
+
+#if 1
+	using goodrange = std::span<std::unique_ptr<int>>;
+	using badrange = std::span<atma::_rope_::node_ptr<T>>;
+
+	static_assert(std::ranges::range<goodrange>);
+
+	badrange yep;
+
+	(void)std::ranges::begin(yep);
+	(void)std::ranges::end(yep);
+
+	static_assert(std::ranges::range<badrange>);
+#endif
+
+	return 4;
 }
+
 
 SCENARIO("atma::rope's internal operations work")
 {
@@ -40,10 +63,27 @@ SCENARIO("atma::rope's internal operations work")
 	auto rhs_children = [&](auto&& x) { return children_of(x.right.value()); };
 	auto rhs_child_node = [&](auto&& x, size_t idx) -> decltype(auto) { return child_node_at(x.right.value(), idx); };
 
+	
+	//using Range = decltype(internal_node.children());
+	//using F = decltype(atma::bind_from<1>(&check_node<RT>, RT::minimum_branches));
+	//static_assert(!std::is_reference_v<Range>);
+#if 0
+	using goodrange = std::span<std::unique_ptr<int>>;
+	using badrange = std::span<atma::_rope_::node_ptr<T>>;
+
+	static_assert(std::ranges::range<goodrange>);
+
+	badrange yep;
+
+	(void)std::ranges::begin(yep);
+	(void)std::ranges::end(yep);
+
+	static_assert(std::ranges::range<badrange>);
+#endif
 
 
 
-
+#if 0
 	GIVEN("several leaf nodes (\"A\", \"B\", \"C\"...) and corresponding node-infos")
 	{
 		auto A = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("A", 1));
@@ -469,6 +509,7 @@ SCENARIO("atma::rope's internal operations work")
 			}
 		}
 	}
+#endif
 }
 
 SCENARIO("rope can be build from text")
@@ -522,6 +563,7 @@ SCENARIO("rope can be build from text")
 }
 
 
+#if 0
 SCENARIO("atma::rope equality operators function")
 {
 	GIVEN("a known passage as a char const*")
@@ -709,3 +751,4 @@ SCENARIO("rope can be inserted" * doctest::skip())
 		}
 	}
 }
+#endif
