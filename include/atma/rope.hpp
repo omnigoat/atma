@@ -4,7 +4,6 @@
 #include <atma/ranges/core.hpp>
 #include <atma/algorithm.hpp>
 #include <atma/utf/utf8_string.hpp>
-#include <atma/intrusive_ptr.hpp>
 
 #include <variant>
 #include <optional>
