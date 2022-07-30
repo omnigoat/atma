@@ -220,6 +220,9 @@
     <ClCompile Include="..\..\include\atma\bind.cppm">
       <Filter>include</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\modules\atma\intrusive_ptr.cppm">
+      <Filter>modules</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />

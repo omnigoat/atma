@@ -524,15 +524,15 @@ namespace atma { namespace unit_test {
 	{
 		struct event_t
 		{
-			event_t(canary_oper_t oper)
+			constexpr event_t(canary_oper_t oper)
 				: id(-1), oper(oper), payload(-1)
 			{}
 
-			event_t(int id, canary_oper_t oper)
+			constexpr event_t(int id, canary_oper_t oper)
 				: id(id), oper(oper), payload(-1)
 			{}
 
-			event_t(int id, canary_oper_t oper, int payload)
+			constexpr event_t(int id, canary_oper_t oper, int payload)
 				: id(id), oper(oper), payload(payload)
 			{}
 
@@ -680,7 +680,7 @@ namespace atma { namespace unit_test {
 
 			auto it = map.find(name);
 			if (it == map.end())
-				it = map.insert({name, std::make_pair(0, event_log_t{})}).first;
+				it = map.insert(std::make_pair(name, std::make_pair(0, event_log_t{}))).first;
 
 			return it;
 		}

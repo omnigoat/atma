@@ -1,9 +1,8 @@
 #pragma once
 
-#include <atma/intrusive_ptr.hpp>
-
 #include <memory>
 
+import atma.intrusive_ptr;
 
 namespace atma
 {
