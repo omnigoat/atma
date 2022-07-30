@@ -2,7 +2,6 @@
 module;
 
 #include <atma/assert.hpp>
-#include <atma/intrusive_ptr.hpp>
 #include <atma/ranges/core.hpp>
 #include <atma/algorithm.hpp>
 #include <atma/utf/utf8_string.hpp>
@@ -24,7 +23,7 @@ export module atma.rope;
 import atma.bind;
 import atma.types;
 import atma.memory;
-
+import atma.intrusive_ptr;
 
 
 
