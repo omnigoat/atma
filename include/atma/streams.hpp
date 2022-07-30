@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atma/intrusive_ptr.hpp>
 #include <atma/bitmask.hpp>
 #include <atma/event.hpp>
 
@@ -8,6 +7,7 @@
 
 import atma.types;
 import atma.memory;
+import atma.intrusive_ptr;
 
 namespace atma
 {

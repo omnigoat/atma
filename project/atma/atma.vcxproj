@@ -76,6 +76,7 @@
     </Natvis>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\modules\atma\intrusive_ptr.cppm" />
     <ClCompile Include="..\..\modules\atma\rope.cppm" />
     <ClCompile Include="..\..\source\include_guide.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>

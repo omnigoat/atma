@@ -1,3 +1,4 @@
+#if 0
 #pragma once
 
 #include <atomic>
@@ -15,8 +16,6 @@ namespace atma
 {
 	struct ref_counted
 	{
-		//virtual ~ref_counted() {}
-
 		template <typename T>
 		auto shared_from_this_as() -> intrusive_ptr<T>
 		{
@@ -24,13 +23,16 @@ namespace atma
 		}
 
 	protected:
-		ref_counted() : ref_count_() {}
+		ref_counted() = default;
+		~ref_counted() = default;
+
 		ref_counted(ref_counted const&) : ref_count_() {}
 
 	private:
 		mutable std::atomic_uint32_t ref_count_;
 
-		template <typename, typename> friend struct ref_counted_traits;
+		template <typename, typename>
+		friend struct ref_counted_traits;
 	};
 
 	template <typename T>
@@ -345,3 +347,5 @@ namespace atma
 	}
 }
 
+
+#endif
