@@ -214,7 +214,10 @@ namespace atma
 
 
 	//
-	//
+	// singular_result
+	// -----------------
+	//   returns a value if all elements in the range map to the same value,
+	//   otherwise returns empty
 	//
 	template <std::ranges::range Range, typename F>
 	requires std::is_invocable_v<F, std::ranges::range_value_t<Range>>

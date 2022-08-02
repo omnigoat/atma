@@ -3000,29 +3000,7 @@ namespace atma::_rope_
 				if (info.children < min_children)
 					return {false, 0};
 
-#if 0
-				using Range = decltype(internal_node.children());
-				using F = decltype(atma::bind_from<1>(&check_node<RT>, RT::minimum_branches));
-				static_assert(!std::is_reference_v<Range>);
-
-				using goodrange = std::span<std::unique_ptr<int>>;
-				using badrange = std::span<node_ptr<RT>>;
-
-				static_assert(std::ranges::range<goodrange>);
-
-				badrange yep;
-				(void)std::ranges::begin(yep);
-				(void)std::ranges::end(yep);
-				
-				static_assert(std::ranges::range<badrange>);
-#endif
-				
-#if 0
-
 				auto r = singular_result(internal_node.children(), atma::bind_from<1>(&check_node<RT>, RT::minimum_branches));
-				//auto tr = internal_node.children()
-				//	| std::ranges::views::transform(atma::bind_from<1>(&check_node<RT>, RT::minimum_branches));
-					
 
 				if (r.has_value())
 				{
@@ -3035,9 +3013,6 @@ namespace atma::_rope_
 					// indicate on which level things went wrong
 					return check_node_result_type{false, 1};
 				}
-#else
-				return {false, 0};
-#endif
 			},
 			[](node_leaf_t<RT> const& leaf) -> check_node_result_type
 			{
