@@ -83,7 +83,6 @@ SCENARIO("atma::rope's internal operations work")
 
 
 
-#if 0
 	GIVEN("several leaf nodes (\"A\", \"B\", \"C\"...) and corresponding node-infos")
 	{
 		auto A = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("A", 1));
@@ -509,7 +508,6 @@ SCENARIO("atma::rope's internal operations work")
 			}
 		}
 	}
-#endif
 }
 
 SCENARIO("rope can be build from text")
@@ -563,7 +561,6 @@ SCENARIO("rope can be build from text")
 }
 
 
-#if 0
 SCENARIO("atma::rope equality operators function")
 {
 	GIVEN("a known passage as a char const*")
@@ -751,4 +748,3 @@ SCENARIO("rope can be inserted" * doctest::skip())
 		}
 	}
 }
-#endif
