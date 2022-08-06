@@ -542,17 +542,15 @@ SCENARIO("rope can be build from text")
 
 		WHEN("we call build_rope_")
 		{
-			auto rope = atma::_rope_::build_rope_<atma::rope_test_traits>(atma::xfer_src(passage, passage_size));
+			auto node_info = atma::_rope_::build_rope_<atma::rope_test_traits>(atma::xfer_src(passage, passage_size));
 
-			THEN("the rope root node-info matches the passage")
+			THEN("the node-info matches the passage")
 			{
-				auto const& root = rope.root();
-
-				CHECK(root.bytes == passage_size);
-				CHECK(root.characters == passage_size);
-				CHECK(root.dropped_bytes == 0);
-				CHECK(root.dropped_characters == 0);
-				CHECK(root.line_breaks == 7);
+				CHECK(node_info.bytes == passage_size);
+				CHECK(node_info.characters == passage_size);
+				CHECK(node_info.dropped_bytes == 0);
+				CHECK(node_info.dropped_characters == 0);
+				CHECK(node_info.line_breaks == 7);
 			}
 		}
 	}
@@ -578,7 +576,8 @@ SCENARIO("atma::rope equality operators function")
 
 		AND_GIVEN("a rope constructed from that passage")
 		{
-			auto rope = atma::_rope_::build_rope_<atma::rope_test_traits>(atma::xfer_src(passage, passage_size));
+			//auto rope = atma::_rope_::build_rope_<atma::rope_test_traits>(atma::xfer_src(passage, passage_size));
+			test_rope_t rope{passage, passage_size};
 
 			THEN("the rope equates to the passage")
 			{
@@ -596,15 +595,15 @@ SCENARIO("atma::rope equality operators function")
 					"station. for your efforts you'll be rewarded \n"
 					"with a $50 gift-coupon that is redeemable at \n"
 					"any store within the food court.";
-
 				auto const passage2_size = strlen(passage2);
-				auto rope2 = atma::_rope_::build_rope_<atma::rope_test_traits>(atma::xfer_src(passage2, passage2_size));
 
-				WHEN("we insert the first word into the second passage, making both passages the same")
+				test_rope_t rope2{passage2, passage2_size};
+
+				WHEN("we insert the first word ('hello') into the second passage, making both passages the same")
 				{
 					rope2.insert(0, "hello", 5);
 
-					THEN("the two ropes equate to each other")
+					THEN("the two ropes are equal")
 					{
 						CHECK(rope == rope2);
 					}
@@ -677,7 +676,8 @@ SCENARIO("splitting")
 	
 		AND_GIVEN("a default-constructed rope of <4, 9>")
 		{
-			auto rope = atma::_rope_::build_rope_<atma::rope_basic_traits<4, 9>>(atma::xfer_src(passage, passage_size));
+			//auto rope = atma::_rope_::build_rope_<atma::rope_basic_traits<4, 9>>(atma::xfer_src(passage, passage_size));
+			atma::basic_rope_t<atma::rope_basic_traits<4, 9>> rope{passage, passage_size};
 
 			WHEN("we split the rope")
 			{
@@ -693,7 +693,8 @@ SCENARIO("splitting")
 
 		AND_GIVEN("a default-constructed rope of <8, 9>")
 		{
-			auto rope = atma::_rope_::build_rope_<atma::rope_basic_traits<8, 9>>(atma::xfer_src(passage, passage_size));
+			//auto rope = atma::_rope_::build_rope_<atma::rope_basic_traits<8, 9>>(atma::xfer_src(passage, passage_size));
+			atma::basic_rope_t<atma::rope_basic_traits<8, 9>> rope{ passage, passage_size };
 
 			WHEN("we split the rope")
 			{
