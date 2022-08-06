@@ -654,6 +654,7 @@ namespace atma
 	struct basic_rope_t
 	{
 		basic_rope_t();
+		basic_rope_t(char const*, size_t);
 
 		auto push_back(char const*, size_t) -> void;
 		auto insert(size_t char_idx, char const* str, size_t sz) -> void;
@@ -3060,7 +3061,7 @@ namespace atma::_rope_
 		void stack_push(level_stack_t& stack, uint32_t level, node_info_t<RT> const& insertee) const;
 		auto stack_finish(level_stack_t& stack) const -> node_info_t<RT>;
 
-		auto operator ()(src_buf_t str) const -> basic_rope_t<RT>;
+		auto operator ()(src_buf_t str) const -> node_info_t<RT>;
 	};
 
 	template <typename RT>
@@ -3180,7 +3181,7 @@ namespace atma::_rope_
 	}
 
 	template <typename RT>
-	inline auto build_rope_t_<RT>::operator ()(src_buf_t str) const -> basic_rope_t<RT>
+	inline auto build_rope_t_<RT>::operator ()(src_buf_t str) const -> node_info_t<RT>
 	{
 		// remove null terminator if necessary
 		if (str[str.size() - 1] == '\0')
@@ -3204,8 +3205,7 @@ namespace atma::_rope_
 
 		// stack fixup
 		auto r = stack_finish(stack);
-		basic_rope_t<RT> result{r};
-		return result;
+		return r;
 	}
 }
 
@@ -3353,7 +3353,7 @@ namespace atma::_rope_
 			size_t candidate_split_idx = std::min(str.size(), RT::buf_size);
 			auto split_idx = find_split_point(str, candidate_split_idx, split_bias::hard_left);
 
-			auto leaf_text = str.take(split_idx);
+			auto leaf_text = str.to(split_idx);
 			str = str.skip(split_idx);
 
 			if (root.node == node_ptr<RT>::null)
@@ -3419,6 +3419,11 @@ namespace atma
 	template <typename RT>
 	inline basic_rope_t<RT>::basic_rope_t()
 		: root_(_rope_::make_leaf_ptr<RT>())
+	{}
+
+	template <typename RT>
+	inline basic_rope_t<RT>::basic_rope_t(char const* passage, size_t passage_size)
+		: root_{_rope_::build_rope_<RT>(xfer_src(passage, passage_size))}
 	{}
 
 	template <typename RT>
@@ -3523,14 +3528,14 @@ namespace atma
 		else
 		{
 			auto [depth, left, right] = _rope_::split(_rope_::tree_t<RT>{root_}, char_idx);
-			auto ins = _rope_::build_rope_<RT>(xfer_src(str, sz));
+			auto ins_node_info = _rope_::build_rope_<RT>(xfer_src(str, sz));
 
 			//std::cout << "left:>" << basic_rope_t{left.info()} << "<\n\n" << std::endl;
 			//std::cout << "right:>" << basic_rope_t{right.info()} << "<\n\n" << std::endl;
 
 			auto tr1 = _rope_::tree_concat_<RT>(
 				_rope_::tree_t<RT>{left.info()},
-				_rope_::tree_t<RT>{ins.root()});
+				_rope_::tree_t<RT>{ins_node_info});
 
 			auto tr2 = _rope_::tree_concat_<RT>(
 				tr1,
