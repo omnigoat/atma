@@ -3422,8 +3422,8 @@ namespace atma
 	{}
 
 	template <typename RT>
-	inline basic_rope_t<RT>::basic_rope_t(char const* passage, size_t passage_size)
-		: root_{_rope_::build_rope_<RT>(xfer_src(passage, passage_size))}
+	inline basic_rope_t<RT>::basic_rope_t(char const* string, size_t size)
+		: root_{_rope_::build_rope_<RT>(xfer_src(string, size))}
 	{}
 
 	template <typename RT>
