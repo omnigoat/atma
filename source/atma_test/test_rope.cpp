@@ -16,34 +16,33 @@ import atma.bind;
 import atma.memory;
 import atma.intrusive_ptr;
 
-using test_rope_t = atma::basic_rope_t<atma::rope_test_traits>;
 
-int test()
+namespace
 {
-	using T = atma::rope_test_traits;
-	
-	//atma::_rope_::text_info_t ti;
-	//atma::_rope_::node_ptr<T> np;
-	//atma::enable_intrusive_ptr_make::template make<atma::_rope_::node_info_t<T>>(ti, np);
+	using test_rope_t = atma::basic_rope_t<atma::rope_test_traits>;
 
-	atma::_rope_::node_ptr<T>::make(atma::_rope_::node_type_t::leaf, 1u);
+	char const* passage =
+		"hello there, this is your captain speaking.  \n"
+		"unfortunately we forgot to fill up the plane \n"
+		"before takeoff. sorry for the inconvenience, \n"
+		"but I'm going to need some upstanding people \n"
+		"to get out and push us to the closest petrol \n"
+		"station. for your efforts you'll be rewarded \n"
+		"with a $50 gift-coupon that is redeemable at \n"
+		"any store within the food court.\n";
 
-#if 1
-	using goodrange = std::span<std::unique_ptr<int>>;
-	using badrange = std::span<atma::_rope_::node_ptr<T>>;
+	size_t const passage_size = strlen(passage);
+	size_t const passage_line_breaks = 8;
 
-	static_assert(std::ranges::range<goodrange>);
-
-	badrange yep;
-
-	(void)std::ranges::begin(yep);
-	(void)std::ranges::end(yep);
-
-	static_assert(std::ranges::range<badrange>);
-#endif
-
-	return 4;
+	auto const* insert_fragment =
+		"\n"
+		"haha just kidding. what I actually need is \n"
+		"for everyone to get under the plane and blow \n"
+		"upwards to keep us flying. ";
+	auto const insert_fragment_size = strlen(insert_fragment);
 }
+
+
 
 
 SCENARIO("atma::rope's internal operations work")
@@ -62,25 +61,6 @@ SCENARIO("atma::rope's internal operations work")
 	auto rhs_internal_node = [&](auto&& x) -> decltype(auto) { return internal_node_of(x.right.value()); };
 	auto rhs_children = [&](auto&& x) { return children_of(x.right.value()); };
 	auto rhs_child_node = [&](auto&& x, size_t idx) -> decltype(auto) { return child_node_at(x.right.value(), idx); };
-
-	
-	//using Range = decltype(internal_node.children());
-	//using F = decltype(atma::bind_from<1>(&check_node<RT>, RT::minimum_branches));
-	//static_assert(!std::is_reference_v<Range>);
-#if 0
-	using goodrange = std::span<std::unique_ptr<int>>;
-	using badrange = std::span<atma::_rope_::node_ptr<T>>;
-
-	static_assert(std::ranges::range<goodrange>);
-
-	badrange yep;
-
-	(void)std::ranges::begin(yep);
-	(void)std::ranges::end(yep);
-
-	static_assert(std::ranges::range<badrange>);
-#endif
-
 
 
 	GIVEN("several leaf nodes (\"A\", \"B\", \"C\"...) and corresponding node-infos")
@@ -510,24 +490,8 @@ SCENARIO("atma::rope's internal operations work")
 	}
 }
 
-namespace
-{
-	char const* passage = 
-		"hello there, this is your captain speaking.  \n"
-		"unfortunately we forgot to fill up the plane \n"
-		"before takeoff. sorry for the inconvenience, \n"
-		"but I'm going to need some upstanding people \n"
-		"to get out and push us to the closest petrol \n"
-		"station. for your efforts you'll be rewarded \n"
-		"with a $50 gift-coupon that is redeemable at \n"
-		"any store within the food court.";
 
-	size_t const passage_size = strlen(passage);
-}
-
-
-
-SCENARIO("rope can be build from text")
+SCENARIO("internal rope-building routines are called")
 {
 	GIVEN("our test passage of text")
 	{
@@ -541,7 +505,7 @@ SCENARIO("rope can be build from text")
 				CHECK(node_info.characters == passage_size);
 				CHECK(node_info.dropped_bytes == 0);
 				CHECK(node_info.dropped_characters == 0);
-				CHECK(node_info.line_breaks == 7);
+				CHECK(node_info.line_breaks == passage_line_breaks);
 			}
 		}
 
@@ -555,13 +519,35 @@ SCENARIO("rope can be build from text")
 				CHECK(node_info.characters == passage_size);
 				CHECK(node_info.dropped_bytes == 0);
 				CHECK(node_info.dropped_characters == 0);
-				CHECK(node_info.line_breaks == 7);
+				CHECK(node_info.line_breaks == passage_line_breaks);
 			}
 		}
 	}
 }
 
 
+
+//
+// construction
+//
+SCENARIO("user constructs a rope")
+{
+	WHEN("a rope is default-constructed")
+	{
+		test_rope_t rope;
+
+		THEN("it is considered empty")
+		{
+			CHECK(rope.size() == 0);
+			CHECK(rope.size_bytes() == 0);
+		}
+	}
+}
+
+
+//
+//  equality operator
+//
 SCENARIO("user invokes operator == with arguments (rope, char const*)")
 {
 	GIVEN("a known passage as a char const*")
@@ -616,39 +602,33 @@ SCENARIO("user invokes operator == with arguments (rope, rope)")
 			CHECK_FALSE(rope1 == rope2);
 		}
 	}
-}
 
-
-SCENARIO("user compares rope against equal rope constructed differently")
-{
-	GIVEN("a known passage as a char const*")
-	AND_GIVEN("a second passage the same as the first, but missing the first word")
+	GIVEN("a rope constructed from a known passage")
+	AND_GIVEN("a second rope constructed from the same passage, but missing the first word")
 	{
 		// +5 to skip "hello"
 		char const* passage2 = passage + 5;
 		auto const passage2_size = strlen(passage2);
 
-		AND_GIVEN("two ropes, each constructed from their respective passage")
+		test_rope_t rope1{passage, passage_size};
+		test_rope_t rope2{passage2, passage2_size};
+
+		WHEN("we insert the missing first word into the second rope, making both ropes lexicographically equivalent")
 		{
-			test_rope_t rope{passage, passage_size};
-			test_rope_t rope2{passage2, passage2_size};
+			rope2.insert(0, "hello", 5);
 
-			WHEN("we insert the missing first word into the second rope, making both ropes semantically the same")
+			AND_WHEN("the two ropes are compared with the equality operator")
+			THEN("they evaluate as equal")
 			{
-				rope2.insert(0, "hello", 5);
-
-				THEN("the two ropes will evaluate as equal")
-				{
-					CHECK(rope == rope2);
-				}
+				CHECK(rope1 == rope2);
 			}
 		}
 	}
 }
 
-
-
-
+//
+// insertion
+//
 #if 0
 SCENARIO("inserting")
 {
@@ -691,38 +671,39 @@ SCENARIO("inserting")
 
 
 
-SCENARIO("splitting")
+SCENARIO("user calls rope_t::split at a valid index")
 {
-	GIVEN("a standard passage")
+	GIVEN("a rope of traits <4, 9> constructed from a passage")
 	{
-		AND_GIVEN("a default-constructed rope of <4, 9>")
+		atma::basic_rope_t<atma::rope_basic_traits<4, 9>> rope{passage, passage_size};
+
+		WHEN("we split the rope at any index")
 		{
-			//auto rope = atma::_rope_::build_rope_<atma::rope_basic_traits<4, 9>>(atma::xfer_src(passage, passage_size));
-			atma::basic_rope_t<atma::rope_basic_traits<4, 9>> rope{passage, passage_size};
-
-			WHEN("we split the rope")
+			for (int i = 0; i != passage_size; ++i)
 			{
-				for (int i = 0; i != passage_size; ++i)
-				{
-					auto [left, right] = rope.split(i);
+				auto [left, right] = rope.split(i);
 
+				THEN("both resultant parts are valid ropes")
+				{
 					CHECK(atma::_rope_::validate_rope_(left.root()));
 					CHECK(atma::_rope_::validate_rope_(right.root()));
 				}
 			}
 		}
+	}
 
-		AND_GIVEN("a default-constructed rope of <8, 9>")
+	GIVEN("a rope of traits <8, 9> constructed from a passage")
+	{
+		atma::basic_rope_t<atma::rope_basic_traits<8, 9>> rope{passage, passage_size};
+
+		WHEN("we split the rope at any index")
 		{
-			//auto rope = atma::_rope_::build_rope_<atma::rope_basic_traits<8, 9>>(atma::xfer_src(passage, passage_size));
-			atma::basic_rope_t<atma::rope_basic_traits<8, 9>> rope{ passage, passage_size };
-
-			WHEN("we split the rope")
+			for (int i = 0; i != passage_size; ++i)
 			{
-				for (int i = 0; i != passage_size; ++i)
-				{
-					auto [left, right] = rope.split(i);
+				auto [left, right] = rope.split(i);
 
+				THEN("both resultant parts are valid ropes")
+				{
 					CHECK(atma::_rope_::validate_rope_(left.root()));
 					CHECK(atma::_rope_::validate_rope_(right.root()));
 				}
