@@ -668,7 +668,7 @@ namespace atma
 
 		// size in characters
 		auto size() const -> size_t { return root_.characters; }
-		auto size_byte() const -> size_t { return root_.bytes - root_.dropped_bytes; }
+		auto size_bytes() const -> size_t { return root_.bytes - root_.dropped_bytes; }
 
 		auto operator == (std::string_view) const -> bool;
 
