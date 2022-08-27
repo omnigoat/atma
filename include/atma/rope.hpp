@@ -120,7 +120,7 @@ namespace atma::_rope_
 //
 namespace atma
 {
-	template <size_t BranchingFactor, size_t BufferSize>
+	template <size_t BranchingFactor, size_t BufferSize, bool Debug = false>
 	struct rope_basic_traits
 	{
 		// how many children an internal node has
@@ -130,14 +130,32 @@ namespace atma
 
 		// rope-buffer size
 		constexpr static size_t const buf_size = BufferSize;
-
+		
 		constexpr static size_t buf_edit_max_size = buf_size - 2;
 		constexpr static size_t buf_edit_split_size = (buf_size / 2) - (buf_size / 32);
 		constexpr static size_t buf_edit_split_drift_size = (buf_size / 32);
+
+		constexpr static bool const debug_internal_validation = Debug;
 	};
 
 	using rope_default_traits = rope_basic_traits<4, 512>;
-	using rope_test_traits = rope_basic_traits<4, 9>;
+	using rope_test_traits = rope_basic_traits<4, 9, true>;
+}
+
+namespace atma::_rope_
+{
+	template <typename RT, typename = std::void_t<>>
+	struct debug_internal_validation_t
+		: std::false_type
+	{};
+
+	template <typename RT>
+	struct debug_internal_validation_t<RT, std::void_t<decltype(RT::debug_internal_validation)>>
+		: std::integral_constant<bool, RT::debug_internal_validation>
+	{};
+
+	template <typename RT>
+	inline constexpr bool debug_internal_validation_v = debug_internal_validation_t<RT>::value;
 }
 
 
@@ -581,6 +599,12 @@ namespace atma::_rope_
 	};
 
 
+	// deduction guides
+	template <typename RT>
+	tree_t(node_info_t<RT> const&) -> tree_t<RT>;
+
+	template <typename RT>
+	tree_t(node_ptr<RT> const&) -> tree_t<RT>;
 
 
 	template <typename RT>
@@ -2350,7 +2374,7 @@ namespace atma::_rope_
 		//     c) with the result from our recursion, call up_fn and return that as the result
 		//     d) fin.
 		//
-		return tree.info().node->visit(
+		return tree.node().visit(
 			[&](node_internal_t<RT>& x)
 			{
 				auto [child_idx, child_info, data_prime] = navigate_to_leaf_selection_selector_(
@@ -2641,21 +2665,21 @@ namespace atma::_rope_
 		// this also means for some of our shortcut algorithms where we return a sub-child
 		// node we are not breaking our recursive algorithm
 		//
-		if constexpr (false)
+		if constexpr (debug_internal_validation_v<RT>)
 		{
-			if (split_left.info && (*split_left.info).node->is_internal())
+			if (split_left.info().node && split_left.node().is_internal())
 			{
-				auto const& lin = split_left.info->node->as_branch();
-				for (auto const& x : lin.children())
+				auto const& left_branch = split_left.node().as_branch();
+				for (auto const& x : left_branch.children())
 				{
 					ATMA_ASSERT(validate_rope_.internal_node(x));
 				}
 			}
 
-			if (split_right.info && (*split_right.info).node->is_internal())
+			if (split_right.info().node && split_right.node().is_internal())
 			{
-				auto const& lin = split_right.info->node->as_branch();
-				for (auto const& x : lin.children())
+				auto const& right_branch = split_right.node().as_branch();
+				for (auto const& x : right_branch.children())
 				{
 					ATMA_ASSERT(validate_rope_.internal_node(x));
 				}
@@ -3434,6 +3458,9 @@ namespace atma
 	template <typename RT>
 	inline auto basic_rope_t<RT>::operator == (std::string_view string) const -> bool
 	{
+		if (this->size() == 0)
+			return string.empty();
+
 		auto iter = basic_rope_char_iterator_t<RT>{*this};
 
 		auto blah = utf8_const_range_t{string.begin(), string.end()};
@@ -3516,6 +3543,7 @@ namespace atma
 		{
 			edit_result = _rope_::insert(char_idx, root_, xfer_src(str, sz));
 		}
+#if 0
 		else if (sz <= RT::buf_edit_max_size * 6)
 		{
 			// chunkify
@@ -3525,23 +3553,54 @@ namespace atma
 
 			}
 		}
+#endif
 		else
 		{
-			auto [depth, left, right] = _rope_::split(_rope_::tree_t<RT>{root_}, char_idx);
-			auto ins_node_info = _rope_::build_rope_<RT>(xfer_src(str, sz));
+			// this is a "big" string, so:
+			//  a) build a rope from the big string
+			//  b) split us (the tree) in twain
+			//  c) concatenate the ropes together
+			//
+			// optimizations provided for when we're inserting at the front or at the end
+			
+			auto ins_rope_info = _rope_::build_rope_<RT>(xfer_src(str, sz));
 
-			//std::cout << "left:>" << basic_rope_t{left.info()} << "<\n\n" << std::endl;
-			//std::cout << "right:>" << basic_rope_t{right.info()} << "<\n\n" << std::endl;
+			if (char_idx == 0)
+			{
+				//root_
+				auto r = _rope_::tree_concat_<RT>(
+					_rope_::tree_t{ins_rope_info},
+					_rope_::tree_t{root_});
 
-			auto tr1 = _rope_::tree_concat_<RT>(
-				_rope_::tree_t<RT>{left.info()},
-				_rope_::tree_t<RT>{ins_node_info});
+				if constexpr (_rope_::debug_internal_validation_v<RT>)
+				{
+					ATMA_ASSERT(atma::_rope_::validate_rope_(r.info()));
+				}
 
-			auto tr2 = _rope_::tree_concat_<RT>(
-				tr1,
-				right.info());
+				edit_result.left = r.info();
+			}
+			else if (char_idx == root_.characters)
+			{
+				auto r = _rope_::tree_concat_<RT>(
+					_rope_::tree_t{root_},
+					_rope_::tree_t{ins_rope_info});
 
-			edit_result.left = tr2.info();
+				edit_result.left = r.info();
+			}
+			else
+			{
+				auto [depth, left, right] = _rope_::split(_rope_::tree_t{root_}, char_idx);
+
+				auto r1 = _rope_::tree_concat_<RT>(
+					_rope_::tree_t{left.info()},
+					_rope_::tree_t{ins_rope_info});
+
+				auto r2 = _rope_::tree_concat_<RT>(
+					r1,
+					right.info());
+
+				edit_result.left = r2.info();
+			}
 		}
 
 		if (edit_result.right.has_value())
