@@ -629,44 +629,23 @@ SCENARIO("user invokes operator == with arguments (rope, rope)")
 //
 // insertion
 //
-#if 0
-SCENARIO("inserting")
+SCENARIO("user calls rope_t::insert")
 {
 	GIVEN("a default-constructed rope")
 	{
-		char const* passage =
-			"hello there, this is your captain speaking.  \n"
-			"unfortunately we forgot to fill up the plane \n"
-			"before takeoff. sorry for the inconvenience, \n"
-			"but I'm going to need some upstanding people \n"
-			"to get out and push us to the closest petrol \n"
-			"station. for your efforts you'll be rewarded \n"
-			"with a $50 gift-coupon that is redeemable at \n"
-			"any store within the food court.";
-		auto const passage_size = strlen(passage);
+		test_rope_t rope;
 
-		auto const* insert = 
-			"haha just kidding. what I actually need is \n"
-			"for everyone to get under the plane and blow \n"
-			"upwards to keep us flying. ";
-		auto const insert_size = strlen(insert);
-
-		using rope_test_traits_2 = atma::rope_basic_traits<8, 9>;
-
-		auto rope = atma::_rope_::build_rope_<rope_test_traits_2>(atma::xfer_src(passage, passage_size));
-
-		WHEN("we split the rope")
+		WHEN("rope_t::insert is called with a known passage at index 0")
 		{
-			rope.insert(239, insert, insert_size);
+			rope.insert(0, passage, passage_size);
 
-			//THEN("something something")
-			//{
-			//	std::cout << rope << std::endl;
-			//}
+			THEN("the rope will compare as equal to the passage")
+			{
+				CHECK(rope == passage);
+			}
 		}
 	}
 }
-#endif
 
 
 
