@@ -683,6 +683,8 @@ namespace atma
 		auto push_back(char const*, size_t) -> void;
 		auto insert(size_t char_idx, char const* str, size_t sz) -> void;
 
+		auto erase(size_t char_idx, size_t size_in_chars) -> void;
+
 		auto split(size_t char_idx) const -> std::tuple<basic_rope_t<RopeTraits>, basic_rope_t<RopeTraits>>;
 
 		template <typename F>
@@ -2509,9 +2511,6 @@ namespace atma::_rope_
 			mended_children[3] = std::get<1>(*maybe_mended_right_nodes);
 		}
 
-		node_info_t<RT>       result_lhs_info;
-		maybe_node_info_t<RT> result_rhs_info;
-
 		auto blah = replace_and_insert_(branch, child_idx, left_info, maybe_right_info);
 
 		return {blah.left, blah.right, mended_left_seam | mended_right_seam};
@@ -2695,19 +2694,14 @@ namespace atma::_rope_
 			if (split_right.is_saturated() && split_right.height() == orig_height)
 			{
 				// optimization: if split_right is a valid child-node, just change idx 0 to split_right
+				auto right = replace_(dest, split_idx, split_right);
 
-				auto right = replace_(tree_t<RT>{dest}, split_idx, split_right);
 				return {our_height, split_left, right};
 			}
 			else
 			{
-				auto rhs_children = node_split_across_rhs_<RT>(
-					dest,
-					split_idx);
-
-				auto right = tree_concat_<RT>(
-					split_right,
-					rhs_children);
+				auto rhs_children = node_split_across_rhs_(dest, split_idx);
+				auto right = tree_concat_(split_right, rhs_children);
 
 				return {our_height, split_left, right};
 			}
@@ -2718,19 +2712,14 @@ namespace atma::_rope_
 			{
 				// optimization: if split_left is a valid child-node, just replace
 				// the last node of our children to split_left
+				auto left = replace_(dest, split_idx, split_left);
 
-				auto left = replace_(tree_t<RT>{dest}, split_idx, split_left);
 				return {our_height, left, split_right};
 			}
 			else
 			{
-				auto lhs_children = node_split_across_lhs_<RT>(
-					dest,
-					split_idx);
-
-				auto left = tree_concat_<RT>(
-					lhs_children,
-					split_left);
+				auto lhs_children = node_split_across_lhs_(dest, split_idx);
+				auto left = tree_concat_(lhs_children, split_left);
 
 				return {our_height, left, split_right};
 			}
@@ -2877,24 +2866,18 @@ namespace atma::_rope_
 
 namespace atma::_rope_
 {
-#define ATMA_ROPE_ASSERT_LEAF_INFO_AND_BUF_IN_SYNC(info, buf) \
-	do { \
-		ATMA_ASSERT((info).dropped_bytes + (info).bytes == (buf).size()); \
-	} while(0)
-
-
 	template <typename RT>
 	inline auto drop_lf_(tree_leaf_t<RT> const& leaf, size_t) -> maybe_node_info_t<RT>
 	{
-		//ATMA_ROPE_ASSERT_LEAF_INFO_AND_BUF_IN_SYNC(leaf_info, leaf.buf);
+		ATMA_ASSERT(!leaf.data().empty());
 
-		if (leaf.data()[0] == charcodes::lf)
+		if (leaf.data().front() == charcodes::lf)
 		{
 			ATMA_ASSERT(leaf.info().line_breaks > 0);
 
 			auto result = leaf.info()
 				+ text_info_t{.dropped_bytes = 1, .dropped_characters = 1}
-			- text_info_t{.bytes = 1, .characters = 1, .line_breaks = 1};
+				- text_info_t{.bytes = 1, .characters = 1, .line_breaks = 1};
 
 			return {result};
 		}
@@ -2907,8 +2890,6 @@ namespace atma::_rope_
 	template <typename RT>
 	inline auto append_lf_(tree_leaf_t<RT> const& leaf, size_t) -> maybe_node_info_t<RT>
 	{
-		//ATMA_ROPE_ASSERT_LEAF_INFO_AND_BUF_IN_SYNC(leaf_info, leaf.buf);
-
 		// validate assumptions:
 		// 
 		//  - we have a cr character at the end of our buffer
@@ -3616,6 +3597,15 @@ namespace atma
 		{
 			root_ = edit_result.left;
 		}
+	}
+
+	template <typename RT>
+	inline auto basic_rope_t<RT>::erase(size_t char_idx, size_t size_in_chars) -> void
+	{
+		// the easiest implementation is to split the tree twice, once at each character location
+		//
+		// but is this the best implementation?
+
 	}
 
 	template <typename RT>
