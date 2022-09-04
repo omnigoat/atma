@@ -401,7 +401,7 @@ namespace atma::_rope_
 	{
 		node_t(node_type_t, uint32_t height);
 
-		constexpr bool is_internal() const;
+		constexpr bool is_branch() const;
 		constexpr bool is_leaf() const;
 
 		auto as_branch() -> node_internal_t<RT>&;
@@ -1425,7 +1425,7 @@ namespace atma::_rope_
 	}
 
 	template <typename RT>
-	inline constexpr bool node_t<RT>::is_internal() const
+	inline constexpr bool node_t<RT>::is_branch() const
 	{
 		return node_type_ == node_type_t::branch;
 	}
@@ -1777,7 +1777,7 @@ namespace atma::_rope_
 	template <typename RT>
 	inline auto replace_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& repl_info) -> node_info_t<RT>
 	{
-		ATMA_ASSERT(dest.node->is_internal(), "replace_: called on non-internal node");
+		ATMA_ASSERT(dest.node->is_branch(), "replace_: called on non-internal node");
 		ATMA_ASSERT(idx < dest.children, "replace_: index out of bounds");
 
 		auto& dest_node = dest.node->as_branch();
@@ -1813,7 +1813,7 @@ namespace atma::_rope_
 	template <typename RT>
 	inline auto append_(node_info_t<RT> const& dest, node_info_t<RT> const& insertee) -> node_info_t<RT>
 	{
-		ATMA_ASSERT(dest.node->is_internal(), "append_: called on non-internal node");
+		ATMA_ASSERT(dest.node->is_branch(), "append_: called on non-internal node");
 		ATMA_ASSERT(dest.children < RT::branching_factor, "append_: insufficient space");
 
 		auto& dest_node = dest.node->as_branch();
@@ -1976,7 +1976,7 @@ namespace atma::_rope_
 	template <typename RT>
 	inline auto replace_and_insert_(node_info_t<RT> const& dest, size_t idx, node_info_t<RT> const& repl_info, maybe_node_info_t<RT> const& maybe_ins_info) -> insert_result_t<RT>
 	{
-		ATMA_ASSERT(dest.node->is_internal());
+		ATMA_ASSERT(dest.node->is_branch());
 
 		auto& dest_node = dest.node->as_branch();
 		ATMA_ASSERT(idx < dest_node.children().size(), "index for replacement out of bounds");
@@ -2678,7 +2678,7 @@ namespace atma::_rope_
 		//
 		if constexpr (debug_internal_validation_v<RT>)
 		{
-			if (split_left.info().node && split_left.node().is_internal())
+			if (split_left.info().node && split_left.node().is_branch())
 			{
 				auto const& left_branch = split_left.node().as_branch();
 				for (auto const& x : left_branch.children())
@@ -2687,7 +2687,7 @@ namespace atma::_rope_
 				}
 			}
 
-			if (split_right.info().node && split_right.node().is_internal())
+			if (split_right.info().node && split_right.node().is_branch())
 			{
 				auto const& right_branch = split_right.node().as_branch();
 				for (auto const& x : right_branch.children())
@@ -2774,44 +2774,124 @@ namespace atma::_rope_
 namespace atma::_rope_
 {
 	template <typename RT>
-	auto erase(tree_t<RT> const& tree, size_t char_idx, size_t size_in_chars) -> edit_result_t<RT>
+	auto erase(tree_t<RT> const& tree, size_t char_idx, size_t size_in_chars) -> erase_result_t<RT>
 	{
-		return erase_(tree, char_idx, size_in_chars);
+		return erase_(tree, char_idx, char_idx + size_in_chars);
 	}
 
 	template <typename RT>
-	auto erase_(tree_t<RT> const& tree, size_t rel_char_idx, size_t rel_size_in_chars) -> edit_result_t<RT>
+	auto erase_(tree_t<RT> const& tree, size_t rel_char_idx, size_t rel_char_end_idx) -> erase_result_t<RT>
 	{
-		// we're a leaf, we need to split our buffer
-		if (tree.node()->is_branch())
+		// branches need to navigate to the correct children
+		if (tree.node().is_branch())
 		{
-			
+			auto const& branch = tree.as_branch();
+
+			ATMA_ASSERT(rel_char_idx < branch.info().characters);
+			ATMA_ASSERT(rel_char_end_idx < branch.info().characters);
+
+			// find begin & end children
+			auto [start_child_idx, start_char_idx] = find_for_char_idx(branch.node(), rel_char_idx);
+			auto [end_child_idx, end_char_idx] = find_for_char_idx(branch.node(), rel_char_end_idx);
+
+
+			// case 1: the section to erase is entirely within one child
+			if (start_child_idx == end_child_idx)
+			{
+				auto [result_lhs, result_rhs] = erase_(tree_t<RT>{
+					branch.children()[start_child_idx]},
+					start_char_idx, end_char_idx);
+
+				if (result_lhs)
+				{
+					auto [ins_lhs, ins_rhs] = replace_and_insert_(branch, start_child_idx, *result_lhs, result_rhs);
+					return {ins_lhs, ins_rhs};
+				}
+				else
+				{
+					ATMA_ASSERT(result_rhs);
+					auto result = replace_(branch, start_child_idx, *result_rhs);
+					return {result};
+				}
+			}
+			// case 2: what to delete spans more than one child
+			else
+			{
+				auto const& start_child = tree_t<RT>{branch.children()[start_child_idx]};
+				auto const& end_child = tree_t<RT>{tree.children()[end_child_idx]};
+
+				// what we need to do is the following:
+				//   1) recurse into the two children in question
+				//   2) delete all intervening children
+				//   3) recreate the node with the remnants of the two nodes
+				//
+				// note: because the range of characters to delete is crossing the boundary
+				//       of child nodes, we can guarantee that neither result of our recursion
+				//       into our two children endpoints will not return two parts, as the
+				//       range of characters extends fully past one of their ends. they *may*
+				//       return zero parts, if the full buffer was erased.
+				//
+				//       this means we can never have more nodes than previously,
+				//       which simplifies our upwards stitching.
+
+
+				// erase at the start of the range
+				auto [start_lhs, start_rhs] = erase_(
+					start_child,
+					start_char_idx, start_child.info().characters);
+
+				// erase at the end
+				auto [end_lhs, end_rhs] = erase_(
+					end_child,
+					0u, end_char_idx);
+				
+				auto new_branch = make_internal_ptr<RT>(branch.height(),
+					xfer_src(branch.children()).to(start_child_idx),
+					start_lhs, start_rhs,
+					end_lhs, end_rhs,
+					xfer_src(branch.children()).from(end_child_idx + 1));
+
+				return {new_branch};
+			}
 		}
+		// we're a leaf, we need to split our buffer
 		else
 		{
+			auto const& leaf = tree.as_leaf();
+
 			// case 1: the whole node is deleted
-			if (rel_char_idx == 0 && rel_size_in_chars == tree.info().characters)
+			if (rel_char_idx == 0 && rel_char_end_idx == tree.info().characters)
 			{
 				return {};
 			}
 			// case 2: there's leftover bits on the lhs
-			else if (rel_char_idx > 0 && (rel_char_idx + rel_size_in_chars) == tree.info().characters)
+			//   - split buffer & return lhs
+			else if (rel_char_idx > 0 && rel_char_end_idx == tree.info().characters)
 			{
-				// split buffer & return lhs
-				auto const& leaf = tree.as_leaf();
-				auto new_data = leaf.data().take(rel_char_idx);
-				auto lhs = make_leaf_ptr<RT>(new_data);
-				return {lhs};
+				auto byte_idx = leaf.byte_idx_from_char_idx(rel_char_idx);
+				auto lhs = make_leaf_ptr<RT>(leaf.data().take(byte_idx));
+				return {lhs, {}};
 			}
 			// case 3: there's leftover bits on the rhs
-			else if (rel_char_idx == 0 && rel_size_in_chars < tree.info().characters)
+			//  - split buffer & return rhs
+			else if (rel_char_idx == 0 && rel_char_end_idx < tree.info().characters)
 			{
-				// split buffer & return rhs
+				auto byte_idx = leaf.byte_idx_from_char_idx(rel_char_end_idx);
+				auto rhs = make_leaf_ptr<RT>(leaf.data().from(byte_idx));
+				return {{}, rhs};
 			}
 			// case 4: this delete operation is fully within this buffer
+			//  - recreate the buffer without the missing bit and return the node
 			else
 			{
-				// split buffer & return the leftover bits on both lhs & rhs
+				auto start_byte_idx = leaf.byte_idx_from_char_idx(rel_char_idx);
+				auto end_byte_idx = leaf.byte_idx_from_char_idx(rel_char_end_idx);
+
+				auto new_leaf = make_leaf_ptr<RT>(
+					leaf.data().take(start_byte_idx),
+					leaf.data().from(end_byte_idx));
+
+				return {new_leaf};
 			}
 		}
 	}
@@ -3357,7 +3437,7 @@ namespace atma::_rope_
 				ATMA_ASSERT(children.size() >= RT::branching_factor / 2);
 
 				// recurse if our right-most child is an internal node
-				if (auto const& last = children[children.size() - 1]; last.node->is_internal())
+				if (auto const& last = children[children.size() - 1]; last.node->is_branch())
 				{
 					auto [left, maybe_right] = append_node_(last, ins);
 					return replace_and_insert_(dest, children.size() - 1, left, maybe_right);
@@ -3665,7 +3745,23 @@ namespace atma
 		// the easiest implementation is to split the tree twice, once at each character location
 		//
 		// but is this the best implementation?
+		auto [left, right] = _rope_::erase(_rope_::tree_t<RT>{root_}, char_idx, size_in_chars);
 
+		ATMA_ASSERT(left, "erase_result_t must return at least the lhs");
+
+		if (right.has_value())
+		{
+			(_rope_::text_info_t&)root_ = *left + *right;
+
+			root_.node = _rope_::make_internal_ptr<RT>(
+				left->node->height() + 1,
+				*left,
+				*right);
+		}
+		else
+		{
+			root_ = *left;
+		}
 	}
 
 	template <typename RT>
@@ -3763,7 +3859,7 @@ namespace atma::_rope_
 	inline basic_leaf_iterator_t<RT>::basic_leaf_iterator_t(basic_rope_t<RT> const& rope)
 	{
 		tree_stack_.push_back({rope.root(), 0});
-		while (std::get<0>(tree_stack_.back()).children()[0].node->is_internal())
+		while (std::get<0>(tree_stack_.back()).children()[0].node->is_branch())
 		{
 			tree_stack_.push_back({std::get<0>(tree_stack_.back()).children().front(), 0});
 		}
@@ -3802,7 +3898,7 @@ namespace atma::_rope_
 		ATMA_ASSERT(!tree_stack_.empty() && std::get<0>(tree_stack_.back()).info().node.get());
 
 		// walk back down
-		while (get_deepest_child().node->is_internal())
+		while (get_deepest_child().node->is_branch())
 		{
 			auto child = get_deepest_child();
 			tree_stack_.push_back({child, 0});
