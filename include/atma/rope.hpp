@@ -943,9 +943,6 @@ namespace atma::_rope_
 //  structure means we're eventually returning a new root node. 
 //  conceptually, these algorithms have assumed that any insertion of
 //  nodes will not lead to seams, i.e. you've already checked that.
-// 
-// 
-//  NOTE: currently these are only used for naive tree-creation... so they may go away
 //
 //---------------------------------------------------------------------
 namespace atma::_rope_
@@ -1039,8 +1036,6 @@ namespace atma::_rope_
 
 namespace atma::_rope_
 {
-
-
 	// mending
 
 	template <typename RT>
@@ -1062,7 +1057,24 @@ namespace atma::_rope_
 	template <typename RT>
 	auto insert(size_t char_idx, node_info_t<RT> const& dest, src_buf_t const& insbuf)
 		-> edit_result_t<RT>;
+}
 
+namespace atma::_rope_
+{
+	// erase
+	template <typename RT>
+	struct erase_result_t
+	{
+		maybe_node_info_t<RT> lhs, rhs;
+	};
+
+	template <typename RT>
+	auto erase(tree_t<RT> const&, size_t char_idx, size_t size_in_chars)
+		-> erase_result_t<RT>;
+
+	template <typename RT>
+	auto erase_(tree_t<RT> const&, size_t rel_char_idx, size_t rel_size_in_chars)
+		-> erase_result_t<RT>;
 }
 
 namespace atma::_rope_
@@ -2168,7 +2180,7 @@ namespace atma::_rope_
 		}
 		else if (idx == 1)
 		{
-			return {branch.children()[0]};
+			return {branch.children().front()};
 		}
 		else
 		{
@@ -2192,7 +2204,7 @@ namespace atma::_rope_
 		}
 		else if (idx == branch.info().children - 2)
 		{
-			return {branch.child_at(branch.info().children - 1)};
+			return {branch.children().back()};
 		}
 		else
 		{
@@ -2758,6 +2770,54 @@ namespace atma::_rope_
 			&split_up_fn_<RT>);
 	}
 }
+
+namespace atma::_rope_
+{
+	template <typename RT>
+	auto erase(tree_t<RT> const& tree, size_t char_idx, size_t size_in_chars) -> edit_result_t<RT>
+	{
+		return erase_(tree, char_idx, size_in_chars);
+	}
+
+	template <typename RT>
+	auto erase_(tree_t<RT> const& tree, size_t rel_char_idx, size_t rel_size_in_chars) -> edit_result_t<RT>
+	{
+		// we're a leaf, we need to split our buffer
+		if (tree.node()->is_branch())
+		{
+			
+		}
+		else
+		{
+			// case 1: the whole node is deleted
+			if (rel_char_idx == 0 && rel_size_in_chars == tree.info().characters)
+			{
+				return {};
+			}
+			// case 2: there's leftover bits on the lhs
+			else if (rel_char_idx > 0 && (rel_char_idx + rel_size_in_chars) == tree.info().characters)
+			{
+				// split buffer & return lhs
+				auto const& leaf = tree.as_leaf();
+				auto new_data = leaf.data().take(rel_char_idx);
+				auto lhs = make_leaf_ptr<RT>(new_data);
+				return {lhs};
+			}
+			// case 3: there's leftover bits on the rhs
+			else if (rel_char_idx == 0 && rel_size_in_chars < tree.info().characters)
+			{
+				// split buffer & return rhs
+			}
+			// case 4: this delete operation is fully within this buffer
+			else
+			{
+				// split buffer & return the leftover bits on both lhs & rhs
+			}
+		}
+	}
+}
+
+
 
 namespace atma::_rope_
 {
