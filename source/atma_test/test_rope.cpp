@@ -648,6 +648,60 @@ SCENARIO("user calls rope_t::insert")
 }
 
 
+SCENARIO("user erases some of the rope")
+{
+	GIVEN("a rope constructed from a known passage")
+	{
+		char const* short_passage = "hello there, you awful monsters you";
+
+		test_rope_t rope{short_passage, strlen(short_passage)};
+
+		WHEN("rope_t::erase is called")
+		{
+			rope.erase(0, 5);
+			
+			THEN("the rope will compare as equal to the passage")
+			{
+				CHECK(rope == short_passage + 5);
+			}
+		}
+	}
+
+	GIVEN("a rope constructed from a known passage")
+	{
+		char const* short_passage = "hello there, you awful monsters you";
+
+		test_rope_t rope{short_passage, strlen(short_passage)};
+
+		WHEN("rope_t::erase is called")
+		{
+			rope.erase(6, 11);
+
+			THEN("the rope will compare as equal to the passage")
+			{
+				CHECK(rope == "hello awful monsters you");
+			}
+		}
+	}
+
+	GIVEN("a rope constructed from a known passage")
+	{
+		char const* short_passage = "hello there, you awful monsters you";
+
+		test_rope_t rope{short_passage, strlen(short_passage)};
+
+		WHEN("rope_t::erase is called")
+		{
+			rope.erase(4, 4);
+
+			THEN("the rope will compare as equal to the passage")
+			{
+				CHECK(rope == "hellere, you awful monsters you");
+			}
+		}
+	}
+}
+
 
 
 SCENARIO("user calls rope_t::split at a valid index")
