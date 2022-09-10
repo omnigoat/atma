@@ -494,20 +494,6 @@ SCENARIO("internal text-modifying operations are performed")
 {
 	using T = atma::rope_test_traits;
 
-	// just quickly grab the node for an insert/edit-result
-	auto internal_node_of = [](auto&& x) -> decltype(auto) { return x.node->as_branch(); };
-	auto children_of = [&](auto&& x) -> decltype(auto) { return internal_node_of(x).children(); };
-	auto child_node_at = [&](auto&& x, size_t idx) -> decltype(auto) { return children_of(x)[idx].node; };
-
-	auto lhs_internal_node = [&](auto&& x) -> decltype(auto) { return internal_node_of(x.left); };
-	auto lhs_children = [&](auto&& x) { return children_of(x.left); };
-	auto lhs_child_node = [&](auto&& x, size_t idx) -> decltype(auto) { return child_node_at(x.left, idx); };
-
-	auto rhs_internal_node = [&](auto&& x) -> decltype(auto) { return internal_node_of(x.right.value()); };
-	auto rhs_children = [&](auto&& x) { return children_of(x.right.value()); };
-	auto rhs_child_node = [&](auto&& x, size_t idx) -> decltype(auto) { return child_node_at(x.right.value(), idx); };
-
-
 	GIVEN("a rope of ['o hey', 'blam\\rdi']")
 	{
 		auto ohey = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("o hey", 5));
@@ -519,6 +505,13 @@ SCENARIO("internal text-modifying operations are performed")
 		auto root_node = atma::_rope_::make_internal_ptr<T>(2u, ohey_info, blam_info);
 		atma::_rope_::node_info_t<T> root_info{root_node};
 
+		WHEN("we call atma::_rope_::insert at position 12 (<end>) with anything")
+		{
+			THEN("the text will be inserted as if we performed a push_back operation")
+			{
+				auto [left, right, seam] = atma::_rope_::insert<T>(12, root_info, atma::xfer_src("\nzxcv", 5));
+			}
+		}
 
 		WHEN("we call atma::_rope_::insert at position 10 ('d') with '\\nzxcv'")
 		{
