@@ -349,7 +349,15 @@ namespace atma::_rope_
 		seam_t seam = seam_t::none;
 
 		template <size_t I>
-		auto& get() const
+		auto const& get() const
+		{
+			if constexpr (I == 0) return this->left;
+			if constexpr (I == 1) return this->right;
+			if constexpr (I == 2) return this->seam;
+		}
+
+		template <size_t I>
+		auto& get()
 		{
 			if constexpr (I == 0) return this->left;
 			if constexpr (I == 1) return this->right;
@@ -1225,12 +1233,21 @@ namespace atma::_rope_
 		ATMA_ASSERT(str);
 
 		text_info_t r;
+		
+		utf8_char_t prev_char;
 		for (auto x : utf8_const_range_t{str, str + sz})
 		{
 			r.bytes += (uint16_t)x.size_bytes();
 			++r.characters;
-			if (utf8_char_is_newline(x))
+
+			// only count distinct newlines, so '\r\n' counts as only one
+			bool const is_followon_lf = (x == '\n') && (prev_char == '\r');
+			if (utf8_char_is_newline(x) && !is_followon_lf)
+			{
 				++r.line_breaks;
+			}
+			
+			prev_char = x;
 		}
 
 		return r;
@@ -1675,8 +1692,8 @@ namespace atma::_rope_
 				insbuf.subspan(0, insbuf_split_idx));
 
 			new_rhs = _rope_::make_leaf_ptr<RT>(
-				insbuf.subspan(insbuf_split_idx, insbuf.size() - insbuf_split_idx),
-				hostbuf.subspan(split_idx - insbuf_split_idx, hostbuf.size() - split_idx + insbuf_split_idx));
+				hostbuf.subspan(split_idx - insbuf_split_idx, hostbuf.size() - split_idx + insbuf_split_idx),
+				insbuf.subspan(insbuf_split_idx, insbuf.size() - insbuf_split_idx));
 		}
 
 		return std::make_tuple(
@@ -2827,7 +2844,7 @@ namespace atma::_rope_
 				//
 				// note: because the range of characters to delete is crossing the boundary
 				//       of child nodes, we can guarantee that neither result of our recursion
-				//       into our two children endpoints will not return two parts, as the
+				//       into our two children endpoints will return two parts, as the
 				//       range of characters extends fully past one of their ends. they *may*
 				//       return zero parts, if the full buffer was erased.
 				//
