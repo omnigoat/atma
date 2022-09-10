@@ -1757,7 +1757,7 @@ namespace atma::_rope_
 		size_t acc_chars = 0;
 		for (auto const& child : x.children())
 		{
-			if (char_idx < acc_chars + child.characters)
+			if (char_idx <= acc_chars + child.characters)
 				break;
 
 			acc_chars += child.characters - child.dropped_characters;
@@ -2623,15 +2623,8 @@ namespace atma::_rope_
 	template <typename RT>
 	inline auto insert(size_t char_idx, node_info_t<RT> const& dest, src_buf_t const& insbuf) -> edit_result_t<RT>
 	{
-		if constexpr (false && "microsoft have fixed their compiler")
-		{
-			return edit_chunk_at_char(dest, char_idx, std::bind(insert_small_text_<RT>, arg1, arg2, arg3, insbuf));
-		}
-		else
-		{
-			return edit_chunk_at_char(tree_t<RT>{dest}, char_idx,
-				[&](tree_leaf_t<RT> const& leaf, size_t char_idx) { return insert_small_text_<RT>(leaf, char_idx, insbuf); });
-		}
+		return edit_chunk_at_char(tree_t<RT>{dest}, char_idx,
+			atma::bind(insert_small_text_<RT>, arg1, arg2, insbuf));
 	}
 
 	template <typename RT>
