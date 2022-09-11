@@ -510,6 +510,13 @@ SCENARIO("internal text-modifying operations are performed")
 			THEN("the text will be inserted as if we performed a push_back operation")
 			{
 				auto [left, right, seam] = atma::_rope_::insert<T>(12, root_info, atma::xfer_src("\nzxcv", 5));
+
+				THEN("the result matches our expectations")
+				{
+					CHECK(left.line_breaks == 2);
+					CHECK(left.characters == 17);
+					CHECK(left.bytes == 17);
+				}
 			}
 		}
 
@@ -522,6 +529,30 @@ SCENARIO("internal text-modifying operations are performed")
 				CHECK(left.line_breaks == 1);
 				CHECK(left.characters == 17);
 				CHECK(left.bytes == 17);
+			}
+		}
+	}
+
+	GIVEN("a rope of ['o hey', 'blam\\r']")
+	{
+		auto ohey = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("o hey", 5));
+		auto blam_cr = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("blam\rdi", 5));
+
+		atma::_rope_::node_info_t<T> ohey_info{ohey};
+		atma::_rope_::node_info_t<T> blam_info{blam_cr};
+
+		auto root_node = atma::_rope_::make_internal_ptr<T>(2u, ohey_info, blam_info);
+		atma::_rope_::node_info_t<T> root_info{root_node};
+
+		WHEN("we call atma::_rope_::insert at position 10 ('d') with '\\nzxcv'")
+		{
+			auto [left, right, seam] = atma::_rope_::insert<T>(10, root_info, atma::xfer_src("\nzxcv", 5));
+
+			THEN("the result matches our expectations")
+			{
+				CHECK(left.line_breaks == 1);
+				CHECK(left.characters == 15);
+				CHECK(left.bytes == 15);
 			}
 		}
 	}
@@ -739,7 +770,58 @@ SCENARIO("user erases some of the rope")
 	}
 }
 
+SCENARIO("user calls rope_t::insert at a valid index")
+{
+	GIVEN("a rope of traits <4, 9> constructed from a passage")
+	{
+		atma::basic_rope_t<atma::rope_basic_traits<4, 9>> rope{passage, passage_size};
 
+		for (int i = 0; i != passage_size; ++i)
+		{
+			WHEN("we insert \"zxcv\" into the rope at any index")
+			{
+				rope.insert(i, "zxcv", 4);
+
+				std::string comp_passage;
+				{
+					comp_passage.append(passage, i);
+					comp_passage.append("zxcv", 4);
+					comp_passage.append(passage + i, passage_size - i);
+				}
+
+				THEN("both resultant parts are valid ropes")
+				{
+					CHECK(rope == comp_passage.c_str());
+				}
+			}
+		}
+	}
+
+	GIVEN("a rope of traits <4, 9> constructed from a passage")
+	{
+		atma::basic_rope_t<atma::rope_basic_traits<4, 9>> rope{passage, passage_size};
+
+		WHEN("we insert \"zxcv\" into the rope at any index")
+		{
+			for (int i = 0; i != passage_size; ++i)
+			{
+				rope.insert(i, "zxcv", 4);
+
+				std::string comp_passage;
+				{
+					comp_passage.append(passage, i);
+					comp_passage.append("zxcv", 4);
+					comp_passage.append(passage + i, passage_size - i);
+				}
+
+				THEN("both resultant parts are valid ropes")
+				{
+					CHECK(rope == comp_passage.c_str());
+				}
+			}
+		}
+	}
+}
 
 SCENARIO("user calls rope_t::split at a valid index")
 {

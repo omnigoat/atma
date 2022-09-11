@@ -602,6 +602,7 @@ namespace atma::_rope_
 				[](node_leaf_t<RT> const&) { return typename node_internal_t<RT>::children_type{}; });
 		}
 
+		auto as_tree() const -> tree_t<RT> const& { return static_cast<tree_branch_t<RT> const&>(*this); }
 		auto as_branch() const -> tree_branch_t<RT> const& { return static_cast<tree_branch_t<RT> const&>(*this); }
 		auto as_leaf() const -> tree_leaf_t<RT> const& { return static_cast<tree_leaf_t<RT> const&>(*this); }
 	};
@@ -907,6 +908,11 @@ namespace atma::_rope_
 	template <typename RT>
 	auto find_for_char_idx(node_internal_t<RT> const& x, size_t char_idx) -> std::tuple<size_t, size_t>;
 
+	// find_for_char_idx_within :: returns <index-of-child-node, remaining-characters>
+	//    this version will return a child that terminates on the index
+	template <typename RT>
+	auto find_for_char_idx_within(node_internal_t<RT> const&, size_t char_idx) -> std::tuple<size_t, size_t>;
+
 	// for_all_text :: visits each leaf in sequence and invokes f(std::string_view)
 	template <typename F, typename RT>
 	auto for_all_text(F f, node_info_t<RT> const& ri) -> void;
@@ -1047,14 +1053,14 @@ namespace atma::_rope_
 	// mending
 
 	template <typename RT>
-	using mend_result_type = std::tuple<seam_t, std::optional<std::tuple<node_info_t<RT>, node_info_t<RT>>>>;
+	using mend_result_type = std::optional<std::tuple<node_info_t<RT>, node_info_t<RT>>>;
 
 	template <typename RT>
-	auto mend_left_seam_(seam_t, maybe_node_info_t<RT> const& sibling_node, node_info_t<RT> const& seam_node)
+	auto mend_left_seam_(seam_t, node_info_t<RT> const& sibling_node, node_info_t<RT> const& seam_node)
 		-> mend_result_type<RT>;
 
 	template <typename RT>
-	auto mend_right_seam_(seam_t, node_info_t<RT> const& seam_node, maybe_node_info_t<RT> const& sibling_node)
+	auto mend_right_seam_(seam_t, node_info_t<RT> const& seam_node, node_info_t<RT> const& sibling_node)
 		-> mend_result_type<RT>;
 }
 
@@ -1316,6 +1322,16 @@ namespace atma::_rope_
 		}
 	}
 
+
+	template <typename RT>
+	inline auto node_internal_construct_(uint32_t& acc_count, node_info_t<RT>* dest, range_of_element_type<maybe_node_info_t<RT>> auto&& xs) -> void
+	{
+		for (auto&& x : xs)
+		{
+			node_internal_construct_(acc_count, dest, x);
+		}
+	}
+
 	template <typename RT>
 	template <typename... Args>
 	inline node_internal_t<RT>::node_internal_t(uint32_t height, Args&&... args)
@@ -1532,7 +1548,7 @@ namespace atma::_rope_
 
 		bool const is_buffer_boundary = (byte_idx == 0 || byte_idx == buf.size());
 		bool const is_utf_codepoint_boundary = (buf[byte_idx] >> 6) != 0b10;
-		bool const is_not_mid_crlf = !is_buffer_boundary || !is_seam(buf[byte_idx - 1], buf[byte_idx]);
+		bool const is_not_mid_crlf = is_buffer_boundary || !is_seam(buf[byte_idx - 1], buf[byte_idx]);
 
 		return is_buffer_boundary || is_utf_codepoint_boundary && is_not_mid_crlf;
 	}
@@ -1621,46 +1637,87 @@ namespace atma::_rope_
 			ATMA_ASSERT(utf8_byte_is_leading((byte const)hostbuf[byte_idx]));
 		}
 
+		size_t const insbuf_size = insbuf.size_bytes();
+
 		// determine split point
-		size_t split_idx = 0;
+		size_t redist_split_idx = 0;
 		size_t insbuf_split_idx = 0;
 		{
-			constexpr auto splitbuf_size = size_t(8);
-			constexpr auto splitbuf_halfsize = splitbuf_size / 2ull;
-			static_assert(splitbuf_halfsize * 2 == splitbuf_size);
+			// stack-allocate our splitbuf
+			//
+			// this is a very small (8-ish chars) buffer that we will use to determine
+			// exactly upon which character to split our *resultant* buffer.
+			// 
+			// note that this split location is the *redistribution* split point, not
+			// the insert point. the redistribution buffer is fictional - we are synthesizing
+			// what it would look like if we zoomed in on a few chars located around the
+			// middle of it - that's where we're going to split this fictional buffer.
+			//
+			// we are doing a bunch of confusing ops to ensure that regardless of where
+			// the insbuf is/was inserted, we correctly redistribute the characters of
+			// the entire fictional redistribute buffer across two halves.
+			//
+			// we're going to great lengths to remove any extraneous allocations
+
+			constexpr size_t splitbuf_size{8};
+			constexpr size_t splitbuf_halfsize{splitbuf_size / 2ull};
+			static_assert(splitbuf_halfsize * 2 == splitbuf_size,
+				"you gotta make your splitbuf size a multiple of two buddy");
 
 			char splitbuf[splitbuf_size] ={0};
 
-			size_t result_size = hostbuf.size() + insbuf.size();
-			size_t midpoint = result_size / 2;
-			size_t ins_end_idx = byte_idx + insbuf.size();
 
-			size_t bufcopy_start = midpoint - std::min(splitbuf_halfsize, midpoint);
-			size_t bufcopy_end = std::min(result_size, midpoint + splitbuf_halfsize);
+			// our fictional "redistribution buffer" is just what we'd have if we naively
+			// inserted insbuf into hostbuf. we're prefixing anything in the redistribution-buffer
+			// space with "redist". note there's not actual redistbuf
+			size_t const redist_size = hostbuf.size() + insbuf.size();
+			size_t const redist_midpoint = redist_size / 2;
+			size_t const redist_halfsize = redist_size / 2;
 
-			for (size_t i = bufcopy_start; i != bufcopy_end; ++i)
+			size_t const redist_ins_end_idx = byte_idx + insbuf.size();
+
+			size_t const redist_splitbuf_copy_begin = redist_midpoint - std::min(splitbuf_halfsize, redist_halfsize);
+			size_t const redist_splitbuf_copy_end = std::min(redist_size, redist_midpoint + splitbuf_halfsize);
+
+
+			// fill our splitbuf from the characters around the midpoint of our redistbuf
+			//
+			// we'll do the following:
+			//  1) fill from hostbuf up until we hit byte_idx, which is where insbuf
+			//     would logically be after the insertion
+			//  2) fill from insbuf until it's exhausted
+			//  3) continue to fill from hostbuf after the byte_idx
+			//
+			for (size_t i = redist_splitbuf_copy_begin; i != redist_splitbuf_copy_end; ++i)
 			{
-				splitbuf[i - bufcopy_start]
+				size_t const splitbuf_i = i - redist_splitbuf_copy_begin;
+
+				splitbuf[splitbuf_i]
 					= (i < byte_idx) ? hostbuf[i]
-					: (i < ins_end_idx) ? insbuf[i - byte_idx]
-					: hostbuf[i - insbuf.size()]
+					: (i < redist_ins_end_idx) ? insbuf[i - byte_idx]
+					: hostbuf[i - insbuf_size]
 					;
 			}
 
-			split_idx = bufcopy_start + find_split_point(
+			// find the split index in redist-space
+			redist_split_idx = redist_splitbuf_copy_begin + find_split_point(
 				xfer_src(splitbuf),
-				midpoint - bufcopy_start);
+				redist_midpoint - redist_splitbuf_copy_begin);
 
+			// if the split-index (in redist space) would be within where insbuf would
+			// have been inserted, we need to know. otherwise it's just the bounds
 			insbuf_split_idx
-				= (ins_end_idx <= split_idx) ? 0
-				: (split_idx <= byte_idx) ? insbuf.size()
-				: midpoint - byte_idx
+				= (redist_ins_end_idx <= redist_split_idx) ? 0
+				: (redist_split_idx <= byte_idx) ? insbuf.size()
+				: redist_split_idx - byte_idx
 				;
 
-			ATMA_ASSERT(utf8_byte_is_leading((byte const)splitbuf[split_idx]));
+			ATMA_ASSERT(utf8_byte_is_leading((byte const)splitbuf[redist_split_idx]));
 		}
 
 		node_info_t<RT> new_lhs, new_rhs;
+
+		size_t const split_idx = redist_split_idx;
 
 		// inserted text is pre-split
 		if (insbuf_split_idx == 0)
@@ -1752,6 +1809,23 @@ namespace atma::_rope_
 	// returns: <index-of-child-node, remaining-characters>
 	template <typename RT>
 	inline auto find_for_char_idx(node_internal_t<RT> const& x, size_t char_idx) -> std::tuple<size_t, size_t>
+	{
+		size_t child_idx = 0;
+		size_t acc_chars = 0;
+		for (auto const& child : x.children())
+		{
+			if (char_idx < acc_chars + child.characters)
+				break;
+
+			acc_chars += child.characters - child.dropped_characters;
+			++child_idx;
+		}
+
+		return std::make_tuple(child_idx, char_idx - acc_chars);
+	}
+
+	template <typename RT>
+	inline auto find_for_char_idx_within(node_internal_t<RT> const& x, size_t char_idx) -> std::tuple<size_t, size_t>
 	{
 		size_t child_idx = 0;
 		size_t acc_chars = 0;
@@ -1983,6 +2057,69 @@ namespace atma::_rope_
 			return insert_result_t<RT>{lhs, rhs};
 		}
 	}
+
+	template <typename RT>
+	inline auto construct_from_(src_bounded_memxfer_t<tree_t<RT>> buf1, src_bounded_memxfer_t<tree_t<RT>> buf2, src_bounded_memxfer_t<tree_t<RT>> buf3) -> insert_result_t<RT>
+	{
+		// this function takes three ranges of nodes and will redistribute
+		size_t const buf1_size = buf1.size();
+		size_t const buf2_size = buf2.size();
+		size_t const buf3_size = buf3.size();
+
+		auto full_size = buf1_size + buf2_size + buf3_size;
+
+		if (full_size < RT::branching_factor)
+		{
+			auto result = make_internal_ptr<RT>(buf1, buf2, buf3);
+			return result;
+		}
+
+		// split evenly
+		auto split_idx = (full_size + 1ull) / 2;
+
+		// case 1, split_idx is within buf1
+		if (split_idx < buf1.size())
+		{
+			auto left = make_internal_ptr<RT>(
+				buf1.to(split_idx));
+
+			auto right = make_internal_ptr<RT>(
+				buf1.from(split_idx),
+				buf2,
+				buf3);
+
+			return {left, right};
+		}
+		// split_idx is within buf2
+		else if (auto buf2_idx = split_idx - buf1_size; buf2_idx < buf2_size)
+		{
+			auto left = make_internal_ptr<RT>(
+				buf1,
+				buf2.to(buf2_idx));
+
+			auto right = make_internal_ptr<RT>(
+				buf2.from(buf2_idx),
+				buf3);
+
+			return {left, right};
+		}
+		else if (auto buf3_idx = split_idx - buf1_size - buf2_size; buf3_idx < buf3_size)
+		{
+			auto left = make_internal_ptr<RT>(
+				buf1,
+				buf2,
+				buf3.to(buf3_idx));
+
+			auto right = make_internal_ptr<RT>(
+				buf3.from(buf3_idx));
+
+			return {left, right};
+		}
+
+		return {};
+	}
+
+
 
 
 
@@ -2468,7 +2605,7 @@ namespace atma::_rope_
 	inline auto edit_chunk_at_char(tree_t<RT> const& tree, size_t char_idx, F&& payload_function) -> edit_result_t<RT>
 	{
 		return navigate_to_leaf(tree, char_idx,
-			tree_find_for_char_idx<RT>,
+			tree_find_for_char_idx_within<RT>,
 			std::forward<F>(payload_function),
 			stitch_upwards_<RT>);
 	}
@@ -2490,8 +2627,6 @@ namespace atma::_rope_
 	{
 		auto const& [left_info, maybe_right_info, seam] = er;
 
-		auto& node = branch.node();
-
 		// validate that there's no seam between our two edit-result nodes. this
 		// should have been caught in whatever edit operation was performed. stitching
 		// the tree and melding crlf pairs is for siblings
@@ -2503,12 +2638,76 @@ namespace atma::_rope_
 			ATMA_ASSERT(!is_seam(leftleaf.buf.back(), rightleaf.buf[maybe_right_info->dropped_bytes]));
 		}
 
-		// no seam, no worries
-		if (seam == seam_t::none && !maybe_right_info)
+		// case 1: there's no seam. regardless if there's one or two children returned,
+		//         we just call replace_and_insert_ and that's that.
+		if (seam == seam_t::none)
 		{
-			return er;
+			auto r = replace_and_insert_(branch, child_idx, left_info, maybe_right_info);
+			return {r.left, r.right, seam_t::none};
+		}
+		// case 2: there's a seam and we only have one node
+		else if (seam != seam_t::none && !maybe_right_info)
+		{
+			// case 2.1: there's only a left-seam
+			if (seam == seam_t::left)
+			{
+				// case 2.1.1 - we're at the front, can't do anything about it at this level
+				if (child_idx == 0)
+				{
+					auto r = replace_<RT>(branch.as_tree(), child_idx, tree_t<RT>{left_info});
+					return {r, {}, seam_t::left};
+				}
+				// case 2.1.2 - in the middle, try and remove seam
+				else if (auto maybe_nodes = mend_left_seam_(seam, branch.child_at((int)child_idx - 1), left_info))
+				{
+					auto const& [prev, child] = *maybe_nodes;
+					auto [rl, rr] = construct_from_(
+						xfer_src(branch.children()).to(child_idx - 1),
+						xfer_src_list({prev, child}),
+						xfer_src(branch.children()).from(child_idx + 1));
+					
+					ATMA_ASSERT(!rr);
+					return {rl, rr, seam_t::none};
+				}
+				// case 2.1.3 - we could not mend the seam (there was no corresponding cr)
+				else
+				{
+					auto r = replace_(branch, child_idx, left_info);
+					return {r, {}, seam_t::none};
+				}
+			}
+			// case 2.2: there's only a right-seam
+			else if (seam == seam_t::right)
+			{
+				// case 2.2.1 - we're at the back, nothing to do
+				if (child_idx == branch.children().size() - 1)
+				{
+					auto r = replace_<RT>(branch, child_idx, tree_t<RT>{left_info});
+					return {r, {}, seam_t::right};
+				}
+				// case 2.2.2 - in the middle, try and remove seam
+				else if (auto maybe_nodes = mend_right_seam_(seam, left_info, branch.child_at((int)child_idx + 1)))
+				{
+					auto const& [child, next] = *maybe_nodes;
+					auto [rl, rr] = replace_and_insert_<RT>(branch, child_idx, child, next);
+					ATMA_ASSERT(!rr);
+					return {rl, rr, seam_t::none};
+				}
+				// case 2.2.3 - we could not mend the seam
+				else
+				{
+					auto r = replace_(branch, child_idx, left_info);
+					return {r, {}, seam_t::none};
+				}
+			}
+			// case 2.3: there's both seams
+			else
+			{
+				// oh jesus
+			}
 		}
 
+#if 0
 		seam_t const left_seam = (seam & seam_t::left);
 		seam_t const right_seam = (seam & seam_t::right);
 
@@ -2518,103 +2717,116 @@ namespace atma::_rope_
 		auto mended_children = std::array<maybe_node_info_t<RT>, 4>
 			{
 				node.try_child_at((int)child_idx - 1),
-				maybe_node_info_t<RT>{left_info},
+				left_info,
 				maybe_right_info,
 				node.try_child_at((int)child_idx + 1)
 			};
 
 		// left seam
-		auto const [mended_left_seam, maybe_mended_left_nodes] = mend_left_seam_(left_seam, mended_children[0], *mended_children[1]);
-		if (maybe_mended_left_nodes)
+		if (left_seam != seam_t::none)
 		{
-			mended_children[0] = std::get<0>(*maybe_mended_left_nodes);
-			mended_children[1] = std::get<1>(*maybe_mended_left_nodes);
+			auto const [mended_left_seam, maybe_mended_left_nodes] = mend_left_seam_(left_seam, mended_children[0], *mended_children[1]);
+			if (maybe_mended_left_nodes)
+			{
+				mended_children[0] = std::get<0>(*maybe_mended_left_nodes);
+				mended_children[1] = std::get<1>(*maybe_mended_left_nodes);
+			}
 		}
 
 		// right seam
-		auto& right_seam_node = mended_children[2] ? *mended_children[2] : *mended_children[1];
-		auto const [mended_right_seam, maybe_mended_right_nodes] = mend_right_seam_(right_seam, right_seam_node, mended_children[3]);
-		if (maybe_mended_right_nodes)
+		if (right_seam != seam_t::none)
 		{
-			right_seam_node = std::get<0>(*maybe_mended_right_nodes);
-			mended_children[3] = std::get<1>(*maybe_mended_right_nodes);
-		}
-
-		auto blah = replace_and_insert_(branch, child_idx, left_info, maybe_right_info);
-
-		return {blah.left, blah.right, mended_left_seam | mended_right_seam};
-	}
-
-	template <typename RT>
-	inline auto mend_left_seam_(seam_t seam, maybe_node_info_t<RT> const& sibling_node, node_info_t<RT> const& seam_node) -> mend_result_type<RT>
-	{
-		if (seam == seam_t::none)
-		{
-			return {seam_t::none, {}};
-		}
-		else if (sibling_node)
-		{
-			// append lf to the back of the previous leaf. if this returns an empty optional,
-			// then that leaf didn't have a trailing cr at the end, and we are just going to
-			// leave this lf as it is... sitting all pretty at the front
-
-			auto sibling_node_prime = navigate_to_back_leaf(tree_t<RT>{*sibling_node},
-				append_lf_<RT>,
-				stitch_upwards_simple_<RT>);
-
-			if (sibling_node_prime)
+			auto& right_seam_node = mended_children[2] ? *mended_children[2] : *mended_children[1];
+			auto const [mended_right_seam, maybe_mended_right_nodes] = mend_right_seam_(right_seam, right_seam_node, mended_children[3]);
+			if (maybe_mended_right_nodes)
 			{
-				// drop lf from seam node
-				auto seam_node_prime = navigate_to_back_leaf(tree_t<RT>{seam_node},
-					drop_lf_<RT>,
-					stitch_upwards_simple_<RT>);
-
-				ATMA_ASSERT(seam_node_prime);
-
-				return {seam_t::none, std::make_tuple(*sibling_node_prime, *seam_node_prime)};
-			}
-			else
-			{
-				return {seam_t::none, {}};
+				right_seam_node = std::get<0>(*maybe_mended_right_nodes);
+				mended_children[3] = std::get<1>(*maybe_mended_right_nodes);
 			}
 		}
 
-		return {seam, {}};
+
+		// if the edit_result we're stitching had two parts, and we were full,
+		// then we must split the node. this is the same as replace_and_insert_
+		// splitting us
+		if (mended_children[2] && branch.children().size() == RT::branching_factor)
+		{
+			auto const left_size = RT::branching_factor / 2 + 1;
+			auto const right_size = RT::branching_factor / 2;
+
+			// case 1: split is to left of both nodes   =>  N N N L R
+			if (child_idx < left_size)
+			{
+				//auto result_left = make_internal_ptr<RT>(
+				//	branch.height(),
+				//	
+				//	xfer_src(mended_children, 4),
+				//	xfer_src(branch.children()).from(std::min(child_idx + 2, branch.children().size())));
+			}
+		}
+
+		auto blah = make_internal_ptr<RT>(
+			branch.height(),
+			xfer_src(branch.children()).take(std::max((int)child_idx - 2, 0)),
+			xfer_src(mended_children, 4),
+			xfer_src(branch.children()).from(std::min(child_idx + 2, branch.children().size())));
+#endif
+
+		return {};
 	}
 
 	template <typename RT>
-	inline auto mend_right_seam_(seam_t seam, node_info_t<RT> const& seam_node, maybe_node_info_t<RT> const& sibling_node) -> mend_result_type<RT>
+	inline auto mend_left_seam_(seam_t seam, node_info_t<RT> const& sibling_node, node_info_t<RT> const& seam_node) -> mend_result_type<RT>
 	{
-		if (seam == seam_t::none)
-		{
-			return {seam_t::none, {}};
-		}
-		else if (sibling_node)
-		{
-			// drop lf from the front of the next leaf. if this returns an empty optional,
-			// then that leaf didn't have an lf at the front, and we are just going to
-			// leave this cr as is... just, dangling there
+		// append lf to the back of the previous leaf. if this returns an empty optional,
+		// then that leaf didn't have a trailing cr at the end, and we are just going to
+		// leave this lf as it is... sitting all pretty at the front
 
-			auto sibling_node_prime = navigate_to_front_leaf(tree_t<RT>{*sibling_node},
+		auto sibling_node_prime = navigate_to_back_leaf(
+			tree_t<RT>{sibling_node},
+			append_lf_<RT>,
+			stitch_upwards_simple_<RT>);
+
+		if (sibling_node_prime)
+		{
+			// drop lf from seam node
+			auto seam_node_prime = navigate_to_front_leaf(tree_t<RT>{seam_node},
 				drop_lf_<RT>,
 				stitch_upwards_simple_<RT>);
 
-			if (sibling_node_prime)
-			{
-				// append lf to seamed leaf
-				auto seam_node_prime = navigate_to_back_leaf(tree_t<RT>{seam_node},
-					append_lf_<RT>,
-					stitch_upwards_simple_<RT>);
+			ATMA_ASSERT(seam_node_prime);
 
-				return {seam_t::none, std::make_tuple(*seam_node_prime, *sibling_node_prime)};
-			}
-			else
-			{
-				return {seam_t::none, {}};
-			}
+			return {std::make_tuple(*sibling_node_prime, *seam_node_prime)};
 		}
 
-		return {seam, {}};
+		return {};
+	}
+
+	template <typename RT>
+	inline auto mend_right_seam_(seam_t seam, node_info_t<RT> const& seam_node, node_info_t<RT> const& sibling_node) -> mend_result_type<RT>
+	{
+		// drop lf from the front of the next leaf. if this returns an empty optional,
+		// then that leaf didn't have an lf at the front, and we are just going to
+		// leave this cr as is... just, dangling there
+
+		auto sibling_node_prime = navigate_to_front_leaf(
+			tree_t<RT>{sibling_node},
+			drop_lf_<RT>,
+			stitch_upwards_simple_<RT>);
+
+		if (sibling_node_prime)
+		{
+			// append lf to seamed leaf
+			auto seam_node_prime = navigate_to_back_leaf(tree_t<RT>{seam_node},
+				append_lf_<RT>,
+				stitch_upwards_simple_<RT>);
+
+			ATMA_ASSERT(seam_node_prime);
+
+			return {std::make_tuple(*seam_node_prime, *sibling_node_prime)};
+		}
+
+		return {};
 	}
 }
 
@@ -2769,6 +2981,12 @@ namespace atma::_rope_
 	inline auto tree_find_for_char_idx(tree_branch_t<RT> const& x, size_t char_idx) -> std::tuple<size_t, size_t>
 	{
 		return find_for_char_idx(x.info().node->as_branch(), char_idx);
+	}
+
+	template <typename RT>
+	inline auto tree_find_for_char_idx_within(tree_branch_t<RT> const& x, size_t char_idx) -> std::tuple<size_t, size_t>
+	{
+		return find_for_char_idx_within(x.node(), char_idx);
 	}
 
 	template <typename RT>
@@ -3736,12 +3954,14 @@ namespace atma
 
 		if (edit_result.right.has_value())
 		{
-			(_rope_::text_info_t&)root_ = edit_result.left + *edit_result.right;
+			root_ = edit_result.left + *edit_result.right;
 
 			root_.node = _rope_::make_internal_ptr<RT>(
 				edit_result.left.node->height() + 1,
 				edit_result.left,
 				*edit_result.right);
+
+			root_.children = 2;
 		}
 		else
 		{
@@ -3767,6 +3987,8 @@ namespace atma
 				left->node->height() + 1,
 				*left,
 				*right);
+
+			root_.children = 2;
 		}
 		else
 		{
@@ -3840,7 +4062,7 @@ namespace atma
 		{
 			// exceeded this leaf, time to move to next leaf
 			std::tie(leaf_, leaf_characters_) = navigate_to_leaf<RT>(tree_t<RT>{rope_.root()}, idx_,
-				& tree_find_for_char_idx<RT>,
+				tree_find_for_char_idx<RT>,
 				[](tree_leaf_t<RT> const& leaf, size_t)
 				{
 					return std::make_tuple(node_leaf_ptr<RT>{&leaf.node()}, leaf.info().characters);
