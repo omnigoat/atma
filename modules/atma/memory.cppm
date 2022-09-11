@@ -1076,6 +1076,13 @@ export namespace atma
 	{
 		return xfer_src(std::forward<Range>(range), from, to - from);
 	}
+
+
+	template <typename T>
+	inline auto xfer_src_list(std::initializer_list<T> things) -> src_bounded_memxfer_t<T>
+	{
+		return {std::allocator<T>(), std::data(things), std::size(things)};
+	}
 }
 
 
