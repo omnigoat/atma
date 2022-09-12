@@ -366,4 +366,11 @@ export namespace atma
 	{
 		return intrusive_ptr<R>(dynamic_cast<R*>(x.get()));
 	}
+
+	template <typename R, typename T>
+	requires std::is_convertible_v<R*, T*>
+	inline auto intrusive_ptr_cast(intrusive_ptr<T> const& x) -> intrusive_ptr<R>
+	{
+		return intrusive_ptr<R>(static_cast<R*>(x.get()));
+	}
 }
