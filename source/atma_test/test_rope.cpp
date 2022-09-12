@@ -50,9 +50,9 @@ SCENARIO("atma::rope's internal operations work")
 	using T = atma::rope_test_traits;
 
 	// just quickly grab the node for an insert/edit-result
-	auto internal_node_of = [](auto&& x) -> decltype(auto) { return x.node->as_branch(); };
+	auto internal_node_of = [](auto&& x) -> decltype(auto) { return x.as_branch().node(); };
 	auto children_of = [&](auto&& x) -> decltype(auto) { return internal_node_of(x).children(); };
-	auto child_node_at = [&](auto&& x, size_t idx) -> decltype(auto) { return children_of(x)[idx].node; };
+	auto child_node_at = [&](auto&& x, size_t idx) -> decltype(auto) { return children_of(x)[idx].node_pointer(); };
 
 	auto lhs_internal_node = [&](auto&& x) -> decltype(auto) { return internal_node_of(x.left); };
 	auto lhs_children = [&](auto&& x) { return children_of(x.left); };
@@ -72,18 +72,18 @@ SCENARIO("atma::rope's internal operations work")
 		auto X = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("X", 1));
 		auto Y = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("Y", 1));
 
-		atma::_rope_::node_info_t<T> A_info{A};
-		atma::_rope_::node_info_t<T> B_info{B};
-		atma::_rope_::node_info_t<T> C_info{C};
-		atma::_rope_::node_info_t<T> D_info{D};
-		atma::_rope_::node_info_t<T> X_info{X};
-		atma::_rope_::node_info_t<T> Y_info{Y};
+		atma::_rope_::tree_t<T> A_info{A};
+		atma::_rope_::tree_t<T> B_info{B};
+		atma::_rope_::tree_t<T> C_info{C};
+		atma::_rope_::tree_t<T> D_info{D};
+		atma::_rope_::tree_t<T> X_info{X};
+		atma::_rope_::tree_t<T> Y_info{Y};
 
 		// test insert where we have space
 		AND_GIVEN("a default-created internal-node")
 		{
 			auto internal_node = atma::_rope_::make_internal_ptr<T>(1u);
-			auto internal_info = atma::_rope_::node_info_t<T>{internal_node};
+			auto internal_info = atma::_rope_::tree_branch_t<T>{internal_node};
 
 			WHEN("we _rope_::insert_ into our internal-node the node A at index 0")
 			{
@@ -96,9 +96,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the text-info is the sum information of A")
 				{
-					CHECK(postAresult.left.bytes == 1);
-					CHECK(postAresult.left.characters == 1);
-					CHECK(postAresult.left.children == 1);
+					CHECK(postAresult.left.info().bytes == 1);
+					CHECK(postAresult.left.info().characters == 1);
+					CHECK(postAresult.left.child_count() == 1);
 				}
 
 				THEN("there is one child node that matches A")
@@ -120,9 +120,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the text-info is the sum information of A & B")
 				{
-					CHECK(postBresult.left.bytes == 2);
-					CHECK(postBresult.left.characters == 2);
-					CHECK(postBresult.left.children == 2);
+					CHECK(postBresult.left.info().bytes == 2);
+					CHECK(postBresult.left.info().characters == 2);
+					CHECK(postBresult.left.child_count() == 2);
 				}
 
 				THEN("there are two nodes that match A & B")
@@ -147,9 +147,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the text-info is the sum information of A & B")
 				{
-					CHECK(postDresult.left.bytes == 4);
-					CHECK(postDresult.left.characters == 4);
-					CHECK(postDresult.left.children == 4);
+					CHECK(postDresult.left.info().bytes == 4);
+					CHECK(postDresult.left.info().characters == 4);
+					CHECK(postDresult.left.child_count() == 4);
 				}
 
 				THEN("there are four nodes that match A, B, C, D")
@@ -175,9 +175,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the text-info is the sum information of A,B,C,D")
 				{
-					CHECK(postDresult.left.bytes == 4);
-					CHECK(postDresult.left.characters == 4);
-					CHECK(postDresult.left.children == 4);
+					CHECK(postDresult.left.info().bytes == 4);
+					CHECK(postDresult.left.info().characters == 4);
+					CHECK(postDresult.left.child_count() == 4);
 				}
 
 				THEN("there are four nodes that match A, B, C, D, but in REVERSE ORDER")
@@ -195,7 +195,7 @@ SCENARIO("atma::rope's internal operations work")
 		AND_GIVEN("a fully-saturated internal-node of [A, B, C, D]")
 		{
 			auto internal_node = atma::_rope_::make_internal_ptr<T>(2u, A_info, B_info, C_info, D_info);
-			auto internal_info = atma::_rope_::node_info_t<T>{internal_node};
+			auto internal_info = atma::_rope_::tree_branch_t<T>{internal_node};
 
 			WHEN("we insert X at index 0")
 			{
@@ -208,9 +208,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the left node-info is three nodes worth")
 				{
-					CHECK(postXresult.left.bytes == 3);
-					CHECK(postXresult.left.characters == 3);
-					CHECK(postXresult.left.children == 3);
+					CHECK(postXresult.left.info().bytes == 3);
+					CHECK(postXresult.left.info().characters == 3);
+					CHECK(postXresult.left.child_count() == 3);
 				}
 
 				THEN("the left node contains X, A, B")
@@ -223,9 +223,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the rhs node-info is two nodes worth")
 				{
-					CHECK(postXresult.right.value().bytes == 2);
-					CHECK(postXresult.right.value().characters == 2);
-					CHECK(postXresult.right.value().children == 2);
+					CHECK(postXresult.right.value().info().bytes == 2);
+					CHECK(postXresult.right.value().info().characters == 2);
+					CHECK(postXresult.right.value().child_count() == 2);
 				}
 
 				THEN("the rhs node contains C, D")
@@ -248,9 +248,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the left node-info is three nodes worth")
 				{
-					CHECK(postXresult.left.bytes == 3);
-					CHECK(postXresult.left.characters == 3);
-					CHECK(postXresult.left.children == 3);
+					CHECK(postXresult.left.info().bytes == 3);
+					CHECK(postXresult.left.info().characters == 3);
+					CHECK(postXresult.left.child_count() == 3);
 				}
 
 				THEN("the left node contains A, X, B")
@@ -263,9 +263,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the rhs node-info is two nodes worth")
 				{
-					CHECK(postXresult.right.value().bytes == 2);
-					CHECK(postXresult.right.value().characters == 2);
-					CHECK(postXresult.right.value().children == 2);
+					CHECK(postXresult.right.value().info().bytes == 2);
+					CHECK(postXresult.right.value().info().characters == 2);
+					CHECK(postXresult.right.value().child_count() == 2);
 				}
 
 				THEN("the rhs node contains C, D")
@@ -287,9 +287,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the left node-info is three nodes worth")
 				{
-					CHECK(postXresult.left.bytes == 3);
-					CHECK(postXresult.left.characters == 3);
-					CHECK(postXresult.left.children == 3);
+					CHECK(postXresult.left.info().bytes == 3);
+					CHECK(postXresult.left.info().characters == 3);
+					CHECK(postXresult.left.child_count() == 3);
 				}
 
 				THEN("the left node contains A, B, X")
@@ -302,9 +302,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the rhs node-info is two nodes worth")
 				{
-					CHECK(postXresult.right.value().bytes == 2);
-					CHECK(postXresult.right.value().characters == 2);
-					CHECK(postXresult.right.value().children == 2);
+					CHECK(postXresult.right.value().info().bytes == 2);
+					CHECK(postXresult.right.value().info().characters == 2);
+					CHECK(postXresult.right.value().child_count() == 2);
 				}
 
 				THEN("the rhs node contains C, D")
@@ -331,9 +331,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the left node-info is three nodes worth")
 				{
-					CHECK(postXresult.left.bytes == 3);
-					CHECK(postXresult.left.characters == 3);
-					CHECK(postXresult.left.children == 3);
+					CHECK(postXresult.left.info().bytes == 3);
+					CHECK(postXresult.left.info().characters == 3);
+					CHECK(postXresult.left.child_count() == 3);
 				}
 
 				THEN("the left node contains A, B, C")
@@ -346,9 +346,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the rhs node-info is two nodes worth")
 				{
-					CHECK(postXresult.right.value().bytes == 2);
-					CHECK(postXresult.right.value().characters == 2);
-					CHECK(postXresult.right.value().children == 2);
+					CHECK(postXresult.right.value().info().bytes == 2);
+					CHECK(postXresult.right.value().info().characters == 2);
+					CHECK(postXresult.right.value().child_count() == 2);
 				}
 
 				THEN("the rhs node contains X, D")
@@ -370,9 +370,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the left node-info is three nodes worth")
 				{
-					CHECK(postXresult.left.bytes == 3);
-					CHECK(postXresult.left.characters == 3);
-					CHECK(postXresult.left.children == 3);
+					CHECK(postXresult.left.info().bytes == 3);
+					CHECK(postXresult.left.info().characters == 3);
+					CHECK(postXresult.left.child_count() == 3);
 				}
 
 				THEN("the left node contains A, B, C")
@@ -385,9 +385,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the rhs node-info is two nodes worth")
 				{
-					CHECK(postXresult.right.value().bytes == 2);
-					CHECK(postXresult.right.value().characters == 2);
-					CHECK(postXresult.right.value().children == 2);
+					CHECK(postXresult.right.value().info().bytes == 2);
+					CHECK(postXresult.right.value().info().characters == 2);
+					CHECK(postXresult.right.value().child_count() == 2);
 				}
 
 				THEN("the rhs node contains D, X")
@@ -403,7 +403,7 @@ SCENARIO("atma::rope's internal operations work")
 		AND_GIVEN("a fully-saturated internal-node of [A, B, C, D]")
 		{
 			auto internal_node = atma::_rope_::make_internal_ptr<T>(2u, A_info, B_info, C_info, D_info);
-			auto internal_info = atma::_rope_::node_info_t<T>{internal_node};
+			auto internal_info = atma::_rope_::tree_branch_t<T>{internal_node};
 
 			WHEN("we call replace_() at index 2 with node X")
 			{
@@ -411,9 +411,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the left node-info is four nodes worth")
 				{
-					CHECK(postXresult.bytes == 4);
-					CHECK(postXresult.characters == 4);
-					CHECK(postXresult.children == 4);
+					CHECK(postXresult.info().bytes == 4);
+					CHECK(postXresult.info().characters == 4);
+					CHECK(postXresult.child_count() == 4);
 				}
 
 				THEN("the node now contains A, B, X, D")
@@ -432,11 +432,11 @@ SCENARIO("atma::rope's internal operations work")
 		AND_GIVEN("an internal-node of [A, B, C]")
 		{
 			auto internal_node = atma::_rope_::make_internal_ptr<T>(2u, A_info, B_info, C_info);
-			auto internal_info = atma::_rope_::node_info_t<T>{internal_node};
+			auto internal_info = atma::_rope_::tree_branch_t<T>{internal_node};
 
 			WHEN("we call replace_and_insert_() at index 2 with node X & nil")
 			{
-				auto postXresult = atma::_rope_::replace_and_insert_<T>(internal_info, 2, X_info, atma::_rope_::maybe_node_info_t<T>());
+				auto postXresult = atma::_rope_::replace_and_insert_<T>(internal_info, 2, X_info, {});
 
 				THEN("the insert-result contains only one node")
 				{
@@ -445,9 +445,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the left node-info is three nodes worth")
 				{
-					CHECK(postXresult.left.bytes == 3);
-					CHECK(postXresult.left.characters == 3);
-					CHECK(postXresult.left.children == 3);
+					CHECK(postXresult.left.info().bytes == 3);
+					CHECK(postXresult.left.info().characters == 3);
+					CHECK(postXresult.left.child_count() == 3);
 				}
 
 				THEN("the left node contains A, B, X")
@@ -470,9 +470,9 @@ SCENARIO("atma::rope's internal operations work")
 
 				THEN("the left node-info is four nodes worth")
 				{
-					CHECK(postXresult.left.bytes == 4);
-					CHECK(postXresult.left.characters == 4);
-					CHECK(postXresult.left.children == 4);
+					CHECK(postXresult.left.info().bytes == 4);
+					CHECK(postXresult.left.info().characters == 4);
+					CHECK(postXresult.left.child_count() == 4);
 				}
 
 				THEN("the left node contains A, B, X, Y")
@@ -499,11 +499,11 @@ SCENARIO("internal text-modifying operations are performed")
 		auto ohey = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("o hey", 5));
 		auto blam_cr = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("blam\rdi", 7));
 
-		atma::_rope_::node_info_t<T> ohey_info{ohey};
-		atma::_rope_::node_info_t<T> blam_info{blam_cr};
+		atma::_rope_::tree_t<T> ohey_info{ohey};
+		atma::_rope_::tree_t<T> blam_info{blam_cr};
 
 		auto root_node = atma::_rope_::make_internal_ptr<T>(2u, ohey_info, blam_info);
-		atma::_rope_::node_info_t<T> root_info{root_node};
+		atma::_rope_::tree_t<T> root_info{root_node};
 
 		WHEN("we call atma::_rope_::insert at position 12 (<end>) with anything")
 		{
@@ -513,9 +513,9 @@ SCENARIO("internal text-modifying operations are performed")
 
 				THEN("the result matches our expectations")
 				{
-					CHECK(left.line_breaks == 2);
-					CHECK(left.characters == 17);
-					CHECK(left.bytes == 17);
+					CHECK(left.info().line_breaks == 2);
+					CHECK(left.info().characters == 17);
+					CHECK(left.info().bytes == 17);
 				}
 			}
 		}
@@ -526,9 +526,9 @@ SCENARIO("internal text-modifying operations are performed")
 
 			THEN("the result matches our expectations")
 			{
-				CHECK(left.line_breaks == 1);
-				CHECK(left.characters == 17);
-				CHECK(left.bytes == 17);
+				CHECK(left.info().line_breaks == 1);
+				CHECK(left.info().characters == 17);
+				CHECK(left.info().bytes == 17);
 			}
 		}
 	}
@@ -538,11 +538,11 @@ SCENARIO("internal text-modifying operations are performed")
 		auto ohey = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("o hey", 5));
 		auto blam_cr = atma::_rope_::make_leaf_ptr<T>(atma::xfer_src("blam\rdi", 5));
 
-		atma::_rope_::node_info_t<T> ohey_info{ohey};
-		atma::_rope_::node_info_t<T> blam_info{blam_cr};
+		atma::_rope_::tree_t<T> ohey_info{ohey};
+		atma::_rope_::tree_t<T> blam_info{blam_cr};
 
 		auto root_node = atma::_rope_::make_internal_ptr<T>(2u, ohey_info, blam_info);
-		atma::_rope_::node_info_t<T> root_info{root_node};
+		atma::_rope_::tree_t<T> root_info{root_node};
 
 		WHEN("we call atma::_rope_::insert at position 10 ('d') with '\\nzxcv'")
 		{
@@ -550,9 +550,9 @@ SCENARIO("internal text-modifying operations are performed")
 
 			THEN("the result matches our expectations")
 			{
-				CHECK(left.line_breaks == 1);
-				CHECK(left.characters == 15);
-				CHECK(left.bytes == 15);
+				CHECK(left.info().line_breaks == 1);
+				CHECK(left.info().characters == 15);
+				CHECK(left.info().bytes == 15);
 			}
 		}
 	}
@@ -569,11 +569,11 @@ SCENARIO("internal rope-building routines are called")
 
 			THEN("the rope root node-info matches the passage")
 			{
-				CHECK(node_info.bytes == passage_size);
-				CHECK(node_info.characters == passage_size);
-				CHECK(node_info.dropped_bytes == 0);
-				CHECK(node_info.dropped_characters == 0);
-				CHECK(node_info.line_breaks == passage_line_breaks);
+				CHECK(node_info.info().bytes == passage_size);
+				CHECK(node_info.info().characters == passage_size);
+				CHECK(node_info.info().dropped_bytes == 0);
+				CHECK(node_info.info().dropped_characters == 0);
+				CHECK(node_info.info().line_breaks == passage_line_breaks);
 			}
 		}
 
@@ -583,11 +583,11 @@ SCENARIO("internal rope-building routines are called")
 
 			THEN("the node-info matches the passage")
 			{
-				CHECK(node_info.bytes == passage_size);
-				CHECK(node_info.characters == passage_size);
-				CHECK(node_info.dropped_bytes == 0);
-				CHECK(node_info.dropped_characters == 0);
-				CHECK(node_info.line_breaks == passage_line_breaks);
+				CHECK(node_info.info().bytes == passage_size);
+				CHECK(node_info.info().characters == passage_size);
+				CHECK(node_info.info().dropped_bytes == 0);
+				CHECK(node_info.info().dropped_characters == 0);
+				CHECK(node_info.info().line_breaks == passage_line_breaks);
 			}
 		}
 	}
