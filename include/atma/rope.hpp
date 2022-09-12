@@ -2660,6 +2660,7 @@ namespace atma::_rope_
 				// case 2.1.2 - in the middle, try and remove seam
 				else if (auto maybe_nodes = mend_left_seam_(seam, branch.child_at((int)child_idx - 1), left_info))
 				{
+#if 0
 					auto const& [prev, child] = *maybe_nodes;
 					auto [rl, rr] = construct_from_(
 						xfer_src(branch.children()).to(child_idx - 1),
@@ -2668,6 +2669,8 @@ namespace atma::_rope_
 					
 					ATMA_ASSERT(!rr);
 					return {rl, rr, seam_t::none};
+#endif
+					return {};
 				}
 				// case 2.1.3 - we could not mend the seam (there was no corresponding cr)
 				else
