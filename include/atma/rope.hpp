@@ -1018,7 +1018,7 @@ namespace atma::_rope_
 	template <typename RT>
 	struct split_result_t
 	{
-		size_t tree_height = 0;
+		uint32_t tree_height = 0;
 		maybe_tree_t<RT> left, right;
 	};
 
@@ -2900,13 +2900,14 @@ namespace atma::_rope_
 		auto const& [orig_height, split_left, split_right] = result;
 
 		// "we", in this stack-frame, are one level higher than what was returned in result
-		size_t const our_height = orig_height + 1;
+		uint32_t const our_height = orig_height + 1;
 
 		// validate assumptions:
 		//
 		//  - split_idx is valid
-		//
+		//  - either split_left, split_right, or both are valid
 		ATMA_ASSERT(split_idx < dest.children().size());
+		ATMA_ASSERT(!!split_left || !!split_right);
 		//
 		// validate invariants of the split-nodes' children, if the split-nodes
 		// were internal nodes (and not leaf nodes, obv).
@@ -2921,6 +2922,8 @@ namespace atma::_rope_
 		//
 		if constexpr (debug_internal_validation_v<RT>)
 		{
+			ATMA_ASSERT(validate_rope_.internal_node(dest.as_tree()));
+
 			if (split_left.has_value() && split_left.value().is_branch())
 			{
 				auto const& left_branch = split_left.value().as_branch();
@@ -2945,8 +2948,12 @@ namespace atma::_rope_
 			// with split_idx equalling zero, the node at idx 0 has been split in two, and
 			// thus there's no LHS upon which to merge split_left - we simply pass along
 			// split_left up the callstack. the RHS must be joined to split_right appropriately
-
-			if (split_right.value().is_saturated() && split_right.value().height() == orig_height)
+			if (!split_right)
+			{
+				auto right = make_internal_ptr<RT>(our_height, dest.children().subspan(1));
+				return {our_height, split_left, right};
+			}
+			else if (split_right.value().is_saturated() && split_right.value().height() == orig_height)
 			{
 				// optimization: if split_right is a valid child-node, just change idx 0 to split_right
 				auto right = replace_(dest, split_idx, split_right.value());
@@ -2963,19 +2970,22 @@ namespace atma::_rope_
 		}
 		else if (split_idx == dest.child_count() - 1)
 		{
-			if (split_left.value().is_saturated() && split_left.value().height() == orig_height)
+			if (!split_left)
+			{
+				auto left = make_internal_ptr<RT>(our_height, dest.children().subspan(0, split_idx));
+				return {our_height, left, split_right};
+			}
+			else if (split_left.value().is_saturated() && split_left.value().height() == orig_height)
 			{
 				// optimization: if split_left is a valid child-node, just replace
 				// the last node of our children to split_left
 				auto left = replace_(dest, split_idx, split_left.value());
-
 				return {our_height, left, split_right};
 			}
 			else
 			{
 				auto lhs_children = node_split_across_lhs_(dest, split_idx);
 				auto left = tree_concat_(lhs_children, split_left.value());
-
 				return {our_height, left, split_right};
 			}
 		}
