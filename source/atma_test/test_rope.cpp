@@ -840,6 +840,12 @@ SCENARIO("user calls rope_t::split at a valid index")
 					CHECK(atma::_rope_::validate_rope_(left.root()));
 					CHECK(atma::_rope_::validate_rope_(right.root()));
 				}
+
+				THEN("both ropes will equal to their passage")
+				{
+					CHECK(left == atma::xfer_src(passage, passage_size).to(i));
+					CHECK(right == atma::xfer_src(passage, passage_size).from(i));
+				}
 			}
 		}
 	}
