@@ -44,6 +44,7 @@
     <OutDir>$(ProjectDir)..\..\builds\$(Platform)\$(Configuration)\$(TargetName)\</OutDir>
     <IntDir>$(ProjectDir)..\..\intermediates\$(Platform)\$(Configuration)\$(TargetName)\</IntDir>
     <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
+    <SourcePath>$(ProjectDir)..\..\source;$(VC_SourcePath);</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='TestOpt|x64'">
     <IncludePath>$(ProjectDir)..\..\vendor;$(ProjectDir)..\..\include;$(IncludePath)</IncludePath>
