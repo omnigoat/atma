@@ -5,7 +5,6 @@
 #include <atma/algorithm.hpp>
 #include <atma/utf/utf8_string.hpp>
 
-#include <variant>
 #include <optional>
 #include <array>
 #include <functional>
@@ -14,6 +13,7 @@
 #include <concepts>
 #include <list>
 #include <ranges>
+#include <variant>
 
 #define ATMA_ROPE_DEBUG_BUFFER 1
 
@@ -1833,8 +1833,8 @@ namespace atma::_rope_
 				insbuf.subspan(0, insbuf_split_idx));
 
 			new_rhs = _rope_::make_leaf_ptr<RT>(
-				hostbuf.subspan(split_idx - insbuf_split_idx, hostbuf.size() - split_idx + insbuf_split_idx),
-				insbuf.subspan(insbuf_split_idx, insbuf.size() - insbuf_split_idx));
+				insbuf.subspan(insbuf_split_idx, insbuf.size() - insbuf_split_idx),
+				hostbuf.subspan(split_idx - insbuf_split_idx, hostbuf.size() - split_idx + insbuf_split_idx));
 		}
 
 		return std::make_tuple(
@@ -3046,12 +3046,13 @@ namespace atma::_rope_
 		{
 			auto const& branch = tree.as_branch();
 
-			ATMA_ASSERT(rel_char_idx < branch.info().characters);
-			ATMA_ASSERT(rel_char_end_idx < branch.info().characters);
+			ATMA_ASSERT(rel_char_idx < rel_char_end_idx);
+			ATMA_ASSERT(rel_char_idx <= branch.info().characters);
+			ATMA_ASSERT(rel_char_end_idx <= branch.info().characters);
 
 			// find begin & end children
 			auto [start_child_idx, start_char_idx] = find_for_char_idx(branch.node(), rel_char_idx);
-			auto [end_child_idx, end_char_idx] = find_for_char_idx(branch.node(), rel_char_end_idx);
+			auto [end_child_idx, end_char_idx] = find_for_char_idx_within(branch.node(), rel_char_end_idx);
 
 
 			// case 1: the section to erase is entirely within one child
@@ -3066,11 +3067,21 @@ namespace atma::_rope_
 					auto [ins_lhs, ins_rhs] = replace_and_insert_(branch, start_child_idx, *result_lhs, result_rhs);
 					return {ins_lhs, ins_rhs};
 				}
-				else
+				else if (result_rhs)
 				{
-					ATMA_ASSERT(result_rhs);
 					auto result = replace_(branch, start_child_idx, *result_rhs);
 					return {result};
+				}
+				else
+				{
+					// we lost the whole node, a.k.a. the char-idxs happened to be the
+					// first and last indexes of this buffer
+
+					auto new_branch = make_internal_ptr<RT>(branch.height(),
+						xfer_src(branch.children()).to(start_child_idx),
+						xfer_src(branch.children()).from(start_child_idx + 1));
+
+					return {new_branch};
 				}
 			}
 			// case 2: what to delete spans more than one child
