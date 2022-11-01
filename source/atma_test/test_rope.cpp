@@ -768,43 +768,70 @@ SCENARIO("user erases some of the rope")
 			}
 		}
 	}
+
+	GIVEN("a rope constructed from a known passage")
+	{
+		WHEN("we erase from any index with for certain lengths")
+		{
+			for (int e = 1; e != 20; ++e)
+			{
+				CAPTURE(e);
+				for (int i = 0; i != passage_size - e; ++i)
+				{
+					CAPTURE(i);
+					test_rope_t rope{passage, passage_size};
+
+					rope.erase(i, e);
+
+					std::string comp_passage;
+					{
+						comp_passage.append(passage, i);
+						comp_passage.append(passage + i + e, passage_size - i - e);
+					}
+
+					CHECK(rope == comp_passage.c_str());
+				}
+			}
+		}
+	}
 }
 
 SCENARIO("user calls rope_t::insert at a valid index")
 {
 	GIVEN("a rope of traits <4, 9> constructed from a passage")
 	{
-		atma::basic_rope_t<atma::rope_basic_traits<4, 9>> rope{passage, passage_size};
-
-		for (int i = 0; i != passage_size; ++i)
-		{
-			WHEN("we insert \"zxcv\" into the rope at any index")
-			{
-				rope.insert(i, "zxcv", 4);
-
-				std::string comp_passage;
-				{
-					comp_passage.append(passage, i);
-					comp_passage.append("zxcv", 4);
-					comp_passage.append(passage + i, passage_size - i);
-				}
-
-				THEN("both resultant parts are valid ropes")
-				{
-					CHECK(rope == comp_passage.c_str());
-				}
-			}
-		}
-	}
-
-	GIVEN("a rope of traits <4, 9> constructed from a passage")
-	{
-		atma::basic_rope_t<atma::rope_basic_traits<4, 9>> rope{passage, passage_size};
-
 		WHEN("we insert \"zxcv\" into the rope at any index")
 		{
 			for (int i = 0; i != passage_size; ++i)
 			{
+				CAPTURE(i);
+
+				atma::basic_rope_t<atma::rope_basic_traits<4, 9>> rope{passage, passage_size};
+				
+				rope.insert(i, "zxcv", 4);
+				
+				std::string comp_passage;
+				{
+					comp_passage.append(passage, i);
+					comp_passage.append("zxcv", 4);
+					comp_passage.append(passage + i, passage_size - i);
+				}
+
+				CHECK(rope == comp_passage.c_str());
+			}
+		}
+	}
+
+	GIVEN("a rope of traits <8, 9> constructed from a passage")
+	{
+		WHEN("we insert \"zxcv\" into the rope at any index")
+		{
+			for (int i = 0; i != passage_size; ++i)
+			{
+				CAPTURE(i);
+
+				atma::basic_rope_t<atma::rope_basic_traits<8, 9>> rope{passage, passage_size};
+
 				rope.insert(i, "zxcv", 4);
 
 				std::string comp_passage;
@@ -814,10 +841,7 @@ SCENARIO("user calls rope_t::insert at a valid index")
 					comp_passage.append(passage + i, passage_size - i);
 				}
 
-				THEN("both resultant parts are valid ropes")
-				{
-					CHECK(rope == comp_passage.c_str());
-				}
+				CHECK(rope == comp_passage.c_str());
 			}
 		}
 	}
@@ -835,17 +859,11 @@ SCENARIO("user calls rope_t::split at a valid index")
 			{
 				auto [left, right] = rope.split(i);
 
-				THEN("both resultant parts are valid ropes")
-				{
-					CHECK(atma::_rope_::validate_rope_(left.root()));
-					CHECK(atma::_rope_::validate_rope_(right.root()));
-				}
-
-				THEN("both ropes will equal to their passage")
-				{
-					CHECK(left == atma::xfer_src(passage, passage_size).to(i));
-					CHECK(right == atma::xfer_src(passage, passage_size).from(i));
-				}
+				CHECK(atma::_rope_::validate_rope_(left.root()));
+				CHECK(atma::_rope_::validate_rope_(right.root()));
+				
+				CHECK(left == atma::xfer_src(passage, passage_size).to(i));
+				CHECK(right == atma::xfer_src(passage, passage_size).from(i));
 			}
 		}
 	}
@@ -860,11 +878,8 @@ SCENARIO("user calls rope_t::split at a valid index")
 			{
 				auto [left, right] = rope.split(i);
 
-				THEN("both resultant parts are valid ropes")
-				{
-					CHECK(atma::_rope_::validate_rope_(left.root()));
-					CHECK(atma::_rope_::validate_rope_(right.root()));
-				}
+				CHECK(atma::_rope_::validate_rope_(left.root()));
+				CHECK(atma::_rope_::validate_rope_(right.root()));
 			}
 		}
 	}

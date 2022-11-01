@@ -149,7 +149,7 @@
 		<DisplayString>dest_bounded_memxfer_t&lt;{"$T1", sb}&gt;</DisplayString>
 		<Expand>
 			<!-- I can't understand the spaces for templating here... -->
-			<ExpandedItem >(atma::detail::bounded_memxfer_impl_t&lt;atma::dest_memory_tag_t,$T1,$T2,$T3 &gt;*)this</ExpandedItem>
+			<ExpandedItem >(atma::detail::bounded_memxfer_impl_t&lt;atma::dest_memory_tag_t,$T1,$T2,$T3&gt;*)this</ExpandedItem>
 		</Expand>
 	</Type>
 
