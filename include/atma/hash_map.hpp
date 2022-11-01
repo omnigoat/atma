@@ -2,7 +2,6 @@
 
 #include "hash.hpp"
 #include "math/functions.hpp"
-#include "meta.hpp"
 #include <atma/assert.hpp>
 
 #include <functional>
@@ -10,6 +9,7 @@
 
 import atma.memory;
 import atma.types;
+import atma.meta;
 
 #if USE_SPP_HASH_MAP
 
@@ -158,7 +158,7 @@ namespace atma::detail
 		, bucket_count_(buckets)
 		, bucket_size_(bucket_size)
 		, bucket_bitmask_(math::log2((uint)bucket_count_))
-		, buckets_(bucket_count_ * sizeof(bucket_chain_ptr), alloc)
+		, buckets_(atma::allocate_n, bucket_count_ * sizeof(bucket_chain_ptr), alloc)
 	{
 		//buckets_.memory_operations().memzero(0, bucket_count_ * sizeof(bucket_chain_ptr));
 		//memory::memzero()
@@ -344,11 +344,11 @@ namespace atma::detail
 				// we have a filled slot
 				if ((chain_ptr->filled & b) == b)
 				{
-					if constexpr (std::is_invocable<F>)
+					if constexpr (std::is_invocable_v<F>)
 					{
 						std::invoke(std::forward<F>(f));
 					}
-					else if constexpr (std::is_invocable_r<void, F, value_type&>)
+					else if constexpr (std::is_invocable_r_v<void, F, value_type&>)
 					{
 						std::invoke(std::forward<F>(f), chain_ptr->at(element_idx));
 					}
