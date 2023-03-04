@@ -1,7 +1,5 @@
 #pragma once
 
-import atma.types;
-
 #include <type_traits>
 #include <tuple>
 
@@ -19,24 +17,26 @@ namespace atma::detail
 	template <typename Fwd, typename Gs, typename F>
 	struct functor_call_;
 
-	template <typename F, typename... Fs>
-	struct functor_call_<functor_call_no_fwds_t, std::tuple<Fs...>, F>
+	template <typename F, typename... Gs>
+	struct functor_call_<functor_call_no_fwds_t, std::tuple<Gs...>, F>
 	{
 		static_assert(std::is_empty_v<F>, "functor must be empty");
 
-		template <typename... Args, typename = std::enable_if_t<(!std::is_invocable_v<Fs, Args...> && ...)>>
+		template <typename... Args>
+		requires (!std::is_invocable_v<Gs, Args...> && ...)
 		constexpr auto operator ()(Args&&... args) const -> std::invoke_result_t<F, Args...>
 		{
 			return reinterpret_cast<F&>(const_cast<functor_call_&>(*this))(std::forward<Args>(args)...);
 		}
 	};
 
-	template <typename... Fwds, typename F, typename... Fs>
-	struct functor_call_<functor_call_fwds_t<Fwds...>, std::tuple<Fs...>, F>
+	template <typename... Fwds, typename F, typename... Gs>
+	struct functor_call_<functor_call_fwds_t<Fwds...>, std::tuple<Gs...>, F>
 	{
 		static_assert(std::is_empty_v<F>, "functor must be empty");
 
-		template <typename... Args, typename = std::enable_if_t<(!std::is_invocable_v<Fs, Fwds..., Args...> && ...)>>
+		template <typename... Args>
+		requires (!std::is_invocable_v<Gs, Fwds..., Args...> && ...)
 		constexpr auto operator ()(Args&&... args) const -> std::invoke_result_t<F, Fwds..., Args...>
 		{
 			return reinterpret_cast<F const&>(*this)(reinterpret_cast<Fwds const&>(*this)..., std::forward<Args>(args)...);
@@ -90,8 +90,8 @@ namespace atma
 	};
 
 	template <typename... Fwds, typename... Fs>
-	functor_list_t(functor_call_fwds_t<Fwds...>, Fs&&...) -> functor_list_t<functor_call_fwds_t<Fwds...>, rm_ref_t<Fs>...>;
+	functor_list_t(functor_call_fwds_t<Fwds...>, Fs&&...) -> functor_list_t<functor_call_fwds_t<Fwds...>, std::remove_reference_t<Fs>...>;
 
 	template <typename... Fs>
-	functor_list_t(Fs&&...) -> functor_list_t<functor_call_no_fwds_t, rm_ref_t<Fs>...>;
+	functor_list_t(Fs&&...) -> functor_list_t<functor_call_no_fwds_t, std::remove_reference_t<Fs>...>;
 }

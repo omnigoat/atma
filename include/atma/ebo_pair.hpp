@@ -2,6 +2,8 @@
 
 #include <type_traits>
 
+import atma.types;
+
 // ebo-pair
 namespace atma::detail
 {
