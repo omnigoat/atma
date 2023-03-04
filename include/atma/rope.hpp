@@ -828,6 +828,9 @@ namespace atma::_rope_
 	template <typename RT>
 	auto find_for_char_idx(node_internal_t<RT> const& x, size_t char_idx) -> std::tuple<size_t, size_t>;
 
+	template <typename RT>
+	auto tree_find_for_char_idx_within(tree_branch_t<RT> const& x, size_t char_idx) -> std::tuple<size_t, size_t>;
+
 	// find_for_char_idx_within :: returns <index-of-child-node, remaining-characters>
 	//    this version will return a child that terminates on the index
 	template <typename RT>

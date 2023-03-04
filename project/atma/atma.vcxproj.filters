@@ -208,9 +208,6 @@
     <ClCompile Include="..\..\modules\atma\bind.cppm">
       <Filter>modules</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\modules\atma\memory.cppm">
-      <Filter>modules</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\modules\atma\meta.cppm">
       <Filter>modules</Filter>
     </ClCompile>
@@ -220,6 +217,7 @@
     <ClCompile Include="..\..\modules\atma\vector.cppm">
       <Filter>modules</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\modules\atma\memory.cppm" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />

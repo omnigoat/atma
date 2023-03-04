@@ -146,7 +146,7 @@ export namespace atma
 		{};
 
 	template <typename T>
-	constexpr static bool is_function_pointer_v = is_function_pointer_t<T>::value;
+	constexpr inline bool is_function_pointer_v = is_function_pointer_t<T>::value;
 
 	//
 	//  is_function_reference
@@ -160,7 +160,7 @@ export namespace atma
 		{};
 
 	template <typename T>
-	constexpr static bool is_function_reference_v = is_function_reference_t<T>::value;
+	constexpr inline bool is_function_reference_v = is_function_reference_t<T>::value;
 
 	//
 	//  is_callable_v
