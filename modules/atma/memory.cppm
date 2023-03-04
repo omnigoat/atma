@@ -511,11 +511,22 @@ export namespace atma
 // get_allocator
 export namespace atma
 {
-	constexpr auto get_allocator = functor_list_t
+#if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
+	constexpr inline auto get_allocator = functor_list_t
 	{
 		[](auto&& r) -> decltype(r.get_allocator()) { return r.get_allocator(); },
 		[](auto&& r) { return std::allocator<rm_cvref_t<value_type_of_t<decltype(r)>>>(); }
 	};
+#else
+	auto get_allocator(auto&& x)
+	{
+		return functor_list_t
+		{
+			[](auto&& r) -> decltype(r.get_allocator()) { return r.get_allocator(); },
+			[](auto&& r) { return std::allocator<rm_cvref_t<value_type_of_t<decltype(r)>>>(); }
+		}(x);
+	}
+#endif
 }
 
 // concept: memory
@@ -537,20 +548,18 @@ export namespace atma
 	};
 
 	template <typename Memory>
-	concept dest_memory_concept = memory_concept<Memory> &&
-		std::is_same_v<dest_memory_tag_t, typename rm_ref_t<Memory>::tag_type>;
+	concept dest_tagged_concept = std::is_same_v<dest_memory_tag_t, typename rm_ref_t<Memory>::tag_type>;
 
 	template <typename Memory>
-	concept src_memory_concept = memory_concept<Memory> &&
-		std::is_same_v<src_memory_tag_t, typename rm_ref_t<Memory>::tag_type>;
+	concept src_tagged_concept = std::is_same_v<src_memory_tag_t, typename rm_ref_t<Memory>::tag_type>;
 
-	template <typename Memory>
-	concept dest_bounded_memory_concept = bounded_memory_concept<Memory> &&
-		std::is_same_v<dest_memory_tag_t, typename rm_ref_t<Memory>::tag_type>;
-
-	template <typename Memory>
-	concept src_bounded_memory_concept = bounded_memory_concept<Memory> &&
-		std::is_same_v<src_memory_tag_t, typename rm_ref_t<Memory>::tag_type>;
+	// these are the primary concepts used throughout the memory system to
+	// for function arguments, to determine behaviour/optimziations we can
+	// infer -- most notably asserting sizes match
+	template <typename Memory> concept dest_memory_concept = memory_concept<Memory> && dest_tagged_concept<Memory>;
+	template <typename Memory> concept src_memory_concept = memory_concept<Memory> && src_tagged_concept<Memory>;
+	template <typename Memory> concept dest_bounded_memory_concept = bounded_memory_concept<Memory> && dest_tagged_concept<Memory>;
+	template <typename Memory> concept src_bounded_memory_concept = bounded_memory_concept<Memory> && src_tagged_concept<Memory>;
 }
 
 // memory traits
@@ -1172,6 +1181,7 @@ export namespace atma::detail
 		}
 	};
 
+#if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
 	template <typename F>
 	constexpr auto _memory_range_construct_delegate_ = functor_list_t
 	{
@@ -1187,20 +1197,61 @@ export namespace atma::detail
 			f(dest, sz);
 		}
 	};
+#else
+	auto _memory_range_construct_delegate_(auto const& ff, auto&&... args)
+	{
+		return functor_list_t
+		{
+			[](auto& f, dest_bounded_memory_concept auto&& dest)
+			{
+				f(dest, std::size(dest));
+			},
+
+			[](auto& f, dest_memory_concept auto&& dest, size_t sz)
+			{
+				f(dest, sz);
+			}
+		}(ff, std::forward<decltype(args)>(args)...);
+	}
+#endif
 }
 
 export namespace atma
 {
-	constexpr auto memory_default_construct = detail::_memory_range_construct_delegate_<decltype(detail::_memory_default_construct_)>;
-	constexpr auto memory_value_construct = detail::_memory_range_construct_delegate_<decltype(detail::_memory_value_construct_)>;
+#if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
+	constexpr inline auto memory_default_construct = detail::_memory_range_construct_delegate_<decltype(detail::_memory_default_construct_)>;
+	constexpr inline auto memory_value_construct = detail::_memory_range_construct_delegate_<decltype(detail::_memory_value_construct_)>;
 
-	constexpr auto memory_direct_construct = [](dest_memory_concept auto&& dest, auto&&... args)
+	constexpr inline auto memory_direct_construct = [](dest_memory_concept auto&& dest, auto&&... args)
 	{
 		detail::_memory_direct_construct_(
 			dest,
 			std::size(dest),
 			std::forward<decltype(args)>(args)...);
 	};
+#else
+	inline auto memory_default_construct(auto&&... args)
+	{
+		detail::_memory_range_construct_delegate_(
+			detail::_memory_default_construct_,
+			std::forward<decltype(args)>(args)...);
+	}
+
+	inline auto memory_value_construct(auto&&... args)
+	{
+		detail::_memory_range_construct_delegate_(
+			detail::_memory_value_construct_,
+			std::forward<decltype(args)>(args)...);
+	}
+
+	constexpr inline auto memory_direct_construct = [](dest_memory_concept auto&& dest, auto&&... args)
+		{
+			detail::_memory_direct_construct_(
+				dest,
+				std::size(dest),
+				std::forward<decltype(args)>(args)...);
+		};
+#endif
 }
 
 
@@ -1212,7 +1263,7 @@ export namespace atma
 // memory_copy_construct / memory_move_construct
 export namespace atma::detail
 {
-	constexpr auto _memory_copy_construct_ = functor_list_t
+	constexpr inline auto _memory_copy_construct_ = functor_list_t
 	{
 		[](auto&& dest, auto&& src, size_t sz)
 		{
@@ -1235,7 +1286,7 @@ export namespace atma::detail
 		}
 	};
 
-	constexpr auto _memory_move_construct_ = functor_list_t
+	constexpr inline auto _memory_move_construct_ = functor_list_t
 	{
 		[](auto&& dest, auto&& src, size_t sz)
 		{
@@ -1325,8 +1376,16 @@ namespace atma::detail
 
 export namespace atma
 {
-	constexpr auto memory_copy_construct = detail::_memory_copymove_delegate_<decltype(detail::_memory_copy_construct_)>;
-	constexpr auto memory_move_construct = detail::_memory_copymove_delegate_<decltype(detail::_memory_move_construct_)>;
+#if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
+	constexpr inline auto memory_copy_construct = detail::_memory_copymove_delegate_<decltype(detail::_memory_copy_construct_)>;
+	constexpr inline auto memory_move_construct = detail::_memory_copymove_delegate_<decltype(detail::_memory_move_construct_)>;
+#else
+	constexpr inline auto memory_copy_construct = [](auto&&... args)
+		{ return detail::_memory_copymove_delegate_<decltype(detail::_memory_copy_construct_)>(std::forward<decltype(args)>(args)...); };
+
+	constexpr inline auto memory_move_construct = [](auto&&... args)
+		{ return detail::_memory_copymove_delegate_<decltype(detail::_memory_move_construct_)>(std::forward<decltype(args)>(args)...); };
+#endif
 }
 
 
@@ -1473,7 +1532,13 @@ export namespace atma::detail
 
 export namespace atma
 {
-	constexpr auto memory_relocate_range = functor_list_t
+#if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
+	constexpr inline auto memory_relocate_range = functor_list_t
+#else
+	constexpr inline auto memory_relocate_range = [](auto&&... args)
+	{
+		functor_list_t
+#endif
 	{
 		[] (auto&& dest, auto&& src, size_t sz)
 		requires dest_memory_concept<decltype(dest)> && src_memory_concept<decltype(src)>
@@ -1534,12 +1599,25 @@ export namespace atma
 				std::data(src),
 				std::size(src));
 		},
+#if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
 	};
+#else
+	}(std::forward<decltype(args)>(args)...);
+	};
+#endif
+
+
 }
 
 export namespace atma
 {
-	constexpr auto memory_compare = functor_list_t
+#if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
+	inline auto memory_compare = functor_list_t
+#else
+	inline auto memory_compare = [](auto&&... args)
+	{
+		return functor_list_t
+#endif
 	{
 		[](auto&& lhs, auto&& rhs, size_t sz)
 		requires memory_concept<decltype(lhs)> && memory_concept<decltype(rhs)>
@@ -1578,5 +1656,9 @@ export namespace atma
 				return ::memcmp(std::data(lhs), std::data(rhs), lhs_sz);
 			}
 		}
+#if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
+#else
+		}(std::forward<decltype(args)>(args)...);
+#endif
 	};
 }

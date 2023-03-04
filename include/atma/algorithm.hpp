@@ -10,62 +10,6 @@ import atma.types;
 import atma.vector;
 import atma.meta;
 
-namespace atma::functors
-{
-	template <typename Orig, auto member>
-	struct member_
-	{
-		constexpr member_() = default;
-
-		template <typename... Args>
-		auto operator ()(Args&&... args) const
-		requires meta::all_same<rm_ref_t<Args>...>::value
-		{
-			auto f = [](auto&& x) { return (x.*member); };
-
-			return Orig::apply(f(std::forward<Args>(args))...);
-		}
-
-		template <typename... Args>
-		auto operator ()(Args&&... args) const
-		requires !meta::all_same<rm_ref_t<Args>...>::value
-		{
-			auto f = [](auto&& x) { return (x.*member); };
-
-			return Orig::apply(f(std::forward<Args>(args))...);
-		}
-	};
-
-	inline constexpr struct add_fn
-	{
-		template <typename A, typename B>
-		requires requires(A a, B b) { {a + b}; }
-		auto operator ()(A&& a, B&& b) const
-		{
-			return a + b;
-		}
-
-		template <typename A, typename B>
-		static auto apply(A&& a, B&& b)
-		requires requires{ {operator +(a, b)}; }
-		{
-			return operator +(std::forward<A>(a), std::forward<B>(b));
-		}
-
-		template <auto member>
-		static member_<add_fn, member> member;
-		
-	} add;
-}
-
-namespace atma::functors
-{
-	//template <typename 
-
-	//functors::add.member<&node_info_t<RT>::characters>
-}
-
-
 namespace atma
 {
 	template <typename C>

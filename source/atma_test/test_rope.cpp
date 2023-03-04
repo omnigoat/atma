@@ -22,7 +22,7 @@ namespace
 	using test_rope_t = atma::basic_rope_t<atma::rope_test_traits>;
 
 	char const* passage =
-		"hello there, this is your captain speaking.  \n"
+		"good evening, this is your captain speaking. \n"
 		"unfortunately we forgot to fill up the plane \n"
 		"before takeoff. sorry for the inconvenience, \n"
 		"but I'm going to need some upstanding people \n"
@@ -674,8 +674,8 @@ SCENARIO("user invokes operator == with arguments (rope, rope)")
 	GIVEN("a rope constructed from a known passage")
 	AND_GIVEN("a second rope constructed from the same passage, but missing the first word")
 	{
-		// +5 to skip "hello"
-		char const* passage2 = passage + 5;
+		// +4 to skip "good"
+		char const* passage2 = passage + 4;
 		auto const passage2_size = strlen(passage2);
 
 		test_rope_t rope1{passage, passage_size};
@@ -683,7 +683,7 @@ SCENARIO("user invokes operator == with arguments (rope, rope)")
 
 		WHEN("we insert the missing first word into the second rope, making both ropes lexicographically equivalent")
 		{
-			rope2.insert(0, "hello", 5);
+			rope2.insert(0, "good", 4);
 
 			AND_WHEN("the two ropes are compared with the equality operator")
 			THEN("they evaluate as equal")
@@ -862,8 +862,8 @@ SCENARIO("user calls rope_t::split at a valid index")
 				CHECK(atma::_rope_::validate_rope_(left.root()));
 				CHECK(atma::_rope_::validate_rope_(right.root()));
 				
-				CHECK(left == atma::xfer_src(passage, passage_size).to(i));
-				CHECK(right == atma::xfer_src(passage, passage_size).from(i));
+				CHECK(left == std::string_view{atma::xfer_src(passage, passage_size).to(i).data()});
+				CHECK(right == std::string_view{atma::xfer_src(passage, passage_size).from(i).data()});
 			}
 		}
 	}
