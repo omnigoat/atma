@@ -862,8 +862,8 @@ SCENARIO("user calls rope_t::split at a valid index")
 				CHECK(atma::_rope_::validate_rope_(left.root()));
 				CHECK(atma::_rope_::validate_rope_(right.root()));
 				
-				CHECK(left == std::string_view{atma::xfer_src(passage, passage_size).to(i).data()});
-				CHECK(right == std::string_view{atma::xfer_src(passage, passage_size).from(i).data()});
+				CHECK(left == atma::xfer_src(passage, passage_size).to(i));
+				CHECK(right == atma::xfer_src(passage, passage_size).from(i));
 			}
 		}
 	}

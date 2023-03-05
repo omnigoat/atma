@@ -625,7 +625,7 @@ namespace atma
 		auto size() const -> size_t { return root_.info().characters; }
 		auto size_bytes() const -> size_t { return root_.info().bytes - root_.info().dropped_bytes; }
 
-		auto operator == (std::string_view) const -> bool;
+		
 
 
 	private:
@@ -637,8 +637,17 @@ namespace atma
 		friend struct _rope_::build_rope_t_<RopeTraits>;
 	};
 
-	template <typename RopeTraits>
-	auto operator == (basic_rope_t<RopeTraits> const&, basic_rope_t<RopeTraits> const&) -> bool;
+
+	// comparison operators
+	template <typename RT>
+	auto operator == (basic_rope_t<RT> const&, basic_rope_t<RT> const&) -> bool;
+
+	template <typename RT>
+	auto operator == (basic_rope_t<RT> const&, std::string_view) -> bool;
+	
+	template <typename RT, std::ranges::contiguous_range Range>
+	requires std::same_as<std::remove_const_t<std::ranges::range_value_t<Range>>, char>
+	auto operator == (basic_rope_t<RT> const&, Range const& rhs) -> bool;
 }
 
 
@@ -3835,76 +3844,6 @@ namespace atma
 	{}
 
 	template <typename RT>
-	inline auto basic_rope_t<RT>::operator == (std::string_view string) const -> bool
-	{
-		if (this->size() == 0)
-			return string.empty();
-
-		auto iter = basic_rope_char_iterator_t<RT>{*this};
-
-		auto blah = utf8_const_range_t{string.begin(), string.end()};
-		for (auto&& x : blah)
-		{
-			if (*iter != x)
-				return false;
-			++iter;
-		}
-
-		return true;
-	}
-
-	template <typename RT>
-	inline auto operator == (basic_rope_t<RT> const& lhs, basic_rope_t<RT> const& rhs) -> bool
-	{
-		if (static_cast<_rope_::tree_t<RT> const&>(lhs.root()).size_bytes() != static_cast<_rope_::tree_t<RT> const&>(rhs.root()).size_bytes())
-			return false;
-
-		_rope_::basic_leaf_iterator_t<RT> lhs_leaf_iter{lhs};
-		_rope_::basic_leaf_iterator_t<RT> rhs_leaf_iter{rhs};
-		_rope_::basic_leaf_iterator_t<RT> sentinel;
-
-		// loop through leaves for both ropes
-		size_t lhs_offset = 0;
-		size_t rhs_offset = 0;
-		while (lhs_leaf_iter != sentinel && rhs_leaf_iter != sentinel)
-		{
-			auto lhsd = lhs_leaf_iter->data().from(lhs_offset);
-			auto rhsd = rhs_leaf_iter->data().from(rhs_offset);
-
-			if (auto r = memory_compare(lhsd, rhsd); r == 0)
-			{
-				// memory contents compared completely, keep going
-				++lhs_leaf_iter;
-				++rhs_leaf_iter;
-				lhs_offset = rhs_offset = 0;
-			}
-			else if (r == std::size(rhsd))
-			{
-				// memory contents compared equally, but rhs ran out of characters
-				++rhs_leaf_iter;
-				lhs_offset = r;
-				rhs_offset = 0;
-			}
-			else if (-r == std::size(lhsd))
-			{
-				// memory contents compared equally, but lhs ran out of characters
-				++lhs_leaf_iter;
-				lhs_offset = 0;
-				rhs_offset = -r;
-			}
-			else
-			{
-				// did not compare equally
-				return false;
-			}
-		}
-
-		// exhausted leaves to compare (all tested equal), so if we exhausted
-		// both ropes equally, then they were completely equal
-		return (lhs_leaf_iter == sentinel && rhs_leaf_iter == sentinel);
-	}
-
-	template <typename RT>
 	inline auto basic_rope_t<RT>::push_back(char const* str, size_t sz) -> void
 	{
 		this->insert(root_.info().characters, str, sz);
@@ -4051,7 +3990,95 @@ namespace atma
 		return stream;
 	}
 
+	template <typename RT>
+	inline auto operator == (basic_rope_t<RT> const& lhs, basic_rope_t<RT> const& rhs) -> bool
+	{
+		if (static_cast<_rope_::tree_t<RT> const&>(lhs.root()).size_bytes() != static_cast<_rope_::tree_t<RT> const&>(rhs.root()).size_bytes())
+			return false;
 
+		_rope_::basic_leaf_iterator_t<RT> lhs_leaf_iter{ lhs };
+		_rope_::basic_leaf_iterator_t<RT> rhs_leaf_iter{ rhs };
+		_rope_::basic_leaf_iterator_t<RT> sentinel;
+
+		// loop through leaves for both ropes
+		size_t lhs_offset = 0;
+		size_t rhs_offset = 0;
+		while (lhs_leaf_iter != sentinel && rhs_leaf_iter != sentinel)
+		{
+			auto lhsd = lhs_leaf_iter->data().from(lhs_offset);
+			auto rhsd = rhs_leaf_iter->data().from(rhs_offset);
+
+			if (auto r = memory_compare(lhsd, rhsd); r == 0)
+			{
+				// memory contents compared completely, keep going
+				++lhs_leaf_iter;
+				++rhs_leaf_iter;
+				lhs_offset = rhs_offset = 0;
+			}
+			else if (r == std::size(rhsd))
+			{
+				// memory contents compared equally, but rhs ran out of characters
+				++rhs_leaf_iter;
+				lhs_offset = r;
+				rhs_offset = 0;
+			}
+			else if (-r == std::size(lhsd))
+			{
+				// memory contents compared equally, but lhs ran out of characters
+				++lhs_leaf_iter;
+				lhs_offset = 0;
+				rhs_offset = -r;
+			}
+			else
+			{
+				// did not compare equally
+				return false;
+			}
+		}
+
+		// exhausted leaves to compare (all tested equal), so if we exhausted
+		// both ropes equally, then they were completely equal
+		return (lhs_leaf_iter == sentinel && rhs_leaf_iter == sentinel);
+	}
+
+	template <typename RT>
+	inline auto operator == (basic_rope_t<RT> const& lhs, std::string_view rhs) -> bool
+	{
+		if (lhs.size() == 0)
+			return rhs.empty();
+
+		auto iter = basic_rope_char_iterator_t<RT>{ lhs };
+
+		auto utf8range = utf8_const_range_t{ rhs.begin(), rhs.end() };
+		for (auto&& x : utf8range)
+		{
+			if (*iter != x)
+				return false;
+			++iter;
+		}
+
+		return true;
+	}
+
+	template <typename RT, std::ranges::contiguous_range Range>
+	requires std::same_as<std::remove_const_t<std::ranges::range_value_t<Range>>, char>
+	auto operator == (basic_rope_t<RT> const& lhs, Range const& rhs) -> bool
+	{
+		if (lhs.size() == 0)
+			return std::empty(rhs);
+
+		auto iter = basic_rope_char_iterator_t<RT>{ lhs };
+
+		auto utf8range = utf8_const_range_t{ std::ranges::begin(rhs), std::ranges::end(rhs) };
+		for (auto&& x : utf8range)
+		{
+			if (*iter != x)
+				return false;
+			++iter;
+		}
+
+		return true;
+	}
 
 	using rope_t = basic_rope_t<rope_default_traits>;
 }
