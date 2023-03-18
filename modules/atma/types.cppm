@@ -416,3 +416,26 @@ export namespace atma
 	template <typename F>
 	using function_traits = function_traits_override<F>;
 }
+
+
+//
+// is_instance_of
+// ----------------
+//   evaluates to true if the type T is an instantiation of
+//   the templated-type Y
+//
+export namespace atma
+{
+	template <typename T, template <typename...> typename Y>
+	struct is_instance_of
+		: std::false_type
+	{};
+
+	template <template <typename...> typename Y, typename... Args>
+	struct is_instance_of<Y<Args...>, Y>
+		: std::true_type
+	{};
+
+	template <typename F, template <typename... Args> typename Y>
+	inline constexpr bool is_instance_of_v = is_instance_of<F, Y>::value;
+}

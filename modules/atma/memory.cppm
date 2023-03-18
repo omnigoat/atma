@@ -1635,8 +1635,7 @@ export namespace atma
 			return ::memcmp(std::data(lhs), std::data(rhs), sz);
 		},
 
-		[](auto&& lhs, auto&& rhs)
-		requires bounded_memory_concept<decltype(lhs)> && bounded_memory_concept<decltype(rhs)>
+		[](bounded_memory_concept auto&& lhs, bounded_memory_concept auto&& rhs)
 		{
 			auto const lhs_sz = std::size(lhs);
 			auto const rhs_sz = std::size(rhs);

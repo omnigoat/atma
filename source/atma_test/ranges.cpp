@@ -62,6 +62,8 @@ SCENARIO_OF("ranges/filter_t", "ranges can be filtered")
 			auto partial_filter = atma::filter(is_even);
 			auto filtered = partial_filter(numbers);
 			
+			static_assert(atma::detail::is_filter_functor_v<decltype(partial_filter)>);
+
 			// filtered must be referring to @numbers by const-reference
 			static_assert(std::is_same_v<typename decltype(filtered)::storage_range_t, atma::vector<int> const&>);
 
