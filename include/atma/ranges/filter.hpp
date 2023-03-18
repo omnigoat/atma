@@ -27,15 +27,7 @@ namespace std
 namespace atma::detail
 {
 	template <typename T>
-	struct is_filtered_range : std::false_type
-	{};
-
-	template <typename R, typename F>
-	struct is_filtered_range<filtered_range_t<R, F>> : std::true_type
-	{};
-
-	template <typename T>
-	inline constexpr bool is_filtered_range_v = is_filtered_range<T>::value;
+	inline constexpr bool is_filtered_range_v = atma::is_instance_of_v<T, filtered_range_t>;
 }
 
 
@@ -43,19 +35,7 @@ namespace atma::detail
 namespace atma::detail
 {
 	template <typename T>
-	struct is_filter_functor
-	{
-		static constexpr bool value = false;
-	};
-
-	template <typename F>
-	struct is_filter_functor<filter_functor_t<F>>
-	{
-		static constexpr bool value = true;
-	};
-
-	template <typename T>
-	inline constexpr bool is_filter_functor_v = is_filter_functor<T>::value;
+	inline constexpr bool is_filter_functor_v = atma::is_instance_of_v<T, filter_functor_t>;
 }
 
 
