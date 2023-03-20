@@ -475,10 +475,10 @@ export namespace atma
 		auto const offset = std::distance(cbegin(), here);
 		imem_guard_lt(size_ + 1);
 
-		memory_move(
+		memory_relocate(
 			xfer_dest(imem_ + offset + 1),
 			xfer_src(imem_ + offset),
-			(size_ - offset) * sizeof value_type);
+			(size_ - offset));
 
 		memory_construct_at(
 			imem_ + offset,
@@ -501,7 +501,7 @@ export namespace atma
 		memory_move(
 			xfer_dest(imem_ + offset + 1),
 			xfer_src(imem_ + offset),
-			(size_ - offset) * sizeof value_type);
+			(size_ - offset));
 
 		memory_construct_at(
 			imem_ + offset,
@@ -539,20 +539,10 @@ export namespace atma
 
 		if (auto const mvsz = (size_ - offset))
 		{
-			if constexpr (std::is_trivial_v<value_type>)
-			{
-				memory_move(
-					xfer_dest(imem_ + reloc_offset),
-					xfer_src(imem_ + offset),
-					mvsz * sizeof value_type);
-			}
-			else
-			{
-				memory_relocate_range(
-					xfer_dest(imem_ + reloc_offset),
-					xfer_src(imem_ + offset),
-					mvsz);
-			}
+			memory_relocate(
+				xfer_dest(imem_ + reloc_offset),
+				xfer_src(imem_ + offset),
+				mvsz);
 		}
 
 		memory_copy_construct(
@@ -571,8 +561,14 @@ export namespace atma
 
 		auto offset = std::distance(cbegin(), here);
 
-		imem_.destruct(offset, 1);
-		imem_.memmove(offset, offset + 1, (size_ - offset - 1) * sizeof value_type);
+		memory_destruct_at(
+			xfer_dest(imem_ + offset));
+
+		memory_move(
+			xfer_dest(imem_ + offset),
+			xfer_src(imem_ + offset + 1)
+			(size_ - offset - 1));
+
 		--size_;
 
 		imem_guard_gt(size_);

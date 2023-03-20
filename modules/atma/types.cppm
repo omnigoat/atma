@@ -221,6 +221,14 @@ export namespace atma
 	constexpr bool is_implicitly_default_constructible_v = detail::is_implicitly_default_constructible_impl<T>::value;
 }
 
+//
+//
+//
+export namespace atma
+{
+	template <typename T>
+	inline constexpr bool actually_false_v = false;
+}
 
 //
 //  visit_with
