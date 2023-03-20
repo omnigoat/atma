@@ -3516,15 +3516,15 @@ namespace atma::_rope_
 			{
 				auto const remainder_size = max_level_size - RT::branching_factor;
 
+				atma::memory_destruct(
+					xfer_dest(array).to(RT::branching_factor));
+				
+				atma::memory_relocate(
+					xfer_dest(array, remainder_size),
+					xfer_src(array).from(RT::branching_factor));
+				
 				atma::memory_default_construct(
-					xfer_dest(array.data(), RT::branching_factor));
-
-				atma::memory_copy(
-					xfer_dest(array.data(), remainder_size),
-					xfer_src(array.data() + RT::branching_factor));
-
-				atma::memory_default_construct(
-					xfer_dest(array.data() + RT::branching_factor, remainder_size));
+					xfer_dest(array).from(remainder_size));
 
 				stack_level_size(stack, level) = remainder_size;
 			}

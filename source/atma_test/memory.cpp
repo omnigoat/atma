@@ -936,6 +936,48 @@ SCENARIO_OF("memory/operations", "destruct is called")
 	}
 }
 
+SCENARIO_OF("memory/operations", "memory_relocate is used")
+{
+	GIVEN("a memory-range of instantiated dragons")
+	{
+		using value_type = dragon_t;
+		using allocator_type = atma::aligned_allocator_t<dragon_t>;
+		using memory_t = atma::basic_memory_t<value_type, allocator_type>;
+
+		static_assert(std::is_empty_v<allocator_type>, "allocator not empty!");
+
+		dragon_t const oliver{ "oliver", 33 };
+		dragon_t const henry{ "henry", 24 };
+		dragon_t const marcie{ "marcie", 27 };
+		dragon_t const rachael{ "rachael", 19 };
+
+		auto dest_storage = std::vector<value_type>{ oliver, henry, marcie, rachael };
+		auto dest_memory = memory_t(dest_storage.data());
+
+		THEN("trivial")
+		{
+			atma::vector<int> numbers{ 1, 2, 3, 4 };
+			atma::memory_relocate(
+				atma::xfer_dest(numbers, 2),
+				atma::xfer_src(numbers, 2, 2));
+		}
+
+		THEN("non trivial")
+		{
+			atma::memory_relocate(
+				atma::xfer_dest(dest_memory, 2),
+				atma::xfer_src(dest_memory, 2, 2));
+
+			//CHECK_VECTOR(dest_storage,
+			//	marcie, rachael, marcie, rachael);
+			CHECK(dest_storage[0] == marcie);
+			CHECK(dest_storage[1] == rachael);
+		}
+	}
+}
+
+
+
 #if 1
 SCENARIO_OF("memory/operations", "memory_copy or memory_move is called")
 {
@@ -971,7 +1013,7 @@ SCENARIO_OF("memory/operations", "memory_copy or memory_move is called")
 				atma::memory_move(
 					atma::xfer_dest(dest_memory, 2),
 					atma::xfer_src(dest_memory + 1, 2));
-
+				
 				CHECK_VECTOR(dest_storage,
 					2, 3, 3, 4);
 			}
