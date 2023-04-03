@@ -58,7 +58,7 @@ export namespace atma
 //
 //    stores an allocator and performs Empty Base Class optimization.
 //
-namespace atma::detail
+export namespace atma::detail
 {
 	template <typename Allocator, bool = std::is_empty_v<Allocator>>
 	struct base_memory_impl;
