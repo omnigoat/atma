@@ -265,7 +265,7 @@ namespace atma
 		template <typename R, typename = std::void_t<>>
 		struct value_type_of_ii
 		{
-			static_assert(actually_false<R>, "couldn't identify value_type for a supposed range concept");
+			static_assert(actually_false_v<R>, "couldn't identify value_type for a supposed range concept");
 		};
 
 		// anything with a ::value_type subtype is that
