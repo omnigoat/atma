@@ -120,6 +120,7 @@
     <ClCompile Include="..\..\source\atma_test\queue.cpp" />
     <ClCompile Include="..\..\source\atma_test\ranges.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_allocators.cpp" />
+    <ClCompile Include="..\..\source\atma_test\test_atomics.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_events.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_rope.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_utf8_string.cpp" />

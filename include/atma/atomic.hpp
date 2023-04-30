@@ -3,6 +3,9 @@
 #include <atma/config/platform.hpp>
 #include <atma/assert.hpp>
 
+#include <cstdint>
+
+
 import atma.types;
 
 namespace atma
@@ -147,11 +150,10 @@ namespace atma
 				// no fencing required on x86/x64
 			}
 
-			static auto store(D volatile* addr, S const& x) -> void
+			static auto store(D volatile* dest, S const& x) -> void
 			{
-				InterlockedExchange(
-					(LONG volatile*)addr,
-					(LONG const&)x);
+				// write to 4-byte aligned addresses are atomic on x64
+				*(LONG volatile*)dest = *(LONG volatile)&x;
 			}
 
 			static auto pre_inc(D volatile* addr) -> D
