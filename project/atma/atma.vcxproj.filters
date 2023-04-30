@@ -220,6 +220,12 @@
     <ClCompile Include="..\..\modules\atma\memory.cppm">
       <Filter>modules</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\modules\atma\lockfree_list.cppm">
+      <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\modules\atma\atomic.cppm">
+      <Filter>modules</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
