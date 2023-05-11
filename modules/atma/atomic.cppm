@@ -40,6 +40,14 @@ namespace atma::detail
 	struct atomic_implementation;
 }
 
+namespace atma::detail
+{
+	inline bool validate_memory_order(memory_order order)
+	{
+		return order < memory_order_seq_cst;
+	}
+}
+
 //
 //
 // reference implementation
@@ -51,17 +59,16 @@ namespace atma::detail
 //
 namespace atma::detail
 {
-	template <typename Compiler>
-	struct atomic_implementation<_atomics_::reference_implementation, Compiler, 2>
+	template <typename Compiler, size_t BitSize>
+	struct atomic_implementation<_atomics_::reference_implementation, Compiler, BitSize>
 	{
-		template <typename... Types, typename... Addresses>
+		template <typename... Addresses>
 		inline static bool validate_addresses(Addresses... addresses)
 		requires (std::is_pointer_v<Addresses> && ...)
 		{
-			static_assert(((sizeof(Types) == 2) && ...),
-				"sizeof type is not 16-bits. sadness ensues");
-
-			return ((sizeof(Types) == 2) && ...) && ((addresses % 2 == 0) && ...);
+			// a) check the type we're pointing to is BitSize
+			// b) check each address is BitSize aligned
+			return ((sizeof(std::remove_pointer_t<Addresses>) == BitSize) && ...) && ((addresses % BitSize == 0) && ...);
 		}
 
 		template <typename T>
@@ -116,19 +123,19 @@ namespace atma::detail
 		}
 
 		template <typename T>
-		inline auto compare_and_swap(T volatile* addr, T* cmp, T const& val) -> bool
+		inline auto compare_and_swap(T volatile* addr, T* expected, T const& replacement) -> bool
 		{
-			ATMA_ASSERT(validate_addresses(addr, cmp));
+			ATMA_ASSERT(validate_addresses(addr, expected));
 
 			// bitwise comparison required, can't use operator == (T, T)
-			if (auto r = *reinterpret_cast<uint16_t volatile*>(addr); r == *reinterpret_cast<uint16_t*>(cmp))
+			if (auto r = *reinterpret_cast<uint16_t volatile*>(addr); r == *reinterpret_cast<uint16_t*>(expected))
 			{
-				*addr = val;
+				*addr = replacement;
 				return true;
 			}
 			else
 			{
-				*cmp = r;
+				*expected = r;
 				return false;
 			}
 		}
@@ -136,7 +143,66 @@ namespace atma::detail
 }
 
 
+//
+// atomic_reinterpret_cast
+// -------------------------
+// 
+// (openly stolen from microsoft's standard library implementation.)
+//
+// the hidden requirement here that necessitates this is the zeroing
+// out of padding bits of non-integral types. so zero-initializing an
+// integral and memcpying into it seems best.
+//
+// we have placed a further restriction requiring the size of the
+// type & the integral to match exactly
+//
+namespace atma::detail
+{
+	template <std::integral Integral, class SourceType>
+	[[nodiscard]] Integral atomic_reinterpret_cast(SourceType const& source) noexcept
+	requires (sizeof(Integral) == sizeof(SourceType))
+	{
+		if constexpr (std::is_integral_v<SourceType>)
+		{
+			return static_cast<Integral>(source);
+		}
+		else if constexpr (std::is_pointer_v<SourceType>)
+		{
+			return reinterpret_cast<Integral>(source);
+		}
+		else
+		{
+			Integral result{};
+			std::memcpy(&result, std::addressof(source), sizeof(source));
+			return result;
+		}
+	}
+}
 
+//
+// atomic_negate
+// ---------------
+// 
+// even though c++20 defines all integers to be in two's complement,
+// we still run into a pickle when we need to negate INT_MIN, as i.e.,
+// -128 can not be negated to +128 within a byte.
+// 
+// this function will perform unsigned subtraction from zero, which
+// for all non-INT_MIN values will result in exactly the same as
+// regular negation (-x) would, but for INT_MIN will result, with
+// maths, as INT_MIN again
+// 
+// also lol the negate operator (-x) returns a straight-up int, not
+// necessarily the type being negated...
+//
+namespace atma::detail
+{
+	template <std::integral T>
+	[[nodiscard]] static auto atomic_negate(T const& x) noexcept
+	{
+		return static_cast<T>(0U - static_cast<std::make_unsigned_t<T>>(x));
+	}
+}
 
 //
 //
@@ -153,90 +219,177 @@ namespace atma::detail
 // memory barrier. for everything else ~there's mastercard~ there's
 // no need
 //
+//
+// msvc: Interlocked functions all act as full memory barriers.
+//       versions postfixed with Acquire, Release, or NoFence, are
+//       all less barriery than that. this means that many of our
+//       implementations don't look at the memory_order, as by
+//       performing an Interlocked on x64 hardware, we are implicitly
+//       sequentially-consistent, the strongest of guarantees.
+//
 namespace atma::detail
 {
 	template <>
 	struct atomic_implementation<_atomics_::x64, _atomics_::msvc, 2>
 	{
-		template <typename... Types, typename... Addresses>
+		template <typename... Addresses>
 		inline static bool validate_addresses(Addresses... addresses)
 		requires (std::is_pointer_v<Addresses> && ...)
 		{
-			static_assert(((sizeof(Types) == 2) && ...),
-				"sizeof type is not 16-bits. sadness ensues");
-
-			return ((sizeof(Types) == 2) && ...) && (((uintptr_t)addresses % 2 == 0) && ...);
+			// a) check the type we're pointing to is 16-bits
+			// b) check each address is 16-bit aligned
+			return ((sizeof(std::remove_pointer_t<Addresses>) == 2) && ...) && ((addresses % 2 == 0) && ...);
 		}
 
-		template <typename T>
-		inline static auto load(T const volatile* addr, memory_order) -> T
+		template <typename T, bool assume_seq_cst = false>
+		inline static auto load(T const volatile* addr, [[maybe_unused]] memory_order order) -> T
 		{
 			ATMA_ASSERT(validate_addresses(addr));
-			// aligned loads are atomic on x64
-			__int16 r = __iso_volatile_load16(reinterpret_cast<__int16 const volatile*>(addr));
-			return reinterpret_cast<T&>(r);
-		}
 
-		template <typename T>
-		inline void store(T volatile* addr, T const& op, memory_order)
-		{
-			ATMA_ASSERT(validate_addresses(addr));
-			// aligned writes are atomic on x64
-			*addr = op;
-		}
-
-		template <typename T>
-		static auto fetch_add(T volatile* addr, T op, memory_order) -> T
-		{
-			ATMA_ASSERT(validate_addresses(addr));
-			return (*addr = *addr + op) - op;
-		}
-
-		template <typename T>
-		static auto fetch_sub(T volatile* addr, T op, memory_order) -> T
-		{
-			ATMA_ASSERT(validate_addresses(addr));
-			return (*addr = *addr - op) + op;
-		}
-
-		template <typename T>
-		static auto add(T volatile* addr, T op, memory_order) -> T
-		{
-			ATMA_ASSERT(validate_addresses(addr));
-			return (*addr = *addr + op);
-		}
-
-		template <typename T>
-		static auto sub(T volatile* addr, T op, memory_order) -> T
-		{
-			ATMA_ASSERT(validate_addresses(addr));
-			return (*addr = *addr - op);
-		}
-
-		template <typename T>
-		inline auto exchange(T volatile* addr, T const& op, memory_order) -> T
-		{
-			ATMA_ASSERT(validate_addresses(addr));
-			auto r = *addr;
-			*addr = op;
-			return r;
-		}
-
-		template <typename T>
-		inline auto compare_and_swap(T volatile* addr, T* cmp, T const& val) -> bool
-		{
-			ATMA_ASSERT(validate_addresses(addr, cmp));
-
-			// bitwise comparison required, can't use operator ==
-			//if (auto r = *reinterpret_cast<uint16_t volatile*>(addr); r == *reinterpret_cast<uint16_t*>(cmp))
-			if (auto r = *addr; _interlockedbittestandset(addr, *cmp))
+			__int16 const result = __iso_volatile_load16(reinterpret_cast<__int16 const volatile*>(addr));
+			
+			if constexpr (assume_seq_cst)
 			{
-				*addr = val;
+				_Compiler_or_memory_barrier();
+			}
+			else switch (order)
+			{
+				case memory_order::relaxed:
+					break;
+				case memory_order::consume:
+				case memory_order::acquire:
+					_Compiler_or_memory_barrier();
+				case memory_order::release:
+				case memory_order::acq_rel:
+				default:
+					ATMA_HALT("incorrect memory order"); 
+			}
+
+			return reinterpret_cast<T const&>(result);
+		}
+
+		template <typename T, bool assume_seq_cst = false>
+		inline void store(T volatile* addr, T const& x, [[maybe_unused]] memory_order order)
+		{
+			ATMA_ASSERT(validate_addresses(addr));
+
+			__int16 const bytes = atomic_reinterpret_cast<__int16>(x);
+
+			if constexpr (assume_seq_cst)
+			{
+				InterlockedExchange16(reinterpret_cast<__int16 volatile*>(addr), bytes);
+			}
+			else
+			{
+				__iso_volatile_store16(reinterpret_cast<__int16 volatile*>(addr), bytes);
+
+				switch (order)
+				{
+					case memory_order::relaxed:
+						break;
+					case memory_order::release:
+						_Compiler_barrier();
+					case memory_order::consume:
+					case memory_order::acquire:
+					case memory_order::acq_rel:
+					default:
+						ATMA_HALT("incorrect memory order");
+				}
+			}
+		}
+
+		template <typename T>
+		static auto fetch_add(T volatile* addr, T const& op, [[maybe_unused]] memory_order order) -> T
+		{
+			ATMA_ASSERT(validate_addresses(addr));
+			ATMA_ASSERT(validate_memory_order(order));
+
+			__int16 result = InterlockedExchangeAdd16(
+				reinterpret_cast<__int16 volatile*>(addr),
+				atomic_reinterpret_cast<__int16>(op));
+
+			return reinterpret_cast<T&>(result);
+		}
+
+		template <typename T>
+		static auto fetch_sub(T volatile* addr, T op, [[maybe_unused]] memory_order order) -> T
+		{
+			ATMA_ASSERT(validate_addresses(addr));
+			ATMA_ASSERT(validate_memory_order(order));
+
+			__int16 result = InterlockedExchangeAdd16(
+				reinterpret_cast<__int16 volatile*>(addr),
+				atomic_negate(atomic_reinterpret_cast<__int16>(op)));
+
+			return reinterpret_cast<T&>(result);
+		}
+
+		template <typename T>
+		static auto add(T volatile* addr, T op, [[maybe_unused]] memory_order order) -> T
+		{
+			ATMA_ASSERT(validate_addresses(addr));
+			ATMA_ASSERT(validate_memory_order(order));
+
+			__int16 bytes = atomic_reinterpret_cast<__int16>(op);
+			__int16 result = InterlockedExchangeAdd16(
+				reinterpret_cast<__int16 volatile*>(addr),
+				bytes) + bytes;
+
+			return reinterpret_cast<T&>(result);
+		}
+
+		template <typename T>
+		static auto sub(T volatile* addr, T op, [[maybe_unused]] memory_order order) -> T
+		{
+			ATMA_ASSERT(validate_addresses(addr));
+			ATMA_ASSERT(validate_memory_order(order));
+
+			__int16 const bytes = atomic_reinterpret_cast<__int16>(op);
+			__int16 const result = InterlockedExchangeAdd16(
+				reinterpret_cast<__int16 volatile*>(addr),
+				atomic_negate(bytes));
+
+			__int16 const postresult = result - bytes;
+
+			return reinterpret_cast<T const&>(postresult);
+		}
+
+		template <typename T>
+		inline auto exchange(T volatile* addr, T const& x, [[maybe_unused]] memory_order order) -> T
+		{
+			ATMA_ASSERT(validate_addresses(addr));
+			ATMA_ASSERT(validate_memory_order(order));
+
+			__int16 const result = InterlockedExchange16(
+				reinterpret_cast<__int16 volatile*>(addr),
+				atomic_reinterpret_cast<__int16>(x));
+
+			return reinterpret_cast<T const&>(result);
+		}
+
+		template <typename T>
+		inline auto compare_and_swap(T volatile* addr, T& expected, T const& replacement,
+			[[maybe_unused]] memory_order order_success, [[maybe_unused]] memory_order order_failure) -> bool
+		{
+			ATMA_ASSERT(validate_addresses(addr, expected));
+			ATMA_ASSERT(validate_memory_order(order_success));
+			ATMA_ASSERT(validate_memory_order(order_failure));
+
+			__int16 const expected_bytes = atomic_reinterpret_cast<__int16>(expected);
+			__int16 const replacement_bytes = atomic_reinterpret_cast<__int16>(replacement);
+
+			__int16 const previous_bytes = InterlockedCompareExchange16(
+				reinterpret_cast<__int16 volatile*>(addr),
+				replacement_bytes,
+				expected_bytes);
+			
+			if (previous_bytes == expected_bytes)
+			{
 				return true;
 			}
 			else
 			{
-				*cmp = r;
+				std::memcpy(std::addressof(expected), &previous_bytes, sizeof(T));
 				return false;
 			}
 		}
