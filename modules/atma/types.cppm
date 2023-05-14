@@ -447,3 +447,73 @@ export namespace atma
 	template <typename F, template <typename... Args> typename Y>
 	inline constexpr bool is_instance_of_v = is_instance_of<F, Y>::value;
 }
+
+//
+// detection metaprogramming
+// ---------------------------
+// can be used to query if a type possesses a _thing_
+//
+// I should really write more words here. you can see 
+// std::experimental::is_detected for more
+//
+export namespace atma
+{
+	struct nonesuch
+	{
+		nonesuch() = delete;
+		~nonesuch() = delete;
+		nonesuch(nonesuch const&) = delete;
+		void operator=(nonesuch const&) = delete;
+	};
+}
+
+namespace atma::detail
+{
+	template <typename Default, typename, template <typename...> typename Op, typename... Args>
+	struct detector
+	{
+		using value_t = std::false_type;
+		using type = Default;
+	};
+
+	template <typename Default, template <typename...> typename Op, typename... Args>
+	struct detector<Default, std::void_t<Op<Args...>>, Op, Args...>
+	{
+		using value_t = std::true_type;
+		using type = Op<Args...>;
+	};
+}
+
+export namespace atma
+{
+	// is_detected / detected_or
+	template <template <typename...> typename Op, typename... Args>
+	using is_detected = typename detail::detector<nonesuch, void, Op, Args...>::value_t;
+
+	template <typename Default, template <typename...> typename Op, typename... Args>
+	using detected_or = detail::detector<Default, void, Op, Args...>;
+
+	// detected_t / detected_or_t
+	template <template <typename...> typename Op, typename... Args>
+	using detected_t = typename detected_or<nonesuch, Op, Args...>::type;
+
+	template <typename Default, template <typename...> typename Op, typename... Args>
+	using detected_or_t = typename detected_or<Default, Op, Args...>::type;
+
+	// is_detected_exact / is_detected_convertible
+	template <typename Expected, template <typename...> typename Op, typename... Args>
+	using is_detected_exact = std::is_same<detected_t<Op, Args...>, Expected>;
+
+	template <typename To, template <typename...> typename Op, typename... Args>
+	using is_detected_convertible = std::is_convertible<detected_t<Op, Args...>, To>;
+
+	// is_detected_v / is_detected_exact_v / is_detected_convertible_v
+	template <template <typename...> typename Op, typename... Args>
+	constexpr inline bool is_detected_v = is_detected<Op, Args...>::value;
+
+	template <typename Expected, template <typename...> typename Op, typename... Args>
+	constexpr inline bool is_detected_exact_v = is_detected_exact<Expected, Op, Args...>::value;
+
+	template <typename To, template <typename...> typename Op, typename... Args>
+	constexpr inline bool is_detected_convertible_v = is_detected_convertible<To, Op, Args...>::value;
+}
