@@ -16,7 +16,7 @@ import atma.types;
 // we are just going to alias to the standard here, as there is no
 // point reinventing the wheel.
 //
-namespace atma
+export namespace atma
 {
 	using memory_order = std::memory_order;
 
@@ -44,7 +44,7 @@ namespace atma
 //
 namespace atma::detail::_atomics_
 {
-	struct any_platform {};
+	struct any_architecture {};
 
 	// supported platforms
 	struct x64 {};
@@ -68,7 +68,7 @@ namespace atma::detail
 	template <typename Platform, typename Compiler, size_t Bitwidth, typename = std::void_t<>>
 	struct atomic_implementation_chooser
 	{
-		using type = atomic_implementation<_atomics_::any_platform, Compiler, Bitwidth>;
+		using type = atomic_implementation<_atomics_::any_architecture, Compiler, Bitwidth>;
 	};
 
 	template <typename Platform, typename Compiler, size_t Bitwidth>
@@ -131,29 +131,11 @@ namespace atma::detail::_atomics_
 		{ using type = __int128; };
 #endif
 }
+
+namespace atma::detail
+{
+	inline constexpr bool assume_seq_cst = true;
 	
-namespace atma::detail
-{
-	template <typename Platform, typename Compiler, size_t Bitwidth, typename = std::void_t<>>
-	struct atomic_implementation_choose_load
-	{
-		using type = atomic_implementation<_atomics_::any_platform, Compiler, Bitwidth>;
-	};
-
-	template <typename Platform, typename Compiler, size_t Bitwidth>
-	struct atomic_implementation_choose_load<
-		Platform, Compiler, Bitwidth,
-		std::void_t<decltype(&atomic_implementation<Platform, Compiler, Bitwidth>::template load<_atomics_::bytes_primitive_t<Bitwidth>>)>>
-	{
-		using type = atomic_implementation<Platform, Compiler, Bitwidth>;
-	};
-
-	template <typename Platform, typename Compiler, size_t Bitwidth>
-	using atomic_implementation_choose_load_t = typename atomic_implementation_choose_load<Platform, Compiler, Bitwidth>::type;
-}
-
-namespace atma::detail
-{
 	inline bool validate_memory_order(memory_order order)
 	{
 		return order < memory_order_seq_cst;
@@ -324,7 +306,7 @@ namespace atma::detail
 	struct atomic_implementation<_atomics_::x64, _atomics_::msvc, 2>
 	{
 		template <typename... Addresses>
-		inline static bool validate_addresses(Addresses... addresses)
+		static bool validate_addresses(Addresses... addresses)
 		requires (std::is_pointer_v<Addresses> && ...)
 		{
 			// a) check the type we're pointing to is 16-bits
@@ -333,7 +315,7 @@ namespace atma::detail
 		}
 
 		template <typename T, bool assume_seq_cst = false>
-		inline static auto load(T const volatile* addr, [[maybe_unused]] memory_order order = memory_order_seq_cst) -> T
+		static auto load(T const volatile* addr, [[maybe_unused]] memory_order order = memory_order_seq_cst) -> T
 		{
 			ATMA_ASSERT(validate_addresses(addr));
 
@@ -361,7 +343,7 @@ namespace atma::detail
 		}
 
 		template <typename T, bool assume_seq_cst = false>
-		inline void store(T volatile* addr, T const& x, [[maybe_unused]] memory_order order)
+		static void store(T volatile* addr, T const& x, [[maybe_unused]] memory_order order)
 		{
 			ATMA_ASSERT(validate_addresses(addr));
 
@@ -375,7 +357,7 @@ namespace atma::detail
 			{
 				case memory_order::release:
 					_Compiler_barrier();
-					[[fallthrough]]
+					[[fallthrough]];
 				case memory_order::relaxed:
 					__iso_volatile_store16(reinterpret_cast<__int16 volatile*>(addr), bytes);
 					break;
@@ -444,7 +426,7 @@ namespace atma::detail
 		}
 
 		template <typename T>
-		inline auto exchange(T volatile* addr, T const& x, [[maybe_unused]] memory_order order) -> T
+		static auto exchange(T volatile* addr, T const& x, [[maybe_unused]] memory_order order) -> T
 		{
 			ATMA_ASSERT(validate_addresses(addr));
 			ATMA_ASSERT(validate_memory_order(order));
@@ -457,7 +439,7 @@ namespace atma::detail
 		}
 
 		template <typename T>
-		inline auto compare_and_swap(T volatile* addr, T& expected, T const& replacement,
+		static auto compare_and_swap(T volatile* addr, T& expected, T const& replacement,
 			[[maybe_unused]] memory_order order_success, [[maybe_unused]] memory_order order_failure) -> bool
 		{
 			ATMA_ASSERT(validate_addresses(addr, expected));
@@ -491,27 +473,17 @@ namespace atma::detail::_atomics_
 	using current_compiler = msvc;
 }
 
-namespace atma::detail::_atomics_
-{
-	template <typename Platform, typename Compiler, typename T, typename... Args>
-	using load_op = decltype(&detail::atomic_implementation<Platform, Compiler, sizeof(T)>::template load<T, Args...>);
-
-	template <typename Platform, typename Compiler, typename T, typename... Args>
-	using store_op = decltype(&detail::atomic_implementation<Platform, Compiler, sizeof(T)>::template store<T, Args...>);
-
-}
-
 namespace atma::detail
 {
 	template <typename T>
-	using fallback_atomic_implementation = atomic_implementation<
-		_atomics_::any_platform,
+	using specialized_atomic_implementation = atomic_implementation<
+		_atomics_::current_architecture,
 		_atomics_::current_compiler,
 		sizeof(T)>;
 
 	template <typename T>
-	using specialized_atomic_implementation = atomic_implementation<
-		_atomics_::current_architecture,
+	using fallback_atomic_implementation = atomic_implementation<
+		_atomics_::any_architecture,
 		_atomics_::current_compiler,
 		sizeof(T)>;
 
@@ -520,8 +492,19 @@ namespace atma::detail
 		atma::is_detected_v<Op, _atomics_::current_architecture, _atomics_::current_compiler, T>,
 		specialized_atomic_implementation<T>,
 		fallback_atomic_implementation<T>>;
+}
 
+namespace atma::detail::_atomics_
+{
+	template <typename Platform, typename Compiler, typename T>
+	using load_op = decltype(&detail::atomic_implementation<Platform, Compiler, sizeof(T)>::template load<T, false>);
 
+	template <typename Platform, typename Compiler, typename T>
+	using store_op = decltype(&detail::atomic_implementation<Platform, Compiler, sizeof(T)>::template store<T, false>);
+}
+
+namespace atma::detail
+{
 	template <typename T>
 	using best_atomic_load_impl_t = best_atomic_implementation_t<_atomics_::load_op, T>;
 
@@ -532,20 +515,27 @@ namespace atma::detail
 export namespace atma
 {
 	template <typename T>
-	auto atomic_load(T const volatile* address, memory_order mo = memory_order_seq_cst) -> T
+	inline auto atomic_load(T const volatile* address, memory_order mo) -> T
 	{
-		using namespace detail;
-		using namespace detail::_atomics_;
-
 		return detail::best_atomic_load_impl_t<T>::load(address, mo);
-		//using blam = detected_t<load_op, current_architecture, current_compiler, T>;
-		//blam::load(address, mo);
 	}
 
 	template <typename T>
-	void atomic_store(T volatile* address, T const& x, memory_order mo = memory_order_seq_cst)
+	inline auto atomic_load(T const volatile* address) -> T
+	{
+		return detail::best_atomic_load_impl_t<T>::template load<T, true>(address);
+	}
+
+	template <typename T>
+	inline void atomic_store(T volatile* address, T const& x, memory_order mo)
 	{
 		return detail::best_atomic_store_impl_t<T>::store(address, x, mo);
+	}
+
+	template <typename T>
+	inline void atomic_store(T volatile* address, T const& x)
+	{
+		return detail::best_atomic_store_impl_t<T>::template store<T, detail::assume_seq_cst>(address, x);
 	}
 }
 

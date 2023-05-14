@@ -10,7 +10,7 @@ SCENARIO("atomics!")
 	{
 		uint16_t blah = 4;
 		atma::atomic_load(&blah);
-
+		atma::atomic_store(&blah, (uint16_t)24, atma::memory_order_release);
 	}
 }
 
