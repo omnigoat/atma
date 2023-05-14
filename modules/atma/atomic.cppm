@@ -7,11 +7,15 @@ module;
 
 export module atma.atomic;
 
-#define ATMA_ASSERT_16BIT_ALIGNED(addr) ATMA_ASSERT((uint64)addr % 2 == 0, "not aligned to 2-byte boundary")
-#define ATMA_ASSERT_32BIT_ALIGNED(addr) ATMA_ASSERT((uint64)addr % 4 == 0, "not aligned to 4-byte boundary")
-#define ATMA_ASSERT_64BIT_ALIGNED(addr) ATMA_ASSERT((uint64)addr % 8 == 0, "not aligned to 8-byte boundary")
+import atma.types;
 
-
+//
+// memory_order
+// --------------
+//
+// we are just going to alias to the standard here, as there is no
+// point reinventing the wheel.
+//
 namespace atma
 {
 	using memory_order = std::memory_order;
@@ -24,11 +28,27 @@ namespace atma
 	inline constexpr auto memory_order_seq_cst = std::memory_order_seq_cst;
 }
 
+
+//
+// atomic-implementation
+// -----------------------
+//
+// the idea here is that we provide an implementation for every
+// <platform, compiler, bitwidth> combination. we first check for a
+// specific platform/compiler pair, and if it doesn't exist, fall back
+// to an "any-platform"/compiler pair. we do not expect an
+// implementation that must be used for a platform, that can also be
+// compiled by every compiler.
+// 
+// a reference implementation is provided to demonstrate the operations.
+//
 namespace atma::detail::_atomics_
 {
+	struct any_platform {};
+
 	// supported platforms
-	struct reference_implementation {};
 	struct x64 {};
+	struct arm64 {};
 
 	// supported compilers
 	struct msvc {};
@@ -36,8 +56,100 @@ namespace atma::detail::_atomics_
 
 namespace atma::detail
 {
-	template <typename Platform, typename Compiler, size_t BitWidth>
-	struct atomic_implementation;
+	template <typename Platform, typename Compiler, size_t Bitwidth>
+	struct atomic_implementation
+	{
+		static_assert(atma::actually_false_v<Platform>, "no relevant atomics-implementation found");
+	};
+}
+
+namespace atma::detail
+{
+	template <typename Platform, typename Compiler, size_t Bitwidth, typename = std::void_t<>>
+	struct atomic_implementation_chooser
+	{
+		using type = atomic_implementation<_atomics_::any_platform, Compiler, Bitwidth>;
+	};
+
+	template <typename Platform, typename Compiler, size_t Bitwidth>
+	struct atomic_implementation_chooser<
+		Platform, Compiler, Bitwidth,
+		std::void_t<decltype(atomic_implementation<Platform, Compiler, Bitwidth>)>>
+	{
+		using type = atomic_implementation<Platform, Compiler, Bitwidth>;
+	};
+
+	template <typename Platform, typename Compiler, size_t Bitwidth>
+	using atomic_implementation_chooser_t = typename atomic_implementation_chooser<Platform, Compiler, Bitwidth>::type;
+}
+
+
+namespace atma::detail::_atomics_
+{
+	template <typename Platform, typename Compiler, size_t Bitwidth>
+	struct bytes_primitive;
+
+	template <typename Platform, typename Compiler, size_t Bitwidth>
+	using bytes_primitive_t = typename bytes_primitive<Platform, Compiler, Bitwidth>::type;
+
+	template <typename Platform, typename Compiler, size_t Bitwidth>
+	auto decl_bytes() noexcept
+		-> std::add_rvalue_reference_t<bytes_primitive_t<Platform, Compiler, Bitwidth>>
+	{
+		ATMA_HALT("don't call this! for decltype only.");
+	}
+
+	template <typename Platform, typename Compiler, size_t Bitwidth>
+	auto decl_bytes_ptr() noexcept
+		-> std::add_rvalue_reference_t<std::add_pointer_t<bytes_primitive_t<Platform, Compiler, Bitwidth>>>
+	{
+		ATMA_HALT("don't call this! for decltype only.");
+	}
+}
+
+namespace atma::detail::_atomics_
+{
+	template <typename Platform>
+	struct bytes_primitive<Platform, msvc, 1>
+		{ using type = __int8; };
+
+	template <typename Platform>
+	struct bytes_primitive<Platform, msvc, 2>
+		{ using type = __int16; };
+
+	template <typename Platform>
+	struct bytes_primitive<Platform, msvc, 4>
+		{ using type = __int32; };
+
+	template <typename Platform>
+	struct bytes_primitive<Platform, msvc, 8>
+		{ using type = __int64; };
+
+#if 0
+	template <typename Platform>
+	struct bytes_primitive<Platform, _atomics_::msvc, 16>
+		{ using type = __int128; };
+#endif
+}
+	
+namespace atma::detail
+{
+	template <typename Platform, typename Compiler, size_t Bitwidth, typename = std::void_t<>>
+	struct atomic_implementation_choose_load
+	{
+		using type = atomic_implementation<_atomics_::any_platform, Compiler, Bitwidth>;
+	};
+
+	template <typename Platform, typename Compiler, size_t Bitwidth>
+	struct atomic_implementation_choose_load<
+		Platform, Compiler, Bitwidth,
+		std::void_t<decltype(&atomic_implementation<Platform, Compiler, Bitwidth>::template load<_atomics_::bytes_primitive_t<Bitwidth>>)>>
+	{
+		using type = atomic_implementation<Platform, Compiler, Bitwidth>;
+	};
+
+	template <typename Platform, typename Compiler, size_t Bitwidth>
+	using atomic_implementation_choose_load_t = typename atomic_implementation_choose_load<Platform, Compiler, Bitwidth>::type;
 }
 
 namespace atma::detail
@@ -49,74 +161,56 @@ namespace atma::detail
 }
 
 //
-//
 // reference implementation
 // --------------------------
-// 
-// this is not atomic-safe or anything. it's to demonstrate the operations
-// that are taking place
 //
+// this is not atomic-safe or anything.
+//
+// it's to demonstrate the operations that are taking place
 //
 namespace atma::detail
 {
-	template <typename Compiler, size_t BitSize>
-	struct atomic_implementation<_atomics_::reference_implementation, Compiler, BitSize>
+	struct atomic_reference_implementation
 	{
-		template <typename... Addresses>
-		inline static bool validate_addresses(Addresses... addresses)
-		requires (std::is_pointer_v<Addresses> && ...)
-		{
-			// a) check the type we're pointing to is BitSize
-			// b) check each address is BitSize aligned
-			return ((sizeof(std::remove_pointer_t<Addresses>) == BitSize) && ...) && ((addresses % BitSize == 0) && ...);
-		}
-
 		template <typename T>
 		inline static auto load(T const volatile* addr, memory_order) -> T
 		{
-			ATMA_ASSERT(validate_addresses(addr));
 			return *addr;
 		}
 
 		template <typename T>
 		inline void store(T volatile* addr, T const& op, memory_order)
 		{
-			ATMA_ASSERT(validate_addresses(addr));
 			*addr = op;
 		}
 
 		template <typename T>
 		static auto fetch_add(T volatile* addr, T op, memory_order) -> T
 		{
-			ATMA_ASSERT(validate_addresses(addr));
 			return (*addr = *addr + op) - op;
 		}
 
 		template <typename T>
 		static auto fetch_sub(T volatile* addr, T op, memory_order) -> T
 		{
-			ATMA_ASSERT(validate_addresses(addr));
 			return (*addr = *addr - op) + op;
 		}
 
 		template <typename T>
 		static auto add(T volatile* addr, T op, memory_order) -> T
 		{
-			ATMA_ASSERT(validate_addresses(addr));
 			return (*addr = *addr + op);
 		}
 
 		template <typename T>
 		static auto sub(T volatile* addr, T op, memory_order) -> T
 		{
-			ATMA_ASSERT(validate_addresses(addr));
 			return (*addr = *addr - op);
 		}
 
 		template <typename T>
 		inline auto exchange(T volatile* addr, T const& op, memory_order) -> T
 		{
-			ATMA_ASSERT(validate_addresses(addr));
 			auto r = *addr;
 			*addr = op;
 			return r;
@@ -125,8 +219,6 @@ namespace atma::detail
 		template <typename T>
 		inline auto compare_and_swap(T volatile* addr, T* expected, T const& replacement) -> bool
 		{
-			ATMA_ASSERT(validate_addresses(addr, expected));
-
 			// bitwise comparison required, can't use operator == (T, T)
 			if (auto r = *reinterpret_cast<uint16_t volatile*>(addr); r == *reinterpret_cast<uint16_t*>(expected))
 			{
@@ -146,7 +238,7 @@ namespace atma::detail
 //
 // atomic_reinterpret_cast
 // -------------------------
-// 
+//
 // (openly stolen from microsoft's standard library implementation.)
 //
 // the hidden requirement here that necessitates this is the zeroing
@@ -193,7 +285,7 @@ namespace atma::detail
 // maths, as INT_MIN again
 // 
 // also lol the negate operator (-x) returns a straight-up int, not
-// necessarily the type being negated...
+// necessarily the type being negated, so this addresses that too.
 //
 namespace atma::detail
 {
@@ -205,11 +297,10 @@ namespace atma::detail
 }
 
 //
-//
 // x64 atomic implementation
 // ---------------------------
-// 
-// it's important to remember that x64 is _strong-ordered_. loads
+//
+// it's important to remember that x64 is _strongly-ordered_. loads
 // and stores have inbuilt acquire and release semantics respectively.
 // so some of these things don't look atomic at all (like, we're
 // ignoring the memory_order parameter).
@@ -217,7 +308,7 @@ namespace atma::detail
 // secondly, x64 is so strongly ordered that there is no re-ordering
 // *OTHER THAN* store-load reordering. for those you need a full
 // memory barrier. for everything else ~there's mastercard~ there's
-// no need
+// no need.
 //
 //
 // msvc: Interlocked functions all act as full memory barriers.
@@ -238,11 +329,11 @@ namespace atma::detail
 		{
 			// a) check the type we're pointing to is 16-bits
 			// b) check each address is 16-bit aligned
-			return ((sizeof(std::remove_pointer_t<Addresses>) == 2) && ...) && ((addresses % 2 == 0) && ...);
+			return ((sizeof(std::remove_pointer_t<Addresses>) == 2) && ...) && (((uintptr_t)addresses % 2 == 0) && ...);
 		}
 
 		template <typename T, bool assume_seq_cst = false>
-		inline static auto load(T const volatile* addr, [[maybe_unused]] memory_order order) -> T
+		inline static auto load(T const volatile* addr, [[maybe_unused]] memory_order order = memory_order_seq_cst) -> T
 		{
 			ATMA_ASSERT(validate_addresses(addr));
 
@@ -250,7 +341,7 @@ namespace atma::detail
 			
 			if constexpr (assume_seq_cst)
 			{
-				_Compiler_or_memory_barrier();
+				_Compiler_barrier();
 			}
 			else switch (order)
 			{
@@ -258,7 +349,8 @@ namespace atma::detail
 					break;
 				case memory_order::consume:
 				case memory_order::acquire:
-					_Compiler_or_memory_barrier();
+					_Compiler_barrier();
+					break;
 				case memory_order::release:
 				case memory_order::acq_rel:
 				default:
@@ -279,22 +371,19 @@ namespace atma::detail
 			{
 				InterlockedExchange16(reinterpret_cast<__int16 volatile*>(addr), bytes);
 			}
-			else
+			else switch (order)
 			{
-				__iso_volatile_store16(reinterpret_cast<__int16 volatile*>(addr), bytes);
-
-				switch (order)
-				{
-					case memory_order::relaxed:
-						break;
-					case memory_order::release:
-						_Compiler_barrier();
-					case memory_order::consume:
-					case memory_order::acquire:
-					case memory_order::acq_rel:
-					default:
-						ATMA_HALT("incorrect memory order");
-				}
+				case memory_order::release:
+					_Compiler_barrier();
+					[[fallthrough]]
+				case memory_order::relaxed:
+					__iso_volatile_store16(reinterpret_cast<__int16 volatile*>(addr), bytes);
+					break;
+				case memory_order::consume:
+				case memory_order::acquire:
+				case memory_order::acq_rel:
+				default:
+					ATMA_HALT("incorrect memory order");
 			}
 		}
 
@@ -304,11 +393,11 @@ namespace atma::detail
 			ATMA_ASSERT(validate_addresses(addr));
 			ATMA_ASSERT(validate_memory_order(order));
 
-			__int16 result = InterlockedExchangeAdd16(
+			__int16 const result = InterlockedExchangeAdd16(
 				reinterpret_cast<__int16 volatile*>(addr),
 				atomic_reinterpret_cast<__int16>(op));
 
-			return reinterpret_cast<T&>(result);
+			return reinterpret_cast<T const&>(result);
 		}
 
 		template <typename T>
@@ -317,11 +406,11 @@ namespace atma::detail
 			ATMA_ASSERT(validate_addresses(addr));
 			ATMA_ASSERT(validate_memory_order(order));
 
-			__int16 result = InterlockedExchangeAdd16(
+			__int16 const result = InterlockedExchangeAdd16(
 				reinterpret_cast<__int16 volatile*>(addr),
 				atomic_negate(atomic_reinterpret_cast<__int16>(op)));
 
-			return reinterpret_cast<T&>(result);
+			return reinterpret_cast<T const&>(result);
 		}
 
 		template <typename T>
@@ -330,12 +419,12 @@ namespace atma::detail
 			ATMA_ASSERT(validate_addresses(addr));
 			ATMA_ASSERT(validate_memory_order(order));
 
-			__int16 bytes = atomic_reinterpret_cast<__int16>(op);
-			__int16 result = InterlockedExchangeAdd16(
+			__int16 const bytes = atomic_reinterpret_cast<__int16>(op);
+			__int16 const result = InterlockedExchangeAdd16(
 				reinterpret_cast<__int16 volatile*>(addr),
 				bytes) + bytes;
 
-			return reinterpret_cast<T&>(result);
+			return reinterpret_cast<T const&>(result);
 		}
 
 		template <typename T>
@@ -396,39 +485,69 @@ namespace atma::detail
 	};
 }
 
+namespace atma::detail::_atomics_
+{
+	using current_architecture = x64;
+	using current_compiler = msvc;
+}
+
+namespace atma::detail::_atomics_
+{
+	template <typename Platform, typename Compiler, typename T, typename... Args>
+	using load_op = decltype(&detail::atomic_implementation<Platform, Compiler, sizeof(T)>::template load<T, Args...>);
+
+	template <typename Platform, typename Compiler, typename T, typename... Args>
+	using store_op = decltype(&detail::atomic_implementation<Platform, Compiler, sizeof(T)>::template store<T, Args...>);
+
+}
+
+namespace atma::detail
+{
+	template <typename T>
+	using fallback_atomic_implementation = atomic_implementation<
+		_atomics_::any_platform,
+		_atomics_::current_compiler,
+		sizeof(T)>;
+
+	template <typename T>
+	using specialized_atomic_implementation = atomic_implementation<
+		_atomics_::current_architecture,
+		_atomics_::current_compiler,
+		sizeof(T)>;
+
+	template <template <typename...> typename Op, typename T>
+	using best_atomic_implementation_t = std::conditional_t<
+		atma::is_detected_v<Op, _atomics_::current_architecture, _atomics_::current_compiler, T>,
+		specialized_atomic_implementation<T>,
+		fallback_atomic_implementation<T>>;
+
+
+	template <typename T>
+	using best_atomic_load_impl_t = best_atomic_implementation_t<_atomics_::load_op, T>;
+
+	template <typename T>
+	using best_atomic_store_impl_t = best_atomic_implementation_t<_atomics_::store_op, T>;
+}
+
 export namespace atma
 {
 	template <typename T>
-	T atomic_load(T const volatile* address, memory_order mo = memory_order_seq_cst)
+	auto atomic_load(T const volatile* address, memory_order mo = memory_order_seq_cst) -> T
 	{
-		return detail::atomic_implementation<detail::_atomics_::x64, detail::_atomics_::msvc, sizeof(T)>
-			::load(address, mo);
+		using namespace detail;
+		using namespace detail::_atomics_;
+
+		return detail::best_atomic_load_impl_t<T>::load(address, mo);
+		//using blam = detected_t<load_op, current_architecture, current_compiler, T>;
+		//blam::load(address, mo);
+	}
+
+	template <typename T>
+	void atomic_store(T volatile* address, T const& x, memory_order mo = memory_order_seq_cst)
+	{
+		return detail::best_atomic_store_impl_t<T>::store(address, x, mo);
 	}
 }
-
-
-#if !defined(ATMA_COMPILER_MSVC)
-
-	#if defined(InterlockedIncrement16)
-		#error Interlocked functions already defined??
-	#endif
-
-	#define InterlockedIncrement16 _InterlockedIncrement16
-	#define InterlockedIncrementAcquire16 _InterlockedIncrement16
-	#define InterlockedIncrementRelease16 _InterlockedIncrement16
-	#define InterlockedIncrementNoFence16 _InterlockedIncrement16
-	#define InterlockedDecrement16 _InterlockedDecrement16
-	#define InterlockedDecrementAcquire16 _InterlockedDecrement16
-	#define InterlockedDecrementRelease16 _InterlockedDecrement16
-	#define InterlockedDecrementNoFence16 _InterlockedDecrement16
-	#define InterlockedCompareExchange16 _InterlockedCompareExchange16
-	#define InterlockedCompareExchangeAcquire16 _InterlockedCompareExchange16
-	#define InterlockedCompareExchangeRelease16 _InterlockedCompareExchange16
-	#define InterlockedCompareExchangeNoFence16 _InterlockedCompareExchange16
-
-#endif
-
-
 
 
 
