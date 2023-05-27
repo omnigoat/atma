@@ -46,9 +46,16 @@ namespace atma::detail::_atomics_
 {
 	struct any_architecture {};
 
-	// supported platforms
-	struct x64 {};
-	struct arm64 {};
+	// supported architectures
+	struct x64
+	{
+		inline static constexpr bool is_strongly_ordered = true;
+	};
+
+	struct arm64
+	{
+		inline static constexpr bool is_strongly_ordered = false;
+	};
 
 	// supported compilers
 	struct msvc {};
@@ -91,20 +98,6 @@ namespace atma::detail::_atomics_
 
 	template <typename Platform, typename Compiler, size_t Bytewidth>
 	using bytes_primitive_t = typename bytes_primitive<Platform, Compiler, Bytewidth>::type;
-
-	template <typename Platform, typename Compiler, size_t Bytewidth>
-	auto decl_bytes() noexcept
-		-> std::add_rvalue_reference_t<bytes_primitive_t<Platform, Compiler, Bytewidth>>
-	{
-		ATMA_HALT("don't call this! for decltype only.");
-	}
-
-	template <typename Platform, typename Compiler, size_t Bytewidth>
-	auto decl_bytes_ptr() noexcept
-		-> std::add_rvalue_reference_t<std::add_pointer_t<bytes_primitive_t<Platform, Compiler, Bytewidth>>>
-	{
-		ATMA_HALT("don't call this! for decltype only.");
-	}
 }
 
 namespace atma::detail::_atomics_
@@ -124,12 +117,6 @@ namespace atma::detail::_atomics_
 	template <typename Platform>
 	struct bytes_primitive<Platform, msvc, 8>
 		{ using type = __int64; };
-
-#if 0
-	template <typename Platform>
-	struct bytes_primitive<Platform, _atomics_::msvc, 16>
-		{ using type = __int128; };
-#endif
 }
 
 namespace atma::detail
@@ -263,16 +250,16 @@ namespace atma::detail
 // 
 // this function will perform unsigned subtraction from zero, which
 // for all non-INT_MIN values will result in exactly the same as
-// regular negation (-x) would, but for INT_MIN will result, with
+// would regular negation (-x), but for INT_MIN will result, with
 // maths, as INT_MIN again
 // 
-// also lol the negate operator (-x) returns a straight-up int, not
-// necessarily the type being negated, so this addresses that too.
+// also lmao the negate operator (-x) returns a straight-up int, not
+// the type being negated, so this addresses that too.
 //
 namespace atma::detail
 {
 	template <std::integral T>
-	[[nodiscard]] static auto atomic_negate(T const& x) noexcept
+	[[nodiscard]] static auto atomic_negate(T x) noexcept
 	{
 		return static_cast<T>(0U - static_cast<std::make_unsigned_t<T>>(x));
 	}
@@ -305,6 +292,8 @@ namespace atma::detail
 	template <size_t Bytewidth>
 	struct atomic_implementation<_atomics_::x64, _atomics_::msvc, Bytewidth>
 	{
+		using architecture_t = _atomics_::x64;
+
 		inline static constexpr size_t byte_width = Bytewidth;
 
 		using bytes_type = _atomics_::bytes_primitive_t<_atomics_::x64, _atomics_::msvc, byte_width>;
@@ -329,6 +318,7 @@ namespace atma::detail
 			ATMA_ASSERT(validate_addresses(addr));
 
 			bytes_type result;
+
 			if constexpr (is_8_bit)
 				result = __iso_volatile_load8(reinterpret_cast<bytes_type const volatile*>(addr));
 			else if constexpr (is_16_bit)
@@ -356,11 +346,11 @@ namespace atma::detail
 					ATMA_HALT("incorrect memory order");
 			}
 
-			return reinterpret_cast<T const&>(result);
+			return reinterpret_cast<T&>(result);
 		}
 
 		template <typename T, bool assume_seq_cst = false>
-		static void store(T volatile* addr, T const& x, [[maybe_unused]] memory_order order)
+		static void store(T volatile* addr, T x, [[maybe_unused]] memory_order order)
 		{
 			ATMA_ASSERT(validate_addresses(addr));
 
@@ -407,7 +397,7 @@ namespace atma::detail
 		}
 
 		template <std::integral T>
-		static auto fetch_add(T volatile* addr, T const& op, [[maybe_unused]] memory_order order) -> T
+		static auto fetch_add(T volatile* addr, T const addend, [[maybe_unused]] memory_order order) -> T
 		{
 			ATMA_ASSERT(validate_addresses(addr));
 			ATMA_ASSERT(validate_memory_order(order));
@@ -418,32 +408,32 @@ namespace atma::detail
 			{
 				result = InterlockedExchangeAdd8(
 					reinterpret_cast<bytes_type volatile*>(addr),
-					atomic_reinterpret_cast<bytes_type>(op));
+					atomic_reinterpret_cast<bytes_type>(addend));
 			}
 			else if constexpr (is_16_bit)
 			{
 				result = InterlockedExchangeAdd16(
 					reinterpret_cast<bytes_type volatile*>(addr),
-					atomic_reinterpret_cast<bytes_type>(op));
+					atomic_reinterpret_cast<bytes_type>(addend));
 			}
 			else if constexpr (is_32_bit)
 			{
 				result = InterlockedExchangeAdd(
 					reinterpret_cast<bytes_type volatile*>(addr),
-					atomic_reinterpret_cast<bytes_type>(op));
+					atomic_reinterpret_cast<bytes_type>(addend));
 			}
 			else if constexpr (is_64_bit)
 			{
 				result = InterlockedExchangeAdd64(
 					reinterpret_cast<bytes_type volatile*>(addr),
-					atomic_reinterpret_cast<bytes_type>(op));
+					atomic_reinterpret_cast<bytes_type>(addend));
 			}
 
 			return reinterpret_cast<T const&>(result);
 		}
 
 		template <std::integral T>
-		static auto fetch_sub(T volatile* addr, T op, [[maybe_unused]] memory_order order) -> T
+		static auto fetch_sub(T volatile* addr, T const subtrahend, [[maybe_unused]] memory_order order) -> T
 		{
 			ATMA_ASSERT(validate_addresses(addr));
 			ATMA_ASSERT(validate_memory_order(order));
@@ -454,44 +444,44 @@ namespace atma::detail
 			{
 				result = InterlockedExchangeAdd8(
 					reinterpret_cast<bytes_type volatile*>(addr),
-					atomic_negate(atomic_reinterpret_cast<bytes_type>(op)));
+					atomic_negate(atomic_reinterpret_cast<bytes_type>(subtrahend)));
 			}
 			else if constexpr (is_16_bit)
 			{
 				result = InterlockedExchangeAdd16(
 					reinterpret_cast<bytes_type volatile*>(addr),
-					atomic_negate(atomic_reinterpret_cast<bytes_type>(op)));
+					atomic_negate(atomic_reinterpret_cast<bytes_type>(subtrahend)));
 			}
 			else if constexpr (is_32_bit)
 			{
 				result = InterlockedExchangeAdd(
 					reinterpret_cast<bytes_type volatile*>(addr),
-					atomic_negate(atomic_reinterpret_cast<bytes_type>(op)));
+					atomic_negate(atomic_reinterpret_cast<bytes_type>(subtrahend)));
 			}
 			else if constexpr (is_64_bit)
 			{
 				result = InterlockedExchangeAdd64(
 					reinterpret_cast<bytes_type volatile*>(addr),
-					atomic_negate(atomic_reinterpret_cast<bytes_type>(op)));
+					atomic_negate(atomic_reinterpret_cast<bytes_type>(subtrahend)));
 			}
 
 			return reinterpret_cast<T const&>(result);
 		}
 
 		template <std::integral T>
-		static auto add(T volatile* addr, T op, memory_order order) -> T
+		static auto add(T volatile* addr, T addend, memory_order order) -> T
 		{
-			return fetch_add(addr, op, order) + op;
+			return fetch_add(addr, addend, order) + addend;
 		}
 
 		template <std::integral T>
-		static auto sub(T volatile* addr, T op, memory_order order) -> T
+		static auto sub(T volatile* addr, T subtrahend, memory_order order) -> T
 		{
-			return fetch_sub(addr, op, order) - op;
+			return fetch_sub(addr, subtrahend, order) - subtrahend;
 		}
 
 		template <typename T>
-		static auto exchange(T volatile* addr, T const& x, [[maybe_unused]] memory_order order) -> T
+		static auto exchange(T volatile* addr, T exchend, [[maybe_unused]] memory_order order) -> T
 		{
 			ATMA_ASSERT(validate_addresses(addr));
 			ATMA_ASSERT(validate_memory_order(order));
@@ -502,32 +492,32 @@ namespace atma::detail
 			{
 				result = InterlockedExchange8(
 					reinterpret_cast<bytes_type volatile*>(addr),
-					atomic_reinterpret_cast<bytes_type>(x));
+					atomic_reinterpret_cast<bytes_type>(exchend));
 			}
 			else if constexpr (is_16_bit)
 			{
 				result = InterlockedExchange16(
 					reinterpret_cast<bytes_type volatile*>(addr),
-					atomic_reinterpret_cast<bytes_type>(x));
+					atomic_reinterpret_cast<bytes_type>(exchend));
 			}
 			else if constexpr (is_32_bit)
 			{
 				result = InterlockedExchange(
 					reinterpret_cast<bytes_type volatile*>(addr),
-					atomic_reinterpret_cast<bytes_type>(x));
+					atomic_reinterpret_cast<bytes_type>(exchend));
 			}
 			else if constexpr (is_64_bit)
 			{
 				result = InterlockedExchange64(
 					reinterpret_cast<bytes_type volatile*>(addr),
-					atomic_reinterpret_cast<bytes_type>(x));
+					atomic_reinterpret_cast<bytes_type>(exchend));
 			}
 
-			return reinterpret_cast<T const&>(result);
+			return reinterpret_cast<T&>(result);
 		}
 
 		template <typename T>
-		static auto compare_exchange(T volatile* addr, T& expected, T const& replacement,
+		static auto compare_exchange(T volatile* addr, T& expected, T const replacement,
 			[[maybe_unused]] memory_order order_success, [[maybe_unused]] memory_order order_failure) -> bool
 		{
 			ATMA_ASSERT(validate_addresses(addr, expected));
@@ -541,7 +531,10 @@ namespace atma::detail
 			
 			if constexpr (is_8_bit)
 			{
-				static_assert(actually_false_v<T>, "no 8-bit compare-exchange instructions exist");
+				previous_bytes = InterlockedCompareExchange8(
+					reinterpret_cast<bytes_type volatile*>(addr),
+					replacement_bytes,
+					expected_bytes);
 			}
 			else if constexpr (is_16_bit)
 			{
@@ -571,7 +564,8 @@ namespace atma::detail
 			}
 			else
 			{
-				std::memcpy(std::addressof(expected), &previous_bytes, byte_width);
+				// reinterpret_cast here instead of memcpy to be faster in debug builds
+				reinterpret_cast<bytes_type&>(expected) = previous_bytes;
 				return false;
 			}
 		}
@@ -582,27 +576,6 @@ namespace atma::detail::_atomics_
 {
 	using current_architecture = x64;
 	using current_compiler = msvc;
-}
-
-namespace atma::detail
-{
-	template <typename T>
-	using specialized_atomic_implementation = atomic_implementation<
-		_atomics_::current_architecture,
-		_atomics_::current_compiler,
-		sizeof(T)>;
-
-	template <typename T>
-	using fallback_atomic_implementation = atomic_implementation<
-		_atomics_::any_architecture,
-		_atomics_::current_compiler,
-		sizeof(T)>;
-
-	template <template <typename...> typename Op, typename T>
-	using best_atomic_implementation_t = std::conditional_t<
-		atma::is_detected_v<Op, _atomics_::current_architecture, _atomics_::current_compiler, T>,
-		specialized_atomic_implementation<T>,
-		fallback_atomic_implementation<T>>;
 }
 
 namespace atma::detail::_atomics_
@@ -635,6 +608,27 @@ namespace atma::detail::_atomics_
 namespace atma::detail
 {
 	template <typename T>
+	using specialized_atomic_implementation = atomic_implementation<
+		_atomics_::current_architecture,
+		_atomics_::current_compiler,
+		sizeof(T)>;
+
+	template <typename T>
+	using fallback_atomic_implementation = atomic_implementation<
+		_atomics_::any_architecture,
+		_atomics_::current_compiler,
+		sizeof(T)>;
+
+	template <template <typename...> typename Op, typename T>
+	using best_atomic_implementation_t = std::conditional_t<
+		atma::is_detected_v<Op, _atomics_::current_architecture, _atomics_::current_compiler, T>,
+		specialized_atomic_implementation<T>,
+		fallback_atomic_implementation<T>>;
+}
+
+namespace atma::detail
+{
+	template <typename T>
 	using best_atomic_load_impl_t = best_atomic_implementation_t<_atomics_::load_op, T>;
 
 	template <typename T>
@@ -659,12 +653,18 @@ namespace atma::detail
 	using best_atomic_compare_exchange_impl_t = best_atomic_implementation_t<_atomics_::compare_exchange_op, T>;
 }
 
+
+//
+//
+//
+//
+//
 export namespace atma
 {
 	template <typename T>
-	inline auto atomic_load(T const volatile* address, memory_order mo) -> T
+	inline auto atomic_load(T const volatile* address, memory_order order) -> T
 	{
-		return detail::best_atomic_load_impl_t<T>::load(address, mo);
+		return detail::best_atomic_load_impl_t<T>::load(address, order);
 	}
 
 	template <typename T>
@@ -674,15 +674,53 @@ export namespace atma
 	}
 
 	template <typename T>
-	inline void atomic_store(T volatile* address, T const& x, memory_order mo)
+	inline void atomic_store(T volatile* address, T const& payload, memory_order order)
 	{
-		return detail::best_atomic_store_impl_t<T>::store(address, x, mo);
+		return detail::best_atomic_store_impl_t<T>::store(address, payload, order);
 	}
 
 	template <typename T>
-	inline void atomic_store(T volatile* address, T const& x)
+	inline void atomic_store(T volatile* address, T const& payload)
 	{
-		return detail::best_atomic_store_impl_t<T>::template store<T, detail::assume_seq_cst>(address, x);
+		return detail::best_atomic_store_impl_t<T>::template store<T, detail::assume_seq_cst>(address, payload);
+	}
+
+	template <typename T>
+	inline auto atomic_fetch_add(T volatile* address, T const addend, memory_order order) -> T
+	{
+		return detail::best_atomic_fetch_add_impl_t<T>::template fetch_add(address, addend, order);
+	}
+
+	template <typename T>
+	inline auto atomic_fetch_sub(T volatile* address, T const subtrahend, memory_order order) -> T
+	{
+		return detail::best_atomic_fetch_sub_impl_t<T>::template fetch_sub(address, subtrahend, order);
+	}
+
+	template <typename T>
+	inline auto atomic_add(T volatile* address, T const addend, memory_order order) -> T
+	{
+		return detail::best_atomic_add_impl_t<T>::template add(address, addend, order);
+	}
+
+	template <typename T>
+	inline auto atomic_sub(T volatile* address, T const subtrahend, memory_order order) -> T
+	{
+		return detail::best_atomic_sub_impl_t<T>::template sub(address, subtrahend, order);
+	}
+
+	template <typename T>
+	inline auto atomic_exchange(T volatile* address, T exchend, [[maybe_unused]] memory_order order) -> T
+	{
+		return detail::best_atomic_exchange_impl_t<T>::template exchange(address, exchend, order);
+	}
+
+	template <typename T>
+	inline auto atomic_compare_exchange(T volatile* address, T& expected, T const replacement,
+		[[maybe_unused]] memory_order order_success, [[maybe_unused]] memory_order order_failure) -> T
+	{
+		return detail::best_atomic_compare_exchange_impl_t<T>::
+			template compare_exchange(address, expected, replacement, order_success, order_failure);
 	}
 }
 
