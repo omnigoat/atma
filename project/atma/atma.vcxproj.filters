@@ -220,10 +220,13 @@
     <ClCompile Include="..\..\modules\atma\memory.cppm">
       <Filter>modules</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\modules\atma\lockfree_list.cppm">
+    <ClCompile Include="..\..\modules\atma\lockfree_queue.cppm">
       <Filter>modules</Filter>
     </ClCompile>
     <ClCompile Include="..\..\modules\atma\atomic.cppm">
+      <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="policies.ixx">
       <Filter>modules</Filter>
     </ClCompile>
   </ItemGroup>
