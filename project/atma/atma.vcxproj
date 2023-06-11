@@ -73,7 +73,7 @@
     <ClCompile Include="..\..\modules\atma\atomic.cppm" />
     <ClCompile Include="..\..\modules\atma\bind.cppm" />
     <ClCompile Include="..\..\modules\atma\intrusive_ptr.cppm" />
-    <ClCompile Include="..\..\modules\atma\lockfree_list.cppm" />
+    <ClCompile Include="..\..\modules\atma\lockfree_queue.cppm" />
     <ClCompile Include="..\..\modules\atma\memory.cppm" />
     <ClCompile Include="..\..\modules\atma\meta.cppm" />
     <ClCompile Include="..\..\modules\atma\rope.cppm" />
@@ -85,6 +85,7 @@
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Development|x64'">false</DeploymentContent>
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Distribution|x64'">false</DeploymentContent>
     </ClCompile>
+    <ClCompile Include="policies.ixx" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />

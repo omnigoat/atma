@@ -1,17 +1,26 @@
 module;
 
 #include <atma/functor.hpp>
+
 #include <atomic>
+#include <bit>
+#include <memory>
 
 export module atma.intrusive_ptr;
 
 
 import atma.meta;
+import atma.policies;
+
+
+
 
 export namespace atma
 {
 	struct ref_counted;
-	template <typename T> struct intrusive_ptr;
+	
+	template <typename, typename...>
+	struct intrusive_ptr;
 }
 
 
@@ -91,85 +100,160 @@ export namespace atma
 }
 
 
-export namespace atma
+namespace atma
 {
 	template <typename T>
+	struct intrusive_ptr_traits
+	{
+		using pointer_type = T*;
+		using reference_type = T&;
+
+		template <typename Y>
+		using rebind = intrusive_ptr_traits<Y>;
+
+		static void assign_ptr(T*& t, T* x) { t = x; }
+		static auto get_ptr(T* t) { return t; }
+
+		template <typename, typename...>
+		struct operations {};
+	};
+}
+
+export namespace atma
+{
+	template <typename Deleter>
+	struct use_deleter
+	{
+		using type = Deleter;
+	};
+
+	template <typename Traits>
+	struct use_ref_counting_semantics
+	{
+		using type = Traits;
+	};
+
+	template <typename Traits>
+	struct use_pointer_semantics
+	{
+		using type = Traits;
+	};
+}
+
+namespace atma::detail
+{
+	template <typename Y, typename T>
+	concept convertible_intrusive_ptr = std::convertible_to<
+		typename intrusive_ptr_traits<Y>::pointer_type,
+		typename intrusive_ptr_traits<T>::pointer_type>;
+
+	// sigh, we do this because we need to inherit from T::operations
+	template <typename T, typename... Policies>
+	using operations_of_t = typename policies::retrieve_t<use_pointer_semantics,
+		policies::default_<ref_counted_traits<T>>,
+		Policies...>::template operations<T, Policies...>;
+}
+
+export namespace atma
+{
+	template <typename T, typename... Policies>
 	struct intrusive_ptr
 	{
+		using deleter_type = policies::retrieve_t<use_deleter,
+			policies::default_<std::default_delete<T>>,
+			Policies...>;
+
+		using refcount_traits = policies::retrieve_t<use_ref_counting_semantics,
+			policies::default_<ref_counted_traits<T>>,
+			Policies...>;
+
+		using pointer_traits = policies::retrieve_t<use_pointer_semantics,
+			policies::default_<intrusive_ptr_traits<T>>,
+			Policies...>;
+
 		using value_type = T;
+		using pointer_type = typename pointer_traits::pointer_type;
+		using reference_type = typename pointer_traits::reference_type;
+
+		// shorthand for taking a convertible Y
+		template <typename Y> using other_pointer_traits = typename pointer_traits::template rebind<Y>;
+		template <typename Y> using other_pointer_type = typename other_pointer_traits<Y>::pointer_type;
+
+
 
 		constexpr intrusive_ptr() noexcept = default;
 
 		explicit constexpr intrusive_ptr(std::nullptr_t) noexcept
 		{}
 
-		explicit intrusive_ptr(T* t)
-			: px(t)
+		explicit intrusive_ptr(pointer_type x)
+			: px{x}
 		{
-			ref_counted_traits<T>::add_ref(t);
+			refcount_traits::add_ref(pointer_traits::get_ptr(px));
 		}
 
 		template <typename Y>
-		requires std::is_convertible_v<Y*, T*>
-		explicit intrusive_ptr(Y* y)
-			: px(y)
+		requires detail::convertible_intrusive_ptr<Y, T>
+		explicit intrusive_ptr(other_pointer_type<Y> y)
+			: px{y}
 		{
-			ref_counted_traits<T>::add_ref(y);
+			refcount_traits::add_ref(pointer_traits::get_ptr(px));
 		}
 
 		intrusive_ptr(intrusive_ptr const& rhs)
-			: px(rhs.px)
+			: px{rhs.px}
 		{
-			ref_counted_traits<T>::add_ref(px);
+			refcount_traits::add_ref(pointer_traits::get_ptr(px));
 		}
 
 		template <typename Y>
-		requires std::is_convertible_v<Y*, T*>
+		requires detail::convertible_intrusive_ptr<Y, T>
 		intrusive_ptr(intrusive_ptr<Y> const& rhs)
-			: px(rhs.px)
+			: px{rhs.px}
 		{
-			ref_counted_traits<T>::add_ref(px);
+			refcount_traits::add_ref(pointer_traits::get_ptr(px));
 		}
 
 		intrusive_ptr(intrusive_ptr&& rhs) noexcept
-			: px(rhs.px)
+			: px{std::move(rhs.px)}
 		{
-			rhs.px = nullptr;
+			pointer_traits::assign_ptr(rhs.px, nullptr);
 		}
 
 		template <typename Y>
-		requires std::is_convertible_v<Y*, T*>
+		requires detail::convertible_intrusive_ptr<Y, T>
 		intrusive_ptr(intrusive_ptr<Y>&& rhs) noexcept
-			: px(rhs.px)
+			: px{std::move(rhs.px)}
 		{
-			rhs.px = nullptr;
+			other_pointer_traits<Y>::assign_ptr(rhs.px, nullptr);
 		}
 
 		~intrusive_ptr()
 		{
-			ref_counted_traits<T>::rm_ref(px);
+			refcount_traits::rm_ref(pointer_traits::get_ptr(px));
 		}
 
 		auto operator = (intrusive_ptr const& rhs) -> intrusive_ptr&
 		{
 			if (this != &rhs)
 			{
-				ref_counted_traits<T>::add_ref(rhs.px);
-				ref_counted_traits<T>::rm_ref(px);
-				px = rhs.px;
+				refcount_traits::add_ref(pointer_traits::get_ptr(rhs.px));
+				refcount_traits::rm_ref(pointer_traits::get_ptr(px));
+				pointer_traits::assign_ptr(px, pointer_traits::get_ptr(rhs.px));
 			}
 
 			return *this;
 		}
 
-		template <typename Y, typename = std::enable_if_t<std::is_convertible<Y*, T*>>>
+		template <typename Y>
+		requires detail::convertible_intrusive_ptr<Y, T>
 		auto operator = (intrusive_ptr<Y> const& rhs) -> intrusive_ptr&
 		{
 			if (this != &rhs)
 			{
-				ref_counted_traits<T>::add_ref(rhs.px);
-				ref_counted_traits<T>::rm_ref(px);
-				px = rhs.px;
+				refcount_traits::add_ref(other_pointer_traits<Y>::get_ptr(rhs.px));
+				refcount_traits::rm_ref(pointer_traits::get_ptr(px));
+				pointer_traits::assign_ptr(px, other_pointer_traits<Y>::get_ptr(rhs.px));
 			}
 
 			return *this;
@@ -185,36 +269,24 @@ export namespace atma
 			return px == nullptr;
 		}
 
-		auto operator * () const -> T&
+		auto operator * () const -> reference_type
 		{
-			return *px;
+			return *pointer_traits::get_ptr(px);
 		}
 
-		auto operator -> () const -> T*
+		auto operator -> () const -> pointer_type
 		{
-			return px;
+			return pointer_traits::get_ptr(px);
 		}
 
-		auto get() const -> T*
+		auto get() const -> pointer_type
 		{
-			return px;
+			return pointer_traits::get_ptr(px);
 		}
 
 		auto reset() -> void
 		{
 			*this = intrusive_ptr{};
-		}
-
-		template <typename Y>
-		auto cast_static() const -> intrusive_ptr<Y>
-		{
-			return intrusive_ptr<Y>(static_cast<Y*>(px));
-		}
-
-		template <typename Y>
-		auto cast_dynamic() const -> intrusive_ptr<Y>
-		{
-			return intrusive_ptr<Y>(dynamic_cast<Y*>(px));
 		}
 
 		template <typename... Args>
@@ -230,13 +302,13 @@ export namespace atma
 		}
 
 	private:
-		T* px = nullptr;
+		pointer_type px {};
 
-		template <typename> friend struct intrusive_ptr;
+		template <typename, typename...> friend struct intrusive_ptr;
 	};
 
-	template <typename T>
-	inline intrusive_ptr<T> const intrusive_ptr<T>::null;
+	template <typename T, typename... Policies>
+	inline intrusive_ptr<T, Policies...> const intrusive_ptr<T, Policies...>::null;
 }
 
 
@@ -309,20 +381,20 @@ export namespace atma
 {
 	struct enable_intrusive_ptr_make
 	{
-		template <typename T, typename... Args>
+		template <typename T, typename... Policies, typename... Args>
 		static auto make(Args&&... args)
 		{
 			return functor_list_t
 			{
-				[](auto&&... args) -> intrusive_ptr<T>
+				[](auto&&... args) -> intrusive_ptr<T, Policies...>
 				requires detail::has_static_method_make<T, decltype(args)...>
 				{
 					return T::make(std::forward<Args>(args)...);
 				},
 
-				[](Args&&... args) -> intrusive_ptr<T>
+				[](Args&&... args) -> intrusive_ptr<T, Policies...>
 				{
-					return intrusive_ptr<T>(new T(std::forward<Args>(args)...));
+					return intrusive_ptr<T, Policies...>(new T(std::forward<Args>(args)...));
 				}
 
 			}(std::forward<Args>(args)...);
@@ -338,11 +410,11 @@ export namespace atma
 //
 export namespace atma
 {
-	template <typename T>
+	template <typename T, typename... Policies>
 	template <typename... Args>
-	inline auto intrusive_ptr<T>::make(Args&&... args) -> intrusive_ptr<T>
+	inline auto intrusive_ptr<T, Policies...>::make(Args&&... args) -> intrusive_ptr<T>
 	{
-		return enable_intrusive_ptr_make::template make<T>(std::forward<Args>(args)...);
+		return enable_intrusive_ptr_make::template make<T, Policies...>(std::forward<Args>(args)...);
 	}
 }
 
@@ -356,21 +428,80 @@ export namespace atma
 }
 
 //
+// intrusive_ptr_cast
 // polymorphic_cast
 //
 export namespace atma
 {
+	template <typename R, typename T>
+	requires detail::convertible_intrusive_ptr<R, T>
+	inline auto intrusive_ptr_cast(intrusive_ptr<T> const& x) -> intrusive_ptr<R>
+	{
+		return intrusive_ptr<R>{static_cast<R*>(x.get())};
+	}
+
 	template <typename R, typename T>
 	requires std::is_convertible_v<R*, T*>
 	inline auto polymorphic_cast(intrusive_ptr<T> const& x) -> intrusive_ptr<R>
 	{
 		return intrusive_ptr<R>(dynamic_cast<R*>(x.get()));
 	}
-
-	template <typename R, typename T>
-	requires std::is_convertible_v<R*, T*>
-	inline auto intrusive_ptr_cast(intrusive_ptr<T> const& x) -> intrusive_ptr<R>
-	{
-		return intrusive_ptr<R>(static_cast<R*>(x.get()));
-	}
 }
+
+
+
+
+
+
+
+namespace atma
+{
+	template <typename T>
+	struct tagged_ptr_semantics
+	{
+		using pointer_type = T*;
+		using reference_type = T&;
+		using const_reference_type = T const&;
+
+		template <typename Y>
+		using rebind = tagged_ptr_semantics<Y>;
+
+
+		inline static constexpr uintptr_t low_bits = std::bit_width(alignof(T));
+		inline static constexpr uintptr_t low_bits_mask = alignof(T) - 1;
+
+
+		static auto tag(pointer_type p) -> uintptr_t
+		{
+			return (uintptr_t)p & low_bits_mask;
+		}
+
+		static auto assign_ptr(pointer_type& p, pointer_type x) -> void
+		{
+			uintptr_t tag = take_tag(p);
+			p = x;
+			(uintptr_t)p |= tag;
+		}
+
+		static auto get_ptr(T* p) -> pointer_type
+		{
+			return static_cast<pointer_type>(static_cast<uintptr_t>(p) & ~low_bits_mask);
+		}
+
+		template <typename T, typename... P>
+		struct operations
+		{
+			auto increment_tag()
+			{
+				auto p = static_cast<intrusive_ptr<T, P...>*>(this)->get();
+				auto new_tag = (tag(p) + 1) & low_bits_mask;
+				auto new_ptr = ((uintptr_t)this->get() & ~low_bits_mask) | new_tag;
+			}
+		};
+	};
+
+	template <typename T>
+	using use_tagged_ptr_semantics = use_pointer_semantics<tagged_ptr_semantics<T>>;
+}
+
+
