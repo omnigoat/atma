@@ -86,7 +86,7 @@ namespace atma
 	template <typename T, typename Y>
 	inline auto stream_cast(atma::intrusive_ptr<Y> const& stream) -> atma::intrusive_ptr<T>
 	{
-		return stream.cast_dynamic<T>();
+		return atma::polymorphic_cast<T>(stream);
 	}
 }
 

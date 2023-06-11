@@ -4,13 +4,22 @@ import atma.atomic;
 import atma.types;
 
 
+//
+// I mean, how do we even test that these sort of functions work
+//
 SCENARIO("atomics!")
 {
-	GIVEN("things")
+	GIVEN("an aligned 16-bit uint16_t with a value known to us")
 	{
 		uint16_t blah = 4;
-		atma::atomic_load(&blah);
-		atma::atomic_store(&blah, (uint16_t)24, atma::memory_order_release);
+		WHEN("we call atma::atomic_load")
+		{
+			auto r = atma::atomic_load(&blah);
+			THEN("the loaded value equals the variable")
+			{
+				CHECK(r == blah);
+			}
+		}
 	}
 }
 
