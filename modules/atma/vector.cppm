@@ -1,7 +1,7 @@
 module;
 
 #include <atma/assert.hpp>
-
+#include <atma/config/platform.hpp>
 #include <initializer_list>
 
 export module atma.vector;
@@ -566,7 +566,7 @@ export namespace atma
 
 		memory_move(
 			xfer_dest(imem_ + offset),
-			xfer_src(imem_ + offset + 1)
+			xfer_src(imem_ + offset + 1),
 			(size_ - offset - 1));
 
 		--size_;
@@ -712,9 +712,12 @@ export namespace atma
 			{
 				imem_.self_allocate(newcap);
 
-				memory_move_construct(
-					xfer_dest(imem_),
-					xfer_src(tmp));
+				if (!tmp.empty())
+				{
+					memory_move_construct(
+						xfer_dest(imem_),
+						xfer_src(tmp));
+				}
 			}
 
 			size_ = tmp.size();

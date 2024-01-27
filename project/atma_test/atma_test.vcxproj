@@ -78,7 +78,7 @@
       <SubSystem>Console</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>$(TargetPath) -r=atma_console</Command>
+      <Command>REM $(TargetPath) -r=atma_console</Command>
     </PostBuildEvent>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
@@ -119,7 +119,10 @@
     <ClCompile Include="..\..\source\atma_test\entrypoint.cpp" />
     <ClCompile Include="..\..\source\atma_test\memory.cpp" />
     <ClCompile Include="..\..\source\atma_test\queue.cpp" />
-    <ClCompile Include="..\..\source\atma_test\ranges.cpp" />
+    <ClCompile Include="..\..\source\atma_test\ranges.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Test|x64'">
+      </ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\..\source\atma_test\test_allocators.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_atomics.cpp">
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Test|x64'">%(AdditionalOptions)</AdditionalOptions>

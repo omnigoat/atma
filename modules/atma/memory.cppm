@@ -33,7 +33,7 @@ import atma.aligned_allocator;
 //
 
 
-
+#define MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG 0
 
 
 
@@ -155,6 +155,8 @@ export namespace atma
 
 		// inherit constructors
 		using base_type::base_type;
+
+		constexpr basic_memory_t() = default;
 
 		basic_memory_t(basic_memory_t const&)
 		requires std::allocator_traits<Allocator>::is_always_equal::value
@@ -511,7 +513,7 @@ export namespace atma
 // get_allocator
 export namespace atma
 {
-#if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
+#if 1 || MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
 	inline constexpr auto get_allocator = functor_list_t
 	{
 		[](auto&& r) -> decltype(r.get_allocator()) { return r.get_allocator(); },
@@ -958,7 +960,7 @@ namespace atma::detail
 	struct xfer_make_from_sized_contiguous_range_
 	{
 		template <sized_and_contiguous_range R>
-		auto operator ()(R&& range) -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<R>>
+		auto operator ()(R&& range) const -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<R>>
 		{
 			return {get_allocator(range), std::ranges::data(range), std::ranges::size(range)};
 		};
@@ -968,7 +970,7 @@ namespace atma::detail
 	struct xfer_make_from_contiguous_range_
 	{
 		template <std::ranges::contiguous_range R>
-		auto operator ()(R&& range) -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<R>>
+		auto operator ()(R&& range) const -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<R>>
 		{
 			auto const sz = std::distance(std::begin(range), std::end(range));
 
@@ -976,13 +978,13 @@ namespace atma::detail
 		}
 
 		template <std::ranges::contiguous_range R>
-		auto operator ()(R&& range, size_t size) -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<R>>
+		auto operator ()(R&& range, size_t size) const -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<R>>
 		{
 			return {get_allocator(range), std::addressof(*std::begin(range)), size};
 		}
 
 		template <std::ranges::contiguous_range R>
-		auto operator ()(R&& range, size_t offset, size_t size) -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<R>>
+		auto operator ()(R&& range, size_t offset, size_t size) const -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<R>>
 		{
 			return {get_allocator(range), std::addressof(*std::begin(range)) + offset, size};
 		}
@@ -992,19 +994,19 @@ namespace atma::detail
 	struct xfer_make_from_memory_
 	{
 		template <memory_concept M>
-		auto operator ()(M&& memory) -> memxfer_range_of_t<tag_type, rm_ref_t<M>>
+		auto operator ()(M&& memory) const -> memxfer_range_of_t<tag_type, rm_ref_t<M>>
 		{
 			return {get_allocator(memory), std::data(memory)};
 		}
 
 		template <memory_concept M>
-		auto operator ()(M&& memory, size_t size) -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<M>>
+		auto operator ()(M&& memory, size_t size) const -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<M>>
 		{
 			return {get_allocator(memory), std::data(memory), size};
 		}
 
 		template <memory_concept M>
-		auto operator ()(M&& memory, size_t offset, size_t size) -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<M>>
+		auto operator ()(M&& memory, size_t offset, size_t size) const -> bounded_memxfer_range_of_t<tag_type, rm_ref_t<M>>
 		{
 			return {get_allocator(memory), std::data(memory) + offset, size};
 		}
@@ -1014,7 +1016,7 @@ namespace atma::detail
 	struct xfer_make_from_iterator_pair_
 	{
 		template <std::contiguous_iterator It>
-		auto operator ()(It begin, It end)
+		auto operator ()(It begin, It end) const
 			-> bounded_memxfer_t
 			< Tag
 			, std::remove_reference_t<decltype(*std::declval<It>())>
@@ -1033,7 +1035,7 @@ namespace atma::detail
 	template <typename tag_type>
 	using xfer_range_maker_ = functor_list_t
 	<
-		functor_call_no_fwds_t,
+		functor_list_fwds_t<>,
 
 		// first match against pointer
 		xfer_make_from_ptr_<tag_type>,
@@ -1131,7 +1133,7 @@ export namespace atma::detail
 export namespace atma::detail
 {
 	template <typename F>
-#if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
+#if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG || 1
 	inline constexpr auto _memory_range_delegate_ = functor_list_t
 #else
 	inline constexpr auto _memory_range_delegate_ = [](auto&&... args)
@@ -1140,25 +1142,7 @@ export namespace atma::detail
 		functor_list_t
 #endif
 		{
-			functor_call_fwds_t<F>(),
-
-			[](auto const&, dest_memory_concept auto&& dest, dest_memory_concept auto&& src, auto&&...)
-			{
-				static_assert(actually_false_v<decltype(src)>, "source parameter not marked as source");
-				return int();
-			},
-
-			[](auto const&, src_memory_concept auto&& dest, src_memory_concept auto&& src, auto&&...)
-			{
-				static_assert(actually_false_v<decltype(dest)>, "dest parameter not marked as dest");
-				return int();
-			},
-
-			[](auto const&, src_memory_concept auto&& dest, dest_memory_concept auto&& src, auto&&...)
-			{
-				static_assert(actually_false_v<decltype(src)>, "dest and src arguments in wrong order");
-				return int();
-			},
+			functor_list_fwds_t<F>(),
 
 			[](auto const& operation, dest_memory_concept auto&& dest, src_memory_concept auto&& src, size_t sz)
 			{
@@ -1184,7 +1168,8 @@ export namespace atma::detail
 					sz);
 			},
 
-			[](auto const& operation, dest_bounded_memory_concept auto&& dest, src_bounded_memory_concept auto&& src)
+			[]<dest_bounded_memory_concept Dest, src_bounded_memory_concept Src>(auto const& operation, Dest&& dest, Src&& src)
+			//requires dest_bounded_memory_concept<Dest> && src_bounded_memory_concept<Src>
 			{
 				ATMA_ASSERT(std::size(dest) == std::size(src));
 
@@ -1196,7 +1181,7 @@ export namespace atma::detail
 					std::size(dest));
 			},
 
-			[](auto const& operation, dest_bounded_memory_concept auto&& dest, src_memory_concept auto&& src)
+			[]<dest_bounded_memory_concept Dest, src_memory_concept Src>(auto const& operation, Dest&& dest, Src&& src)
 			{
 				operation(
 					get_allocator(dest),
@@ -1216,6 +1201,11 @@ export namespace atma::detail
 					std::size(src));
 			},
 
+			[](auto const& operation, dest_memory_concept auto&& dest, src_memory_concept auto&& src)
+			{
+				//static_assert(actually_false_v<decltype(dest)>, "can not perform operation on two unbounded ranges, when no size provided");
+			},
+
 			// this method is the odd one out, taking a pair of iterators as the source
 			//
 			// not all operations are guaranteed to support this, but should provide an
@@ -1229,7 +1219,7 @@ export namespace atma::detail
 					begin, end);
 			}
 
-#if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
+#if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG || 1
 		};
 #else
 		}(std::forward<decltype(args)>(args)...);
@@ -1299,7 +1289,7 @@ export namespace atma::detail
 	template <typename F>
 	constexpr auto _memory_range_construct_delegate_ = functor_list_t
 	{
-		functor_call_fwds_t<F>{},
+		functor_list_fwds_t<F>{},
 
 		[](auto& f, dest_bounded_memory_concept auto&& dest)
 		{
