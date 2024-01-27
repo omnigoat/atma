@@ -187,7 +187,7 @@ export namespace atma
 	//
 	//  rm_cvref_t
 	//
-	template <typename T>
+	export template <typename T>
 	using rm_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
 	//

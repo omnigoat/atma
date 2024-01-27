@@ -363,6 +363,9 @@ SCENARIO_OF("vector", "vector::insert is called")
 		atma::vector<std::string> v{"timothy", "maria"};
 		atma::vector<std::string> v2{"henry", "theodore", "marcie", "rachael"};
 
+		//atma::vector<int> numbers{1, 2, 3, 4};
+		//numbers.erase(numbers.begin());
+
 		WHEN("v.insert(v2.begin, v2.end) is called")
 		{
 			v.insert(v.begin() + 1, v2.begin(), v2.end());

@@ -14,6 +14,7 @@
 #include <list>
 #include <ranges>
 #include <variant>
+#include <ranges>
 
 #define ATMA_ROPE_DEBUG_BUFFER 1
 
@@ -1794,6 +1795,8 @@ namespace atma::_rope_
 					: hostbuf[i - insbuf_size]
 					;
 			}
+
+			static_assert(std::ranges::contiguous_range<decltype(splitbuf)>);
 
 			// find the split index in redist-space
 			redist_split_idx = redist_splitbuf_copy_begin + find_split_point(
