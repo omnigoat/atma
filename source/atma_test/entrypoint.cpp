@@ -15,19 +15,28 @@ import atma.memory;
 
 namespace test
 {
-	constexpr auto get_allocator = atma::functor_list_t
+	struct Counter
 	{
-		[](auto&& r) -> decltype(auto) { return r.get_allocator(); },
-		[](auto&& r) { return std::allocator<std::ranges::range_value_t<decltype(r)>>{}; }
+		int i = 0;
+	};
+
+	auto get_allocator = atma::functor_list_t
+	{
+		atma::functor_list_fwds_t<Counter>{},
+
+		[](auto& c, auto&& r) requires requires { { ++c.i }; } { ++c.i; return r.get_allocator(); },
+		[](auto& c, auto&& r) { ++c.i; return std::allocator<std::remove_reference_t<decltype(r)>>{}; }
 	};
 }
-
 
 struct dragon { int get_allocator() { return 4; } };
 int blam()
 {
 	dragon d;
-	return test::get_allocator();
+	test::get_allocator(d);
+	test::get_allocator(d);
+	test::get_allocator(d);
+	return test::get_allocator.template forwarded_functor<0>().i;
 }
 
 namespace test
@@ -147,7 +156,8 @@ int go()
 
 int main(int argc, char** argv)
 {
-	return doctest::Context(argc, argv).run();
+	return blam();
+	//return doctest::Context(argc, argv).run();
 	//return go();
 }
 
