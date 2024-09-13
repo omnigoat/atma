@@ -58,19 +58,25 @@ namespace atma::detail
 	template <typename Fwds, bool Empty, typename Fs>
 	struct functor_list2_t
 		: detail::functor_list_<Fwds, std::tuple<>, Fs>
-	{};
+	{
+		constexpr functor_list2_t(auto&&...) noexcept
+		{}
+	};
 
 	template <typename... Fwds, typename Fs>
 	struct functor_list2_t<functor_list_fwds_t<Fwds...>, false, Fs>
 		: detail::functor_list_<detail::functor_list_stateful_fwds_t<Fwds...>, std::tuple<>, Fs>
 	{
+		constexpr functor_list2_t(auto&&...) noexcept
+		{}
+
 		template <typename... Args>
 		constexpr decltype(auto) operator ()(Args&&... args) const
 		{
 			using base_type = detail::functor_list_<detail::functor_list_stateful_fwds_t<Fwds...>, std::tuple<>, Fs>;
 
-			return std::apply([&]<class... Ts>(Ts&&... ts) {
-				return std::invoke(static_cast<base_type const&>(*this), std::forward<Ts>(ts)..., std::forward<Args>(args)...);
+			return std::apply([&]<class... FFwds>(FFwds&... ffs) {
+				return std::invoke(static_cast<base_type const&>(*this), ffs..., std::forward<Args>(args)...);
 			}, fwds_);
 		}
 
@@ -84,7 +90,6 @@ namespace atma::detail
 	private:
 		mutable std::tuple<Fwds...> fwds_;
 	};
-
 }
 
 namespace atma
@@ -94,15 +99,25 @@ namespace atma
 
 	template <typename... Fwds, typename... Fs>
 	struct functor_list_t<functor_list_fwds_t<Fwds...>, Fs...>
-		: functor_list2_t<functor_list_fwds_t<std::add_lvalue_reference_t<Fwds>...>, (std::is_empty_v<Fwds> && ...), std::tuple<Fs...>>
+		: detail::functor_list2_t<
+			functor_list_fwds_t<Fwds...>,
+			(std::is_empty_v<Fwds> && ...),
+			std::tuple<Fs...>>
 	{
-		constexpr functor_list_t() noexcept = default;
-		constexpr functor_list_t(auto&&...) noexcept {}
+		static_assert(!(std::is_reference_v<Fwds> || ...),
+			"none of the forwards can be a reference-type");
+
+		using base_type = detail::functor_list2_t<
+			functor_list_fwds_t<Fwds...>,
+			(std::is_empty_v<Fwds> && ...),
+			std::tuple<Fs...>>;
+
+		using base_type::base_type;
 	};
 
 	template <typename... Fs>
 	struct functor_list_t<Fs...>
-		: functor_list2_t<functor_list_fwds_t<>, true, std::tuple<Fs...>>
+		: detail::functor_list2_t<functor_list_fwds_t<>, true, std::tuple<Fs...>>
 	{};
 
 	// deduction guides
