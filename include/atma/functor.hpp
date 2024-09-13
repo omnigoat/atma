@@ -74,7 +74,7 @@ namespace atma::detail
 		constexpr decltype(auto) operator ()(Args&&... args) const
 		{
 			using base_type = detail::functor_list_<detail::functor_list_stateful_fwds_t<Fwds...>, std::tuple<>, Fs>;
-
+			
 			return std::apply([&]<class... FFwds>(FFwds&... ffs) {
 				return std::invoke(static_cast<base_type const&>(*this), ffs..., std::forward<Args>(args)...);
 			}, fwds_);

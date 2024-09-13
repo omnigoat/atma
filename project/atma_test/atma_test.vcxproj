@@ -43,7 +43,6 @@
     <IncludePath>$(ProjectDir)..\..\vendor;$(ProjectDir)..\..\include;$(IncludePath)</IncludePath>
     <OutDir>$(ProjectDir)..\..\builds\$(Platform)\$(Configuration)\$(TargetName)\</OutDir>
     <IntDir>$(ProjectDir)..\..\intermediates\$(Platform)\$(Configuration)\$(TargetName)\</IntDir>
-    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
     <SourcePath>$(ProjectDir)..\..\source;$(VC_SourcePath);</SourcePath>
     <UseStructuredOutput>false</UseStructuredOutput>
   </PropertyGroup>
@@ -66,7 +65,7 @@
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <DiagnosticsFormat>Caret</DiagnosticsFormat>
+      <DiagnosticsFormat>Classic</DiagnosticsFormat>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <EnforceTypeConversionRules>true</EnforceTypeConversionRules>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -79,7 +78,7 @@
       <SubSystem>Console</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>REM $(TargetPath) -r=atma_console</Command>
+      <Command>$(TargetPath) -r=atma_console</Command>
     </PostBuildEvent>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>

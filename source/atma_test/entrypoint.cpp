@@ -15,34 +15,6 @@ import atma.memory;
 
 namespace test
 {
-	struct Counter
-	{
-		int i = 0;
-	};
-
-	static Counter cc;
-
-	auto dragon_count = atma::functor_list_t
-	{
-		atma::functor_list_fwds_t<Counter>{},
-
-		[](Counter& c, auto&& r) requires requires { { ++c.i }; } { ++c.i; return r.dragon_count(); },
-		[](Counter& c, auto&& r) { --c.i; }
-	};
-}
-
-struct dragon { int dragon_count() { return 4; } };
-int blam()
-{
-	dragon d;
-	test::dragon_count(d);
-	test::dragon_count(d);
-	test::dragon_count(d);
-	return test::dragon_count.template forwarded_functor<0>().i;
-}
-
-namespace test
-{
 	template <typename Range>
 	concept memory_concept = requires(Range r)
 	{
@@ -138,28 +110,8 @@ namespace test
 
 }
 
-int go()
-{
-	std::array<int, 4> array{1, 2, 3, 4};
-	std::array<int, 4> array2;
-
-	std::vector<int> numbers{1, 2, 3, 4};
-
-	//test::get_allocator(numbers);
-
-
-	test::memory_copy(
-		atma::xfer_dest(array2.data()),
-		atma::xfer_src(array.data()),
-		4);
-
-	return 4;
-}
-
 int main(int argc, char** argv)
 {
-	return blam();
-	//return doctest::Context(argc, argv).run();
-	//return go();
+	return doctest::Context(argc, argv).run();
 }
 
