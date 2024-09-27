@@ -5,30 +5,40 @@
 
 namespace atma
 {
-	template <typename... Fwds> struct functor_list_fwds_t {};
+	template <typename... Fwds>
+	struct functor_list_fwds_t
+	{
+		constexpr functor_list_fwds_t()
+		requires (sizeof...(Fwds) > 0)
+		{}
+
+		constexpr functor_list_fwds_t(Fwds&&... rvalue_fwds)
+			: rvalue_fwds{std::forward<Fwds>(rvalue_fwds)...}
+		{}
+
+		std::tuple<Fwds...> rvalue_fwds;
+	};
 }
 
 // Fwds: the forwards, Gs: "previously seen" functors, F: "functor in question", Rs: "yet to evaluate"
 namespace atma::detail
 {
-	template <typename...> struct functor_list_stateful_fwds_t {};
-
 	template <typename Fwds, typename Gs, typename F>
 	struct functor_delegate_;
 
-	template <typename... Fwds, typename... Gs, typename F>
-	struct functor_delegate_<functor_list_fwds_t<Fwds...>, std::tuple<Gs...>, F>
+	template <typename... Gs, typename F>
+	struct functor_delegate_<functor_list_fwds_t<>, std::tuple<Gs...>, F>
 	{
 		template <typename... Args>
-		requires (!std::is_invocable_v<Gs, Fwds..., Args...> && ...) && std::is_invocable_v<F, Fwds..., Args...>
+		requires (!std::is_invocable_v<Gs, Args...> && ...) && std::is_invocable_v<F, Args...>
 		constexpr decltype(auto) operator ()(Args&&... args) const
 		{
-			return F{}(Fwds{}..., std::forward<Args>(args)...);
+			return F{}(std::forward<Args>(args)...);
 		}
 	};
 
 	template <typename... FwdRefs, typename... Gs, typename F>
-	struct functor_delegate_<functor_list_stateful_fwds_t<FwdRefs...>, std::tuple<Gs...>, F>
+	struct functor_delegate_<functor_list_fwds_t<FwdRefs...>, std::tuple<Gs...>, F>
 	{
 		template <typename... Args>
 		requires (!std::is_invocable_v<Gs, FwdRefs..., Args...> && ...) && std::is_invocable_v<F, FwdRefs..., Args...>
@@ -54,41 +64,36 @@ namespace atma::detail
 
 namespace atma::detail
 {
+	template <typename Fwds, typename Fs> struct functor_list2_t;
+
 	// case when all forwarded-functors are empty
-	template <typename Fwds, bool Empty, typename Fs>
-	struct functor_list2_t
-		: detail::functor_list_<Fwds, std::tuple<>, Fs>
+	template <typename Fs>
+	struct functor_list2_t<functor_list_fwds_t<>, Fs>
+		: detail::functor_list_<functor_list_fwds_t<>, std::tuple<>, Fs>
 	{
 		constexpr functor_list2_t(auto&&...) noexcept
 		{}
 	};
 
 	template <typename... Fwds, typename Fs>
-	struct functor_list2_t<functor_list_fwds_t<Fwds...>, false, Fs>
-		: detail::functor_list_<detail::functor_list_stateful_fwds_t<Fwds...>, std::tuple<>, Fs>
+	struct functor_list2_t<functor_list_fwds_t<Fwds...>, Fs>
+		: protected detail::functor_list_<functor_list_fwds_t<Fwds&...>, std::tuple<>, Fs>
 	{
-		constexpr functor_list2_t(auto&&...) noexcept
+		using base_type = detail::functor_list_<functor_list_fwds_t<Fwds&...>, std::tuple<>, Fs>;
+
+		constexpr functor_list2_t(functor_list_fwds_t<Fwds...> fwds, auto&&...) noexcept
+			: fwds{std::move(fwds.rvalue_fwds)}
 		{}
 
 		template <typename... Args>
 		constexpr decltype(auto) operator ()(Args&&... args) const
 		{
-			using base_type = detail::functor_list_<detail::functor_list_stateful_fwds_t<Fwds...>, std::tuple<>, Fs>;
-			
-			return std::apply([&]<class... FFwds>(FFwds&... ffs) {
-				return std::invoke(static_cast<base_type const&>(*this), ffs..., std::forward<Args>(args)...);
-			}, fwds_);
+			return std::apply([&](std::add_lvalue_reference_t<Fwds>... fwds) {
+				return std::invoke(static_cast<base_type const&>(*this), fwds..., std::forward<Args>(args)...);
+			}, fwds);
 		}
 
-		template <size_t Idx>
-		decltype(auto) forwarded_functor() const
-			{ return std::get<Idx>(fwds_); }
-
-		auto forwarded_functors() const -> std::tuple<Fwds...> const&
-			{ return fwds_; }
-
-	private:
-		mutable std::tuple<Fwds...> fwds_;
+		mutable std::tuple<Fwds...> fwds;
 	};
 }
 
@@ -101,15 +106,10 @@ namespace atma
 	struct functor_list_t<functor_list_fwds_t<Fwds...>, Fs...>
 		: detail::functor_list2_t<
 			functor_list_fwds_t<Fwds...>,
-			(std::is_empty_v<Fwds> && ...),
 			std::tuple<Fs...>>
 	{
-		static_assert(!(std::is_reference_v<Fwds> || ...),
-			"none of the forwards can be a reference-type");
-
 		using base_type = detail::functor_list2_t<
 			functor_list_fwds_t<Fwds...>,
-			(std::is_empty_v<Fwds> && ...),
 			std::tuple<Fs...>>;
 
 		using base_type::base_type;
@@ -117,7 +117,7 @@ namespace atma
 
 	template <typename... Fs>
 	struct functor_list_t<Fs...>
-		: detail::functor_list2_t<functor_list_fwds_t<>, true, std::tuple<Fs...>>
+		: detail::functor_list2_t<functor_list_fwds_t<>, std::tuple<Fs...>>
 	{};
 
 	// deduction guides
