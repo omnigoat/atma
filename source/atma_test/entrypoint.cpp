@@ -13,6 +13,7 @@
 
 import atma.memory;
 
+#if 0
 namespace test
 {
 	template <typename Range>
@@ -109,9 +110,40 @@ namespace test
 	inline constexpr auto memory_copy = ::test::_memory_range_delegate_<decltype(_memory_copy_)>;
 
 }
+#endif
+
+namespace test
+{
+	struct Counter
+	{
+		int i = 0;
+	};
+
+	Counter cc;
+
+	auto get_allocator = atma::functor_list_t
+	{
+		atma::functor_list_fwds_t<Counter&>{cc},
+
+		[](auto& c, auto&& r) { ++c.i; return r.get_allocator(); },
+		[](auto& c, auto&& r) { ++c.i; return std::allocator<std::remove_reference_t<decltype(r)>>{}; }
+	};
+}
+
+struct dragon { int get_allocator() { return 4; } };
+int blam()
+{
+	dragon d;
+	test::get_allocator(d);
+	test::get_allocator(d);
+	test::get_allocator(d);
+	return std::get<0>(test::get_allocator.fwds).i;
+}
+
 
 int main(int argc, char** argv)
 {
+	blam();
 	return doctest::Context(argc, argv).run();
 }
 
