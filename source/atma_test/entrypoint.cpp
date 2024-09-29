@@ -123,7 +123,7 @@ namespace test
 
 	auto get_allocator = atma::functor_list_t
 	{
-		atma::functor_list_base_t{cc},
+		atma::functor_list_datum_t{cc},
 
 		[](auto& c, auto&& r) { ++c.i; return r.get_allocator(); },
 		[](auto& c, auto&& r) { ++c.i; return std::allocator<std::remove_reference_t<decltype(r)>>{}; }
@@ -137,7 +137,7 @@ int blam()
 	test::get_allocator(d);
 	test::get_allocator(d);
 	test::get_allocator(d);
-	return test::get_allocator.i;
+	return test::get_allocator.datum().i;
 }
 
 
