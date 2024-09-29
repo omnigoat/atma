@@ -1035,8 +1035,6 @@ namespace atma::detail
 	template <typename tag_type>
 	using xfer_range_maker_ = functor_list_t
 	<
-		functor_list_fwds_t<>,
-
 		// first match against pointer
 		xfer_make_from_ptr_<tag_type>,
 
@@ -1142,7 +1140,7 @@ export namespace atma::detail
 		functor_list_t
 #endif
 		{
-			functor_list_fwds_t<F>(),
+			functor_list_base_t<F>(),
 
 			[](auto const& operation, dest_memory_concept auto&& dest, src_memory_concept auto&& src, size_t sz)
 			{
