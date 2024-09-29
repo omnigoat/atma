@@ -1140,7 +1140,7 @@ export namespace atma::detail
 		functor_list_t
 #endif
 		{
-			functor_list_base_t<F>(),
+			functor_list_datum_t<F>(),
 
 			[](auto const& operation, dest_memory_concept auto&& dest, src_memory_concept auto&& src, size_t sz)
 			{
@@ -1287,7 +1287,7 @@ export namespace atma::detail
 	template <typename F>
 	constexpr auto _memory_range_construct_delegate_ = functor_list_t
 	{
-		functor_list_fwds_t<F>{},
+		functor_list_datum_t<F>{},
 
 		[](auto& f, dest_bounded_memory_concept auto&& dest)
 		{
