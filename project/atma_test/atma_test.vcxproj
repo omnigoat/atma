@@ -25,8 +25,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='TestOpt|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -43,8 +42,8 @@
     <IncludePath>$(ProjectDir)..\..\vendor;$(ProjectDir)..\..\include;$(IncludePath)</IncludePath>
     <OutDir>$(ProjectDir)..\..\builds\$(Platform)\$(Configuration)\$(TargetName)\</OutDir>
     <IntDir>$(ProjectDir)..\..\intermediates\$(Platform)\$(Configuration)\$(TargetName)\</IntDir>
-    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
     <SourcePath>$(ProjectDir)..\..\source;$(VC_SourcePath);</SourcePath>
+    <UseStructuredOutput>false</UseStructuredOutput>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='TestOpt|x64'">
     <IncludePath>$(ProjectDir)..\..\vendor;$(ProjectDir)..\..\include;$(IncludePath)</IncludePath>
@@ -52,6 +51,7 @@
     <IntDir>$(ProjectDir)..\..\intermediates\$(Platform)\$(Configuration)\$(TargetName)\</IntDir>
     <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
     <LinkIncremental>false</LinkIncremental>
+    <UseStructuredOutput>false</UseStructuredOutput>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Test|x64'">
     <ClCompile>
@@ -59,17 +59,16 @@
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>_ITERATOR_DEBUG_LEVEL=0;_CONTAINER_DEBUG_LEVEL=0;_AMD64_;WIN32;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_ITERATOR_DEBUG_LEVEL=0;_CONTAINER_DEBUG_LEVEL=0;_AMD64_;WIN32;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4201;4100;4127</DisableSpecificWarnings>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <DiagnosticsFormat>Caret</DiagnosticsFormat>
+      <DiagnosticsFormat>Classic</DiagnosticsFormat>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <EnforceTypeConversionRules>true</EnforceTypeConversionRules>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <FloatingPointModel />
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>%(AdditionalOptions)</AdditionalOptions>
@@ -78,7 +77,7 @@
       <SubSystem>Console</SubSystem>
     </Link>
     <PostBuildEvent>
-      <Command>REM $(TargetPath) -r=atma_console</Command>
+      <Command>$(TargetPath) -r=atma_console</Command>
     </PostBuildEvent>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
@@ -89,10 +88,10 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
-      <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>_AMD64_;WIN32;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <Optimization>MinSpace</Optimization>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_ITERATOR_DEBUG_LEVEL=0;_AMD64_;WIN32;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4201;4100;4996</DisableSpecificWarnings>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\vendor;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -105,13 +104,16 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalOptions>/LTCG %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PostBuildEvent>
-      <Command>$(TargetPath) -r=atma_console</Command>
+      <Command>REM $(TargetPath) -r=atma_console</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
