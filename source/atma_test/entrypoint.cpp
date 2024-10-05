@@ -116,7 +116,6 @@ namespace test
 {
 	struct Counter
 	{
-		int i = 0;
 	};
 
 	Counter cc;
@@ -125,8 +124,8 @@ namespace test
 	{
 		atma::functor_list_fwds_t<Counter>{},
 
-		[](auto& c, auto&& r) requires requires { { r.get_allocator() }; } { ++c.i; return r.get_allocator(); },
-		[](auto& c, auto&& r) { ++c.i; return 5; }
+		[](auto c, auto&& r) requires requires { { r.get_allocator() }; } { return r.get_allocator(); },
+		[](auto c, auto&& r) { return 5; }
 	};
 
 	auto get_allocator2 = atma::functor_list_t
@@ -149,7 +148,7 @@ int blam()
 	sum += test::get_allocator(w);
 	sum += test::get_allocator(d);
 
-	return std::get<0>(test::get_allocator.fwds).i + sum;
+	return 0; //std::get<0>(test::get_allocator.fwds).i + sum;
 }
 
 
