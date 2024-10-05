@@ -15,6 +15,7 @@ SCENARIO("atomics!")
 		WHEN("we call atma::atomic_load")
 		{
 			auto r = atma::atomic_load(&blah);
+			r = atma::atomic_add(&blah, uint16_t{4}, atma::memory_order::relaxed);
 			THEN("the loaded value equals the variable")
 			{
 				CHECK(r == blah);

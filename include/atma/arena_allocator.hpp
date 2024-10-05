@@ -161,7 +161,7 @@ namespace atma
 		// go through valid pages first
 		for (; page->valid(); page = page->next)
 		{
-			if (report = page->has_space(block_count_, required_blocks))
+			if ((report = page->has_space(block_count_, required_blocks)))
 				goto get_page_bit_idx;
 		}
 

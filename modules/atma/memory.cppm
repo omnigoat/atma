@@ -1035,8 +1035,6 @@ namespace atma::detail
 	template <typename tag_type>
 	using xfer_range_maker_ = functor_list_t
 	<
-		functor_list_fwds_t<>,
-
 		// first match against pointer
 		xfer_make_from_ptr_<tag_type>,
 
@@ -1289,7 +1287,7 @@ export namespace atma::detail
 	template <typename F>
 	constexpr auto _memory_range_construct_delegate_ = functor_list_t
 	{
-		functor_list_fwds_t<F>{},
+		functor_list_datum_t<F>{},
 
 		[](auto& f, dest_bounded_memory_concept auto&& dest)
 		{

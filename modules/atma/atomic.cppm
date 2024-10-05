@@ -3,6 +3,9 @@ module;
 #include <atma/config/platform.hpp>
 #include <atma/assert.hpp>
 
+// for _ReadWriteBarrier()
+#include <winnt.h>
+
 #include <atomic>
 
 export module atma.atomic;
@@ -20,10 +23,10 @@ export namespace atma
 {
 	using memory_order = std::memory_order;
 
+	inline constexpr auto memory_order_relaxed = std::memory_order_relaxed;
+	inline constexpr auto memory_order_consume = std::memory_order_consume;
 	inline constexpr auto memory_order_acquire = std::memory_order_acquire;
 	inline constexpr auto memory_order_release = std::memory_order_release;
-	inline constexpr auto memory_order_consume = std::memory_order_consume;
-	inline constexpr auto memory_order_relaxed = std::memory_order_relaxed;
 	inline constexpr auto memory_order_acq_rel = std::memory_order_acq_rel;
 	inline constexpr auto memory_order_seq_cst = std::memory_order_seq_cst;
 }
@@ -121,7 +124,7 @@ namespace atma::detail::_atomics_
 
 namespace atma::detail
 {
-	inline constexpr bool assume_seq_cst = true;
+	inline constexpr bool known_seq_cst = true;
 	
 	inline bool validate_memory_order(memory_order order)
 	{
@@ -312,7 +315,7 @@ namespace atma::detail
 			return ((sizeof(std::remove_pointer_t<Addresses>) == byte_width) && ...) && (((uintptr_t)addresses % byte_width == 0) && ...);
 		}
 
-		template <typename T, bool assume_seq_cst = false>
+		template <typename T, bool known_seq_cst = false>
 		static auto load(T const volatile* addr, [[maybe_unused]] memory_order order = memory_order_seq_cst) -> T
 		{
 			ATMA_ASSERT(validate_addresses(addr));
@@ -328,7 +331,7 @@ namespace atma::detail
 			else if constexpr (is_64_bit)
 				result = __iso_volatile_load64(reinterpret_cast<bytes_type const volatile*>(addr));
 
-			if constexpr (assume_seq_cst)
+			if constexpr (known_seq_cst)
 			{
 				_Compiler_barrier();
 			}
@@ -338,6 +341,7 @@ namespace atma::detail
 					break;
 				case memory_order::consume:
 				case memory_order::acquire:
+				case memory_order::seq_cst:
 					_Compiler_barrier();
 					break;
 				case memory_order::release:
@@ -349,23 +353,25 @@ namespace atma::detail
 			return reinterpret_cast<T&>(result);
 		}
 
-		template <typename T, bool assume_seq_cst = false>
+		template <typename T, bool known_seq_cst = false>
 		static void store(T volatile* addr, T x, [[maybe_unused]] memory_order order)
 		{
 			ATMA_ASSERT(validate_addresses(addr));
 
 			bytes_type const bytes = atomic_reinterpret_cast<bytes_type>(x);
 
-			if constexpr (assume_seq_cst)
+			if constexpr (known_seq_cst)
 			{
+				// the easiest way to store with seq_cst is via exchange
+
 				if constexpr (is_8_bit)
-					InterlockedExchange8(reinterpret_cast<bytes_type volatile*>(addr), bytes);
+					_InterlockedExchange8(reinterpret_cast<bytes_type volatile*>(addr), bytes);
 				else if constexpr (is_16_bit)
-					InterlockedExchange16(reinterpret_cast<bytes_type volatile*>(addr), bytes);
+					_InterlockedExchange16(reinterpret_cast<bytes_type volatile*>(addr), bytes);
 				else if constexpr (is_32_bit)
-					InterlockedExchange(reinterpret_cast<bytes_type volatile*>(addr), bytes);
+					_InterlockedExchange(reinterpret_cast<bytes_type volatile*>(addr), bytes);
 				else if constexpr (is_64_bit)
-					InterlockedExchange64(reinterpret_cast<bytes_type volatile*>(addr), bytes);
+					_InterlockedExchange64(reinterpret_cast<bytes_type volatile*>(addr), bytes);
 			}
 			else switch (order)
 			{
@@ -388,6 +394,9 @@ namespace atma::detail
 					break;
 				}
 
+				case memory_order::seq_cst:
+					this->store<T, true>(addr, x, order);
+
 				case memory_order::consume:
 				case memory_order::acquire:
 				case memory_order::acq_rel:
@@ -406,25 +415,25 @@ namespace atma::detail
 
 			if constexpr (is_8_bit)
 			{
-				result = InterlockedExchangeAdd8(
+				result = _InterlockedExchangeAdd8(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					atomic_reinterpret_cast<bytes_type>(addend));
 			}
 			else if constexpr (is_16_bit)
 			{
-				result = InterlockedExchangeAdd16(
+				result = _InterlockedExchangeAdd16(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					atomic_reinterpret_cast<bytes_type>(addend));
 			}
 			else if constexpr (is_32_bit)
 			{
-				result = InterlockedExchangeAdd(
+				result = _InterlockedExchangeAdd(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					atomic_reinterpret_cast<bytes_type>(addend));
 			}
 			else if constexpr (is_64_bit)
 			{
-				result = InterlockedExchangeAdd64(
+				result = _InterlockedExchangeAdd64(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					atomic_reinterpret_cast<bytes_type>(addend));
 			}
@@ -442,25 +451,25 @@ namespace atma::detail
 
 			if constexpr (is_8_bit)
 			{
-				result = InterlockedExchangeAdd8(
+				result = _InterlockedExchangeAdd8(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					atomic_negate(atomic_reinterpret_cast<bytes_type>(subtrahend)));
 			}
 			else if constexpr (is_16_bit)
 			{
-				result = InterlockedExchangeAdd16(
+				result = _InterlockedExchangeAdd16(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					atomic_negate(atomic_reinterpret_cast<bytes_type>(subtrahend)));
 			}
 			else if constexpr (is_32_bit)
 			{
-				result = InterlockedExchangeAdd(
+				result = _InterlockedExchangeAdd(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					atomic_negate(atomic_reinterpret_cast<bytes_type>(subtrahend)));
 			}
 			else if constexpr (is_64_bit)
 			{
-				result = InterlockedExchangeAdd64(
+				result = _InterlockedExchangeAdd64(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					atomic_negate(atomic_reinterpret_cast<bytes_type>(subtrahend)));
 			}
@@ -490,25 +499,25 @@ namespace atma::detail
 
 			if constexpr (is_8_bit)
 			{
-				result = InterlockedExchange8(
+				result = _InterlockedExchange8(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					atomic_reinterpret_cast<bytes_type>(exchend));
 			}
 			else if constexpr (is_16_bit)
 			{
-				result = InterlockedExchange16(
+				result = _InterlockedExchange16(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					atomic_reinterpret_cast<bytes_type>(exchend));
 			}
 			else if constexpr (is_32_bit)
 			{
-				result = InterlockedExchange(
+				result = _InterlockedExchange(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					atomic_reinterpret_cast<bytes_type>(exchend));
 			}
 			else if constexpr (is_64_bit)
 			{
-				result = InterlockedExchange64(
+				result = _InterlockedExchange64(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					atomic_reinterpret_cast<bytes_type>(exchend));
 			}
@@ -531,28 +540,28 @@ namespace atma::detail
 			
 			if constexpr (is_8_bit)
 			{
-				previous_bytes = InterlockedCompareExchange8(
+				previous_bytes = _InterlockedCompareExchange8(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					replacement_bytes,
 					expected_bytes);
 			}
 			else if constexpr (is_16_bit)
 			{
-				previous_bytes = InterlockedCompareExchange16(
+				previous_bytes = _InterlockedCompareExchange16(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					replacement_bytes,
 					expected_bytes);
 			}
 			else if constexpr (is_32_bit)
 			{
-				previous_bytes = InterlockedCompareExchange(
+				previous_bytes = _InterlockedCompareExchange(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					replacement_bytes,
 					expected_bytes);
 			}
 			else if constexpr (is_64_bit)
 			{
-				previous_bytes = InterlockedCompareExchange64(
+				previous_bytes = _InterlockedCompareExchange64(
 					reinterpret_cast<bytes_type volatile*>(addr),
 					replacement_bytes,
 					expected_bytes);
@@ -682,7 +691,7 @@ export namespace atma
 	template <typename T>
 	inline void atomic_store(T volatile* address, T const& payload)
 	{
-		return detail::best_atomic_store_impl_t<T>::template store<T, detail::assume_seq_cst>(address, payload);
+		return detail::best_atomic_store_impl_t<T>::template store<T, detail::known_seq_cst>(address, payload);
 	}
 
 	template <typename T>

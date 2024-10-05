@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.29306.81
+# Visual Studio Version 17
+VisualStudioVersion = 17.10.35004.147
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "atma_test", "project\atma_test\atma_test.vcxproj", "{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}"
 EndProject
@@ -17,8 +17,8 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.Development|x64.ActiveCfg = Test|x64
 		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.Development|x64.Build.0 = Test|x64
-		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.Distribution|x64.ActiveCfg = Test|x64
-		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.Distribution|x64.Build.0 = Test|x64
+		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.Distribution|x64.ActiveCfg = TestOpt|x64
+		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.Distribution|x64.Build.0 = TestOpt|x64
 		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.Test|x64.ActiveCfg = Test|x64
 		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.Test|x64.Build.0 = Test|x64
 		{AD2E1D66-97F7-4E55-8277-0FAFA8B4CB0F}.TestOpt|x64.ActiveCfg = TestOpt|x64
@@ -29,8 +29,8 @@ Global
 		{3301E1FA-9F23-43C6-A5E1-183204867D44}.Distribution|x64.Build.0 = Distribution|x64
 		{3301E1FA-9F23-43C6-A5E1-183204867D44}.Test|x64.ActiveCfg = Development|x64
 		{3301E1FA-9F23-43C6-A5E1-183204867D44}.Test|x64.Build.0 = Development|x64
-		{3301E1FA-9F23-43C6-A5E1-183204867D44}.TestOpt|x64.ActiveCfg = Development|x64
-		{3301E1FA-9F23-43C6-A5E1-183204867D44}.TestOpt|x64.Build.0 = Development|x64
+		{3301E1FA-9F23-43C6-A5E1-183204867D44}.TestOpt|x64.ActiveCfg = Distribution|x64
+		{3301E1FA-9F23-43C6-A5E1-183204867D44}.TestOpt|x64.Build.0 = Distribution|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
