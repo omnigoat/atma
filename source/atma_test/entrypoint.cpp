@@ -121,12 +121,12 @@ namespace test
 
 	Counter cc;
 
-	auto get_allocator = atma::functor_list_t
+	constexpr auto get_allocator = atma::functor_list_t
 	{
-		atma::functor_list_fwds_t<Counter&>{cc},
+		atma::functor_list_fwds_t<Counter>{},
 
-		[](auto& c, auto&& r) { ++c.i; return r.get_allocator(); },
-		[](auto& c, auto&& r) { ++c.i; return std::allocator<std::remove_reference_t<decltype(r)>>{}; }
+		[](auto& c, auto&& r) requires requires { { r.get_allocator() }; } { ++c.i; return r.get_allocator(); },
+		[](auto& c, auto&& r) { ++c.i; return 5; }
 	};
 
 	auto get_allocator2 = atma::functor_list_t
@@ -136,20 +136,26 @@ namespace test
 	};
 }
 
-struct dragon { int get_allocator() { return 4; } };
+struct dragon { int get_allocator() const { return 4; } };
+struct wyvern {  };
+
 int blam()
 {
 	dragon d;
-	test::get_allocator(d);
-	test::get_allocator(d);
-	test::get_allocator(d);
-	return std::get<0>(test::get_allocator.fwds).i;
+	wyvern w;
+
+	int sum {};
+	sum += test::get_allocator(d);
+	sum += test::get_allocator(w);
+	sum += test::get_allocator(d);
+
+	return std::get<0>(test::get_allocator.fwds).i + sum;
 }
 
 
 int main(int argc, char** argv)
 {
-	blam();
-	return doctest::Context(argc, argv).run();
+	return blam();
+	//return doctest::Context(argc, argv).run();
 }
 
