@@ -514,7 +514,7 @@ export namespace atma
 export namespace atma
 {
 #if 1 || MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
-	inline constexpr auto get_allocator = functor_list_t
+	inline constexpr auto get_allocator = functor_cascade_t
 	{
 		[](auto&& r) -> decltype(r.get_allocator()) { return r.get_allocator(); },
 		[](auto&& r) { return std::allocator<rm_cvref_t<value_type_of_t<decltype(r)>>>(); }
@@ -522,7 +522,7 @@ export namespace atma
 #else
 	auto get_allocator(auto&& x)
 	{
-		return functor_list_t
+		return functor_cascade_t
 		{
 			[](auto&& r) -> decltype(r.get_allocator()) { return r.get_allocator(); },
 			[](auto&& r) { return std::allocator<rm_cvref_t<value_type_of_t<decltype(r)>>>(); }
@@ -1033,7 +1033,7 @@ namespace atma::detail
 namespace atma::detail
 {
 	template <typename tag_type>
-	using xfer_range_maker_ = functor_list_t
+	using xfer_range_maker_ = functor_cascade_t
 	<
 		// first match against pointer
 		xfer_make_from_ptr_<tag_type>,
@@ -1132,15 +1132,15 @@ export namespace atma::detail
 {
 	template <typename F>
 #if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG || 1
-	inline constexpr auto _memory_range_delegate_ = functor_list_t
+	inline constexpr auto _memory_range_delegate_ = functor_cascade_t
 #else
 	inline constexpr auto _memory_range_delegate_ = [](auto&&... args)
 	{
 		// forward the functor F to our implementations
-		functor_list_t
+		functor_cascade_t
 #endif
 		{
-			functor_list_fwds_t<F>(),
+			functor_cascade_fwds_t<F>(),
 
 			[](auto const& operation, dest_memory_concept auto&& dest, src_memory_concept auto&& src, size_t sz)
 			{
@@ -1285,7 +1285,7 @@ export namespace atma::detail
 
 #if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
 	template <typename F>
-	constexpr auto _memory_range_construct_delegate_ = functor_list_t
+	constexpr auto _memory_range_construct_delegate_ = functor_cascade_t
 	{
 		functor_list_datum_t<F>{},
 
@@ -1302,7 +1302,7 @@ export namespace atma::detail
 #else
 	auto _memory_range_construct_delegate_(auto const& ff, auto&&... args)
 	{
-		return functor_list_t
+		return functor_cascade_t
 		{
 			[](auto& f, dest_bounded_memory_concept auto&& dest)
 			{
@@ -1360,7 +1360,7 @@ export namespace atma
 // memory_copy_construct / memory_move_construct
 export namespace atma::detail
 {
-	inline constexpr auto _memory_copy_construct_ = functor_list_t
+	inline constexpr auto _memory_copy_construct_ = functor_cascade_t
 	{
 		[](auto&& dest_allocator, auto&&, auto* px, auto* py, size_t size)
 		{
@@ -1379,7 +1379,7 @@ export namespace atma::detail
 		}
 	};
 
-	inline constexpr auto _memory_move_construct_ = functor_list_t
+	inline constexpr auto _memory_move_construct_ = functor_cascade_t
 	{
 		[](auto&& dest_allocator, auto&&, auto* px, auto* py, size_t size)
 		{
@@ -1443,7 +1443,7 @@ export namespace atma
 //
 export namespace atma::detail
 {
-	inline constexpr auto _memory_copy_ = functor_list_t
+	inline constexpr auto _memory_copy_ = functor_cascade_t
 	{
 		[] (auto&&, auto&&, auto* px, auto* py, size_t size)
 		requires !std::is_trivial_v<std::remove_reference_t<decltype(*px)>>
@@ -1469,7 +1469,7 @@ export namespace atma::detail
 //
 export namespace atma::detail
 {
-	inline constexpr auto _memory_move_ = functor_list_t
+	inline constexpr auto _memory_move_ = functor_cascade_t
 	{
 		[]<typename T>(auto&&, auto&&, T* px, T const* py, size_t size)
 		requires !std::is_trivial_v<std::remove_reference_t<T>>
@@ -1528,11 +1528,11 @@ export namespace atma::detail
 
 
 #if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
-	inline constexpr auto _memory_relocate_ = functor_list_t
+	inline constexpr auto _memory_relocate_ = functor_cascade_t
 #else
 	inline constexpr auto _memory_relocate_ = [](auto&&... args)
 	{
-		return functor_list_t
+		return functor_cascade_t
 #endif
 	{
 		[]<trivially_copyable T>(auto&&, auto&&, T* px, T const* py, size_t size)
@@ -1704,11 +1704,11 @@ export namespace atma
 export namespace atma
 {
 #if MSVC_HAS_FIXED_THEIR_LAMBDA_SYMBOLS_IN_MODULES_BUG
-	inline auto memory_compare = functor_list_t
+	inline auto memory_compare = functor_cascade_t
 #else
 	inline auto memory_compare = [](auto&&... args)
 	{
-		return functor_list_t
+		return functor_cascade_t
 #endif
 	{
 		[](memory_concept auto&& lhs, memory_concept auto&& rhs, size_t sz)

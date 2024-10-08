@@ -384,7 +384,7 @@ export namespace atma
 		template <typename T, typename... Policies, typename... Args>
 		static auto make(Args&&... args)
 		{
-			return functor_list_t
+			return functor_cascade_t
 			{
 				[](auto&&... args) -> intrusive_ptr<T, Policies...>
 				requires detail::has_static_method_make<T, decltype(args)...>
