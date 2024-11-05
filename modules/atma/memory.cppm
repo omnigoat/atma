@@ -1449,55 +1449,18 @@ export namespace atma::detail
 	template <typename T>
 	concept copy_constructible = std::is_copy_constructible_v<T>;
 
+	template <typename T>
+	concept move_assignable = std::is_move_assignable_v<T>;
 
 
 	inline constexpr auto _memory_relocate_ = functor_cascade_t
 	{
-		[]<trivially_copyable T>(auto&&, auto&&, T* px, T const* py, size_t size)
+		[]<trivially_copyable T>(auto&&, auto&&, T* px, T* py, size_t count)
 		{
-			::memmove(px, py, sizeof(T) * size);
+			::memmove(px, py, sizeof(T) * count);
 		},
 
-		[]<move_constructible T>(auto&& dest_allocator, auto&& src_allocator, T* px, T const* py, size_t size)
-		{
-			using dest_allocator_traits = allocator_traits_of_t<decltype(dest_allocator)>;
-			using src_allocator_traits = allocator_traits_of_t<decltype(src_allocator)>;
-
-			// destination range is earlier, move forwards
-			if (px < py)
-			{
-				for (size_t i = 0; i != size; ++i, ++px, ++py)
-				{
-					dest_allocator_traits::construct(
-						dest_allocator,
-						px, std::move(*py));
-
-					src_allocator_traits::destroy(
-						src_allocator,
-						py);
-				}
-			}
-			// src range earlier, move backwards
-			else
-			{
-				auto pxe = px + size;
-				auto pye = py + size;
-				for (size_t i = 0; i != size; ++i)
-				{
-					--pxe, --pye;
-
-					dest_allocator_traits::construct(
-						dest_allocator,
-						pxe, std::move(*pye));
-
-					src_allocator_traits::destroy(
-						src_allocator,
-						pye);
-				}
-			}
-		},
-
-		[]<copy_constructible T>(auto&& dest_allocator, auto&& src_allocator, T* px, T const* py, size_t size)
+		[]<move_constructible T>(auto&& dest_allocator, auto&& src_allocator, T* px, T* py, size_t count)
 		{
 			using dest_allocator_traits = allocator_traits_of_t<decltype(dest_allocator)>;
 			using src_allocator_traits = allocator_traits_of_t<decltype(src_allocator)>;
@@ -1505,39 +1468,93 @@ export namespace atma::detail
 			// destination range is earlier, move forwards
 			if (px < py)
 			{
-				for (size_t i = 0; i != size; ++i, ++px, ++py)
+				for (size_t i = 0; i != count; ++i, ++px, ++py)
 				{
-					dest_allocator_traits::construct(
-						dest_allocator,
-						px, *py);
-
-					src_allocator_traits::destroy(
-						src_allocator,
-						py);
+					dest_allocator_traits::construct(dest_allocator, px, std::move(*py));
+					src_allocator_traits::destroy(src_allocator, py);
 				}
 			}
 			// src range earlier, move backwards
 			else
 			{
-				auto pxe = px + size;
-				auto pye = py + size;
-				for (size_t i = 0; i != size; ++i)
+				auto pxe = px + count;
+				auto pye = py + count;
+				for (size_t i = 0; i != count; ++i)
 				{
 					--pxe, --pye;
 
-					dest_allocator_traits::construct(
-						dest_allocator,
-						pxe, *pye);
-
-					src_allocator_traits::destroy(
-						src_allocator,
-						pye);
+					dest_allocator_traits::construct(dest_allocator, pxe, std::move(*pye));
+					src_allocator_traits::destroy(src_allocator, pye);
 				}
 			}
 		},
+
+		[]<copy_constructible T>(auto&& dest_allocator, auto&& src_allocator, T* px, T* py, size_t count)
+		{
+			using dest_allocator_traits = allocator_traits_of_t<decltype(dest_allocator)>;
+			using src_allocator_traits = allocator_traits_of_t<decltype(src_allocator)>;
+
+			// destination range is earlier, move forwards
+			if (px < py)
+			{
+				for (size_t i = 0; i != count; ++i, ++px, ++py)
+				{
+					dest_allocator_traits::construct(dest_allocator, px, *py);
+					src_allocator_traits::destroy(src_allocator, py);
+				}
+			}
+			// src range earlier, move backwards
+			else
+			{
+				auto pxe = px + count;
+				auto pye = py + count;
+				for (size_t i = 0; i != count; ++i)
+				{
+					--pxe, --pye;
+
+					dest_allocator_traits::construct(dest_allocator, pxe, *pye);
+					src_allocator_traits::destroy(src_allocator, pye);
+				}
+			}
+		},
+
+#if 1
+		[]<typename T>(auto&& dest_allocator, auto&& src_allocator, T* px, T* py, size_t count)
+		requires std::is_default_constructible_v<T> && std::is_move_assignable_v<T>
+		{
+			using dest_allocator_traits = allocator_traits_of_t<decltype(dest_allocator)>;
+			using src_allocator_traits = allocator_traits_of_t<decltype(src_allocator)>;
+
+			// destination range is earlier, move forwards
+			if (px < py)
+			{
+				for (size_t i = 0; i != count; ++i, ++px, ++py)
+				{
+					dest_allocator_traits::construct(dest_allocator, px);
+					*px = static_cast<T&&>(*py);
+					src_allocator_traits::destroy(src_allocator, py);
+				}
+			}
+			// src range earlier, move backwards
+			else if (py < px)
+			{
+				auto pxe = px + count;
+				auto pye = py + count;
+
+				while (pxe != px)
+				{
+					--pxe, --pye;
+
+					dest_allocator_traits::construct(dest_allocator, pxe);
+					*pxe = std::move(*pye);
+					src_allocator_traits::destroy(src_allocator, pye);
+				}
+			}
+		},
+#endif
 
 #if 0
-		[]<template T>(auto&& dest_allocator, auto&& src_allocator, T* px, T const* py, size_t size)
+		[]<template T>(auto&& dest_allocator, auto&& src_allocator, T* px, T* py, size_t size)
 		requires std::is_default_constructible_v<T> && std::is_copy_assignable_v<T>
 		{
 			using dest_allocator_traits = allocator_traits_of_t<decltype(dest_allocator)>;
@@ -1579,6 +1596,7 @@ export namespace atma::detail
 #endif
 
 		[](auto&& dest_allocator, auto* px, auto begin, auto end)
+		requires std::contiguous_iterator<decltype(begin)>
 		{
 			for (; begin != end; ++px, ++begin)
 			{
