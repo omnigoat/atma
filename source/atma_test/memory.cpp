@@ -1237,6 +1237,39 @@ SCENARIO("memory_relocate is used")
 			CHECK(dest_storage[0] == marcie);
 			CHECK(dest_storage[1] == rachael);
 		}
+
+		THEN("move-constructible")
+		{
+			struct bop
+			{
+				bop() = default;
+				bop(bop const&) = delete;
+
+				bop& operator = (bop const&) = delete;
+				bop& operator = (bop&& rhs)
+				{
+					std::swap(name, rhs.name);
+					return *this;
+				}
+
+				bop(std::string const& name)
+					: name{name}
+				{}
+
+				std::string name;
+			};
+
+			bop bops[4] = {{"hello"}, {"how"}, {"are"}, {"you"}};
+			//atma::vector<bop> bops; //{"hello", "how", "are", "you"};
+			//bops.emplace_back("hello");
+			//atma::typed_unique_memory_t<bop> yay{atma::allocate_n, 4};
+			auto* yay = reinterpret_cast<bop*>(malloc(sizeof(bop) * 4));
+
+			atma::memory_relocate(
+				atma::xfer_dest(yay, 4),
+				atma::xfer_src(bops, 4));
+
+		}
 	}
 }
 
