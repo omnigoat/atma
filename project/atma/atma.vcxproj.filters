@@ -229,6 +229,9 @@
     <ClCompile Include="policies.ixx">
       <Filter>modules</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\modules\atma\benchmark.cppm">
+      <Filter>modules</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
