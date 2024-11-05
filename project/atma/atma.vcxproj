@@ -71,6 +71,7 @@
     <ClCompile Include="..\..\modules\atma\aligned_allocator.cppm" />
     <ClCompile Include="..\..\modules\atma\assert.cppm" />
     <ClCompile Include="..\..\modules\atma\atomic.cppm" />
+    <ClCompile Include="..\..\modules\atma\benchmark.cppm" />
     <ClCompile Include="..\..\modules\atma\bind.cppm" />
     <ClCompile Include="..\..\modules\atma\intrusive_ptr.cppm" />
     <ClCompile Include="..\..\modules\atma\lockfree_queue.cppm" />
