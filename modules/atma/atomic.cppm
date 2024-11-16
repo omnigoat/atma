@@ -124,11 +124,9 @@ namespace atma::detail::_atomics_
 
 namespace atma::detail
 {
-	inline constexpr bool known_seq_cst = true;
-	
 	inline bool validate_memory_order(memory_order order)
 	{
-		return order < memory_order_seq_cst;
+		return memory_order_relaxed <= order && order <= memory_order_seq_cst;
 	}
 }
 
@@ -396,6 +394,7 @@ namespace atma::detail
 
 				case memory_order::seq_cst:
 					this->store<T, true>(addr, x, order);
+					break;
 
 				case memory_order::consume:
 				case memory_order::acquire:
@@ -574,7 +573,7 @@ namespace atma::detail
 			else
 			{
 				// reinterpret_cast here instead of memcpy to be faster in debug builds
-				reinterpret_cast<bytes_type&>(expected) = previous_bytes;
+				reinterpret_cast<bytes_type volatile&>(expected) = previous_bytes;
 				return false;
 			}
 		}
@@ -614,52 +613,52 @@ namespace atma::detail::_atomics_
 	using compare_exchange_op = decltype(detail::atomic_implementation<Platform, Compiler, sizeof(T)>::template compare_exchange<T>);
 }
 
-namespace atma::detail
+namespace atma::detail::_atomics_
 {
 	template <typename T>
 	using specialized_atomic_implementation = atomic_implementation<
-		_atomics_::current_architecture,
-		_atomics_::current_compiler,
+		current_architecture,
+		current_compiler,
 		sizeof(T)>;
 
 	template <typename T>
 	using fallback_atomic_implementation = atomic_implementation<
-		_atomics_::any_architecture,
-		_atomics_::current_compiler,
+		any_architecture,
+		current_compiler,
 		sizeof(T)>;
 
 	template <template <typename...> typename Op, typename T>
-	using best_atomic_implementation_t = std::conditional_t<
+	using select_implementation_t = std::conditional_t<
 		atma::is_detected_v<Op, _atomics_::current_architecture, _atomics_::current_compiler, T>,
 		specialized_atomic_implementation<T>,
 		fallback_atomic_implementation<T>>;
 }
 
-namespace atma::detail
+namespace atma::detail::_atomics_
 {
 	template <typename T>
-	using best_atomic_load_impl_t = best_atomic_implementation_t<_atomics_::load_op, T>;
+	using best_load_t = select_implementation_t<load_op, T>;
 
 	template <typename T>
-	using best_atomic_store_impl_t = best_atomic_implementation_t<_atomics_::store_op, T>;
+	using best_store_t = select_implementation_t<store_op, T>;
 
 	template <typename T>
-	using best_atomic_fetch_add_impl_t = best_atomic_implementation_t<_atomics_::fetch_add_op, T>;
+	using best_fetch_add_t = select_implementation_t<fetch_add_op, T>;
 
 	template <typename T>
-	using best_atomic_fetch_sub_impl_t = best_atomic_implementation_t<_atomics_::fetch_sub_op, T>;
+	using best_fetch_sub_t = select_implementation_t<fetch_sub_op, T>;
 
 	template <typename T>
-	using best_atomic_add_impl_t = best_atomic_implementation_t<_atomics_::add_op, T>;
+	using best_add_t = select_implementation_t<add_op, T>;
 
 	template <typename T>
-	using best_atomic_sub_impl_t = best_atomic_implementation_t<_atomics_::sub_op, T>;
+	using best_sub_t = select_implementation_t<sub_op, T>;
 
 	template <typename T>
-	using best_atomic_exchange_impl_t = best_atomic_implementation_t<_atomics_::exchange_op, T>;
+	using best_exchange_t = select_implementation_t<exchange_op, T>;
 
 	template <typename T>
-	using best_atomic_compare_exchange_impl_t = best_atomic_implementation_t<_atomics_::compare_exchange_op, T>;
+	using best_compare_exchange_t = select_implementation_t<compare_exchange_op, T>;
 }
 
 
@@ -673,63 +672,63 @@ export namespace atma
 	template <typename T>
 	inline auto atomic_load(T const volatile* address, memory_order order) -> T
 	{
-		return detail::best_atomic_load_impl_t<T>::load(address, order);
+		return detail::_atomics_::best_load_t<T>::load(address, order);
 	}
 
 	template <typename T>
 	inline auto atomic_load(T const volatile* address) -> T
 	{
-		return detail::best_atomic_load_impl_t<T>::template load<T, true>(address);
+		return detail::_atomics_::best_load_t<T>::template load<T, true>(address);
 	}
 
 	template <typename T>
 	inline void atomic_store(T volatile* address, T const& payload, memory_order order)
 	{
-		return detail::best_atomic_store_impl_t<T>::store(address, payload, order);
+		return detail::_atomics_::best_store_t<T>::store(address, payload, order);
 	}
 
 	template <typename T>
 	inline void atomic_store(T volatile* address, T const& payload)
 	{
-		return detail::best_atomic_store_impl_t<T>::template store<T, detail::known_seq_cst>(address, payload);
+		return detail::_atomics_::best_store_t<T>::template store<T, detail, true>(address, payload);
 	}
 
 	template <typename T>
 	inline auto atomic_fetch_add(T volatile* address, T const addend, memory_order order) -> T
 	{
-		return detail::best_atomic_fetch_add_impl_t<T>::template fetch_add(address, addend, order);
+		return detail::_atomics_::best_fetch_add_t<T>::fetch_add(address, addend, order);
 	}
 
 	template <typename T>
 	inline auto atomic_fetch_sub(T volatile* address, T const subtrahend, memory_order order) -> T
 	{
-		return detail::best_atomic_fetch_sub_impl_t<T>::template fetch_sub(address, subtrahend, order);
+		return detail::_atomics_::best_fetch_sub_t<T>::fetch_sub(address, subtrahend, order);
 	}
 
 	template <typename T>
 	inline auto atomic_add(T volatile* address, T const addend, memory_order order) -> T
 	{
-		return detail::best_atomic_add_impl_t<T>::template add(address, addend, order);
+		return detail::_atomics_::best_add_t<T>::add(address, addend, order);
 	}
 
 	template <typename T>
 	inline auto atomic_sub(T volatile* address, T const subtrahend, memory_order order) -> T
 	{
-		return detail::best_atomic_sub_impl_t<T>::template sub(address, subtrahend, order);
+		return detail::_atomics_::best_sub_t<T>::sub(address, subtrahend, order);
 	}
 
 	template <typename T>
 	inline auto atomic_exchange(T volatile* address, T exchend, [[maybe_unused]] memory_order order) -> T
 	{
-		return detail::best_atomic_exchange_impl_t<T>::template exchange(address, exchend, order);
+		return detail::_atomics_::best_exchange_t<T>::exchange(address, exchend, order);
 	}
 
 	template <typename T>
 	inline auto atomic_compare_exchange(T volatile* address, T& expected, T const replacement,
 		[[maybe_unused]] memory_order order_success, [[maybe_unused]] memory_order order_failure) -> T
 	{
-		return detail::best_atomic_compare_exchange_impl_t<T>::
-			template compare_exchange(address, expected, replacement, order_success, order_failure);
+		return detail::_atomics_::best_compare_exchange_t<T>::
+			compare_exchange(address, expected, replacement, order_success, order_failure);
 	}
 }
 
