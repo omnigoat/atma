@@ -4,7 +4,101 @@
 #include <atma/unit_test.hpp>
 #include <span>
 
+template <typename K, typename V, typename Alloc>
+struct synth_hash_map_1
+{};
+
+template <typename Alloc, typename K, typename V, typename Random>
+struct synth_hash_map_2
+{};
+
+
 import atma.bench;
+import atma.meta;
+
+template <size_t N>
+struct string_literal
+{
+	constexpr string_literal(const char (&str)[N])
+	{
+		std::copy_n(str, N, data);
+	}
+
+	char data[N];
+};
+
+namespace atma::bench
+{
+	template <string_literal name, typename... Args>
+	struct param
+	{
+		constexpr static inline auto name = name.data;
+	};
+}
+
+using hash_map_kv_pairs = atma::meta::list<
+	atma::bench::param<"u64|u64", uint64_t, uint64_t>,
+	atma::bench::param<"u64|string", uint64_t, std::string>>;
+
+
+	
+struct hash_map_adaptor_1
+{
+	template <string_literal, typename K, typename V>
+	using type = synth_hash_map_1<K, V, std::allocator<K>>;
+};
+
+struct hash_map_adaptor_2
+{
+	template <string_literal, typename K, typename V>
+	using type = synth_hash_map_2<std::allocator<K>, K, V, int>;
+};
+
+using hash_map_adaptors = atma::meta::list<
+	atma::bench::param<"synth1", hash_map_adaptor_1>,
+	atma::bench::param<"synth2", hash_map_adaptor_2>>;
+
+
+
+struct pmc_axis_t
+{
+
+};
+
+template <typename... Axis>
+struct scenario_t
+{
+	using axis = atma::meta::list<Axis...>;
+
+	scenario_t()
+	{
+
+	}
+
+	template <typename... Axis>
+	static void perform_execution()
+	{
+
+	}
+
+	template <typename axis1>
+	void execute();
+};
+
+template <typename... Axis>
+template <typename axis1>
+void scenario_t<Axis...>::execute<axis1>()
+
+ATMA_BENCH_SCENARIO("hash_map", hash_map_adaptors, hash_map_kv_pairs)
+{
+	
+	ATMA_BENCH_OP("insert")
+	{
+		
+	}
+}
+
+
 #define FORCE_MATERIALIZATION(x) ::atma::bench::no_optimize<__LINE__>(x)
 
 template <typename T, size_t E>

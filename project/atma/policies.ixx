@@ -45,7 +45,7 @@ export namespace atma::policies
 	struct retrieve<Retriever>
 	{
 		//static_assert(actually_false_v<Retriever<void>>, "no matching policy");
-		using type = meta::nothing;
+		using type = void;
 	};
 
 	// more complex case (default argument provided)

@@ -1,3 +1,6 @@
+
+// yes, much of this file is inspired by kvasir.mpl
+
 module;
 
 #include <utility>
@@ -13,57 +16,512 @@ namespace atma::meta
 	inline constexpr T* nullptr_v = nullptr;
 }
 
+
+// integral types
+export namespace atma::meta
+{
+	struct nothing {};
+
+	template <typename...>
+	using void_ = void;
+
+	template <auto x>
+	using integral_constant_of = std::integral_constant<decltype(x), x>;
+
+	template <bool         x> using bool_    = integral_constant_of<x>;
+	template <char         x> using char_    = integral_constant_of<x>;
+	template <int          x> using int_     = integral_constant_of<x>;
+	template <unsigned int x> using uint_    = integral_constant_of<x>;
+	template <uint32_t     x> using uint32_  = integral_constant_of<x>;
+	template <uint64_t     x> using uint64_  = integral_constant_of<x>;
+	template <size_t       x> using usize_   = integral_constant_of<x>;
+}
+
+
+// integral operations
+export namespace atma::meta
+{
+	template <typename x> using inc = integral_constant_of<++x()>;
+	template <typename x> using dec = integral_constant_of<--x()>;
+
+	template <typename x, typename y> using mul = integral_constant_of<x() * y()>;
+	template <typename x, typename y> using div = integral_constant_of<x() / y()>;
+	template <typename x, typename y> using add = integral_constant_of<x() + y()>;
+	template <typename x, typename y> using sub = integral_constant_of<x() - y()>;
+}
+
+
 // any_t
-namespace atma::meta
+export namespace atma::meta
 {
 	template <typename T = void>
-	struct any_t_
+	struct any_t
 	{
-		constexpr any_t_() = default;
+		constexpr any_t() = default;
 
-		constexpr any_t_(T&&)
+		constexpr any_t(T&&)
 		{}
 	};
 
 	template <>
-	struct any_t_<void>
+	struct any_t<void>
 	{
-		constexpr any_t_() = default;
+		constexpr any_t() = default;
 
 		template <typename T>
-		constexpr any_t_(T&&)
+		constexpr any_t(T&&)
 		{}
 	};
-
-	export using any_t = any_t_<>;
 }
 
-// type
+
+// identity
+export namespace atma::meta::lazy
+{
+	struct identity
+	{
+		template <typename T>
+		using f = T;
+	};
+}
+
 export namespace atma::meta
 {
 	template <typename T>
-	struct type
+	using identity = T;
+}
+
+
+
+
+// typeval
+namespace atma::meta
+{
+	template <typename T>
+	constexpr auto tv_ = T::type::value;
+}
+
+
+//
+// dependent call
+//
+namespace atma::meta::lazy::detail
+{
+	// dependent-call
+	template <typename, bool>
+	struct dcc_impl
+	{};
+
+	template <typename F>
+	struct dcc_impl<F, true> : F
+	{};
+
+
+	// dependent-call-function
+	template <bool>
+	struct dccf_impl
 	{
-		using value_type = T;
+		template <template <typename...> class F, typename... Args>
+		using f = F<Args...>;
+	};
+
+	template <>
+	struct dccf_impl<false>
+	{
+		template <template <typename...> class F, typename... Args>
+		using f = F<>;
+	};
+
+}
+
+// dependent-call
+// ----------------
+export namespace atma::meta::lazy
+{
+	template <typename F, size_t Sz>
+	using dcc = typename detail::dcc_impl<F, Sz < 1024>;
+
+	template <template <typename...> typename F, typename... Args>
+	using dccf = typename detail::dccf_impl<(sizeof...(Args) > 0)>::template f<F, Args...>;
+}
+
+#if 1
+// call-continuation
+// -------------------
+// 
+//  yeah requires explanation
+//
+export namespace atma::meta::lazy
+{
+	template <typename F, typename... Args>
+	using cc = typename dcc<F, sizeof...(Args)>::template f<Args...>;
+}
+#else
+// defer
+namespace atma::meta::lazy::detail
+{
+	template <bool, typename>
+	struct _defer_
+	{};
+
+	template <typename F>
+	struct _defer_<true, F> : F
+	{};
+}
+
+// call-continuation
+// -------------------
+//  yeah requires explanation
+export namespace atma::meta::lazy
+{
+	template <typename F, typename... Ts>
+	using cc = typename detail::_defer_<(sizeof(Ts...) < 1'000'000), F>::template apply<Ts...>;
+}
+#endif
+
+
+//
+// continuation-from-eager-template
+// ----------------------------------
+//
+// Since all continuations/metafunctions in our metaprogram have
+// their main operands sent through member-alias 'f', then any
+// (usually eager-written) metafunction that processes all its
+// template arguments as class-arguments must be converted.
+// 
+//    template <typename A, typename B>
+//    struct less_than
+//    {
+//        using type = bool_<A::value < B::value>;
+//    };
+//
+namespace atma::meta::lazy::detail
+{
+	template <typename F, typename C = identity>
+	struct cfu_impl
+	{
+		template <typename... Args>
+		struct fn
+		{
+			using f = cc<C, typename F::template f<Args...>>;
+		};
+	};
+
+	template <typename F>
+	struct cfu_impl<F, identity>
+	{
+		template <typename... Args>
+		struct fn
+		{
+			using f = typename F::template f<Args...>;
+		};
 	};
 }
 
+export namespace atma::meta::lazy
+{
+	template <typename F, typename C = identity>
+	using cfu = typename detail::cfu_impl<F, C>::fn;
+}
+
+
+//
+// continuation-from-eager
+// -------------------------
+//
+// Since all continuations/metafunctions in our metaprogram have
+// their main operands sent through member-alias 'f', then any
+// (usually eager-written) metafunction that processes all its
+// template arguments as class-arguments must be converted.
+// 
+//    template <typename A, typename B>
+//    using type = bool_<A::value < B::value>;
+// 
+//    cfe<less_than, Continuation>
+//
+export namespace atma::meta::lazy
+{
+	template <template <typename...> class F, typename C = identity>
+	struct cfe
+	{
+		template <typename... Args>
+		using f = typename C::template f<dccf<F, Args...>>;
+	};
+
+	template <template <typename...> class F>
+	struct cfe<F, identity>
+	{ // specialization for identity - no need to continue
+		template <typename... Args>
+		using f = dccf<F, Args...>;
+	};
+}
+
+//
+// continuation-from-lazy
+// ------------------------
+//
+//    struct less_than
+//    {
+//        template <typename A, typename B>
+//        using type = bool_<A::value < B::value>;
+//    };
+// 
+//    non-mpl lazy function  ->  mpl-approved lazy function
+// 
+//    cfl<less_than, Continuation>
+//
+export namespace atma::meta::lazy
+{
+	template <template <typename...> class F, typename C = identity>
+	struct cfl
+	{
+		template <typename... Args>
+		using f = typename C::template f<typename dccf<F, Args...>::type>;
+	};
+
+	template <template <typename...> class F>
+	struct cfl<F, identity>
+	{ // specialization for identity - no need to continue
+		template <typename... Args>
+		using f = typename dccf<F, Args...>::type;
+	};
+}
+
+//
+// continuation-from-value
+// -------------------------
+//
+// requires explanation
+//
+export namespace atma::meta::lazy
+{
+	template <typename T, typename C = identity>
+	struct cfv
+	{
+		template <typename...>
+		using f = typename C::template f<T>;
+	};
+}
+
+
+// invoke
+export namespace atma::meta::lazy
+{
+	template <typename F, typename... Args>
+	using invoke = typename F::template f<Args...>;
+}
+
+//
 // list
+//
 export namespace atma::meta
 {
 	template <typename... As>
 	struct list
 	{
 		using type = list;
-		static constexpr size_t size() noexcept { return sizeof...(As); }
+		static inline constexpr size_t size = sizeof...(As);
 	};
+}
 
-	struct listify
+
+//
+// listify
+//
+export namespace atma::meta
+{
+	namespace lazy
 	{
-		template <typename... Ts>
-		using apply = list<Ts...>;
+		struct listify
+		{
+			template <typename... Es>
+			using f = list<Es...>;
+		};
+	}
+
+	template <typename... Es>
+	using listify = typename lazy::listify::template f<Es...>;
+}
+
+//
+// unpack
+//
+namespace atma::meta::lazy::detail
+{
+	template <bool front, typename, typename, typename...>
+	struct unpack_impl;
+
+	template <typename C, typename... Es, typename... Args>
+	struct unpack_impl<true, C, list<Es...>, Args...>
+	{
+		using f = cc<C, Es..., Args...>;
 	};
 
+	template <typename C, typename... Es, typename... Args>
+	struct unpack_impl<false, C, list<Es...>, Args...>
+	{
+		using f = cc<C, Args..., Es...>;
+	};
+}
+
+export namespace atma::meta::lazy
+{
+	template <typename C>
+	struct unpack_front
+	{
+		template <typename List, typename... Args>
+		using f = typename detail::unpack_impl<true, C, List, Args...>::f;
+	};
+
+	template <typename C>
+	struct unpack_back
+	{
+		template <typename List, typename... Args>
+		using f = typename detail::unpack_impl<false, C, List, Args...>::f;
+	};
+
+	// order doesn't matter, pick one
+	template <typename C>
+	using unpack = unpack_back<C>;
+}
+
+
+//
+// at
+// ----
+// 
+// gets the argument at index N
+//
+namespace atma::meta::lazy::detail
+{
+	template <size_t N, typename C>
+	struct _at_
+	{
+		template <typename Head, typename... Tail>
+		using f = cc<_at_<N - 1, C>, Tail...>;
+	};
+
+	template <typename C>
+	struct _at_<0, C>
+	{
+		template <typename E0, typename...>
+		using f = cc<C, E0>;
+	};
+
+	template <typename C>
+	struct _at_<1, C>
+	{
+		template <typename E0, typename E1, typename... Elements>
+		using f = cc<C, E1>;
+	};
+
+	template <typename C>
+	struct _at_<2, C>
+	{
+		template <typename E0, typename E1, typename E2, typename...>
+		using f = cc<C, E2>;
+	};
+
+	template <typename C>
+	struct _at_<3, C>
+	{
+		template <typename E0, typename E1, typename E2, typename E3, typename...>
+		using f = cc<C, E3>;
+	};
+}
+
+export namespace atma::meta::lazy
+{
+	template <typename N, typename C = identity>
+	struct at
+	{
+		template <typename... Elements>
+		using f = cc<detail::_at_<N::value, C>, Elements...>;
+	};
+}
+
+export namespace atma::meta
+{
+	template <size_t N, typename List>
+	using at = lazy::cc<lazy::unpack<lazy::at<usize_<N>>>, List>;
+}
+
+
+
+
+
+
+
+//
+// drop
+//
+#if 0
+namespace atma::meta::lazy::detail
+{
+	template <size_t N, typename C>
+	struct _drop_
+	{
+		template <typename Head, typename... Tail>
+		using f = cc<typename _drop_<N - 1, C>::template f<Tail...>>;
+	};
+
+	template <typename C>
+	struct _drop_<0, C>
+	{
+		template <typename E0, typename...>
+		using f = cc<C, E0>;
+	};
+
+	template <typename C>
+	struct _drop_<1, C>
+	{
+		template <typename E0, typename E1, typename... Elements>
+		using f = cc<C, E1>;
+	};
+
+	template <typename C>
+	struct _drop_<2, C>
+	{
+		template <typename E0, typename E1, typename... Elements>
+		using f = cc<C, Elements...>;
+	};
+
+	template <typename C>
+	struct _drop_<3, C>
+	{
+		template <typename E0, typename E1, typename E2, typename... Elements>
+		using f = cc<C, Elements...>;
+	};
+}
+
+export namespace atma::meta::lazy
+{
+	template <typename Idx, typename C = identity>
+	struct drop;
+
+	template <std::integral Integral, template <Integral> typename MI, Integral Idx, typename C>
+	struct drop<MI<Idx>, C>
+	{
+		template <typename... Elements>
+		using f = typename detail::_drop_<Idx, C>::template f<Elements...>;
+	};
+}
+
+export namespace atma::meta
+{
+	template <size_t N, typename List>
+	using drop = lazy::cc<lazy::unpack<lazy::drop<usize_<N>>>, List>;
+}
+#endif
+
+
+
+
+
+
+#if 0
+export namespace atma::meta
+{
 	namespace detail
 	{
 		template <int N, typename>
@@ -117,370 +575,320 @@ export namespace atma::meta
 	template <int N, typename list>
 	using drop_back = typename detail::drop_back_<N, list>::type;
 }
-
-// integral types
-export namespace atma::meta
-{
-	struct nothing {};
-
-	template <auto x>
-	using integral_constant_of = std::integral_constant<decltype(x), x>;
-
-	template <typename...>
-	using void_ = void;
-
-	template <bool     x> using bool_   = integral_constant_of<x>;
-	template <char     x> using char_   = integral_constant_of<x>;
-	template <int      x> using int_    = integral_constant_of<x>;
-	template <uint32_t x> using uint32_ = integral_constant_of<x>;
-	template <uint64_t x> using uint64_ = integral_constant_of<x>;
-}
-
-// integral operations
-export namespace atma::meta
-{
-	template <typename x> using inc = integral_constant_of<++x()>;
-	template <typename x> using dec = integral_constant_of<--x()>;
-
-	template <typename x, typename y> using mul = integral_constant_of<x() * y()>;
-	template <typename x, typename y> using div = integral_constant_of<x() / y()>;
-	template <typename x, typename y> using add = integral_constant_of<x() + y()>;
-	template <typename x, typename y> using sub = integral_constant_of<x() - y()>;
-}
-
-// identity
-export namespace atma::meta::lazy
-{
-	struct identity
-	{
-		template <typename T>
-		using apply = T;
-	};
-}
-
-export namespace atma::meta
-{
-	template <typename T>
-	using identity = T;
-}
-
-// typeval
-namespace atma::meta
-{
-	template <typename T>
-	constexpr auto tv_ = T::type::value;
-}
-
-
-// defer
-namespace atma::meta::lazy::detail
-{
-	template <bool, typename>
-	struct _defer_
-	{};
-
-	template <typename F>
-	struct _defer_<true, F> : F
-	{};
-}
-
-// call-continuation
-// -------------------
-//  yeah requires explanation
-export namespace atma::meta::lazy
-{
-	template <typename F, typename... Ts>
-	using cc = typename detail::_defer_<(sizeof(Ts...) < 1'000'000), F>::template apply<Ts...>;
-}
-
-// lift
-export namespace atma::meta::lazy
-{
-	template <template <typename...> typename F, typename C = identity>
-	struct lift
-	{
-		template <typename... Ts>
-		using apply = cc<C, F<Ts>...>;
-	};
-}
-
-// invoke
-export namespace atma::meta::lazy
-{
-	template <typename F, typename... Args>
-	using invoke = typename F::template apply<Args...>;
-}
-
-// delist
-namespace atma::meta::lazy::detail
-{
-	template <typename C, typename L, typename... Ts>
-	struct _delist_;
-
-	template <typename C, typename... Ts, typename... ATs>
-	struct _delist_<C, list<Ts...>, ATs...>
-	{
-		using type = cc<C, Ts..., ATs...>;
-	};
-}
-
-export namespace atma::meta::lazy
-{
-	template <typename C>
-	struct delist
-	{
-		template <typename... Ts>
-		using apply = typename detail::_delist_<C, Ts...>::type;
-	};
-}
-
-// map
-#if 0
-namespace atma::meta
-{
-	template <typename, typename>
-	struct map_impl;
-
-	template <class F>
-	struct map_impl<F, list<>> {
-		using type = list<>;
-	};
-
-	template <typename F, typename... Xs>
-	struct map_impl<F, list<Xs...>> {
-		using type = list<invoke<F, Xs>...>;
-	};
-
-	export template <typename F, typename List>
-	using map = typename map_impl<F, List>::type;
-}
 #endif
 
 
-// fold
-namespace atma::meta
+
+//
+// list_element_t
+//
+export namespace atma::meta::lazy
 {
-	namespace detail
+	template <size_t Idx, typename C = identity>
+	struct list_element_t
 	{
-		template <typename, typename, typename>
-		struct fold_impl;
+		template <typename Head, typename... Rest>
+		using f = cc<list_element_t<Idx - 1, C>, Rest...>;
+	};
 
-		template <typename F, typename I>
-		struct fold_impl<F, I, list<>> {
-			using type = I;
-		};
-
-		template <typename F, typename I, typename XH, typename... Xs>
-		struct fold_impl<F, I, list<XH, Xs...>> {
-			using type = typename fold_impl<F, lazy::invoke<F, I, XH>, list<Xs...>>::type;
-		};
-
-		// fold_pick: pick which fold function to use (init value or no)
-		template <typename>
-		struct fold_pick;
-
-		template <typename F, typename I, typename... Xs>
-		struct fold_pick<list<F, I, list<Xs...>>> : fold_impl<F, I, list<Xs...>>
-		{};
-
-		template <typename F, typename XH, typename... Xs>
-		struct fold_pick<list<F, list<XH, Xs...>>> : fold_impl<F, XH, list<Xs...>>
-		{};
-	}
-
-	export template <typename... Args>
-	using fold = typename detail::fold_pick<list<Args...>>::type;
-}
-
-// bind_back
-export namespace atma::meta
-{
-	template <typename F, typename... Us>
-	struct bind_back
+	template <typename C>
+	struct list_element_t<0, C>
 	{
-		template <typename... Ts>
-		using invoke = lazy::invoke<F, Ts..., Us...>;
+		template <typename Head, typename... Rest>
+		using f = cc<C, Head>;
 	};
 }
+
+export namespace atma::meta
+{
+	template <size_t Idx, typename List>
+	using list_element_t = lazy::cc<lazy::unpack<lazy::list_element_t<Idx>>, List>;
+}
+
+//
+// fold-left
+// -----------
+// 
+//
+namespace atma::meta::lazy::detail
+{
+	template <size_t Argc>
+	struct foldl_impl
+	{
+		template <typename F, typename Acc, typename Arg0, typename... Args>
+		using f = typename foldl_impl<sizeof...(Args)>::template f<F, typename F::template f<Acc, Arg0>, Args...>;
+	};
+
+	template <>
+	struct foldl_impl<0>
+	{
+		template <typename, typename Acc>
+		using f = Acc;
+	};
+}
+
+// todo: foldl selector
+
+export namespace atma::meta::lazy
+{
+	template <typename F, typename C = identity>
+	struct foldl
+	{
+		template <typename Init, typename... Args>
+		using f = cc<C, cc<detail::foldl_impl<sizeof...(Args)>, F, Init, Args...>>;
+	};
+}
+
+export namespace atma::meta
+{
+	template <template <typename...> typename F, typename Init, typename List>
+	using foldl = lazy::cc<lazy::unpack_back<lazy::foldl<lazy::cfe<F>>>, List, Init>;
+
+	template <template <typename...> typename F, typename Init, typename... Es>
+	using foldl_pack = lazy::cc<lazy::foldl<lazy::cfe<F>>, Init, Es...>;
+}
+
+
+//
+// fold-right
+// -----------
+// 
+//
+namespace atma::meta::lazy::detail
+{
+	template <size_t Argc>
+	struct foldr_impl
+	{
+		template <typename F, typename Arg0, typename... Args>
+		using f = typename F::template f<Arg0, cc<foldr_impl<sizeof...(Args)>, F, Args...>>;
+	};
+
+	template <>
+	struct foldr_impl<2>
+	{
+		template <typename F, typename Arg0, typename Arg1>
+		using f = typename F::template f<Arg0, Arg1>;
+	};
+
+	template <>
+	struct foldr_impl<1>
+	{
+		template <typename F, typename Arg0>
+		using f = Arg0;
+	};
+}
+
+export namespace atma::meta::lazy
+{
+	template <typename F, typename C = identity>
+	struct foldr
+	{
+		template <typename... Args>
+		using f = cc<C, cc<detail::foldr_impl<sizeof...(Args)>, F, Args...>>;
+	};
+}
+
+namespace atma::meta::detail
+{
+	template <typename F, typename...>
+	struct foldr_selector;
+
+	template <typename F, typename... Es>
+	struct foldr_selector<F, list<Es...>>
+	{ // no initial value
+		using type = lazy::cc<lazy::foldr<F>, Es...>;
+	};
+
+	template <typename F, typename... Es, typename Init>
+	struct foldr_selector<F, Init, list<Es...>>
+	{ // initial value
+		using type = lazy::cc<lazy::foldr<F>, Es..., Init>;
+	};
+}
+
+export namespace atma::meta
+{
+	template <template <typename...> typename F, typename... InitAndOrList>
+	using foldr = typename detail::foldr_selector<lazy::cfe<F>, InitAndOrList...>::type;
+
+	template <template <typename...> typename F, typename... Es>
+	using foldr_pack = lazy::cc<lazy::foldr<lazy::cfe<F>>, Es...>;
+}
+
 
 
 // logical operators
-export namespace atma::meta
+export namespace atma::meta::lazy
 {
-	struct and_op {
+	template <typename C = identity>
+	struct and_
+	{
 		template <typename A, typename B>
-		using invoke = integral_constant_of<tv_<A> && tv_<B>>;
+		using f = typename C::template f<bool_<A::value && B::value>>;
 	};
 
-	struct or_op {
+	template <typename C = identity>
+	struct or_
+	{
 		template <typename A, typename B>
-		using invoke = integral_constant_of<tv_<A> || tv_<B>>;
+		using f = typename C::template f<bool_<A::value || B::value>>;
 	};
+}
+
+export namespace atma::meta
+{
+	template <typename A, typename B>
+	using and_ = bool_<A::value && B::value>;
+
+	template <typename A, typename B>
+	using or_ = bool_<A::value || B::value>;
 }
 
 
 // all/any
 export namespace atma::meta
 {
-	template <typename list>
-	using all = fold<and_op, bool_<true>, list>;
-
-	template <typename list>
-	using any = fold<or_op, bool_<false>, list>;
+	//template <typename List>
+	//using all = foldl<and_, bool_<true>, List>;
+	//
+	//template <typename List>
+	//using any = foldl<or_, bool_<false>, List>;
 }
-
-export namespace atma::meta
-{
-	namespace detail
-	{
-		template <typename List1, typename List2>
-		struct _all_same2_;
-
-		template <typename... Args1, typename... Args2>
-		struct _all_same2_<list<Args1...>, list<Args2...>>
-		{
-			using pair_list = list<std::pair<Args1, Args2>...>;
-		};
-
-		template <typename X>
-		struct _all_same_
-		{
-			static_assert(std::is_same_v<X, int>, "wrong");
-		};
-
-		template <typename... Args>
-		struct _all_same_<list<Args...>>
-		{
-			using first_list = drop<1, list<Args...>>;
-			using second_list = drop_back<1, list<Args...>>;
-		};
-
-		template <typename... Args>
-		struct _all_same3_
-		{
-			using L = _all_same_<list<Args...>>;
-			using P = typename _all_same2_<typename L::first_list, typename L::second_list>::pair_list;
-		};
-
-		struct same_op {
-			template <typename X>
-			using invoke = std::is_same<typename X::first_type, typename X::second_type>;
-		};
-	}
-
-	//template <typename... Args>
-	//using all_same = all<map<detail::same_op, typename detail::_all_same3_<Args...>::P>>;
-}
-
 
 // if
 namespace atma::meta::lazy::detail
 {
-	template <typename>
+	template <bool, typename, typename>
 	struct _if_;
 
-	template <>
-	struct _if_<bool_<false>>
-	{
-		template <typename, typename FalseType>
-		using apply = FalseType;
-	};
+	template <typename TC, typename FC>
+	struct _if_<false, TC, FC> : FC
+	{ };
 
-	template <>
-	struct _if_<bool_<true>>
-	{
-		template <typename TrueType, typename>
-		using apply = TrueType;
-	};
+	template <typename TC, typename FC>
+	struct _if_<true, TC, FC> : TC
+	{ };
 }
 
 export namespace atma::meta::lazy
 {
-	template <typename C = identity>
+	template <typename Predicate, typename TC, typename FC>
 	struct if_
 	{
-		template <typename Cond, typename TrueValue, typename FalseValue>
-		using apply = cc<C, typename detail::_if_<Cond>::template apply<TrueValue, FalseValue>>;
-	};
-
-	template <>
-	struct if_<identity>
-	{ // specialization for identity to do no work
-		template <typename Cond, typename TrueValue, typename FalseValue>
-		using apply = typename detail::_if_<Cond>::template apply<TrueValue, FalseValue>;
+		template <typename... Args>
+		using f = typename detail::_if_<dcc<Predicate, sizeof...(Args)>::template f<Args...>::value, TC, FC>::template f<Args...>;
 	};
 }
 
 export namespace atma::meta
 {
-	template <typename Pred, typename TrueBranch, typename FalseBranch>
-	using if_ = typename lazy::if_<lazy::identity>::template apply<Pred, TrueBranch, FalseBranch>;
+	template <bool C>
+	struct is_true
+	{
+		template <typename...>
+		using f = bool_<C>;
+	};
+
+	template <bool Condition, typename TrueBranch, typename FalseBranch>
+	using if_ = lazy::cc<lazy::if_<is_true<Condition>, lazy::at<usize_<0>>, lazy::at<usize_<1>>>, TrueBranch, FalseBranch>;
 }
 
 // map
-namespace atma::meta::lazy
+export namespace atma::meta::lazy
 {
 	template <typename F, typename C = listify>
 	struct map
 	{
 		template <typename... Ts>
-		using apply = cc<C, typename F::template apply<Ts>...>;
+		using f = typename C::template f<typename F::template f<Ts>...>;
 	};
 }
 
 export namespace atma::meta
 {
 	template <template <typename> typename F, typename List>
-	using map = lazy::cc<lazy::delist<lazy::map<lazy::lift<F>>>, List>;
+	using map = typename lazy::unpack<lazy::map<lazy::cfe<F>>>::template f<List>;
 }
 
 //
-// find_if
+// permutations lazy-stylez
 //
-namespace atma::meta::lazy::detail
-{
-	template <
-		size_t,           // 0: empty list, 1: not empty
-		typename FC,      // found continuation
-		typename NFC = FC // not-found continuation
-	>
-	struct _find_;
-
-	struct lmao {};
-
-	template <typename FC, typename NFC>
-	struct _find_<0, FC, NFC>
-	{ // empty list
-		template <typename, typename... Ts>
-		using apply = invoke<NFC>;
-	};
-
-	template <typename FC, typename NFC>
-	struct _find_<1, FC, NFC>
-	{ // non-empty list
-		template <typename F, typename E, typename... Ts>
-		using apply = invoke<
-			if_<>, invoke<F, E>,
-				invoke<FC, E, Ts...>,
-				invoke<_find_<(sizeof...(Ts) > 0), FC, NFC>, F, Ts...>>;
-	};
-}
-
-export namespace atma::meta::lazy
-{
-	template <typename FC = listify, typename NFC = FC>
-	struct find_if
-	{
-		template <typename F, typename... Ts>
-		using apply = typename detail::_find_<(sizeof...(Ts) > 0), FC, NFC>::template apply<F, Ts...>;
-	};
-}
-
 export namespace atma::meta
 {
-	template <typename Pred, typename List>
-	using find_if = typename lazy::delist<lazy::find_if<>>::template apply<List>;
+	//  
 }
+
+
+//
+// permutations
+//
+export namespace atma::meta::old
+{
+	template <typename L, size_t PermSize>
+	struct list_perm
+	{
+		using list_type = L;
+		static inline constexpr size_t perm_size = PermSize;
+
+		template <size_t Idx>
+		using list_element_type = list_element_t<(Idx / perm_size) % list_type::size, list_type>;
+	};
+
+	template <typename Acc, typename... Lists>
+	struct generate_list_perms;
+
+	template <typename Acc>
+	struct generate_list_perms<Acc>
+	{
+		using type = Acc;
+	};
+
+	template <typename... Acc, typename List, typename... Rest>
+	struct generate_list_perms<list<Acc...>, List, Rest...>
+	{
+		using element = list_perm<List, (Rest::size * ... * 1)>;
+		using type = typename generate_list_perms<list<Acc..., element>, Rest...>::type;
+	};
+
+	template <typename ListPerms, typename IndexSequence>
+	struct splat_perms {};
+
+	template <size_t Idx, typename... Perms>
+	struct perm_get
+	{
+		using type = list<typename Perms::template list_element_type<Idx>...>;
+	};
+
+	template <typename... Perms, size_t... Idxs>
+	struct splat_perms<list<Perms...>, std::index_sequence<Idxs...>>
+	{
+		using type = list<typename perm_get<Idxs, Perms...>::type...>;
+	};
+
+	template <typename... Lists>
+	struct permutations
+	{
+		static inline constexpr size_t total_size = (Lists::size * ...);
+
+		using list_perms_type = typename generate_list_perms<list<>, Lists...>::type;
+
+		using type = typename splat_perms<list_perms_type, std::make_index_sequence<total_size>>::type;
+	};
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 //template <typename T>
@@ -490,13 +898,13 @@ export namespace atma::meta
 struct is_signed
 {
 	template <typename T>
-	using apply = std::bool_constant<std::is_signed_v<T>>;
+	using f = std::bool_constant<std::is_signed_v<T>>;
 };
 
 struct make_unsigned
 {
 	template <typename T>
-	using apply = std::make_unsigned_t<T>;
+	using f = std::make_unsigned_t<T>;
 };
 
 //template <typename T>
@@ -510,40 +918,109 @@ struct blahz
 struct blahzify
 {
 	template <typename... Ts>
-	using apply = blahz<Ts...>;
+	using f = blahz<Ts...>;
 };
 
-template <typename C = atma::meta::listify>
+template <typename C = atma::meta::lazy::listify>
 struct size_is_32bit_or_less
 {
-	template <typename... Ts>
-	using apply = atma::meta::lazy::cc<C, std::bool_constant<sizeof(Ts) <= 4>...>;
+	template <typename T>
+	using f = atma::meta::integral_constant_of<sizeof(T) <= 4>;
 };
+
+enum class MathsOperation
+{
+	Mul, Div, Add, Sub
+};
+
+template <template <typename...> typename Op, typename Value>
+struct oper : Value
+{};
+
+template <typename A, typename B>
+struct oper_action;
+
+template <typename A, template <typename...> typename Op, typename Value>
+struct oper_action<A, oper<Op, Value>>
+{
+	using type = Op<A, Value>;
+};
+
+template <typename A, template <typename...> typename Op, typename Value>
+struct oper_action<oper<Op, Value>, A>
+{
+	using type = Op<Value, A>;
+};
+
+template <typename A, typename B>
+using oper_action_t = typename oper_action<A, B>::type;
 
 export void test_mythings()
 {
 	using namespace atma;
 	using namespace atma::meta;
 
-	static_assert(std::is_same_v<
-		list<bool_<true>, bool_<true>, bool_<true>, bool_<false>>,
-		typename lazy::invoke<lazy::map<make_unsigned, size_is_32bit_or_less<>>, int, short, long, long long>
-	>);
+
+	//static_assert(std::is_same_v<
+	//	list<bool_<true>, bool_<true>, bool_<true>, bool_<false>>,
+	//	typename lazy::invoke<lazy::map<make_unsigned, size_is_32bit_or_less<>>, int, short, long, long long>
+	//>);
 
 	static_assert(std::is_same_v<
 		list<unsigned int, unsigned short, unsigned long>,
 		map<std::make_unsigned_t, list<int, short, long>>
 	>);
 
+	static_assert(std::is_same_v<
+		uint_<10>,
+		foldl<add, uint_<0>, list<uint_<1>, uint_<2>, uint_<3>, uint_<4>>>
+	>);
+
+	static_assert(std::is_same_v<
+		uint_<33>,
+		foldr<oper_action_t, uint_<3>, list<oper<sub, uint_<40>>, oper<div, uint_<21>>>>
+	>);
+
+	static_assert(std::is_same_v<
+		uint_<33>,
+		foldr_pack<oper_action_t, oper<sub, uint_<40>>, oper<div, uint_<21>>, uint_<3>>
+	>);
 
 	static_assert(std::is_same_v<lazy::invoke<lazy::map<make_unsigned>, int, short, long>, list<unsigned int, unsigned short, unsigned long>>);
 
-	static_assert(std::is_same_v<lazy::invoke<lazy::if_<>, bool_<true>, int, float>, int>);
-	static_assert(std::is_same_v<if_<bool_<true>, int, float>, int>);
+	//static_assert(lazy::cc<lazy::if_<size_is_32bit_or_less<>,
+	//	lazy::identity,
+	//	lazy::identity>, int>, int>);
 
-	using blah = typename lazy::find_if<>::template apply<is_signed, unsigned char, unsigned int, int, unsigned long>;
-	
-	static_assert(std::is_same_v<blah, list<int, unsigned long>>);
+	//if_<false, int, float>;
 
-	//static_assert(std::is_same_v<atma::meta::find<is_signed, unsigned char, unsigned int, int, unsigned long>, int>);
+	static_assert(std::is_same_v<int, if_<true, int, float>>);
+
+	using first_param_is_signed = lazy::at<usize_<0>, lazy::cfl<std::is_signed>>;
+	static_assert(std::is_same_v<int, 
+		lazy::cc<lazy::if_<first_param_is_signed, lazy::at<usize_<0>>, lazy::at<usize_<1>>>, int, float>>);
+	//static_assert(std::is_same_v<if_<bool_<true>, int, float>, int>);
+
+
+	struct A{}; struct B{}; struct C{};
+
+	// permutations - works
+#if 1
+	static_assert(std::is_same_v<typename old::permutations<list<int, float, short>, list<char, double>, list<A, B>>::type,
+		list<
+			list<int, char, A>,
+			list<int, char, B>,
+			list<int, double, A>,
+			list<int, double, B>,
+			list<float, char, A>,
+			list<float, char, B>,
+			list<float, double, A>,
+			list<float, double, B>,
+			list<short, char, A>,
+			list<short, char, B>,
+			list<short, double, A>,
+			list<short, double, B>
+		>
+	>);
+#endif
 }
