@@ -613,21 +613,19 @@ export namespace atma::meta
 namespace atma::meta::lazy::detail
 {
 	template <size_t Argc>
-	struct foldl_impl
+	struct _foldl_
 	{
 		template <typename F, typename Acc, typename Arg0, typename... Args>
-		using f = typename foldl_impl<sizeof...(Args)>::template f<F, typename F::template f<Acc, Arg0>, Args...>;
+		using f = typename _foldl_<sizeof...(Args)>::template f<F, typename F::template f<Acc, Arg0>, Args...>;
 	};
 
 	template <>
-	struct foldl_impl<0>
+	struct _foldl_<0>
 	{
 		template <typename, typename Acc>
 		using f = Acc;
 	};
 }
-
-// todo: foldl selector
 
 export namespace atma::meta::lazy
 {
@@ -635,14 +633,34 @@ export namespace atma::meta::lazy
 	struct foldl
 	{
 		template <typename Init, typename... Args>
-		using f = cc<C, cc<detail::foldl_impl<sizeof...(Args)>, F, Init, Args...>>;
+		using f = typename C::template f<typename detail::_foldl_<sizeof...(Args)>::template f<F, Init, Args...>>;
+	};
+}
+
+namespace atma::meta::detail
+{
+	template <size_t>
+	struct _foldl_selector_;
+
+	template <>
+	struct _foldl_selector_<1>
+	{ // no initial value
+		template <typename F, typename List>
+		using f = typename lazy::unpack<lazy::foldl<F>>::template f<List>;
+	};
+
+	template <>
+	struct _foldl_selector_<2>
+	{ // initial value (list expanded at back)
+		template <typename F, typename Init, typename List>
+		using f = lazy::unpack_back<lazy::foldl<F>>::template f<List, Init>;
 	};
 }
 
 export namespace atma::meta
 {
-	template <template <typename...> typename F, typename Init, typename List>
-	using foldl = lazy::cc<lazy::unpack_back<lazy::foldl<lazy::cfe<F>>>, List, Init>;
+	template <template <typename...> typename F, typename... InitAndOrList>
+	using foldl = typename detail::_foldl_selector_<sizeof...(InitAndOrList)>::template f<lazy::cfe<F>, InitAndOrList...>;
 
 	template <template <typename...> typename F, typename Init, typename... Es>
 	using foldl_pack = lazy::cc<lazy::foldl<lazy::cfe<F>>, Init, Es...>;
@@ -657,21 +675,21 @@ export namespace atma::meta
 namespace atma::meta::lazy::detail
 {
 	template <size_t Argc>
-	struct foldr_impl
+	struct _foldr_
 	{
 		template <typename F, typename Arg0, typename... Args>
-		using f = typename F::template f<Arg0, cc<foldr_impl<sizeof...(Args)>, F, Args...>>;
+		using f = typename F::template f<Arg0, typename _foldr_<sizeof...(Args)>::template f<F, Args...>>;
 	};
 
 	template <>
-	struct foldr_impl<2>
+	struct _foldr_<2>
 	{
 		template <typename F, typename Arg0, typename Arg1>
 		using f = typename F::template f<Arg0, Arg1>;
 	};
 
 	template <>
-	struct foldr_impl<1>
+	struct _foldr_<1>
 	{
 		template <typename F, typename Arg0>
 		using f = Arg0;
@@ -684,32 +702,34 @@ export namespace atma::meta::lazy
 	struct foldr
 	{
 		template <typename... Args>
-		using f = cc<C, cc<detail::foldr_impl<sizeof...(Args)>, F, Args...>>;
+		using f = typename C::template f<cc<detail::_foldr_<sizeof...(Args)>, F, Args...>>;
 	};
 }
 
 namespace atma::meta::detail
 {
-	template <typename F, typename...>
-	struct foldr_selector;
+	template <size_t>
+	struct _foldr_selector_;
 
-	template <typename F, typename... Es>
-	struct foldr_selector<F, list<Es...>>
+	template <>
+	struct _foldr_selector_<1>
 	{ // no initial value
-		using type = lazy::cc<lazy::foldr<F>, Es...>;
+		template <typename F, typename List>
+		using f = typename lazy::unpack<lazy::foldr<F>>::template f<List>;
 	};
 
-	template <typename F, typename... Es, typename Init>
-	struct foldr_selector<F, Init, list<Es...>>
-	{ // initial value
-		using type = lazy::cc<lazy::foldr<F>, Es..., Init>;
+	template <>
+	struct _foldr_selector_<2>
+	{ // initial value (list expanded at front)
+		template <typename F, typename Init, typename List>
+		using f = lazy::unpack_front<lazy::foldr<F>>::template f<List, Init>;
 	};
 }
 
 export namespace atma::meta
 {
 	template <template <typename...> typename F, typename... InitAndOrList>
-	using foldr = typename detail::foldr_selector<lazy::cfe<F>, InitAndOrList...>::type;
+	using foldr = typename detail::_foldr_selector_<sizeof...(InitAndOrList)>::template f<lazy::cfe<F>, InitAndOrList...>;
 
 	template <template <typename...> typename F, typename... Es>
 	using foldr_pack = lazy::cc<lazy::foldr<lazy::cfe<F>>, Es...>;
@@ -748,11 +768,11 @@ export namespace atma::meta
 // all/any
 export namespace atma::meta
 {
-	//template <typename List>
-	//using all = foldl<and_, bool_<true>, List>;
-	//
-	//template <typename List>
-	//using any = foldl<or_, bool_<false>, List>;
+	template <typename List>
+	using all = foldl<and_, bool_<true>, List>;
+
+	template <typename List>
+	using any = foldl<or_, bool_<false>, List>;
 }
 
 // if
@@ -965,15 +985,43 @@ export void test_mythings()
 	//	list<bool_<true>, bool_<true>, bool_<true>, bool_<false>>,
 	//	typename lazy::invoke<lazy::map<make_unsigned, size_is_32bit_or_less<>>, int, short, long, long long>
 	//>);
+	using a_list  = list<int, char, float>;
+
+	
+	//
+	//
+	//
+	using make_index1_unsigned_lvalue = 
+		lazy::unpack<
+		lazy::at<uint_<1>,
+		lazy::cfe<std::make_unsigned_t,
+		lazy::cfe<std::add_lvalue_reference_t>>>>;
+
+	static_assert(std::is_same_v<
+		list<unsigned short&, unsigned int&, unsigned long&>,
+		lazy::cc<lazy::map<make_index1_unsigned_lvalue>,
+			list<float, short>,
+			list<double, int>,
+			list<long double, long>
+		>
+	>);
 
 	static_assert(std::is_same_v<
 		list<unsigned int, unsigned short, unsigned long>,
 		map<std::make_unsigned_t, list<int, short, long>>
 	>);
 
+	//
+	//
+	//
 	static_assert(std::is_same_v<
-		uint_<10>,
-		foldl<add, uint_<0>, list<uint_<1>, uint_<2>, uint_<3>, uint_<4>>>
+		uint_<1>,
+		foldl<sub, uint_<11>, list<uint_<1>, uint_<2>, uint_<3>, uint_<4>>>
+	>);
+
+	static_assert(std::is_same_v<
+		uint_<1>,
+		typename lazy::foldl<lazy::cfe<sub>>::template f<uint_<11>, uint_<1>, uint_<2>, uint_<3>, uint_<4>>
 	>);
 
 	static_assert(std::is_same_v<
