@@ -242,7 +242,12 @@ private:
 	ULONG cache_misses_{};
 };
 
-
+#if 0
+ATMA_BENCHMARK_SUITE("hash-maps")
+	.add_axis()
+{
+}
+#endif
 
 void test()
 {

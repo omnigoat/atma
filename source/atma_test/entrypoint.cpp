@@ -3,6 +3,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT
 #include <atma/unit_test.hpp>
 #include <span>
+#include <unordered_map>
 
 template <typename K, typename V, typename Alloc>
 struct synth_hash_map_1
@@ -29,34 +30,50 @@ struct string_literal
 
 namespace atma::bench
 {
-	template <string_literal name, typename... Args>
-	struct param
+	template <string_literal name, typename payload>
+	struct param : payload
 	{
 		constexpr static inline auto name = name.data;
 	};
+
+	template <typename Key, typename Value>
+	struct key_value_param_payload
+	{
+		using key_type = Key;
+		using value_type = Value;
+
+		static inline const auto default_key = Key{};
+		static inline const auto default_value = Value{};
+	};
+
+	template <string_literal name, typename Key, typename Value>
+	struct key_value_param
+		: param<name, key_value_param_payload<Key, Value>>
+	{ };
 }
 
-using hash_map_kv_pairs = atma::meta::list<
-	atma::bench::param<"u64|u64", uint64_t, uint64_t>,
-	atma::bench::param<"u64|string", uint64_t, std::string>>;
+using hash_map_kv_pairs = atma::meta::list
+<
+	atma::bench::key_value_param<"u64|u64", uint64_t, uint64_t>,
+	atma::bench::key_value_param<"u64|string", uint64_t, std::string>
+>;
 
 
-	
 struct hash_map_adaptor_1
 {
-	template <string_literal, typename K, typename V>
-	using type = synth_hash_map_1<K, V, std::allocator<K>>;
+	template <typename K, typename V>
+	using type = std::unordered_map<K, V>;
 };
 
 struct hash_map_adaptor_2
 {
-	template <string_literal, typename K, typename V>
-	using type = synth_hash_map_2<std::allocator<K>, K, V, int>;
+	template <typename K, typename V>
+	using type = std::unordered_map<K, V>;
 };
 
 using hash_map_adaptors = atma::meta::list<
-	atma::bench::param<"synth1", hash_map_adaptor_1>,
-	atma::bench::param<"synth2", hash_map_adaptor_2>>;
+	atma::bench::param<"map1", hash_map_adaptor_1>,
+	atma::bench::param<"map2", hash_map_adaptor_2>>;
 
 
 
@@ -64,37 +81,125 @@ struct pmc_axis_t
 {
 
 };
+struct abstract_scenario;
 
-template <typename... Axis>
-struct scenario_t
+static std::vector<abstract_scenario*> scenarios_;
+
+struct abstract_scenario
 {
-	using axis = atma::meta::list<Axis...>;
-
-	scenario_t()
+	abstract_scenario()
 	{
-
+		scenarios_.push_back(this);
 	}
 
-	template <typename... Axis>
-	static void perform_execution()
-	{
+	
 
-	}
-
-	template <typename axis1>
-	void execute();
+	virtual void execute_all() = 0;
 };
 
-template <typename... Axis>
-template <typename axis1>
-void scenario_t<Axis...>::execute<axis1>()
 
-ATMA_BENCH_SCENARIO("hash_map", hash_map_adaptors, hash_map_kv_pairs)
+template <typename S, typename... Axis>
+struct base_scenario
+	: abstract_scenario
 {
+	using combinations = atma::meta::select_combinations_t<Axis...>;
+
+	void execute_all() override
+	{
+		execute_template(combinations{});
+	}
+
+	template <typename... combs>
+	void execute_template(atma::meta::list<combs...>)
+	{
+		(execute_template_2(combs{}), ...);
+	}
+
+	template <typename... axis>
+	void execute_template_2(atma::meta::list<axis...>)
+	{
+		execute_wrapper<axis...>();
+	}
+
+	template <typename... axis>
+	void execute_wrapper()
+	{
+		valid_test_case = -1;
+		test_cases = 0;
+
+		// call once to register all the ops
+		static_cast<S*>(this)->template execute<axis...>();
+		
+		int total_test_cases = test_cases;
+
+		++valid_test_case;
+		do
+		{
+			test_cases = 0;
+			static_cast<S*>(this)->template execute<axis...>();
+			++valid_test_case;
+		} while (valid_test_case != total_test_cases);
+	}
+
+	bool register_op(char const* name)
+	{
+		return (valid_test_case == test_cases++);
+	}
+
+	std::vector<std::pair<char const*, bool>> ops_;
+	bool executed_op_this_run_ = false;
+
+	int valid_test_case{};
+	int test_cases{};
+
 	
+};
+
+#define ATMA_BENCH_INTERNAL_TEMPLATE_ARGS_M(r, data, i, elem) BOOST_PP_COMMA_IF(i) typename BOOST_PP_CAT(Param, BOOST_PP_INC(i))
+#define ATMA_BENCH_INTERNAL_SCENARIO_EXECUTE_TEMPLATE_ARGS(...) \
+	BOOST_PP_SEQ_FOR_EACH_I(ATMA_BENCH_INTERNAL_TEMPLATE_ARGS_M, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+
+#define ATMA_BENCH_INTERNAL_SCENARIO(scenario, ...) \
+	struct scenario : base_scenario<scenario, __VA_ARGS__> \
+	{ \
+		template <ATMA_BENCH_INTERNAL_SCENARIO_EXECUTE_TEMPLATE_ARGS(__VA_ARGS__)> \
+		void execute(); \
+	}; \
+	static scenario CAT(scenario, _instance); \
+	template <ATMA_BENCH_INTERNAL_SCENARIO_EXECUTE_TEMPLATE_ARGS(__VA_ARGS__)> \
+	void scenario::execute()
+
+#define EXPAND(x, y) x##y
+#define CAT(a, b) EXPAND(a, b)
+
+#define ATMA_BENCH_SCENARIO(name, ...) \
+	ATMA_BENCH_INTERNAL_SCENARIO(CAT(name, __LINE__), __VA_ARGS__)
+
+#define ATMA_BENCH_OP(name) \
+	if (this->register_op(name))
+
+#define ATMA_BENCH_OP_2(op)
+	
+
+ATMA_BENCH_SCENARIO(hash_map, hash_map_adaptors, hash_map_kv_pairs)
+{
+	using hash_map_type = typename Param1::template type<
+		typename Param2::key_type,
+		typename Param2::value_type>;
+
+	auto const default_key = Param2::default_key;
+	auto const default_value = Param2::default_value;
+
+	hash_map_type hash_map;
+
 	ATMA_BENCH_OP("insert")
 	{
-		
+		hash_map[default_key] = default_value;
+	}
+
+	ATMA_BENCH_OP("erase")
+	{
+		hash_map.erase(default_key);
 	}
 }
 
@@ -132,6 +237,11 @@ void fill_randomized(std::span<T> numbers)
 
 int main()
 {
+	for (auto* scenario : scenarios_)
+	{
+		scenario->execute_all();
+	}
+
 	//WinNtModuleContext ctx;
 	//WinNtProfileSession profile_session(ctx);
 	//
