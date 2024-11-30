@@ -155,6 +155,9 @@ export namespace atma::meta::lazy
 {
 	template <typename F, typename... Args>
 	using cc = typename dcc<F, sizeof...(Args)>::template f<Args...>;
+
+	template <typename F, typename... Args>
+	using ccf = typename dcc<F, sizeof...(Args)>::template cf<Args...>;
 }
 #else
 // defer
@@ -316,11 +319,17 @@ export namespace atma::meta::lazy
 //
 export namespace atma::meta
 {
-	template <typename... As>
+	template <typename... es>
 	struct list
 	{
 		using type = list;
-		static inline constexpr size_t size = sizeof...(As);
+		static inline constexpr size_t size = sizeof...(es);
+
+		template <typename x>
+		using push_front = list<x, es...>;
+
+		template <typename x>
+		using push_back = list<es..., x>;
 	};
 }
 
@@ -577,22 +586,37 @@ export namespace atma::meta
 }
 #endif
 
+// list_size
+export namespace atma::meta::lazy
+{
+	template <typename C = identity>
+	struct list_size
+	{
+		template <typename... es>
+		using f = usize_<sizeof...(es)>;
+	};
+}
 
+export namespace atma::meta
+{
+	template <typename List>
+	inline constexpr size_t list_size_v = lazy::cc<lazy::unpack<lazy::list_size<>>, List>::value;
+}
 
 //
-// list_element_t
+// list_element
 //
 export namespace atma::meta::lazy
 {
 	template <size_t Idx, typename C = identity>
-	struct list_element_t
+	struct list_element
 	{
 		template <typename Head, typename... Rest>
-		using f = cc<list_element_t<Idx - 1, C>, Rest...>;
+		using f = cc<list_element<Idx - 1, C>, Rest...>;
 	};
 
 	template <typename C>
-	struct list_element_t<0, C>
+	struct list_element<0, C>
 	{
 		template <typename Head, typename... Rest>
 		using f = cc<C, Head>;
@@ -602,7 +626,7 @@ export namespace atma::meta::lazy
 export namespace atma::meta
 {
 	template <size_t Idx, typename List>
-	using list_element_t = lazy::cc<lazy::unpack<lazy::list_element_t<Idx>>, List>;
+	using list_element_t = lazy::cc<lazy::unpack<lazy::list_element<Idx>>, List>;
 }
 
 //
@@ -703,6 +727,9 @@ export namespace atma::meta::lazy
 	{
 		template <typename... Args>
 		using f = typename C::template f<cc<detail::_foldr_<sizeof...(Args)>, F, Args...>>;
+
+		template <typename CC, typename... Args>
+		using cf = typename CC::template f<cc<detail::_foldr_<sizeof...(Args)>, F, Args...>>;
 	};
 }
 
@@ -819,8 +846,13 @@ export namespace atma::meta::lazy
 	template <typename F, typename C = listify>
 	struct map
 	{
+		struct splat {};
+
 		template <typename... Ts>
 		using f = typename C::template f<typename F::template f<Ts>...>;
+
+		template <typename CC, typename... Ts>
+		using cf = typename CC::template f<typename F::template f<Ts>...>;
 	};
 }
 
@@ -833,10 +865,279 @@ export namespace atma::meta
 //
 // permutations lazy-stylez
 //
+namespace atma::meta::lazy
+{
+	template <typename acc_tt, typename list_of_lists_tt, size_t idx>
+	struct thing;
+
+	template <typename acc_tt, size_t idx>
+	struct thing<acc_tt, list<>, idx>
+	{
+		using type = acc_tt;
+	};
+
+	template <typename... aes, typename lhead, typename... ltail, size_t idx>
+	struct thing<list<aes...>, list<lhead, ltail...>, idx>
+	{
+		using type = typename thing<
+			list<aes..., list_element<(idx / (list_size_v<ltail> * ... * 1)) % list_size_v<lhead>, lhead>>,
+			list<ltail...>,
+			idx>::type;
+	};
+}
+
+namespace atma::meta::lazy::detail
+{
+	// permutation accumulator
+	template <size_t idx_vv, typename list_tt = list<>>
+	struct perm_acc : integral_constant_of<idx_vv>
+	{
+		using list_type = list_tt;
+	};
+
+	// "permutations_f"
+	template <typename C = identity>
+	struct perm_f
+	{
+		template <typename List, typename Perm>
+		using f = typename C::template f<perm_acc<
+			Perm::value / list_size_v<List>,
+			typename Perm::list_type::template push_front<list_element_t<(Perm::value % list_size_v<List>), List>>
+		>>;
+	};
+
+	// get subtype "list_type"
+	template <typename C = identity>
+	struct subtype_list_type
+	{
+		template <typename T>
+		using f = typename C::template f<typename T::list_type>;
+	};
+
+	template <typename Idxs, typename C>
+	struct _select_combinations_;
+
+	template <size_t... idxs, typename C>
+	struct _select_combinations_<std::index_sequence<idxs...>, C>
+	{
+		template <typename... lists_tt>
+		using f = typename C::template f<
+			cc<lazy::foldr<perm_f<>, subtype_list_type<>>, lists_tt..., perm_acc<idxs>>...
+		>;
+	};
+}
+
+export namespace atma::meta::lazy
+{
+	template <typename C = listify>
+	struct select_combinations
+	{
+		template <typename... lists_tt>
+		using f = typename detail::_select_combinations_<std::make_index_sequence<(list_size_v<lists_tt> * ... * 1)>, C>::template f<lists_tt...>;
+	};
+}
+
 export namespace atma::meta
 {
-	//  
+	template <typename... lists_tt>
+	using select_combinations_t = lazy::cc<lazy::select_combinations<>, lists_tt...>;
 }
+
+#if 0
+export namespace atma::meta::lazy
+{
+	namespace detail
+	{
+		
+		// permutation accumulator
+		template <typename idx_tt, typename list_tt = list<>>
+		struct perm_acc
+		{
+			using idx = idx_tt;
+			using list_type = list_tt;
+		};
+
+		// "permutations_f"
+		template <typename C = identity>
+		struct perm_f
+		{
+			template <typename List, typename Perm>
+			using f = typename C::template f<perm_acc<
+				div<typename Perm::idx, usize_<list_size_v<List>>>,
+				typename Perm::list_type::template push_front<list_element_t<(typename Perm::idx() % list_size_v<List>), List>>
+			>>;
+		};
+
+		// get subtype "list_type"
+		template <typename C = identity>
+		struct subtype_list_type
+		{
+			template <typename T>
+			using f = typename C::template f<typename T::list_type>;
+
+			template <typename CC, typename T>
+			using cf = typename CC::template f<typename T::list_type>;
+		};
+
+
+		template <typename Idxs, typename C>
+		struct _select_combinations_;
+
+		template <size_t... idxs, typename C>
+		struct _select_combinations_<std::index_sequence<idxs...>, C>
+		{
+			template <typename... lists_tt>
+			using f = typename C::template f<
+				cc<lazy::foldr<perm_f<>, subtype_list_type<>>, lists_tt..., perm_acc<usize_<idxs>>>...
+			>;
+		};
+	}
+
+	template <typename C = identity>
+	struct product
+	{
+		template <typename... numbers>
+		using f = typename C::template f<uint_<(numbers::value * ... * 1)>>;
+
+		template <typename CC, typename... numbers>
+		using cf = cc<CC, uint_<(numbers::value * ... * 1)>>;
+	};
+
+	template <template <typename...> typename F, typename... trailing_args_tt>
+	struct bind1_front
+	{
+		template <typename arg0, typename... args>
+		using f = cc<F<arg0, trailing_args_tt...>, args...>;
+	};
+
+	template <typename C, typename step, typename... rest>
+	struct _exec_
+	{
+		template <typename... args>
+		using f = ccf<step, _exec_<C, rest...>, args...>;
+	};
+
+	template <typename C, typename step>
+	struct _exec_<C, step>
+	{
+		template <typename... args>
+		using f = ccf<step, C, args...>;
+	};
+
+	template <typename step, typename... rest>
+	struct exec
+	{
+		template <typename... args>
+		using f = ccf<step, exec<rest...>, args...>;
+
+		template <typename CC, typename... args>
+		using cf = ccf<step, _exec_<CC, rest...>, args...>;
+	};
+
+	template <typename last_step>
+	struct exec<typename last_step>
+	{
+		template <typename... args>
+		using f = cc<last_step, args...>;
+
+		template <typename CC, typename... args>
+		using cf = ccf<last_step, CC, args...>;
+	};
+
+#if 1
+	template <typename C, typename idxs>
+	struct _make_index_sequence_;
+
+	template <typename C, size_t... idxs>
+	struct _make_index_sequence_<C, std::index_sequence<idxs...>>
+	{
+		using type = typename C::template f<usize_<idxs>...>;
+	};
+
+	template <typename C = listify>
+	struct make_index_sequence
+	{
+		template <typename size>
+		using f = typename _make_index_sequence_<C, std::make_index_sequence<size::value>>::type;
+
+		template <typename CC, typename size>
+		using cf = typename _make_index_sequence_<CC, std::make_index_sequence<size::value>>::type;
+	};
+
+	template <typename C, typename... ps>
+	struct hold_args
+	{
+		template <typename... args>
+		using f = cc<C, args..., ps...>;
+
+		template <typename CC, typename... args>
+		using cf = cc<CC, args..., ps...>;
+	};
+
+	template <typename lhs, typename rhs>
+	struct exec_and_push_back
+	{
+		template <typename... args>
+		using f = ccf<lhs, typename hold_args<rhs, args>::template f<args...>...>;
+	};
+
+	struct becomes_int
+	{
+		template <typename... args>
+		using f = int;
+
+		template <typename CC, typename... args>
+		using cf = int;
+	};
+
+	template <typename C = listify>
+	struct select_combinations
+	{
+		using g = exec_and_push_back<
+			exec<
+				map<unpack<list_size<>>>,      // map from lists to list size
+				product<>,                     // get product (number)
+				make_index_sequence<>
+				//,         // make an index-list
+				//map<cfe<detail::perm_acc>>   // turn each index list into a perm_acc
+			>,
+			//map<foldr<detail::perm_f<>>>
+			listify
+		>;
+
+			//,
+			//	product<
+			//		make_index_sequence<
+			//			bind1_front<detail::_select_combinations_, C>
+			//		>
+			//	>
+			//>;
+
+		//template <typename... lists_tt>
+		//using f = typename g::template f<lists_tt...>;
+
+		template <typename... lists_tt>
+		using f = typename detail::_select_combinations_<std::make_index_sequence<(list_size_v<lists_tt> * ... * 1)>, C>::template f<lists_tt...>;
+
+		
+	};
+#endif
+#if 0
+	call<
+		exec
+		<
+			map<unpack<list_size<>>>,
+			product<>,
+			make_index_sequence<>,
+			foldr<perm_f<>>,
+			subtype_list_type<>
+		>,
+		lists_tt..., perm_acc<idxs>
+	>
+
+#endif
+}
+#endif
 
 
 //
@@ -1050,7 +1351,49 @@ export void test_mythings()
 	//static_assert(std::is_same_v<if_<bool_<true>, int, float>, int>);
 
 
+	struct one{}; struct two{}; struct three{};
 	struct A{}; struct B{}; struct C{};
+	struct cat{}; struct dog{}; struct rabbit{};
+
+	//using g = typename old::permutations<
+	//	list<int, float, short, int, float, short, A, B, A, B, A, B, A, B, int, float, short, int, float, short, A, B, A, B, A, B, A, B>,
+	//	list<char, double, char, double, meta::list<>, int, int, int, int, int, int, float, short, int, float, short, A, B, A, B, A, B, A, B>,
+	//	list<A, B, A, B, A, B, A, B, A, B, int, float, short, int, float, short, A, B, A, B, A, B, A, B>,
+	//	list<int, float, short, int, float, short, A, B, A, B, A, B, A, B>
+	//>::type;
+
+	using selected_combinations = lazy::cc<lazy::select_combinations<>, list<one, two, three>, list<A, B, C>, list<cat, dog, rabbit>>;
+	static_assert(std::is_same_v<selected_combinations,
+		list<
+			list<one, A, cat>,
+			list<one, A, dog>,
+			list<one, A, rabbit>,
+			list<one, B, cat>,
+			list<one, B, dog>,
+			list<one, B, rabbit>,
+			list<one, C, cat>,
+			list<one, C, dog>,
+			list<one, C, rabbit>,
+			list<two, A, cat>,
+			list<two, A, dog>,
+			list<two, A, rabbit>,
+			list<two, B, cat>,
+			list<two, B, dog>,
+			list<two, B, rabbit>,
+			list<two, C, cat>,
+			list<two, C, dog>,
+			list<two, C, rabbit>,
+			list<three, A, cat>,
+			list<three, A, dog>,
+			list<three, A, rabbit>,
+			list<three, B, cat>,
+			list<three, B, dog>,
+			list<three, B, rabbit>,
+			list<three, C, cat>,
+			list<three, C, dog>,
+			list<three, C, rabbit>
+		>
+	>);
 
 	// permutations - works
 #if 1
