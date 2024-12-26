@@ -178,8 +178,9 @@ struct base_scenario
 #define ATMA_BENCH_OP(name) \
 	if (this->register_op(name))
 
-#define ATMA_BENCH_OP_2(op)
-	
+#define thing(name) \
+	for (auto const& _ = atma::bench::gx->register_bench(name); atma::bench::gx->reenter_benchmark(); ) \
+		if (auto _ = atma::bench::scoped_profiling())
 
 ATMA_BENCH_SCENARIO(hash_map, hash_map_adaptors, hash_map_kv_pairs)
 {

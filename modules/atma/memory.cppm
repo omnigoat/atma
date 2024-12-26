@@ -698,7 +698,7 @@ namespace atma::detail
 		// observers
 		auto empty() const -> bool { return extent_v == 0; }
 		auto size() const -> size_t { return extent_v; }
-		auto size_bytes() const -> size_t { return extent_v * sizeof value_type; }
+		auto size_bytes() const -> size_t { return extent_v * sizeof(value_type); }
 	};
 
 	// dynamic-extent version
@@ -754,7 +754,7 @@ namespace atma::detail
 		// observers
 		constexpr auto empty() const -> bool { return size_ == 0; }
 		constexpr auto size() const -> size_t { return size_; }
-		constexpr auto size_bytes() const -> size_t { return size_ * sizeof value_type; }
+		constexpr auto size_bytes() const -> size_t { return size_ * sizeof(value_type); }
 
 	private:
 		// explicitly hide memxfer constructors because we must initialize size

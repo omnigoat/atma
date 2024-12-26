@@ -14,6 +14,7 @@
     <ClInclude Include="..\..\include\atma\algorithm.hpp" />
     <ClInclude Include="..\..\include\atma\arena_allocator.hpp" />
     <ClInclude Include="..\..\include\atma\atomic.hpp" />
+    <ClInclude Include="..\..\include\atma\benchmark.hpp" />
     <ClInclude Include="..\..\include\atma\ebo_pair.hpp" />
     <ClInclude Include="..\..\include\atma\flyweight.hpp" />
     <ClInclude Include="..\..\include\atma\function.hpp" />
