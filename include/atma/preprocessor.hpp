@@ -3,6 +3,15 @@
 #include <boost/preprocessor/seq.hpp>
 #include <boost/preprocessor/variadic.hpp>
 
+
+#define ATMA_CAT(a, b)
+
+
+
+
+
+
+
 //
 // GENERATE_COMBINATIONS_OF_TUPLES
 // ---------------------------------
