@@ -1,10 +1,15 @@
 
 
 #define DOCTEST_CONFIG_IMPLEMENT
+#include <atma/benchmark.hpp>
 #include <atma/unit_test.hpp>
+
 #include <span>
 #include <unordered_map>
 
+import atma.benchmark;
+
+#if 0
 template <typename K, typename V, typename Alloc>
 struct synth_hash_map_1
 {};
@@ -203,9 +208,10 @@ ATMA_BENCH_SCENARIO(hash_map, hash_map_adaptors, hash_map_kv_pairs)
 		hash_map.erase(default_key);
 	}
 }
+#endif
 
-
-#define FORCE_MATERIALIZATION(x) ::atma::bench::no_optimize<__LINE__>(x)
+// ::atma::bench::no_optimize<__LINE__>(x)
+#define FORCE_MATERIALIZATION(x) 
 
 template <typename T, size_t E>
 static void sum(std::span<T, E> numbers)
@@ -238,18 +244,15 @@ void fill_randomized(std::span<T> numbers)
 
 int main()
 {
-	for (auto* scenario : scenarios_)
-	{
-		scenario->execute_all();
-	}
+	atma::bench::execute_all();
 
 	//WinNtModuleContext ctx;
 	//WinNtProfileSession profile_session(ctx);
 	//
-	std::vector<int> numbers{100 * 1024 * 1024};
-	fill_randomized(std::span{numbers});
+	//std::vector<int> numbers{100 * 1024 * 1024};
+	//fill_randomized(std::span{numbers});
 	//int numbers[4] = {1, 2, 3, 4};
-	sum(std::span{numbers});
+	//sum(std::span{numbers});
 }
 
 #if 0

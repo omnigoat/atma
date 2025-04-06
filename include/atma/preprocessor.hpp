@@ -1,14 +1,18 @@
 #pragma once
 
+#include <utility>
+
 #include <boost/preprocessor/seq.hpp>
 #include <boost/preprocessor/variadic.hpp>
 
 
-#define ATMA_CAT(a, b)
-
-
-
-
+#if !defined(_MSVC_TRADITIONAL) || _MSVC_TRADITIONAL
+#  define ATMA_PP_CAT(a, b) ATMA_PP_INTERNAL_CAT(a, b)
+#  define ATMA_PP_INTERNAL_CAT(a, b) ATMA_PP_INTERNAL_CAT2(~, a ## b)
+#  define ATMA_PP_INTERNAL_CAT2(_, x) x
+#else
+#  define ATMA_PP_CAT(a, b) a##b
+#endif
 
 
 

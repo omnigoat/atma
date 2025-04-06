@@ -1,5 +1,12 @@
 module;
 
+#include <atma/benchmark.hpp>
+
+#include <string>
+#include <chrono>
+
+
+
 #  define WIN32_LEAN_AND_MEAN
 #  include <Windows.h>
 #  include <xmmintrin.h>
@@ -9,10 +16,639 @@ module;
 #include <Psapi.h>
 #include <cstdint>
 #include <cstdio>
+#include <profileapi.h>
 
 #include <atma/assert.hpp>
 
-export module atma.bench;
+
+export module atma.benchmark;
+
+
+
+
+
+
+
+namespace atma::bench::detail
+{
+	using clock_type = std::conditional_t<std::chrono::high_resolution_clock::is_steady,
+		std::chrono::high_resolution_clock,
+		std::chrono::steady_clock>;
+
+	std::chrono::nanoseconds get_resolution()
+	{
+		constexpr int iterations = 20;
+
+		clock_type::duration shortest = clock_type::duration::max();
+		for (int i = 0; i != iterations; ++i)
+		{
+			clock_type::time_point const e = clock_type::now();
+			clock_type::time_point e2;
+			do { e2 = clock_type::now(); } while (e2 == e);
+			shortest = std::min(shortest, e2 - e);
+		}
+
+		return std::chrono::duration_cast<std::chrono::nanoseconds>(shortest);
+	}
+}
+
+
+namespace atma::bench
+{
+	struct benchmark_signature
+	{
+		constexpr benchmark_signature() = default;
+
+		constexpr benchmark_signature(char const* name, char const* file, int line)
+			: name(name), file(file), line(line)
+		{}
+
+		char const* name{};
+		char const* file{};
+		int line{};
+	};
+
+	template <typename R, typename C>
+	struct base_sso_comparator
+	{
+		using member_ptr_type = R(C::*);
+
+		base_sso_comparator(member_ptr_type member)
+			: member{member}
+		{}
+
+	protected:
+		member_ptr_type const member;
+	};
+
+	template <typename C>
+	struct sso_strcmp : base_sso_comparator<char const*, C>
+	{
+		using base_sso_comparator<char const*, C>::base_sso_comparator;
+
+		template <typename A, typename B>
+		int operator () (A const& lhs, B const& rhs) const
+		{
+			return strcmp((lhs.*this->member), (rhs.*this->member));
+		}
+	};
+
+	template <typename C>
+	sso_strcmp(char const* (C::*)) -> sso_strcmp<C>;
+
+	template <typename R, typename C>
+	struct sso_sub : base_sso_comparator<R, C>
+	{
+		using base_sso_comparator<R, C>::base_sso_comparator;
+
+		template <typename A, typename B>
+		int operator () (A const& lhs, B const& rhs) const
+		{
+			return (lhs.*this->member) - (rhs.*this->member);
+		}
+	};
+
+	template <typename A, typename B>
+	auto spaceship_chain(A const&, B const&)
+	{
+		return 0;
+	}
+
+	template <typename A, typename B, typename C, typename... Comparators>
+	auto spaceship_chain(A const& lhs, B const& rhs, C comparator, Comparators... comparators)
+	{
+		if (auto const r = comparator(lhs, rhs); r == 0)
+			return spaceship_chain(lhs, rhs, comparators...);
+		else
+			return r;
+	}
+
+	inline int operator <=> (benchmark_signature const& lhs, benchmark_signature const& rhs)
+	{
+		return spaceship_chain(lhs, rhs,
+			sso_strcmp{&benchmark_signature::name},
+			sso_strcmp{&benchmark_signature::file},
+			sso_sub{&benchmark_signature::line});
+	}
+}
+
+namespace atma::bench
+{
+	struct executing_epoch_t
+	{
+		struct fake_iter_t
+		{
+			uint64_t i;
+			uint64_t operator*() const { return i; }
+			void operator ++() {++i;}
+			bool operator != (fake_iter_t rhs) { return i != rhs.i; }
+		};
+
+		uint64_t iters;
+
+		auto begin() const -> fake_iter_t { return {0}; }
+		auto end() const -> fake_iter_t { return {iters}; }
+	};
+}
+
+namespace atma::bench
+{
+	struct benchmark;
+
+	struct marker
+	{
+		enum class state_t { spinning_up, measuring };
+
+		marker(benchmark*);
+		~marker();
+
+		size_t epochs_remaining() const;
+		auto execute_epoch() -> executing_epoch_t;
+		//size_t current_epoch_iterations();
+
+		void update(detail::clock_type::time_point = detail::clock_type::now());
+
+	private:
+		size_t estimate_best_iter_count(std::chrono::nanoseconds elapsed, uint64_t iterations) const;
+
+	private:
+		benchmark* benchmark_{};
+
+		std::chrono::nanoseconds target_epoch_duration_;
+
+		state_t state_{};
+
+		// iteration logic
+		detail::clock_type::time_point time_start_;
+		size_t total_iterations_{};
+		std::chrono::nanoseconds total_elapsed_{};
+		size_t current_epoch_iterations_{};
+		size_t epochs_{};
+	};
+}
+
+namespace atma::bench
+{
+	struct benchmark
+	{
+		constexpr benchmark() = default;
+		constexpr benchmark(bool executed)
+			: executed(executed)
+		{}
+
+		bool begin()
+		{
+			return executed ? false : (executed = true);
+		}
+		
+		void end()
+		{
+			std::cout << "time: " << time << ", iters: " << iterations << std::endl;
+			std::cout << "mean time: " << (time / iterations) << std::endl;
+		}
+
+		marker mark()
+		{
+			// perform confidence analysis here
+			return marker{this};
+		}
+
+		// config
+		size_t epochs{11};
+		size_t clock_multiplier{1000};
+		std::chrono::nanoseconds min_epoch_duration{std::chrono::milliseconds(1)};
+		std::chrono::nanoseconds max_epoch_duration{std::chrono::milliseconds(100)};
+		size_t min_epoch_iterations{1};
+		size_t epoch_iterations{};
+
+		// accumulation
+		std::chrono::nanoseconds time;
+		size_t iterations{};
+		size_t cycles{};
+		size_t branch_instructions{};
+		size_t branch_misses{};
+		size_t cache_misses{};
+
+		bool executed{};
+	};
+
+	struct benchmark_handle
+	{
+		constexpr benchmark_handle() = default;
+		constexpr benchmark_handle(benchmark* bm)
+			: benchmark_{bm}
+		{}
+
+		~benchmark_handle()
+		{
+			if (benchmark_ && benchmark_->executed)
+				benchmark_->end();
+		}
+
+		operator bool()
+		{
+			return benchmark_ && benchmark_->begin();
+		}
+
+		benchmark* get() const { return benchmark_; }
+
+	private:
+		benchmark* benchmark_{};
+	};
+}
+
+
+//
+// marker implementation
+//
+namespace atma::bench
+{
+	
+	__forceinline marker::marker(benchmark* bm)
+		: benchmark_{bm}
+		, target_epoch_duration_{benchmark_->clock_multiplier * detail::get_resolution()}
+		, current_epoch_iterations_{benchmark_->min_epoch_iterations}
+	{
+		if (target_epoch_duration_ < benchmark_->min_epoch_duration)
+			target_epoch_duration_ = benchmark_->min_epoch_duration;
+		if (target_epoch_duration_ > benchmark_->max_epoch_duration)
+			target_epoch_duration_ = benchmark_->max_epoch_duration;
+	}
+
+	__forceinline marker::~marker()
+	{
+		benchmark_->time += total_elapsed_;
+		benchmark_->iterations += total_iterations_;
+	}
+
+	inline size_t marker::epochs_remaining() const
+	{
+		return benchmark_->epochs - epochs_;
+	}
+
+	inline auto marker::execute_epoch() -> executing_epoch_t
+	{
+		time_start_ = detail::clock_type::now();
+		return executing_epoch_t{current_epoch_iterations_};
+	}
+
+	//inline size_t marker::current_epoch_iterations()
+	//{
+	//	time_start_ = detail::clock_type::now();
+	//	return current_epoch_iterations_;
+	//}
+
+	inline size_t marker::estimate_best_iter_count(std::chrono::nanoseconds elapsed, uint64_t iterations) const
+	{
+		auto const delapsed = (double)elapsed.count();
+		auto const dtarget_duration = (double)target_epoch_duration_.count();
+		auto dremaining_iters = std::max(dtarget_duration - delapsed, 0.0) / delapsed * (double)current_epoch_iterations_;
+
+		dremaining_iters *= 1.2;
+
+		return static_cast<size_t>(dremaining_iters + 0.5);
+	}
+
+	__forceinline void marker::update(detail::clock_type::time_point time_end)
+	{
+		auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(time_end - time_start_);
+
+		if (state_ == state_t::spinning_up)
+		{
+			bool const close_enough = elapsed * 3 >= target_epoch_duration_ * 2;
+			if (close_enough)
+			{
+				state_ = state_t::measuring;
+				total_iterations_ += current_epoch_iterations_;
+				total_elapsed_ += elapsed;
+				current_epoch_iterations_ = estimate_best_iter_count(total_elapsed_, total_iterations_);
+			}
+			else if (elapsed * 10 < target_epoch_duration_)
+			{
+				// protect against overflow of upscaling the iterations to consume the remaining time
+				current_epoch_iterations_ = (current_epoch_iterations_ * 10 > current_epoch_iterations_)
+					? estimate_best_iter_count(elapsed, current_epoch_iterations_)
+					: 0;
+			}
+
+			++epochs_;
+		}
+		else
+		{
+			total_iterations_ += current_epoch_iterations_;
+			total_elapsed_ += elapsed;
+			current_epoch_iterations_ = estimate_best_iter_count(total_elapsed_, total_iterations_);
+			++epochs_;
+		}
+
+		if (epochs_ == benchmark_->epochs)
+		{
+			current_epoch_iterations_ = 0;
+		}
+	}
+}
+
+#if 0
+namespace std
+{
+	template <>
+	struct hash<atma::bench::benchmark_signature>
+	{
+		size_t operator()(atma::bench::benchmark_signature const& x) const
+		{
+			return x.line;
+		}
+	};
+}
+#endif
+
+namespace atma::bench
+{
+	template <typename S, typename... Axis>
+	struct base_scenario
+		: abstract_scenario
+	{
+		using combinations = atma::meta::select_combinations_t<Axis...>;
+
+		base_scenario() = default;
+
+		void execute_all() override
+		{
+			execute_template(combinations{});
+		}
+
+		template <typename... combs>
+		void execute_template(atma::meta::list<combs...>)
+		{
+			(execute_template_2(combs{}), ...);
+		}
+
+		template <typename... axis>
+		void execute_template_2(atma::meta::list<axis...>)
+		{
+			execute_wrapper<axis...>();
+		}
+
+		template <typename... axis>
+		void execute_wrapper()
+		{
+			valid_test_case = -1;
+			test_cases = 0;
+
+			do
+			{
+				executed_benchmark_this_run_ = false;
+				static_cast<S*>(this)->template execute<axis...>();
+			} while (executed_benchmark_this_run_);
+		}
+
+		benchmark_handle register_benchmark(char const* name, char const* file, int line)
+		{
+			if (executed_benchmark_this_run_)
+				return benchmark_handle{};
+
+			auto [it, inserted] = marks_.emplace(benchmark_signature(name, file, line), benchmark{});
+			if (inserted)
+				executed_benchmark_this_run_ = true;
+			
+			return benchmark_handle{&it->second};
+		}
+
+	protected:
+		inline static benchmark const nonesuch_benchmark_{false};
+
+		std::map<benchmark_signature, benchmark> marks_;
+		bool executed_benchmark_this_run_ = false;
+
+		int valid_test_case{};
+		int test_cases{};
+	};
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+export namespace atma::bench::detail
+{
+	std::vector<abstract_scenario*> scenarios_;
+}
+
+namespace atma::bench
+{
+	abstract_scenario::abstract_scenario()
+	{
+		detail::scenarios_.push_back(this);
+	}
+}
+
+template <size_t N>
+struct string_literal
+{
+	constexpr string_literal(const char (&str)[N])
+	{
+		std::copy_n(str, N, data);
+	}
+
+	char data[N];
+};
+
+namespace atma::bench
+{
+	template <string_literal name, typename payload>
+	struct param : payload
+	{
+		constexpr static inline auto name = name.data;
+	};
+
+	template <typename Key, typename Value>
+	struct key_value_param_payload
+	{
+		using key_type = Key;
+		using value_type = Value;
+
+		static inline const auto default_key = Key{};
+		static inline const auto default_value = Value{};
+	};
+
+	template <string_literal name, typename Key, typename Value>
+	struct key_value_param
+		: param<name, key_value_param_payload<Key, Value>>
+	{ };
+}
+
+using hash_map_kv_pairs = atma::meta::list
+<
+	atma::bench::key_value_param<"u64|u64", uint64_t, uint64_t>,
+	atma::bench::key_value_param<"u64|string", uint64_t, std::string>
+>;
+
+
+struct hash_map_adaptor_1
+{
+	template <typename K, typename V>
+	using type = std::map<K, V>;
+};
+
+struct hash_map_adaptor_2
+{
+	template <typename K, typename V>
+	using type = std::unordered_map<K, V>;
+};
+
+using hash_map_adaptors = atma::meta::list<
+	atma::bench::param<"map1", hash_map_adaptor_1>,
+	atma::bench::param<"map2", hash_map_adaptor_2>>;
+
+
+
+ATMA_BENCH_SCENARIO(hash_map, hash_map_adaptors, hash_map_kv_pairs)
+{
+	using hash_map_type = typename Param1::template type<
+		typename Param2::key_type,
+		typename Param2::value_type>;
+
+	auto const default_key = Param2::default_key;
+	auto const default_value = Param2::default_value;
+
+	hash_map_type hash_map;
+
+	ATMA_BENCHMARK("insert")
+	{
+		hash_map[default_key] = default_value;
+	}
+
+	ATMA_BENCHMARK("erase")
+	{
+		hash_map.erase(default_key);
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// win32 implementation
+
+
+//export module atma.bench;
 
 using NTSTATUS = long;
 
