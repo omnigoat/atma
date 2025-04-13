@@ -10,34 +10,10 @@
 #include <unordered_map>
 #include <chrono>
 
+#include <intrin.h>
+
 import atma.meta;
 
-
-namespace atma::bench
-{
-	struct abstract_scenario
-	{
-		abstract_scenario();
-
-		virtual void execute_all() = 0;
-	};
-}
-
-namespace atma::bench::detail
-{
-	extern std::vector<abstract_scenario*> scenarios_;
-}
-
-namespace atma::bench
-{
-	inline void execute_all()
-	{
-		for (auto* scenario : detail::scenarios_)
-		{
-			scenario->execute_all();
-		}
-	}
-}
 
 
 
@@ -58,13 +34,16 @@ namespace atma::bench
 #define ATMA_BENCH_SCENARIO(name, ...) \
 	ATMA_BENCH_INTERNAL_SCENARIO(ATMA_PP_CAT(name, __LINE__), __VA_ARGS__)
 
-#define ATMA_INTERNAL_BENCH_2(name, benchmark, file, line, markername) \
-	if (auto benchmark = this->register_benchmark(name, file, line)) \
-		for (auto markername = benchmark.get()->mark(); markername.epochs_remaining(); markername.update()) \
-			for (auto _ : markername.execute_epoch())
-			//for (size_t atma_bench_i = markername.current_epoch_iterations(); atma_bench_i != 0; atma_bench_i--)
+#define ATMA_INTERNAL_BENCH_2_LAMBDA(name, file, line) \
+	this->register_benchmark(name, file, line, (uintptr_t)_ReturnAddress())
 
-#define ATMA_INTERNAL_BENCH(name, benchmark) \
-	ATMA_INTERNAL_BENCH_2(name, benchmark, __FILE__, __LINE__, ATMA_PP_CAT(benchmark, _marker))
+#define ATMA_INTERNAL_BENCH_2(name, file, line, benchmark, execbm) \
+	if (auto benchmark = ATMA_INTERNAL_BENCH_2_LAMBDA(name, file, line)) \
+		for (auto execbm = benchmark.execute(); execbm.epochs_remaining(); execbm.update()) \
+			for (uint64_t atmbi = execbm.execute_epoch().iters; atmbi != 0; atmbi--)
 
-#define ATMA_BENCHMARK(name) ATMA_INTERNAL_BENCH(name, ATMA_PP_CAT(abmi, __LINE__))
+#define ATMA_INTERNAL_BENCH(name, file, line, benchmark) \
+	ATMA_INTERNAL_BENCH_2(name, file, line, benchmark, ATMA_PP_CAT(benchmark, _ebm))
+
+#define ATMA_BENCHMARK(name) \
+	ATMA_INTERNAL_BENCH(name, __FILE__, __LINE__, ATMA_PP_CAT(abmi, __LINE__))

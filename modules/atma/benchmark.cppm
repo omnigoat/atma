@@ -5,6 +5,7 @@ module;
 #include <string>
 #include <chrono>
 
+#include <ranges>
 
 
 #  define WIN32_LEAN_AND_MEAN
@@ -19,13 +20,141 @@ module;
 #include <profileapi.h>
 
 #include <atma/assert.hpp>
-
+#include <atma/benchmark.hpp>
+#include <atma/ranges/zip.hpp>
 
 export module atma.benchmark;
 
 
+export namespace atma::bench
+{
+	template <size_t N>
+	struct string_literal
+	{
+		constexpr string_literal(const char (&str)[N])
+		{
+			std::copy_n(str, N, data);
+		}
+
+		char data[N];
+	};
+}
 
 
+namespace atma::bench
+{
+	struct result_t
+	{
+		// heading : value
+		std::map<std::string, std::string> axis;
+
+		std::chrono::nanoseconds time;
+		uint64_t iterations;
+	};
+}
+
+namespace atma::bench
+{
+	struct result_recorder_t
+	{
+		virtual void set_axes_count(uint64_t) {}
+		virtual void set_axis_header(uint64_t index, std::string_view) {}
+		virtual void set_axis_value(uint64_t index, std::string_view) {}
+
+		virtual void record(result_t const&) = 0;
+	};
+}
+
+namespace atma::bench
+{
+	struct result_outputter_t
+	{
+		virtual void output(result_t const&) = 0;
+	};
+
+	constexpr int max_outputters = 4;
+
+	using result_outputter_ptr = std::unique_ptr<result_outputter_t>;
+
+	result_outputter_ptr outputters_[max_outputters];
+}
+
+namespace atma::bench
+{
+	template <typename... Outputs>
+	void set_scenario_output_impl(int index)
+	{
+		for (int i = index; i != max_outputters; ++i)
+			outputters_[i].reset();
+	}
+
+	template <typename... Outputs>
+	void set_scenario_output_impl(int index, result_outputter_ptr o, Outputs... outputs)
+	{
+		ATMA_ASSERT(index < max_outputters);
+		outputters_[index] = o;
+
+		set_scenario_output_impl(index + 1, outputs...);
+	}
+}
+
+export namespace atma::bench
+{
+	template <typename... Outputs>
+	void set_scenario_output(Outputs... outputs)
+	{
+		set_scenario_output_impl(0, outputs...);
+	}
+}
+
+export namespace atma::bench
+{
+	struct abstract_scenario
+		: result_recorder_t
+	{
+		abstract_scenario();
+
+		virtual void measure_all() = 0;
+
+		virtual void record(result_t const& r) override
+		{
+			results_.push_back(r);
+			//std::cout << "time: " << r.time << ", iters: " << r.iterations << std::endl;
+			std::cout << "mean time: " << (r.time / r.iterations) << std::endl;
+		}
+
+	private:
+		std::vector<result_t> results_;
+	};
+}
+
+namespace atma::bench::detail
+{
+	extern std::vector<abstract_scenario*> scenarios_;
+}
+
+export namespace atma::bench
+{
+	inline void measure_all()
+	{
+		for (auto* scenario : detail::scenarios_)
+		{
+			scenario->measure_all();
+		}
+	}
+
+	template <string_literal Name, typename... Params>
+	struct axis
+	{
+		using params_type = atma::meta::list<Params...>;
+
+		static constexpr auto name = Name.data;
+		static constexpr auto params = atma::meta::list<Params...>{};
+	};
+
+	template <typename... Axis>
+	void measure_along() {}
+}
 
 
 
@@ -59,13 +188,14 @@ namespace atma::bench
 	{
 		constexpr benchmark_signature() = default;
 
-		constexpr benchmark_signature(char const* name, char const* file, int line)
-			: name(name), file(file), line(line)
+		constexpr benchmark_signature(char const* name, char const* file, int line, uintptr_t id)
+			: name(name), file(file), line(line), id{id}
 		{}
 
 		char const* name{};
 		char const* file{};
 		int line{};
+		uintptr_t id{};
 	};
 
 	template <typename R, typename C>
@@ -104,7 +234,7 @@ namespace atma::bench
 		template <typename A, typename B>
 		int operator () (A const& lhs, B const& rhs) const
 		{
-			return (lhs.*this->member) - (rhs.*this->member);
+			return (int)(lhs.*this->member) - (int)(rhs.*this->member);
 		}
 	};
 
@@ -128,43 +258,54 @@ namespace atma::bench
 		return spaceship_chain(lhs, rhs,
 			sso_strcmp{&benchmark_signature::name},
 			sso_strcmp{&benchmark_signature::file},
-			sso_sub{&benchmark_signature::line});
+			sso_sub{&benchmark_signature::line},
+			sso_sub{&benchmark_signature::id});
 	}
 }
 
+
+//
+// executing_epoch_t
+// -------------------
+//
 namespace atma::bench
 {
 	struct executing_epoch_t
 	{
-		struct fake_iter_t
+		struct iterator
 		{
 			uint64_t i;
+
 			uint64_t operator*() const { return i; }
 			void operator ++() {++i;}
-			bool operator != (fake_iter_t rhs) { return i != rhs.i; }
+			bool operator != (iterator rhs) { return i != rhs.i; }
 		};
 
 		uint64_t iters;
 
-		auto begin() const -> fake_iter_t { return {0}; }
-		auto end() const -> fake_iter_t { return {iters}; }
+		auto begin() const -> iterator { return {0}; }
+		auto end() const -> iterator { return {iters}; }
 	};
 }
 
+
+//
+// executing_benchmark_t
+// -----------------------
+//
 namespace atma::bench
 {
-	struct benchmark;
+	struct benchmark_t;
 
-	struct marker
+	struct executing_benchmark_t
 	{
 		enum class state_t { spinning_up, measuring };
 
-		marker(benchmark*);
-		~marker();
+		executing_benchmark_t(benchmark_t*);
+		~executing_benchmark_t();
 
 		size_t epochs_remaining() const;
 		auto execute_epoch() -> executing_epoch_t;
-		//size_t current_epoch_iterations();
 
 		void update(detail::clock_type::time_point = detail::clock_type::now());
 
@@ -172,46 +313,59 @@ namespace atma::bench
 		size_t estimate_best_iter_count(std::chrono::nanoseconds elapsed, uint64_t iterations) const;
 
 	private:
-		benchmark* benchmark_{};
+		benchmark_t* benchmark_{};
 
+		std::chrono::nanoseconds clock_resolution_;
 		std::chrono::nanoseconds target_epoch_duration_;
 
-		state_t state_{};
-
 		// iteration logic
+		state_t state_{};
+		size_t epoch_iters_{};
 		detail::clock_type::time_point time_start_;
+
+		// accumulation
 		size_t total_iterations_{};
 		std::chrono::nanoseconds total_elapsed_{};
-		size_t current_epoch_iterations_{};
-		size_t epochs_{};
+		size_t total_epochs_{};
 	};
 }
 
+
+//
+// benchmark_t
+// -------------
+//
 namespace atma::bench
 {
-	struct benchmark
+	struct benchmark_t
 	{
-		constexpr benchmark() = default;
-		constexpr benchmark(bool executed)
-			: executed(executed)
+		constexpr benchmark_t(result_recorder_t* rr)
+			: result_recorder_{rr}
 		{}
 
 		bool begin()
 		{
-			return executed ? false : (executed = true);
+			return !executed && (executed = true);
 		}
 		
 		void end()
 		{
-			std::cout << "time: " << time << ", iters: " << iterations << std::endl;
-			std::cout << "mean time: " << (time / iterations) << std::endl;
+			//std::cout << "time: " << time << ", iters: " << iterations << std::endl;
+			//std::cout << "mean time: " << (time / iterations) << std::endl;
+			result_recorder_->record(result_t{.time = time, .iterations = iterations});
 		}
 
-		marker mark()
+		executing_benchmark_t mark()
 		{
 			// perform confidence analysis here
-			return marker{this};
+			return executing_benchmark_t{this};
 		}
+
+		//using results_callback_fnptr = void(*)(result_t const&);
+
+		// results
+		//results_callback_fnptr results_callback_;
+		result_recorder_t* result_recorder_{};
 
 		// config
 		size_t epochs{11};
@@ -222,7 +376,7 @@ namespace atma::bench
 		size_t epoch_iterations{};
 
 		// accumulation
-		std::chrono::nanoseconds time;
+		std::chrono::nanoseconds time{};
 		size_t iterations{};
 		size_t cycles{};
 		size_t branch_instructions{};
@@ -231,43 +385,59 @@ namespace atma::bench
 
 		bool executed{};
 	};
+}
 
+
+//
+// benchmark_handle
+// ------------------
+//
+namespace atma::bench
+{
 	struct benchmark_handle
 	{
 		constexpr benchmark_handle() = default;
-		constexpr benchmark_handle(benchmark* bm)
+		constexpr benchmark_handle(benchmark_t* bm)
 			: benchmark_{bm}
 		{}
 
 		~benchmark_handle()
 		{
-			if (benchmark_ && benchmark_->executed)
+			if (benchmark_)
+			{
 				benchmark_->end();
+			}
 		}
 
-		operator bool()
+		operator bool() const
 		{
-			return benchmark_ && benchmark_->begin();
+			return benchmark_ != nullptr;
 		}
 
-		benchmark* get() const { return benchmark_; }
+		executing_benchmark_t execute() const
+		{
+			return benchmark_->mark();
+		}
+
+		benchmark_t* get() const { return benchmark_; }
 
 	private:
-		benchmark* benchmark_{};
+		benchmark_t* benchmark_{};
 	};
 }
 
 
 //
-// marker implementation
+// executing_benchmark_t implementation
 //
 namespace atma::bench
 {
 	
-	__forceinline marker::marker(benchmark* bm)
+	__forceinline executing_benchmark_t::executing_benchmark_t(benchmark_t* bm)
 		: benchmark_{bm}
-		, target_epoch_duration_{benchmark_->clock_multiplier * detail::get_resolution()}
-		, current_epoch_iterations_{benchmark_->min_epoch_iterations}
+		, clock_resolution_{detail::get_resolution()}
+		, target_epoch_duration_{benchmark_->clock_multiplier * clock_resolution_}
+		, epoch_iters_{benchmark_->min_epoch_iterations}
 	{
 		if (target_epoch_duration_ < benchmark_->min_epoch_duration)
 			target_epoch_duration_ = benchmark_->min_epoch_duration;
@@ -275,75 +445,79 @@ namespace atma::bench
 			target_epoch_duration_ = benchmark_->max_epoch_duration;
 	}
 
-	__forceinline marker::~marker()
+	__forceinline executing_benchmark_t::~executing_benchmark_t()
 	{
 		benchmark_->time += total_elapsed_;
 		benchmark_->iterations += total_iterations_;
 	}
 
-	inline size_t marker::epochs_remaining() const
+	inline size_t executing_benchmark_t::epochs_remaining() const
 	{
-		return benchmark_->epochs - epochs_;
+		ATMA_ASSERT(total_epochs_ <= benchmark_->epochs);
+		return benchmark_->epochs - total_epochs_;
 	}
 
-	inline auto marker::execute_epoch() -> executing_epoch_t
+	inline auto executing_benchmark_t::execute_epoch() -> executing_epoch_t
 	{
 		time_start_ = detail::clock_type::now();
-		return executing_epoch_t{current_epoch_iterations_};
+		return executing_epoch_t{epoch_iters_};
 	}
 
-	//inline size_t marker::current_epoch_iterations()
-	//{
-	//	time_start_ = detail::clock_type::now();
-	//	return current_epoch_iterations_;
-	//}
-
-	inline size_t marker::estimate_best_iter_count(std::chrono::nanoseconds elapsed, uint64_t iterations) const
+	inline size_t executing_benchmark_t::estimate_best_iter_count(std::chrono::nanoseconds elapsed, uint64_t iterations) const
 	{
 		auto const delapsed = (double)elapsed.count();
 		auto const dtarget_duration = (double)target_epoch_duration_.count();
-		auto dremaining_iters = std::max(dtarget_duration - delapsed, 0.0) / delapsed * (double)current_epoch_iterations_;
+		auto const dremaining_iters = std::max(dtarget_duration, 0.0) / delapsed * (double)epoch_iters_;
 
-		dremaining_iters *= 1.2;
-
-		return static_cast<size_t>(dremaining_iters + 0.5);
+		return static_cast<size_t>(dremaining_iters * 1.2 + 0.5);
 	}
 
-	__forceinline void marker::update(detail::clock_type::time_point time_end)
+	__forceinline void executing_benchmark_t::update(detail::clock_type::time_point time_end)
 	{
 		auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(time_end - time_start_);
+		if (elapsed == std::chrono::nanoseconds::zero())
+			elapsed = clock_resolution_;
 
 		if (state_ == state_t::spinning_up)
 		{
+			// two-thirds or more of the way to the target epoch duration
 			bool const close_enough = elapsed * 3 >= target_epoch_duration_ * 2;
+
+			// yeah goood enough - consider this a valid epoch and add it
+			// to our measurements - but still reevaluate the number of iterations
 			if (close_enough)
 			{
 				state_ = state_t::measuring;
-				total_iterations_ += current_epoch_iterations_;
+				total_iterations_ += epoch_iters_;
 				total_elapsed_ += elapsed;
-				current_epoch_iterations_ = estimate_best_iter_count(total_elapsed_, total_iterations_);
+				epoch_iters_ = estimate_best_iter_count(total_elapsed_, total_iterations_);
+				++total_epochs_;
 			}
+			// we're very far away from the target duration, x10 the iterations
 			else if (elapsed * 10 < target_epoch_duration_)
 			{
-				// protect against overflow of upscaling the iterations to consume the remaining time
-				current_epoch_iterations_ = (current_epoch_iterations_ * 10 > current_epoch_iterations_)
-					? estimate_best_iter_count(elapsed, current_epoch_iterations_)
+				epoch_iters_ = (epoch_iters_ * 10 > epoch_iters_)
+					? estimate_best_iter_count(elapsed, epoch_iters_)
 					: 0;
+				//std::cout << "new iters: " << epoch_iters_ << std::endl;
 			}
-
-			++epochs_;
+			else
+			{
+				epoch_iters_ = estimate_best_iter_count(elapsed, epoch_iters_);
+				//std::cout << "new iters: " << epoch_iters_ << std::endl;
+			}
 		}
 		else
 		{
-			total_iterations_ += current_epoch_iterations_;
+			total_iterations_ += epoch_iters_;
 			total_elapsed_ += elapsed;
-			current_epoch_iterations_ = estimate_best_iter_count(total_elapsed_, total_iterations_);
-			++epochs_;
+			epoch_iters_ = estimate_best_iter_count(total_elapsed_, total_iterations_);
+			++total_epochs_;
 		}
 
-		if (epochs_ == benchmark_->epochs)
+		if (total_epochs_ == benchmark_->epochs)
 		{
-			current_epoch_iterations_ = 0;
+			epoch_iters_ = 0;
 		}
 	}
 }
@@ -364,36 +538,82 @@ namespace std
 
 namespace atma::bench
 {
+	struct scenario_recorder_t
+		: result_recorder_t
+	{
+		virtual void set_axes_count(uint64_t count)
+		{
+			axes.clear();
+			axes.resize(count);
+		}
+
+		virtual void set_axis_header(uint64_t index, std::string_view header)
+		{
+			axes[index].first = header;
+		}
+
+		virtual void set_axis_value(uint64_t index, std::string_view value)
+		{
+			axes[index].second = value;
+		}
+
+		virtual void record(result_t const& r) override
+		{
+			//results_.push_back(r);
+			for (auto const& [k, v] : axes)
+				std::cout << k << ", " << v << " - ";
+			//std::cout << "time: " << r.time << ", iters: " << r.iterations << std::endl;
+			std::cout << "mean time: " << (r.time / r.iterations) << std::endl;
+		}
+
+		//std::map<std::string, std::string> axis;
+		std::vector<std::pair<std::string, std::string>> axes;
+	};
+}
+
+namespace atma::bench
+{
+	template <typename... Args>
+	void invoke_expand_i(auto&& f)
+	{
+		uint64_t index = 0;
+		(std::invoke(f, index++, Args{}), ...);
+	}
+
 	template <typename S, typename... Axis>
 	struct base_scenario
 		: abstract_scenario
 	{
-		using combinations = atma::meta::select_combinations_t<Axis...>;
+		using axes_type = meta::list<Axis...>;
+		using combinations = meta::select_combinations_t<typename Axis::params_type...>;
 
-		base_scenario() = default;
-
-		void execute_all() override
+		base_scenario()
 		{
-			execute_template(combinations{});
+			recorder_.set_axes_count(axes_type::size);
+
+			invoke_expand_i<Axis...>(
+				[&](uint64_t index, auto a) {
+					recorder_.set_axis_header(index, a.name);
+				});
 		}
 
-		template <typename... combs>
-		void execute_template(atma::meta::list<combs...>)
+		void measure_all() override
 		{
-			(execute_template_2(combs{}), ...);
-		}
-
-		template <typename... axis>
-		void execute_template_2(atma::meta::list<axis...>)
-		{
-			execute_wrapper<axis...>();
+			std::invoke([&]<typename... Combos>(meta::list<Combos...>){
+				((std::invoke([&]<typename... Axes>(meta::list<Axes...>) {
+					this->execute_wrapper<Axes...>();
+				}, Combos{})), ...);
+			}, combinations{});
 		}
 
 		template <typename... axis>
 		void execute_wrapper()
 		{
-			valid_test_case = -1;
-			test_cases = 0;
+			invoke_expand_i<axis...>(
+				[&](uint64_t index, auto a)
+				{
+					recorder_.set_axis_value(index++, a.name);
+				});
 
 			do
 			{
@@ -402,26 +622,41 @@ namespace atma::bench
 			} while (executed_benchmark_this_run_);
 		}
 
-		benchmark_handle register_benchmark(char const* name, char const* file, int line)
+		benchmark_handle register_benchmark(char const* name, char const* file, int line, uintptr_t id)
 		{
 			if (executed_benchmark_this_run_)
+			{
 				return benchmark_handle{};
-
-			auto [it, inserted] = marks_.emplace(benchmark_signature(name, file, line), benchmark{});
-			if (inserted)
-				executed_benchmark_this_run_ = true;
+			}
+			else if (auto [it, inserted] = benchmarks_.emplace(benchmark_signature(name, file, line, id), benchmark_t{&recorder_}); inserted)
+			{
+				//std::cout << name << " " << file << ":" << line << '(' << id << ") ";
 			
-			return benchmark_handle{&it->second};
+				//	std::cout << x << " ";
+				//std::cout << std::endl;
+
+				executed_benchmark_this_run_ = true;
+				return benchmark_handle{&it->second};
+			}
+			else
+			{
+				return benchmark_handle{};
+			}
 		}
 
+	private:
+		scenario_recorder_t recorder_;
+
+		std::vector<std::string> axis_headers;
+		std::vector<std::string> current_axis;
+
 	protected:
-		inline static benchmark const nonesuch_benchmark_{false};
-
-		std::map<benchmark_signature, benchmark> marks_;
-		bool executed_benchmark_this_run_ = false;
-
-		int valid_test_case{};
-		int test_cases{};
+		using benchmarks_t = std::map<benchmark_signature, benchmark_t>;
+		using results_t = std::vector<result_t>;
+		
+		benchmarks_t benchmarks_;
+		results_t results_;
+		bool executed_benchmark_this_run_{};
 	};
 }
 
@@ -483,16 +718,7 @@ namespace atma::bench
 	}
 }
 
-template <size_t N>
-struct string_literal
-{
-	constexpr string_literal(const char (&str)[N])
-	{
-		std::copy_n(str, N, data);
-	}
 
-	char data[N];
-};
 
 namespace atma::bench
 {
@@ -518,8 +744,7 @@ namespace atma::bench
 	{ };
 }
 
-using hash_map_kv_pairs = atma::meta::list
-<
+using hash_map_kv_pairs = atma::bench::axis<"types",
 	atma::bench::key_value_param<"u64|u64", uint64_t, uint64_t>,
 	atma::bench::key_value_param<"u64|string", uint64_t, std::string>
 >;
@@ -537,10 +762,9 @@ struct hash_map_adaptor_2
 	using type = std::unordered_map<K, V>;
 };
 
-using hash_map_adaptors = atma::meta::list<
+using hash_map_adaptors = atma::bench::axis<"implementation",
 	atma::bench::param<"map1", hash_map_adaptor_1>,
 	atma::bench::param<"map2", hash_map_adaptor_2>>;
-
 
 
 ATMA_BENCH_SCENARIO(hash_map, hash_map_adaptors, hash_map_kv_pairs)
@@ -549,7 +773,7 @@ ATMA_BENCH_SCENARIO(hash_map, hash_map_adaptors, hash_map_kv_pairs)
 		typename Param2::key_type,
 		typename Param2::value_type>;
 
-	auto const default_key = Param2::default_key;
+	auto default_key = Param2::default_key;
 	auto const default_value = Param2::default_value;
 
 	hash_map_type hash_map;
