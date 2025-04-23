@@ -43,8 +43,10 @@ void fill_randomized(std::span<T> numbers)
 
 int main()
 {
-	//atma::bench::set_scenario_output(
-	//	atma::bench::output_file_writer_t{"output.txt"});
+	atma::bench::set_scenario_output(
+		atma::bench::stdout_outputter_t{}
+		//atma::bench::output_file_writer_t{"output.txt"}
+	);
 
 	atma::bench::measure_all();
 
