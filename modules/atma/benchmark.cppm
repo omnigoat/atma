@@ -43,6 +43,21 @@ export namespace atma::bench
 
 namespace atma::bench
 {
+	struct measurement_t
+	{
+		std::chrono::nanoseconds time;
+		uint64_t iterations;
+		//uint64_t branches;
+		//uint64_t branch_misses;
+	};
+
+	struct axes_measurement_t
+	{
+		std::map<std::string, std::string> axes;
+		measurement_t measurement;
+	};
+
+
 	struct result_t
 	{
 		// heading : value
@@ -50,6 +65,17 @@ namespace atma::bench
 
 		std::chrono::nanoseconds time;
 		uint64_t iterations;
+		//uint64_t branches;
+		//uint64_t branch_misses;
+	};
+}
+
+namespace atma::bench
+{
+	struct scenario_result_t
+	{
+		std::string name;
+		std::vector<axes_measurement_t> measurements;
 	};
 }
 
@@ -61,7 +87,7 @@ namespace atma::bench
 		virtual void set_axis_header(uint64_t index, std::string_view) {}
 		virtual void set_axis_value(uint64_t index, std::string_view) {}
 
-		virtual void record(result_t const&) = 0;
+		virtual void record(measurement_t const&) = 0;
 	};
 }
 
@@ -70,16 +96,16 @@ export namespace atma::bench
 	struct result_outputter_t
 	{
 		virtual ~result_outputter_t() = default;
-		virtual void output(result_t const&) = 0;
+		virtual void output(measurement_t const&) = 0;
 	};
 
 	struct stdout_outputter_t : result_outputter_t
 	{
-		virtual void output(result_t const& r) final
+		virtual void output(measurement_t const& r) final
 		{
-			for (auto const& [k, v] : r.axes)
-				std::cout << k << ", " << v << ", ";
-			std::cout << "mean time: " << (r.time / r.iterations) << std::endl;
+			//for (auto const& [k, v] : r.axes)
+			//	std::cout << k << ", " << v << ", ";
+			//std::cout << "mean time: " << (r.time / r.iterations) << std::endl;
 		}
 	};
 }
@@ -92,7 +118,7 @@ namespace atma::bench
 
 	result_outputter_ptr outputters_[max_outputters];
 
-	void scenario_output(result_t const& r)
+	void scenario_output(measurement_t const& r)
 	{
 		for (auto& outputter : outputters_)
 		{
@@ -132,38 +158,35 @@ export namespace atma::bench
 
 export namespace atma::bench
 {
-	struct abstract_scenario
+	struct abstract_scenario_t
 		: result_recorder_t
 	{
-		abstract_scenario();
+		abstract_scenario_t();
 
-		virtual void measure_all() = 0;
-
-		virtual void record(result_t const& r) override
-		{
-			results_.push_back(r);
-			//std::cout << "time: " << r.time << ", iters: " << r.iterations << std::endl;
-			std::cout << "mean time: " << (r.time / r.iterations) << std::endl;
-		}
-
-	private:
-		std::vector<result_t> results_;
+		virtual scenario_result_t measure_all() = 0;
 	};
 }
 
 namespace atma::bench::detail
 {
-	extern std::vector<abstract_scenario*> scenarios_;
+	extern std::vector<abstract_scenario_t*> scenarios_;
 }
 
 export namespace atma::bench
 {
-	inline void measure_all()
+	using measure_all_result_t = std::vector<scenario_result_t>;
+
+	inline auto measure_all() -> measure_all_result_t
 	{
+		measure_all_result_t r;
+
 		for (auto* scenario : detail::scenarios_)
 		{
-			scenario->measure_all();
+			scenario_result_t sr = scenario->measure_all();
+			r.push_back(sr);
 		}
+
+		return r;
 	}
 
 	template <string_literal Name, typename... Params>
@@ -375,7 +398,7 @@ namespace atma::bench
 		{
 			//std::cout << "time: " << time << ", iters: " << iterations << std::endl;
 			//std::cout << "mean time: " << (time / iterations) << std::endl;
-			result_recorder_->record(result_t{.time = time, .iterations = iterations});
+			result_recorder_->record(measurement_t{.time = time, .iterations = iterations});
 		}
 
 		executing_benchmark_t mark()
@@ -384,10 +407,7 @@ namespace atma::bench
 			return executing_benchmark_t{this};
 		}
 
-		//using results_callback_fnptr = void(*)(result_t const&);
-
 		// results
-		//results_callback_fnptr results_callback_;
 		result_recorder_t* result_recorder_{};
 
 		// config
@@ -580,11 +600,11 @@ namespace atma::bench
 			axes[index].second = value;
 		}
 
-		virtual void record(result_t const& r) override
+		virtual void record(measurement_t const& r) override
 		{
-			result_t rr = r;
-			for (auto const& [k, v] : axes)
-				rr.axes.emplace(k, v);
+			measurement_t rr = r;
+			//for (auto const& [k, v] : axes)
+			//	rr.axes.emplace(k, v);
 			//std::cout << "mean time, " << (r.time / r.iterations) << std::endl;
 			scenario_output(rr);
 		}
@@ -604,22 +624,21 @@ namespace atma::bench
 
 	template <typename S, typename... Axis>
 	struct base_scenario
-		: abstract_scenario
+		: abstract_scenario_t
 	{
 		using axes_type = meta::list<Axis...>;
 		using combinations = meta::select_combinations_t<typename Axis::params_type...>;
 
 		base_scenario()
+			: result_{static_cast<S*>(this)->name}
 		{
-			recorder_.set_axes_count(axes_type::size);
-
 			invoke_expand_i<Axis...>(
 				[&](uint64_t index, auto a) {
-					recorder_.set_axis_header(index, a.name);
+					axis_headers.push_back(a.name);
 				});
 		}
 
-		void measure_all() override
+		auto measure_all() -> scenario_result_t override
 		{
 			std::invoke(
 				[&]<typename... Combos>(meta::list<Combos...>) {
@@ -629,15 +648,18 @@ namespace atma::bench
 				},
 				combinations{}
 			);
+
+			return result_;
 		}
 
 		template <typename... axis>
 		void execute_wrapper()
 		{
+			current_axis_values.clear();
+
 			invoke_expand_i<axis...>(
-				[&](uint64_t index, auto a)
-				{
-					recorder_.set_axis_value(index++, a.name);
+				[&](uint64_t index, auto a) {
+					current_axis_values.emplace(axis_headers[index], a.name);
 				});
 
 			do
@@ -653,7 +675,7 @@ namespace atma::bench
 			{
 				return benchmark_handle{};
 			}
-			else if (auto [it, inserted] = benchmarks_.emplace(benchmark_signature(name, file, line, id), benchmark_t{&recorder_}); inserted)
+			else if (auto [it, inserted] = benchmarks_.emplace(benchmark_signature(name, file, line, id), benchmark_t{this}); inserted)
 			{
 				executed_benchmark_this_run_ = true;
 				return benchmark_handle{&it->second};
@@ -664,11 +686,22 @@ namespace atma::bench
 			}
 		}
 
+		void record(measurement_t const& m) override
+		{
+			//result_.results.push_back(r);
+			axes_measurement_t a;
+			a.axes = current_axis_values;
+			a.measurement = m;
+
+			result_.measurements.emplace_back(std::move(a));
+		}
+
 	private:
 		scenario_recorder_t recorder_;
 
 		std::vector<std::string> axis_headers;
-		std::vector<std::string> current_axis;
+		std::map<std::string, std::string> current_axis_values;
+		//std::vector<std::string> current_axis;
 
 	protected:
 		using benchmarks_t = std::map<benchmark_signature, benchmark_t>;
@@ -676,6 +709,7 @@ namespace atma::bench
 		
 		benchmarks_t benchmarks_;
 		results_t results_;
+		scenario_result_t result_;
 		bool executed_benchmark_this_run_{};
 	};
 }
@@ -727,12 +761,12 @@ namespace atma::bench
 
 export namespace atma::bench::detail
 {
-	std::vector<abstract_scenario*> scenarios_;
+	std::vector<abstract_scenario_t*> scenarios_;
 }
 
 namespace atma::bench
 {
-	abstract_scenario::abstract_scenario()
+	abstract_scenario_t::abstract_scenario_t()
 	{
 		detail::scenarios_.push_back(this);
 	}

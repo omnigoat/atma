@@ -21,9 +21,10 @@ import atma.meta;
 #define ATMA_BENCH_INTERNAL_SCENARIO_EXECUTE_TEMPLATE_ARGS(...) \
 	BOOST_PP_SEQ_FOR_EACH_I(ATMA_BENCH_INTERNAL_TEMPLATE_ARGS_M, ~, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
-#define ATMA_BENCH_INTERNAL_SCENARIO(scenario, ...) \
+#define ATMA_BENCH_INTERNAL_SCENARIO(scenario, scenario_name, ...) \
 	struct scenario : ::atma::bench::base_scenario<scenario, __VA_ARGS__> \
 	{ \
+		static constexpr char const* name = scenario_name; \
 		template <ATMA_BENCH_INTERNAL_SCENARIO_EXECUTE_TEMPLATE_ARGS(__VA_ARGS__)> \
 		void execute(); \
 	}; \
@@ -32,7 +33,7 @@ import atma.meta;
 	void scenario::execute()
 
 #define ATMA_BENCH_SCENARIO(name, ...) \
-	ATMA_BENCH_INTERNAL_SCENARIO(ATMA_PP_CAT(name, __LINE__), __VA_ARGS__)
+	ATMA_BENCH_INTERNAL_SCENARIO(ATMA_PP_CAT(name, __LINE__), #name, __VA_ARGS__)
 
 #define ATMA_INTERNAL_BENCH_2_LAMBDA(name, file, line) \
 	this->register_benchmark(name, file, line, (uintptr_t)_ReturnAddress())

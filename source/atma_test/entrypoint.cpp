@@ -43,12 +43,19 @@ void fill_randomized(std::span<T> numbers)
 
 int main()
 {
-	atma::bench::set_scenario_output(
-		atma::bench::stdout_outputter_t{}
-		//atma::bench::output_file_writer_t{"output.txt"}
-	);
+	//atma::bench::set_scenario_output(
+	//	atma::bench::stdout_outputter_t{}
+	//	//atma::bench::output_file_writer_t{"output.txt"}
+	//);
 
-	atma::bench::measure_all();
+	//auto r = atma::bench::measure_all();
+	
+	//atma::bench::measure_all_to_stdout();
+	//auto r = atma::bench::measure_all();
+
+	//atma::bench::stdout_outputter_t s;
+	//for (auto const& sr : r)
+	//	s.output(sr);
 
 	//auto r = atma::bench::quick_benchmark([]{
 	//	int i{};
