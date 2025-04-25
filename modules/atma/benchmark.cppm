@@ -45,6 +45,7 @@ namespace atma::bench
 {
 	struct measurement_t
 	{
+		std::string name;
 		std::chrono::nanoseconds time;
 		uint64_t iterations;
 		//uint64_t branches;
@@ -53,28 +54,15 @@ namespace atma::bench
 
 	struct axes_measurement_t
 	{
-		std::map<std::string, std::string> axes;
+		//std::map<std::string, std::string> axes;
+		std::vector<std::string> axes;
 		measurement_t measurement;
 	};
 
-
-	struct result_t
-	{
-		// heading : value
-		std::map<std::string, std::string> axes;
-
-		std::chrono::nanoseconds time;
-		uint64_t iterations;
-		//uint64_t branches;
-		//uint64_t branch_misses;
-	};
-}
-
-namespace atma::bench
-{
 	struct scenario_result_t
 	{
 		std::string name;
+		std::vector<std::string> axes_headers;
 		std::vector<axes_measurement_t> measurements;
 	};
 }
@@ -105,7 +93,7 @@ export namespace atma::bench
 		{
 			//for (auto const& [k, v] : r.axes)
 			//	std::cout << k << ", " << v << ", ";
-			//std::cout << "mean time: " << (r.time / r.iterations) << std::endl;
+			std::cout << (r.time / r.iterations) << std::endl;
 		}
 	};
 }
@@ -201,6 +189,48 @@ export namespace atma::bench
 	template <typename... Axis>
 	void measure_along() {}
 }
+
+
+export namespace atma::bench
+{
+	void measure_all_to_stdout()
+	{
+		auto r = measure_all();
+	
+		stdout_outputter_t stdout_writer;
+		for (auto const& sr : r)
+		{
+			std::vector<size_t> padding;
+		
+			for (size_t i = 0u; i != sr.axes_headers.size(); ++i)
+			{
+				size_t pad = sr.axes_headers[i].size();
+				for (auto const& mm : sr.measurements)
+					pad = std::max(pad, mm.axes[i].size());
+				padding.push_back(pad);
+			}
+
+			std::cout << sr.name << std::endl;
+			//for (auto const& axis : sr.axes_headers)
+			for (size_t i = 0; i != sr.axes_headers.size(); ++i)
+				std::cout << std::setw(padding[i]) << sr.axes_headers[i] << " | ";
+			std::cout << "measurement" << std::endl;
+			std::cout << "---------------------------------------------" << std::endl;
+
+			for (auto const& amr : sr.measurements)
+			{
+				int i = 0;
+				for (auto const& axis : amr.axes)
+					std::cout << std::setw(padding[i++]) << axis << " | ";
+
+				std::cout << amr.measurement.name << " -> ";
+				stdout_writer.output(amr.measurement);
+			}
+		}
+	}
+}
+
+
 
 
 
@@ -385,8 +415,9 @@ namespace atma::bench
 {
 	struct benchmark_t
 	{
-		constexpr benchmark_t(result_recorder_t* rr)
+		constexpr benchmark_t(result_recorder_t* rr, char const* name)
 			: result_recorder_{rr}
+			, name{name}
 		{}
 
 		bool begin()
@@ -396,19 +427,20 @@ namespace atma::bench
 		
 		void end()
 		{
-			//std::cout << "time: " << time << ", iters: " << iterations << std::endl;
-			//std::cout << "mean time: " << (time / iterations) << std::endl;
-			result_recorder_->record(measurement_t{.time = time, .iterations = iterations});
+			result_recorder_->record(measurement_t{
+				.name = name,
+				.time = time,
+				.iterations = iterations});
 		}
 
 		executing_benchmark_t mark()
 		{
-			// perform confidence analysis here
 			return executing_benchmark_t{this};
 		}
 
 		// results
 		result_recorder_t* result_recorder_{};
+		std::string name;
 
 		// config
 		size_t epochs{11};
@@ -542,12 +574,10 @@ namespace atma::bench
 				epoch_iters_ = (epoch_iters_ * 10 > epoch_iters_)
 					? estimate_best_iter_count(elapsed, epoch_iters_)
 					: 0;
-				//std::cout << "new iters: " << epoch_iters_ << std::endl;
 			}
 			else
 			{
 				epoch_iters_ = estimate_best_iter_count(elapsed, epoch_iters_);
-				//std::cout << "new iters: " << epoch_iters_ << std::endl;
 			}
 		}
 		else
@@ -603,9 +633,6 @@ namespace atma::bench
 		virtual void record(measurement_t const& r) override
 		{
 			measurement_t rr = r;
-			//for (auto const& [k, v] : axes)
-			//	rr.axes.emplace(k, v);
-			//std::cout << "mean time, " << (r.time / r.iterations) << std::endl;
 			scenario_output(rr);
 		}
 
@@ -634,7 +661,7 @@ namespace atma::bench
 		{
 			invoke_expand_i<Axis...>(
 				[&](uint64_t index, auto a) {
-					axis_headers.push_back(a.name);
+					result_.axes_headers.push_back(a.name);
 				});
 		}
 
@@ -655,11 +682,11 @@ namespace atma::bench
 		template <typename... axis>
 		void execute_wrapper()
 		{
-			current_axis_values.clear();
+			current_axes_values.clear();
 
 			invoke_expand_i<axis...>(
 				[&](uint64_t index, auto a) {
-					current_axis_values.emplace(axis_headers[index], a.name);
+					current_axes_values.push_back(a.name);
 				});
 
 			do
@@ -675,7 +702,7 @@ namespace atma::bench
 			{
 				return benchmark_handle{};
 			}
-			else if (auto [it, inserted] = benchmarks_.emplace(benchmark_signature(name, file, line, id), benchmark_t{this}); inserted)
+			else if (auto [it, inserted] = benchmarks_.emplace(benchmark_signature(name, file, line, id), benchmark_t{this, name}); inserted)
 			{
 				executed_benchmark_this_run_ = true;
 				return benchmark_handle{&it->second};
@@ -690,7 +717,7 @@ namespace atma::bench
 		{
 			//result_.results.push_back(r);
 			axes_measurement_t a;
-			a.axes = current_axis_values;
+			a.axes = current_axes_values;
 			a.measurement = m;
 
 			result_.measurements.emplace_back(std::move(a));
@@ -699,16 +726,12 @@ namespace atma::bench
 	private:
 		scenario_recorder_t recorder_;
 
-		std::vector<std::string> axis_headers;
-		std::map<std::string, std::string> current_axis_values;
-		//std::vector<std::string> current_axis;
+		std::vector<std::string> current_axes_values;
 
 	protected:
 		using benchmarks_t = std::map<benchmark_signature, benchmark_t>;
-		using results_t = std::vector<result_t>;
 		
 		benchmarks_t benchmarks_;
-		results_t results_;
 		scenario_result_t result_;
 		bool executed_benchmark_this_run_{};
 	};
@@ -817,15 +840,17 @@ struct hash_map_adaptor_2
 };
 
 using hash_map_adaptors = atma::bench::axis<"implementation",
-	atma::bench::param<"map1", hash_map_adaptor_1>,
-	atma::bench::param<"map2", hash_map_adaptor_2>>;
+	atma::bench::param<"std::map", hash_map_adaptor_1>,
+	atma::bench::param<"std::unordered_map", hash_map_adaptor_2>>;
 
+template <typename Adapter, typename KVPair>
+using hash_map_maker_t = typename Adapter::template type<
+	typename KVPair::key_type,
+	typename KVPair::value_type>;
 
 ATMA_BENCH_SCENARIO(hash_map, hash_map_adaptors, hash_map_kv_pairs)
 {
-	using hash_map_type = typename Param1::template type<
-		typename Param2::key_type,
-		typename Param2::value_type>;
+	using hash_map_type = hash_map_maker_t<Param1, Param2>;
 
 	auto default_key = Param2::default_key;
 	auto const default_value = Param2::default_value;

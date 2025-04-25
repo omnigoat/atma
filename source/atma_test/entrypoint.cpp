@@ -48,9 +48,7 @@ int main()
 	//	//atma::bench::output_file_writer_t{"output.txt"}
 	//);
 
-	//auto r = atma::bench::measure_all();
-	
-	//atma::bench::measure_all_to_stdout();
+	atma::bench::measure_all_to_stdout();
 	//auto r = atma::bench::measure_all();
 
 	//atma::bench::stdout_outputter_t s;
