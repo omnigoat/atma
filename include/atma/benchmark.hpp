@@ -35,16 +35,20 @@ import atma.meta;
 #define ATMA_BENCH_SCENARIO(name, ...) \
 	ATMA_BENCH_INTERNAL_SCENARIO(ATMA_PP_CAT(name, __LINE__), #name, __VA_ARGS__)
 
-#define ATMA_INTERNAL_BENCH_2_LAMBDA(name, file, line) \
+#define ATMA_INTERNAL_BENCH_LAMBDA(name, file, line) \
 	this->register_benchmark(name, file, line, (uintptr_t)_ReturnAddress())
 
-#define ATMA_INTERNAL_BENCH_2(name, file, line, benchmark, execbm) \
-	if (auto benchmark = ATMA_INTERNAL_BENCH_2_LAMBDA(name, file, line)) \
-		for (auto execbm = benchmark.execute(); execbm.epochs_remaining(); execbm.update()) \
-			for (uint64_t atmbi = execbm.execute_epoch().iters; atmbi != 0; atmbi--)
-
 #define ATMA_INTERNAL_BENCH(name, file, line, benchmark) \
-	ATMA_INTERNAL_BENCH_2(name, file, line, benchmark, ATMA_PP_CAT(benchmark, _ebm))
+	if (auto benchmark = ATMA_INTERNAL_BENCH_LAMBDA(name, file, line)) \
+		for (auto _atma_bench_execbm_ = benchmark.execute(); _atma_bench_execbm_.epochs_remaining(); _atma_bench_execbm_.update()) \
+			for (auto _ : _atma_bench_execbm_.execute_epoch())
+
+			//for (uint64_t atmbi = _atma_bench_execbm_.execute_epoch().iters; atmbi != 0; atmbi--)
 
 #define ATMA_BENCHMARK(name) \
 	ATMA_INTERNAL_BENCH(name, __FILE__, __LINE__, ATMA_PP_CAT(abmi, __LINE__))
+
+#define ATMA_BENCH_SUBMEASURE() \
+	for (int i = (_atma_bench_execbm_.reset(), 0); i++ != 1; _atma_bench_execbm_.record_submeasurement())
+
+

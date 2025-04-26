@@ -93,7 +93,7 @@ export namespace atma::bench
 		{
 			//for (auto const& [k, v] : r.axes)
 			//	std::cout << k << ", " << v << ", ";
-			std::cout << (r.time / r.iterations) << std::endl;
+			std::cout << (r.time / r.iterations) << " (" << r.time <<  " / " << r.iterations << ")" << std::endl;
 		}
 	};
 }
@@ -191,6 +191,20 @@ export namespace atma::bench
 }
 
 
+namespace atma::bench
+{
+#if defined(_MSC_VER)
+#  pragma optimize("", off)
+	void doNotOptimizeAwaySink(void const*) {}
+#  pragma optimize("", on)
+#endif
+
+	export template <typename T>
+	void doNotOptimizeAway(T const& val) {
+		doNotOptimizeAwaySink(&val);
+	}
+}
+
 export namespace atma::bench
 {
 	void measure_all_to_stdout()
@@ -210,15 +224,18 @@ export namespace atma::bench
 				padding.push_back(pad);
 			}
 
-			std::cout << sr.name << std::endl;
+			std::cout << " :: " << sr.name << " ::" << std::endl;
+			std::cout << std::endl;
 			//for (auto const& axis : sr.axes_headers)
+			std::cout << " ";
 			for (size_t i = 0; i != sr.axes_headers.size(); ++i)
 				std::cout << std::setw(padding[i]) << sr.axes_headers[i] << " | ";
 			std::cout << "measurement" << std::endl;
-			std::cout << "---------------------------------------------" << std::endl;
+			std::cout << " ---------------------------------------------------" << std::endl;
 
 			for (auto const& amr : sr.measurements)
 			{
+				std::cout << " ";
 				int i = 0;
 				for (auto const& axis : amr.axes)
 					std::cout << std::setw(padding[i++]) << axis << " | ";
@@ -383,7 +400,47 @@ namespace atma::bench
 		size_t epochs_remaining() const;
 		auto execute_epoch() -> executing_epoch_t;
 
-		void update(detail::clock_type::time_point = detail::clock_type::now());
+		void update(std::chrono::nanoseconds elapsed);
+
+		void update()
+		{
+			auto now = detail::clock_type::now();
+			if (submeasures_ == 0)
+				elapsed_ += std::chrono::duration_cast<std::chrono::nanoseconds>(now - time_start_);
+
+			update(elapsed_);
+
+			submeasures_ = 0;
+			elapsed_ = std::chrono::nanoseconds::zero();
+		}
+
+		template <typename F>
+		executing_benchmark_t& measure(F&& f)
+		{
+			time_start_ = detail::clock_type::now();
+			f();
+			elapsed_ += std::chrono::duration_cast<std::chrono::nanoseconds>(detail::clock_type::now() - time_start_);
+			++submeasures_;
+			return *this;
+		}
+
+		void reset()
+		{
+			time_start_ = detail::clock_type::now();
+		}
+
+		void record_submeasurement()
+		{
+			elapsed_ += std::chrono::duration_cast<std::chrono::nanoseconds>(detail::clock_type::now() - time_start_);
+			++submeasures_;
+		}
+
+		template <typename F>
+		executing_benchmark_t& perform(F&& f)
+		{
+			f();
+			return *this;
+		}
 
 	private:
 		size_t estimate_best_iter_count(std::chrono::nanoseconds elapsed, uint64_t iterations) const;
@@ -398,6 +455,8 @@ namespace atma::bench
 		state_t state_{};
 		size_t epoch_iters_{};
 		detail::clock_type::time_point time_start_;
+		std::chrono::nanoseconds elapsed_{};
+		uint64_t submeasures_{};
 
 		// accumulation
 		size_t total_iterations_{};
@@ -431,11 +490,6 @@ namespace atma::bench
 				.name = name,
 				.time = time,
 				.iterations = iterations});
-		}
-
-		executing_benchmark_t mark()
-		{
-			return executing_benchmark_t{this};
 		}
 
 		// results
@@ -491,7 +545,7 @@ namespace atma::bench
 
 		executing_benchmark_t execute() const
 		{
-			return benchmark_->mark();
+			return executing_benchmark_t{benchmark_};
 		}
 
 		benchmark_t* get() const { return benchmark_; }
@@ -547,9 +601,8 @@ namespace atma::bench
 		return static_cast<size_t>(dremaining_iters * 1.2 + 0.5);
 	}
 
-	__forceinline void executing_benchmark_t::update(detail::clock_type::time_point time_end)
+	__forceinline void executing_benchmark_t::update(std::chrono::nanoseconds elapsed)
 	{
-		auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(time_end - time_start_);
 		if (elapsed == std::chrono::nanoseconds::zero())
 			elapsed = clock_resolution_;
 
@@ -705,12 +758,18 @@ namespace atma::bench
 			else if (auto [it, inserted] = benchmarks_.emplace(benchmark_signature(name, file, line, id), benchmark_t{this, name}); inserted)
 			{
 				executed_benchmark_this_run_ = true;
+				current_ = &it->second;
 				return benchmark_handle{&it->second};
 			}
 			else
 			{
 				return benchmark_handle{};
 			}
+		}
+
+		auto current_benchmark() -> benchmark_t*
+		{
+			return current_;
 		}
 
 		void record(measurement_t const& m) override
@@ -727,6 +786,7 @@ namespace atma::bench
 		scenario_recorder_t recorder_;
 
 		std::vector<std::string> current_axes_values;
+		benchmark_t* current_;
 
 	protected:
 		using benchmarks_t = std::map<benchmark_signature, benchmark_t>;
@@ -736,51 +796,6 @@ namespace atma::bench
 		bool executed_benchmark_this_run_{};
 	};
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 export namespace atma::bench::detail
 {
@@ -821,6 +836,34 @@ namespace atma::bench
 	{ };
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 using hash_map_kv_pairs = atma::bench::axis<"types",
 	atma::bench::key_value_param<"u64|u64", uint64_t, uint64_t>,
 	atma::bench::key_value_param<"u64|string", uint64_t, std::string>
@@ -855,17 +898,78 @@ ATMA_BENCH_SCENARIO(hash_map, hash_map_adaptors, hash_map_kv_pairs)
 	auto default_key = Param2::default_key;
 	auto const default_value = Param2::default_value;
 
-	hash_map_type hash_map;
+#if 0
+	ATMA_BENCH_EX("insert")
+	{
+		hash_map_type hash_map;
+
+		ATMA_BENCH_SUBMEASURE_EX()
+		{
+			ATMA_BENCH_SUBMEASURE_EX_MEASURE()
+			{
+				hash_map[default_key] = default_value;
+			}
+
+			hash_map.clear();
+		}
+	}
+
+	ATMA_BENCH_EX("insert lambda")
+	{
+		hash_map_type hash_map;
+
+		ATMA_BENCH_SUBMEASURE()
+			.measure([&]{ hash_map[default_key] = default_value; })
+			.perform([&]{ hash_map.clear(); });
+	}
+
+#else
+
+	double d = 1.0;
+
+	ATMA_BENCHMARK("double thing")
+	{
+		d += 1.0 / d;
+		if (d > 5.0) {
+			d -= 5.0;
+		}
+
+		atma::bench::doNotOptimizeAway(d);
+	}
 
 	ATMA_BENCHMARK("insert")
 	{
-		hash_map[default_key] = default_value;
+		hash_map_type hash_map;
+
+		ATMA_BENCH_SUBMEASURE()
+		{
+			hash_map[default_key] = default_value;
+		}
+
+		hash_map.clear();
 	}
 
-	ATMA_BENCHMARK("erase")
+#endif
+
+#if 0
+	ATMA_BENCH_EX("erase")
 	{
-		hash_map.erase(default_key);
+		hash_map_type hash_map;
+
+		ATMA_BENCH_SUBMEASURE()
+			.perform([&]{ hash_map[default_key] = default_value; })
+			.measure([&]{ hash_map.erase(default_key); });
 	}
+
+	ATMA_BENCH_EX("insert + erase")
+	{
+		hash_map_type hash_map;
+
+		ATMA_BENCH_SUBMEASURE()
+			.measure([&]{ hash_map[default_key] = default_value; })
+			.measure([&]{ hash_map.erase(default_key); });
+	}
+#endif
 }
 
 
