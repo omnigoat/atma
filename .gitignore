@@ -6,6 +6,7 @@ x64/
 
 # ignore obj folder for CS projects
 project/AtmaCS/obj/
+project/**/*.i
 
 *.opensdf
 *.suo
