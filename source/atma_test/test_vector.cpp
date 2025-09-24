@@ -378,3 +378,239 @@ SCENARIO_OF("vector", "vector::insert is called")
 		}
 	}
 }
+
+#define SELECT_PLATFORM_case_PLATFORM_WIN64(...) 0
+#define SELECT_PLATFORM_case_PLATFORM_LINUX64(...) 0
+#define SELECT_PLATFORM_case_PLATFORM_ANDROID(...) 1
+#define SELECT_PLATFORM_case_PLATFORM_IPHONE(...) 0
+#define SELECT_PLATFORM_case_PLATFORM_SWITCH(...) 0
+#define SELECT_PLATFORM_case_failure(...) 1
+
+#define ID_PLATFORM_case_PLATFORM_WIN64 1
+#define ID_PLATFORM_case_PLATFORM_LINUX64 2
+#define ID_PLATFORM_case_PLATFORM_ANDROID 5
+#define ID_PLATFORM_case_PLATFORM_IPHONE 6
+#define ID_PLATFORM_case_PLATFORM_SWITCH 7
+
+
+#define ES3(r, s, x) BOOST_PP_ADD(s, x)
+#define ES2(r, s, t) \
+	(BOOST_PP_EQUAL( \
+		BOOST_PP_CAT(ID_PLATFORM_case_, BOOST_PP_TUPLE_ELEM(0, BOOST_PP_TUPLE_ELEM(0, t))), \
+		BOOST_PP_CAT(ID_PLATFORM_case_, BOOST_PP_TUPLE_ELEM(1, t))))
+
+	//BOOST_PP_EQUAL(member, BOOST_PP_TUPLE_ELEM(0, candidate))
+	
+//#define ESS(r, member, candidates) BOOST_PP_SEQ_FOR_EACH_R(r, ES2, member, (one)(two)(three))
+//#define ESS2(r, candidates, member) ESS(r, candidates, member)
+#define ES(r, product) (BOOST_PP_SEQ_TO_TUPLE(product))
+
+	//candidates_ >> candidates ||| member_ >> member
+	//(BOOST_PP_SEQ_FOLD_LEFT(ES3, 0, BOOST_PP_SEQ_FOR_EACH(ES2, member, candidates)))
+
+#define failure(mname, x) (failure, TW(__LINE__, mname - missing entry for exhaustive list))
+#define unwrap(mname, x) x
+
+#define PLATFORM_EXHAUSTIVE_SEARCH(mname, members, candidates) \
+	BOOST_PP_IF(BOOST_PP_EQUAL( \
+		BOOST_PP_SEQ_SIZE(members), \
+		BOOST_PP_SEQ_FOLD_LEFT(ES3, 0,  \
+			BOOST_PP_SEQ_FOR_EACH(ES2, 0, \
+				BOOST_PP_SEQ_FOR_EACH_PRODUCT(ES, (candidates)(members))))), \
+		unwrap, \
+		failure) (mname, BOOST_PP_SEQ_ENUM(candidates))
+
+#define LOW_TIER_PLATFORMS_LIST \
+	(PLATFORM_ANDROID)\
+	(PLATFORM_IPHONE)\
+	(PLATFORM_SWITCH)
+
+#define LOW_TIER_PLATFORMS_EXHAUSTIVE(...) \
+	PLATFORM_EXHAUSTIVE_SEARCH( \
+		LOW_TIER_PLATFORMS, \
+		(PLATFORM_ANDROID)(PLATFORM_IPHONE)(PLATFORM_SWITCH), \
+		BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+
+
+
+//LOW_TIER_PLATFORMS_EXHAUSTIVE(
+//	(PLATFORM_ANDROID, 3),
+//	(PLATFORM_SWITCH, 8),
+//	(PLATFORM_IPHONE, 77))
+
+#define SELECT_PLATFORM_subcategory_PHYSICS_TRICKY_case_PLATFORM_WIN64(s, x) 0
+
+#define TW2(msg) _Pragma(#msg)
+#define TW1(msg) TW2(message(msg))
+//#define TW00(msg) TW1(message(#msg))
+#define TW00(file, line, msg) TW1(file "(" #line "): error a la Frostbite: " #msg)
+#define TW0(file, line, msg) TW00(file, line, msg)
+#define TW(line, msg) TW0(__FILE__, line, msg)
+//#define BOOST_PP_IIF_BOOST_PP_BOOL__woah_unspecified_platform(...) TW(_Pragma("message(\"error : " #__FILE__ "you've missed a platform for this exhaustive list\")")
+
+#define CALC2_HAVE_RESULT_3(state, x, name) SELECT_PLATFORM_case_##name(state, x)
+#define CALC2_HAVE_RESULT_2(state, x, name) CALC2_HAVE_RESULT_3(state, x, name)
+#define CALC2_HAVE_RESULT(state, x, name) CALC2_HAVE_RESULT_2(state, x, name)
+
+
+#define USOP(d, state, x) \
+	BOOST_PP_OR(state, CALC2_HAVE_RESULT(state, x, BOOST_PP_TUPLE_ELEM(0, x)))
+
+
+// this is highly dependant on the implementation of boost
+#define BOOST_PP_IIF_BOOST_PP_BOOL__woah_unspecified_platform(...) \
+	TW(__LINE__, "you've missed a platform for this exhaustive list")
+
+#define SELECT_PLATFORM_case_PLATFORM_UNSPECIFIED_2_1() 1
+#define SELECT_PLATFORM_case_PLATFORM_UNSPECIFIED_2_0() _woah_unspecified_platform
+
+#define SELECT_PLATFORM_case_PLATFORM_UNSPECIFIED_2(state, x, n) \
+	BOOST_PP_IF(GET_EXH(state), \
+		BOOST_PP_CAT(SELECT_PLATFORM_case_PLATFORM_UNSPECIFIED_2_, n)(), \
+		SELECT_PLATFORM_case_PLATFORM_UNSPECIFIED_2_1())
+
+#define SELECT_PLATFORM_case_PLATFORM_UNSPECIFIED(state, x) \
+	SELECT_PLATFORM_case_PLATFORM_UNSPECIFIED_2(state, x, \
+		BOOST_PP_SEQ_FOLD_LEFT(USOP, 0, \
+			BOOST_PP_SEQ_REMOVE(BOOST_PP_TUPLE_ELEM(3, state), \
+			BOOST_PP_TUPLE_ELEM(2, x))))
+	
+
+#define GET_RESULT(state) BOOST_PP_TUPLE_ELEM(0, state)
+#define GET_PLAT_FOUND(state) BOOST_PP_TUPLE_ELEM(1, state)
+#define GET_EXH(state) BOOST_PP_TUPLE_ELEM(2, state)
+#define GET_PLAT_LIST(state) BOOST_PP_TUPLE_ELEM(3, state)
+
+#define CALC_HAVE_RESULT_3(state, x, name) SELECT_PLATFORM_case_##name(state, x)
+#define CALC_HAVE_RESULT_2(state, x, name) CALC_HAVE_RESULT_3(state, x, name)
+#define CALC_HAVE_RESULT(state, x, name) \
+	BOOST_PP_IF(BOOST_PP_NOT(BOOST_PP_TUPLE_ELEM(1, state)), \
+		CALC_HAVE_RESULT_2(state, x, name), \
+		BOOST_PP_TUPLE_ELEM(1, state))
+
+#define CALC_RESULT(state, x) \
+	BOOST_PP_IF(BOOST_PP_NOT(BOOST_PP_TUPLE_ELEM(1, state)),\
+		BOOST_PP_IF(BOOST_PP_CAT(SELECT_PLATFORM_case_, BOOST_PP_TUPLE_ELEM(0, x))(state, x), \
+			BOOST_PP_TUPLE_ELEM(1, x),\
+			BOOST_PP_TUPLE_ELEM(0, state)),\
+		BOOST_PP_TUPLE_ELEM(0, state))
+
+#define PRED(r, state) \
+	BOOST_PP_EQUAL(GET_PLAT_FOUND(state), 0)
+
+#define OP(d, state, x) \
+	( \
+		CALC_RESULT(state, x), \
+		CALC_HAVE_RESULT(state, x, BOOST_PP_TUPLE_ELEM(0, x)), \
+		GET_EXH(state), \
+		GET_PLAT_LIST(state) \
+	)
+
+#define M(r, state) \
+	state
+
+#define PERFORM_NONEXHAUSTIVE 0
+#define PERFORM_EXHAUSTIVE 1
+
+// (result, have-result, exhaustive, seq)
+#define BLAMMO3(exh, seq) BOOST_PP_TUPLE_ELEM(0, BOOST_PP_SEQ_FOLD_LEFT(OP, (~, 0, exh, seq), seq))
+#define TR(s, d, i, elem) (BOOST_PP_TUPLE_PUSH_BACK(elem, i))
+#define BLAMMO2(exh, seq) BLAMMO3(exh, BOOST_PP_SEQ_FOR_EACH_I(TR, ~, seq))
+#define COMPILER_SWITCH(...) BLAMMO2(PERFORM_NONEXHAUSTIVE, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+#define COMPILER_SWITCH_EXHAUSTIVE(...) BLAMMO2(PERFORM_EXHAUSTIVE, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+
+#define HOORAY COMPILER_SWITCH( \
+	(PLATFORM_WIN64, hello), \
+	(PLATFORM_LINUX64, goodbye), \
+	(PLATFORM_UNSPECIFIED, where_am_i))
+
+
+#define HUZZAH COMPILER_SWITCH( \
+	(PLATFORM_WIN64, "hello"), \
+	(PLATFORM_LINUX64, "goodbye"), \
+	\
+	LOW_TIER_PLATFORMS_EXHAUSTIVE( \
+		(PLATFORM_ANDROID, "whoops"), \
+		(PLATFORM_SWITCH, "my bad"), \
+		(PLATFORM_IPHONE, "everyone")), \
+	\
+	(PLATFORM_UNSPECIFIED, "oh no"))
+
+
+
+#define CACHE_LINE_SIZE \
+	FB_PLATFORM_SWITCH( \
+		(EA_PLATFORM_WINDOWS, "hello") \
+		(EA_PLATFORM_LINUX, "goodbye") \
+		\
+		LOW_TIER_PLATFORMS_EXHAUSTIVE( \
+			(EA_PLATFORM_ANDROID, "whoops") \
+			(EA_PLATFORM_SWITCH, "my bad") \
+			(EA_PLATFORM_IPHONE, "everyone")) \
+		\
+		(EA_PLATFORM_UNSPECIFIED, "oh no"))
+
+template <size_t N>
+struct string_literal
+{
+	constexpr string_literal(const char(&str)[N])
+	{
+		std::copy_n(str, N, data);
+	}
+
+	char data[N];
+};
+
+template <string_literal>
+struct print {};
+
+int blam()
+{
+
+	//LOW_TIER_PLATFORMS_EXHAUSTIVE(\
+	//	(PLATFORM_ANDROID, 3), \
+	//	/*(PLATFORM_SWITCH, 8), */\
+	//	(PLATFORM_IPHONE, 77));
+
+	//constexpr char const* r = HUZZAH;
+
+	
+}
+
+
+
+template <typename F, typename R>
+struct map_range
+{
+	map_range(auto&& f, auto&& r)
+		: f_{std::forward<decltype(f)>(f)}
+		, r_{std::forward<decltype(r)>(r)}
+	{}
+
+	// apply 
+	void execute(auto&& permutator, auto&& returnor)
+	{
+		for (auto i = std::begin(r_), ie = std::end(r_); i != ie; ++i)
+		{
+			auto&& x = *i;
+			auto p = permutator(x);
+			if (auto [r, yes] = returnor(p); yes)
+				return r;
+		}
+	}
+
+	void apply(auto&& g)
+	{
+		//for (auto&& x : r_)
+		//{
+		//	g(f_(r_));
+		//}
+
+		r_.apply([&](auto&& x) { return g(f_(x)); });
+	}
+
+private:
+	F f_;
+	R r_;
+};
+

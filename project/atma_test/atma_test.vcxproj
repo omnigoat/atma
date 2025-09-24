@@ -59,7 +59,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_ITERATOR_DEBUG_LEVEL=0;_CONTAINER_DEBUG_LEVEL=0;_AMD64_;WIN32;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_AMD64_;WIN32;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4201;4100;4127</DisableSpecificWarnings>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <AdditionalIncludeDirectories>
@@ -89,7 +89,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>MinSpace</Optimization>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_ITERATOR_DEBUG_LEVEL=0;_AMD64_;WIN32;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_AMD64_;WIN32;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4201;4100;4996</DisableSpecificWarnings>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -133,7 +133,9 @@
     <ClCompile Include="..\..\source\atma_test\test_pointers.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_rope.cpp" />
     <ClCompile Include="..\..\source\atma_test\test_utf8_string.cpp" />
-    <ClCompile Include="..\..\source\atma_test\test_vector.cpp" />
+    <ClCompile Include="..\..\source\atma_test\test_vector.cpp">
+      <UseStandardPreprocessor Condition="'$(Configuration)|$(Platform)'=='TestOpt|x64'">true</UseStandardPreprocessor>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\atma\atma.vcxproj">

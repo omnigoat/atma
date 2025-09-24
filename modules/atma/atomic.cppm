@@ -84,7 +84,7 @@ namespace atma::detail
 	template <typename Platform, typename Compiler, size_t Bytewidth>
 	struct atomic_implementation_chooser<
 		Platform, Compiler, Bytewidth,
-		std::void_t<decltype(atomic_implementation<Platform, Compiler, Bytewidth>)>>
+		std::void_t<decltype(atomic_implementation<Platform, Compiler, Bytewidth>{}) >>
 	{
 		using type = atomic_implementation<Platform, Compiler, Bytewidth>;
 	};

@@ -259,7 +259,7 @@ namespace atma
 
 		[[nodiscard]] value_type* allocate(std::size_t n)
 		{
-			return (value_type*)resource_->allocate(n * sizeof value_type);
+			return (value_type*)resource_->allocate(n * sizeof(value_type));
 		}
 
 		void deallocate(value_type* p, std::size_t sz)
